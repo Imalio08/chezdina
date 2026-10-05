@@ -18,15 +18,50 @@ const DEFAULT_HERO = {
   ],
 };
 
+function Countdown({ endsAt }) {
+  const [tick, setTick] = useState(0);
+  useEffect(() => { const t = setInterval(()=>setTick(x=>x+1), 1000); return ()=>clearInterval(t); }, []);
+  const ms = new Date(endsAt) - new Date();
+  if (ms <= 0) return null;
+  const d = Math.floor(ms/86400000);
+  const h = Math.floor((ms%86400000)/3600000);
+  const m = Math.floor((ms%3600000)/60000);
+  const s = Math.floor((ms%60000)/1000);
+  const B = ({v,l}) => <span className="inline-flex flex-col items-center bg-white/15 rounded-lg px-2 py-1 min-w-[42px]"><span className="font-bold tabular text-lg leading-none">{String(v).padStart(2,"0")}</span><span className="text-[9px] uppercase opacity-70">{l}</span></span>;
+  return <div className="flex gap-1.5 items-center" data-testid="flash-countdown">{d>0&&<B v={d} l="j"/>}<B v={h} l="h"/><B v={m} l="min"/><B v={s} l="s"/></div>;
+}
+
 export default function Home() {
   const [products, setProducts] = useState([]);
   const [hero, setHero] = useState(DEFAULT_HERO);
   const [idx, setIdx] = useState(0);
-  useEffect(() => { api.get("/public/products").then(r=>setProducts(r.data)); api.get("/public/site").then(r=>{ if (r.data?.hero) setHero({...DEFAULT_HERO, ...r.data.hero}); }).catch(()=>{}); }, []);
+  const [flash, setFlash] = useState(null);
+  useEffect(() => {
+    api.get("/public/products").then(r=>setProducts(r.data));
+    api.get("/public/site").then(r=>{ if (r.data?.hero) setHero({...DEFAULT_HERO, ...r.data.hero}); }).catch(()=>{});
+    api.get("/public/promotions").then(r=>{
+      const f = (r.data||[]).find(p=>p.flash && p.ends_at);
+      if (f) setFlash(f);
+    }).catch(()=>{});
+  }, []);
   useEffect(() => { const t = setInterval(()=>setIdx(i=>(i+1)%hero.mosaic.length), 4000); return ()=>clearInterval(t); }, [hero.mosaic.length]);
 
   return (
     <div>
+      {flash && (
+        <div className="bg-gradient-to-r from-[#b02a2a] via-[#d94848] to-[#b02a2a] text-white px-4 py-3" data-testid="flash-banner">
+          <div className="max-w-6xl mx-auto flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl animate-pulse">⚡</span>
+              <div>
+                <div className="font-serif text-lg">Vente flash — Code <span className="font-mono bg-white/20 px-2 rounded">{flash.code}</span></div>
+                <div className="text-xs opacity-90">{flash.type==="percent"?`-${flash.value}% sur toute la boutique`:flash.type==="free_delivery"?"Livraison offerte":""}</div>
+              </div>
+            </div>
+            <Countdown endsAt={flash.ends_at}/>
+          </div>
+        </div>
+      )}
       <section className="bg-[#fff5f5]">
         <div className="max-w-6xl mx-auto px-4 py-14 lg:py-20 grid lg:grid-cols-2 gap-10 items-center">
           <div>

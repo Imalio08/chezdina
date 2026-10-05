@@ -16,9 +16,26 @@ export default function Orders() {
   useEffect(() => { load(); }, []);
 
   const changeStatus = async (id, status) => {
-    await api.patch(`/orders/${id}/status`, { status });
+    let payload = { status };
+    if (status === "annulee" || status === "echouee") {
+      const reason = prompt("Motif de l'annulation / échec ?");
+      if (reason === null) return;
+      payload.reason = reason;
+    }
+    if (status === "retournee") {
+      const reason = prompt("Motif du retour ?");
+      if (reason === null) return;
+      payload.reason = reason;
+    }
+    // "Reportée" is modeled as confirmee + rescheduled_for
+    if (status === "reportee") {
+      const next = prompt("Date de report (YYYY-MM-DD) ?");
+      if (!next) return;
+      payload = { status: "confirmee", reason: "Reportée", next_date: next };
+    }
+    await api.patch(`/orders/${id}/status`, payload);
     toast.success("Statut mis à jour"); load();
-    if (selected) setSelected({...selected, status});
+    if (selected) setSelected({...selected, status: payload.status});
   };
 
   const filtered = orders.filter(o => !filter || o.status===filter);
@@ -141,7 +158,9 @@ function OrderDrawer({ order, onClose, onStatus, onReload }) {
         ) : canEdit && (
           <div className="mb-4">
             <div className="text-xs text-[#666] mb-2">Changer le statut</div>
-            <div className="flex gap-1 flex-wrap">{STATUSES.map(s=><button key={s} onClick={()=>onStatus(order.id,s)} className={`px-2 py-1 text-xs rounded border ${order.status===s?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid={`change-status-${s}`}>{statusLabel[s]}</button>)}</div>
+            <div className="flex gap-1 flex-wrap">{STATUSES.map(s=><button key={s} onClick={()=>onStatus(order.id,s)} className={`px-2 py-1 text-xs rounded border ${order.status===s?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid={`change-status-${s}`}>{statusLabel[s]}</button>)}
+              <button onClick={()=>onStatus(order.id,"reportee")} className="px-2 py-1 text-xs rounded border border-[#e4991e] text-[#e4991e]" data-testid="change-status-reportee">⏱ Reporter</button>
+            </div>
           </div>
         )}
 

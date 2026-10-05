@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { fcfa, dateFmt } from "@/lib/format";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
-import { MessageCircle, ShoppingBag, ChevronLeft, ChevronRight, Star, Check } from "lucide-react";
+import { MessageCircle, ShoppingBag, ChevronLeft, ChevronRight, Star, Check, Bell } from "lucide-react";
 
 function Stars({ value = 0, size = 14, onPick }) {
   return (
@@ -26,6 +26,7 @@ export default function ProductPage() {
   const [color, setColor] = useState("");
   const [imgIdx, setImgIdx] = useState(0);
   const [showReview, setShowReview] = useState(false);
+  const [showAlert, setShowAlert] = useState(false);
   const { addToCart } = useApp();
 
   useEffect(() => {
@@ -107,7 +108,11 @@ export default function ProductPage() {
           )}
 
           <div className="flex gap-3 mt-6">
-            <button onClick={add} disabled={!canAdd} className="dina-btn-primary flex-1" data-testid="product-add-cart"><ShoppingBag size={16}/>{canAdd?"Ajouter":"Rupture"}</button>
+            {canAdd ? (
+              <button onClick={add} className="dina-btn-primary flex-1" data-testid="product-add-cart"><ShoppingBag size={16}/>Ajouter au panier</button>
+            ) : (
+              <button onClick={()=>setShowAlert(true)} className="dina-btn-primary flex-1" style={{background:"#e4991e",borderColor:"#e4991e"}} data-testid="product-alert-me"><Bell size={16}/>Alertez-moi</button>
+            )}
             <button onClick={wa} className="dina-btn-secondary flex-1" style={{background:"#1f8a4c",color:"white",borderColor:"#1f8a4c"}} data-testid="product-whatsapp"><MessageCircle size={16}/>WhatsApp</button>
           </div>
           <div className="text-xs text-[#666] mt-4 flex items-center gap-2"><Check size={12} className="text-[#1f8a4c]"/>Livraison 24h à Abidjan · Paiement à la livraison accepté</div>
@@ -130,6 +135,31 @@ export default function ProductPage() {
       </section>
 
       {showReview && <ReviewForm productId={id} onClose={()=>setShowReview(false)} onDone={()=>{setShowReview(false); api.get(`/public/reviews/${id}`).then(r=>setReviews(r.data)); api.get(`/public/product/${id}`).then(r=>setP(r.data));}}/>}
+      {showAlert && <AlertMeForm productId={id} size={size} onClose={()=>setShowAlert(false)}/>}
+    </div>
+  );
+}
+
+function AlertMeForm({ productId, size, onClose }) {
+  const [phone, setPhone] = useState("+225 ");
+  const [loading, setLoading] = useState(false);
+  const submit = async () => {
+    if (!/\d{6,}/.test(phone.replace(/\D/g,""))) return toast.error("Numéro invalide");
+    setLoading(true);
+    try {
+      await api.post("/public/stock-alert", { product_id: productId, size: size || null, phone });
+      toast.success("Nous vous préviendrons par WhatsApp dès le retour en stock !");
+      onClose();
+    } catch { toast.error("Erreur"); } finally { setLoading(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 w-full max-w-sm" onClick={e=>e.stopPropagation()}>
+        <div className="font-serif text-xl mb-2">Alertez-moi quand dispo</div>
+        <div className="text-xs text-[#666] mb-4">Nous vous enverrons un message WhatsApp dès que la taille <b>{size||"souhaitée"}</b> sera à nouveau en stock.</div>
+        <input className="dina-input mb-4" placeholder="+225 XX XX XX XX XX" value={phone} onChange={e=>setPhone(e.target.value)} data-testid="alert-phone"/>
+        <div className="flex gap-2"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={submit} disabled={loading} className="dina-btn-primary flex-1" data-testid="alert-submit">{loading?"…":"M'alerter"}</button></div>
+      </div>
     </div>
   );
 }
