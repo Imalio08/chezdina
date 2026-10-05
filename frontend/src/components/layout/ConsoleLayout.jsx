@@ -47,11 +47,34 @@ export default function ConsoleLayout() {
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [showNotif, setShowNotif] = useState(false);
-  const [notifs] = useState([
-    { id:1, type:"stock", title:"Stock faible", msg:"5 variantes sous le seuil", at:"il y a 10 min", color:"#e4991e" },
-    { id:2, type:"order", title:"Nouvelle commande", msg:"DN-260501-1234 · 32 500 FCFA", at:"il y a 25 min", color:"#1f8a4c" },
-    { id:3, type:"review", title:"Avis à modérer", msg:"3 nouveaux avis clientes", at:"il y a 1 h", color:"#b02a2a" },
-  ]);
+  const [notifs, setNotifs] = useState([]);
+  const [readIds, setReadIds] = useState(() => new Set(JSON.parse(localStorage.getItem("dina_read_notifs") || "[]")));
+  const unreadCount = notifs.filter(n => !readIds.has(n.id)).length;
+  useEffect(() => {
+    const fetchNotifs = () => api.get("/notifications").then(r => setNotifs(r.data || [])).catch(()=>{});
+    fetchNotifs();
+    const t = setInterval(fetchNotifs, 30000);
+    return () => clearInterval(t);
+  }, []);
+  const markAllRead = () => {
+    const all = new Set([...readIds, ...notifs.map(n=>n.id)]);
+    setReadIds(all);
+    localStorage.setItem("dina_read_notifs", JSON.stringify([...all]));
+  };
+  const openNotif = (n) => {
+    const next = new Set(readIds); next.add(n.id); setReadIds(next);
+    localStorage.setItem("dina_read_notifs", JSON.stringify([...next]));
+    setShowNotif(false);
+    if (n.link) nav(n.link);
+  };
+  const timeAgo = (iso) => {
+    if (!iso) return "";
+    const diff = (new Date() - new Date(iso)) / 1000;
+    if (diff < 60) return "à l'instant";
+    if (diff < 3600) return `il y a ${Math.floor(diff/60)} min`;
+    if (diff < 86400) return `il y a ${Math.floor(diff/3600)} h`;
+    return `il y a ${Math.floor(diff/86400)} j`;
+  };
   const [showAi, setShowAi] = useState(false);
   const nav = useNavigate();
 
@@ -136,12 +159,34 @@ export default function ConsoleLayout() {
           <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip" data-testid="theme-toggle">{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
           <div className="relative">
             <button onClick={()=>setShowNotif(!showNotif)} className="dina-chip relative" data-testid="notifications-button">
-              <Bell size={12}/>{notifs.length}
+              <Bell size={12}/>{unreadCount>0 && <span className="absolute -top-1 -right-1 bg-[#c62828] text-white text-[9px] rounded-full min-w-[16px] h-4 px-1 grid place-items-center font-bold">{unreadCount}</span>}
             </button>
             {showNotif && (
-              <div className="absolute right-0 top-9 w-80 bg-white dark:bg-[#1a1a1a] border border-[#ececec] rounded-xl shadow-xl p-2 z-40" data-testid="notifications-panel">
-                <div className="flex justify-between items-center px-2 py-1 mb-1"><span className="font-semibold text-sm">Notifications</span><button onClick={()=>setShowNotif(false)}><X size={14}/></button></div>
-                {notifs.map(n=><div key={n.id} className="p-2.5 rounded-lg hover:bg-[#fff5f5] cursor-pointer"><div className="flex items-start gap-2"><span className="status-dot mt-1.5" style={{background:n.color}}/><div className="flex-1"><div className="text-sm font-medium">{n.title}</div><div className="text-xs text-[#666]">{n.msg}</div><div className="text-[10px] text-[#999] mt-0.5">{n.at}</div></div></div></div>)}
+              <div className="absolute right-0 top-9 w-96 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 z-40 max-h-[70vh] overflow-y-auto scrollbar-thin" data-testid="notifications-panel">
+                <div className="flex justify-between items-center px-2 py-1 mb-1 sticky top-0 bg-white dark:bg-[#1a1a1a]">
+                  <span className="font-semibold text-sm">Notifications{notifs.length>0 && <span className="text-xs text-[#666] font-normal ml-1">({notifs.length})</span>}</span>
+                  <div className="flex items-center gap-2">
+                    {unreadCount>0 && <button onClick={markAllRead} className="text-xs text-[#b02a2a] hover:underline" data-testid="notifs-mark-read">Tout lu</button>}
+                    <button onClick={()=>setShowNotif(false)}><X size={14}/></button>
+                  </div>
+                </div>
+                {notifs.length===0 ? (
+                  <div className="text-sm text-[#666] text-center py-6">Aucune notification 🎉</div>
+                ) : notifs.map(n => {
+                  const unread = !readIds.has(n.id);
+                  return (
+                    <button key={n.id} onClick={()=>openNotif(n)} className={`w-full text-left p-2.5 rounded-lg hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] block ${unread?"bg-[#fff5f5]/50 dark:bg-[#141414]":""}`} data-testid={`notif-${n.type}`}>
+                      <div className="flex items-start gap-2">
+                        <span className="status-dot mt-1.5" style={{background:n.color}}/>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-medium flex items-center gap-1">{n.title}{unread && <span className="w-1.5 h-1.5 rounded-full bg-[#b02a2a]"/>}</div>
+                          <div className="text-xs text-[#666] truncate">{n.msg}</div>
+                          <div className="text-[10px] text-[#999] mt-0.5">{timeAgo(n.at)}</div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

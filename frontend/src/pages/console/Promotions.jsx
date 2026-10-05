@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { fcfa, dateFmt, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Copy, Zap } from "lucide-react";
 
 const TYPES = [
   { v:"percent", label:"Pourcentage (%)" },
@@ -11,10 +11,15 @@ const TYPES = [
   { v:"bogo", label:"2 pour 1 (BOGO)" },
 ];
 const CHANNELS = ["all","boutique","store","whatsapp","instagram","tiktok"];
+const FLASH_PRESETS = [
+  { label:"1 heure", h:1 }, { label:"6 heures", h:6 }, { label:"24 heures", h:24 },
+  { label:"48 heures", h:48 }, { label:"7 jours", h:168 },
+];
 
 export default function Promotions() {
   const [p, setP] = useState([]);
   const [editing, setEditing] = useState(null);
+  const [flashOpen, setFlashOpen] = useState(false);
   const load = async () => { try { const r = await api.get("/promotions"); setP(r.data); } catch { toast.error("Erreur"); } };
   useEffect(() => { load(); }, []);
   const save = async (f) => {
@@ -22,6 +27,12 @@ export default function Promotions() {
       if (editing?.id) await api.patch(`/promotions/${editing.id}`, f);
       else await api.post("/promotions", f);
       toast.success("Enregistré"); setEditing(null); load();
+    } catch { toast.error("Erreur"); }
+  };
+  const launchFlash = async (f) => {
+    try {
+      await api.post("/promotions", f);
+      toast.success(`⚡ Vente flash ${f.code} lancée !`); setFlashOpen(false); load();
     } catch { toast.error("Erreur"); }
   };
   const del = async (id) => { if (!confirm("Supprimer ?")) return; await api.delete(`/promotions/${id}`); toast.success("Supprimé"); load(); };
@@ -32,7 +43,13 @@ export default function Promotions() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between"><div><h1 className="font-serif text-3xl">Promotions</h1><p className="text-sm text-[#666]">Codes promo, ventes flash, livraison gratuite</p></div><button onClick={()=>setEditing({})} className="dina-btn-primary !min-h-[40px]" data-testid="promo-new"><Plus size={14}/>Nouvelle promo</button></div>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div><h1 className="font-serif text-3xl">Promotions</h1><p className="text-sm text-[#666]">Codes promo, ventes flash, livraison gratuite</p></div>
+        <div className="flex gap-2">
+          <button onClick={()=>setFlashOpen(true)} className="dina-btn-primary !min-h-[40px]" style={{background:"linear-gradient(90deg,#b02a2a,#e4991e)"}} data-testid="flash-launcher"><Zap size={14}/>Vente flash</button>
+          <button onClick={()=>setEditing({})} className="dina-btn-secondary !min-h-[40px]" data-testid="promo-new"><Plus size={14}/>Nouvelle promo</button>
+        </div>
+      </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Total</div><div className="font-serif text-2xl tabular">{p.length}</div></div>
@@ -62,6 +79,96 @@ export default function Promotions() {
       </table></div>
 
       {editing && <PromoForm initial={editing.id?editing:null} onSave={save} onClose={()=>setEditing(null)}/>}
+      {flashOpen && <FlashLauncher onLaunch={launchFlash} onClose={()=>setFlashOpen(false)}/>}
+    </div>
+  );
+}
+
+function FlashLauncher({ onLaunch, onClose }) {
+  const [discount, setDiscount] = useState(20);
+  const [hours, setHours] = useState(24);
+  const [customDate, setCustomDate] = useState("");
+  const [code, setCode] = useState(() => `FLASH${Math.floor(Math.random()*900+100)}`);
+  const [channel, setChannel] = useState("all");
+  const [minOrder, setMinOrder] = useState(0);
+
+  const endsAt = customDate ? new Date(customDate).toISOString() : new Date(Date.now() + hours*3600*1000).toISOString();
+  const endsLabel = new Date(endsAt).toLocaleString("fr-FR", { dateStyle:"short", timeStyle:"short" });
+
+  const submit = () => {
+    if (!code || discount <= 0) return toast.error("Code et % obligatoires");
+    onLaunch({
+      code: code.toUpperCase(),
+      type: "percent",
+      value: discount,
+      starts_at: new Date().toISOString(),
+      ends_at: endsAt,
+      usage_limit: 0,
+      min_order: +minOrder || 0,
+      channel,
+      active: true,
+      flash: true,
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-start justify-between mb-1">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-[#b02a2a] to-[#e4991e] grid place-items-center text-white">⚡</div>
+            <div>
+              <div className="font-serif text-xl">Lancer une vente flash</div>
+              <div className="text-xs text-[#666]">Un countdown live apparaîtra sur la vitrine</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4 mt-5">
+          <div>
+            <label className="text-xs uppercase text-[#666] font-semibold">Réduction</label>
+            <div className="flex items-center gap-2 mt-1">
+              <input type="range" min="5" max="70" step="5" value={discount} onChange={e=>setDiscount(+e.target.value)} className="flex-1 accent-[#b02a2a]" data-testid="flash-discount-range"/>
+              <div className="text-right w-16"><span className="font-serif text-2xl text-[#b02a2a] tabular">-{discount}</span><span className="text-sm">%</span></div>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs uppercase text-[#666] font-semibold">Durée</label>
+            <div className="grid grid-cols-5 gap-1.5 mt-1">
+              {FLASH_PRESETS.map(p=><button key={p.h} onClick={()=>{setHours(p.h); setCustomDate("");}} className={`px-2 py-2 rounded-lg text-xs font-semibold border transition ${!customDate && hours===p.h?"bg-[#b02a2a] text-white border-[#b02a2a]":"border-[#ececec] dark:border-[#2a2a2a] hover:bg-[#fff5f5] dark:hover:bg-[#2a1818]"}`} data-testid={`flash-preset-${p.h}`}>{p.label}</button>)}
+            </div>
+            <div className="mt-2">
+              <label className="text-[10px] text-[#999] uppercase">Ou date/heure précise</label>
+              <input type="datetime-local" className="dina-input mt-1" value={customDate} onChange={e=>setCustomDate(e.target.value)} data-testid="flash-custom-date"/>
+            </div>
+            <div className="mt-2 text-xs bg-[#fff5f5] dark:bg-[#2a1818] text-[#b02a2a] px-3 py-2 rounded-lg">Se termine le <b>{endsLabel}</b></div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs uppercase text-[#666] font-semibold">Code</label>
+              <input className="dina-input mt-1 font-mono uppercase" value={code} onChange={e=>setCode(e.target.value.toUpperCase())} data-testid="flash-code"/>
+            </div>
+            <div>
+              <label className="text-xs uppercase text-[#666] font-semibold">Canal</label>
+              <select className="dina-input mt-1" value={channel} onChange={e=>setChannel(e.target.value)} data-testid="flash-channel">
+                {CHANNELS.map(c=><option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs uppercase text-[#666] font-semibold">Panier min. (FCFA, 0 = aucun)</label>
+            <input type="number" className="dina-input mt-1" value={minOrder} onChange={e=>setMinOrder(e.target.value)} data-testid="flash-min"/>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-6">
+          <button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button>
+          <button onClick={submit} className="dina-btn-primary flex-1" style={{background:"linear-gradient(90deg,#b02a2a,#e4991e)"}} data-testid="flash-launch"><Zap size={14}/>Lancer maintenant</button>
+        </div>
+      </div>
     </div>
   );
 }

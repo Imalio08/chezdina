@@ -53,6 +53,24 @@ Available on **every console page** via bottom-right ⚡ button. Opens chat pane
 - Red/pink palette: #b02a2a primary, #fde8e8 light, #fff5f5 soft-bg.
 - Global search bar (products + orders + customers), lang toggle (fr/en), dark mode toggle (persists to localStorage + document.html class), online/offline chip, notifications dropdown bell.
 
+## Implemented (Feb 6 2026 — this session)
+### Dark Mode Polish
+- All cards/tables/modals/inputs auto-recolour via `html.dark` cascade and CSS variable overrides.
+- **Recharts** fully themed: grid lines, axis labels, legends and tooltips swap to dark palette (`.recharts-cartesian-grid line`, `.recharts-text`, `.recharts-tooltip-wrapper`).
+- Hover states, soft-red backgrounds, text/border colour utilities (`bg-white`, `bg-[#fff5f5]`, `text-[#666]`, `border-[#ececec]`, etc.) all have dark-mode variants — no more glaring white panels at night.
+
+### Smart Notifications (real-time, from DB)
+- New backend endpoint `GET /api/notifications` aggregates in real-time from Mongo collections:
+  - New orders (status=nouvelle) · Low-stock products (stock<5) · Pending reviews · Back-in-stock alerts not notified · Abandoned carts not recovered
+- Each notification has `id/type/title/msg/at/link/color`; sorted newest first; capped at 30.
+- Frontend bell: unread count badge (red pill), polls every 30s, click-through routes to the right tab, "Tout lu" button, read-state persisted in localStorage, time-ago formatting.
+
+### Flash Sale Scheduler (one-tap)
+- New ⚡ "Vente flash" button on Promotions page opens dedicated modal:
+  - Discount slider 5–70% · Duration presets (1h/6h/24h/48h/7j) or custom datetime
+  - Auto-generated code (editable), channel picker, min-order cap, live end-time preview
+- Fires `POST /api/promotions` with `flash:true`, `starts_at=now`, `ends_at` computed — storefront picks it up instantly via `/public/promotions` and renders the live countdown banner.
+
 ## Backlog
 ### P1
 - Replace WhatsApp wa.me placeholders with real Cloud API (business number already configured).

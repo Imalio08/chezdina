@@ -77,12 +77,38 @@ html.dark {
 html.dark body { background: #0f0f0f; color: #f0f0f0; }
 html.dark .dina-card, html.dark .dina-card-white { background: #1a1a1a; border-color: #2a2a2a; color: #f0f0f0; }
 html.dark .dina-input { background: #1a1a1a; border-color: #2a2a2a; color: #f0f0f0; }
+html.dark .dina-input::placeholder { color: #666; }
 html.dark .dina-chip { background: #1a1a1a; border-color: #2a2a2a; color: #e0e0e0; }
 html.dark .dina-table thead th { background: #1a1a1a; color: #a0a0a0; border-color: #2a2a2a; }
 html.dark .dina-table tbody td { border-color: #2a2a2a; color: #f0f0f0; }
 html.dark .dina-table tbody tr:nth-child(even) { background: #141414; }
 html.dark .dina-table tbody tr:hover { background: #2a1818; }
 html.dark .dina-btn-secondary { background: #1a1a1a; color: #f0f0f0; border-color: #f0f0f0; }
+
+/* Dark mode polish — nested white backgrounds, modals, text */
+html.dark .bg-white { background: #1a1a1a !important; }
+html.dark .bg-\[\#fff5f5\], html.dark .bg-\[\#fde8e8\] { background: #2a1818 !important; }
+html.dark .bg-\[\#f5f5f5\], html.dark .bg-\[\#fafafa\], html.dark .bg-\[\#f8f8f8\] { background: #141414 !important; }
+html.dark .border-\[\#ececec\] { border-color: #2a2a2a !important; }
+html.dark .text-\[\#1c1c1c\], html.dark .text-\[\#111\] { color: #f0f0f0 !important; }
+html.dark .text-\[\#666\], html.dark .text-\[\#777\] { color: #a0a0a0 !important; }
+html.dark .text-\[\#999\] { color: #808080 !important; }
+html.dark .dina-table tbody tr:hover td { color: #fff; }
+html.dark .text-\[\#b02a2a\] { color: #ff6b6b !important; }
+html.dark .text-\[\#0021cc\] { color: #7a8cff !important; }
+
+/* Dark mode polish — Recharts (grid, axis, tooltip) */
+html.dark .recharts-cartesian-grid line { stroke: #2a2a2a !important; }
+html.dark .recharts-cartesian-axis-line, html.dark .recharts-cartesian-axis-tick-line { stroke: #333 !important; }
+html.dark .recharts-text, html.dark .recharts-cartesian-axis-tick-value tspan { fill: #a0a0a0 !important; }
+html.dark .recharts-legend-item-text { color: #d0d0d0 !important; }
+html.dark .recharts-tooltip-wrapper .recharts-default-tooltip { background: #1a1a1a !important; border: 1px solid #2a2a2a !important; color: #f0f0f0 !important; }
+html.dark .recharts-tooltip-item-list .recharts-tooltip-item { color: #f0f0f0 !important; }
+html.dark .recharts-tooltip-label { color: #f0f0f0 !important; }
+
+/* Dark mode polish — specific soft red/pink backgrounds used widely */
+html.dark [style*="background: #fff5f5"], html.dark [style*="background:#fff5f5"] { background: #2a1818 !important; }
+html.dark [style*="background: #fde8e8"], html.dark [style*="background:#fde8e8"] { background: #3a1a1a !important; }
 
 * { border-color: hsl(var(--border)); }
 

@@ -859,6 +859,71 @@ async def abandoned_cart(body: Dict[str,Any]):
 async def list_abandoned(user: dict = Depends(get_user)):
     return clean(await db.abandoned_carts.find({"recovered": False}).sort("created_at", -1).to_list(200))
 
+@api.get("/notifications")
+async def notifications(user: dict = Depends(get_user)):
+    """Real-time notifications from DB: new orders, low stock, pending reviews, stock alerts, abandoned carts."""
+    items = []
+    new_orders = await db.orders.find({"status": "nouvelle"}).sort("created_at", -1).to_list(10)
+    for o in new_orders:
+        items.append({
+            "id": f"order-{o['id']}",
+            "type": "order",
+            "title": "Nouvelle commande",
+            "msg": f"{o.get('code','?')} · {o.get('customer',{}).get('name','?')} · {int(o.get('total',0))} FCFA",
+            "at": o.get("created_at"),
+            "link": "/console/commandes",
+            "color": "#1f8a4c",
+        })
+    low_products = await db.products.find({"stock": {"$lt": 5}}).sort("stock", 1).to_list(10)
+    for p in low_products:
+        items.append({
+            "id": f"stock-{p['id']}",
+            "type": "stock",
+            "title": "Stock faible",
+            "msg": f"{p['name']} · {p['stock']} restant(s)",
+            "at": now_iso(),
+            "link": "/console/stock",
+            "color": "#e4991e",
+        })
+    pending_reviews = await db.reviews.find({"status": "pending"}).sort("created_at", -1).to_list(10)
+    for r in pending_reviews:
+        items.append({
+            "id": f"review-{r['id']}",
+            "type": "review",
+            "title": "Avis à modérer",
+            "msg": f"{r.get('rating',0)}★ · {(r.get('comment') or '')[:60]}",
+            "at": r.get("created_at"),
+            "link": "/console/avis",
+            "color": "#b02a2a",
+        })
+    pending_alerts = await db.stock_alerts.find({"notified": False}).sort("created_at", -1).to_list(10)
+    for a in pending_alerts:
+        p = await db.products.find_one({"id": a.get("product_id")})
+        pname = p["name"] if p else "Produit"
+        items.append({
+            "id": f"alert-{a['id']}",
+            "type": "alert",
+            "title": "Alerte retour en stock",
+            "msg": f"{pname} · taille {a.get('size','?')} · {a.get('phone','')}",
+            "at": a.get("created_at"),
+            "link": "/console/alertes",
+            "color": "#e4991e",
+        })
+    carts = await db.abandoned_carts.find({"recovered": False}).sort("created_at", -1).to_list(5)
+    for c in carts:
+        items.append({
+            "id": f"cart-{c['id']}",
+            "type": "cart",
+            "title": "Panier abandonné",
+            "msg": f"{c.get('phone','?')} · {int(c.get('total',0))} FCFA",
+            "at": c.get("created_at"),
+            "link": "/console/alertes",
+            "color": "#c62828",
+        })
+    items.sort(key=lambda x: x.get("at") or "", reverse=True)
+    return items[:30]
+
+
 # ---------- Site CMS ----------
 @api.get("/public/site")
 async def public_site():
