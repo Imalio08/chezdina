@@ -9,6 +9,8 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const token = localStorage.getItem("dina_token");
+    if (!token) { setUser(false); setLoading(false); return; }
     (async () => {
       try {
         const { data } = await api.get("/auth/me");

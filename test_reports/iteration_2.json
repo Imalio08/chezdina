@@ -1,0 +1,34 @@
+{
+  "summary": "Full e2e test of the 4 new storefront features on Chez Dina Boutique. Backend: 8/8 pytest tests pass (after one minor assertion correction — see RCA note). Frontend: all critical flows pass: multi-image carousel + thumbnails + prev/next + dot indicator, per-size/pointure stock labels (rupture / X restants / dispo), out-of-stock sizes correctly disabled, 'X en stock pour la pointure {size}' line, add-to-cart with toast, reviews modal (5-star picker + name + comment + Publier) creates review via POST /api/public/reviews and review appears instantly, catalog cards show ★ rating next to price, checkout cart items with per-item carousel chevrons + mini dots, GPS 'Utiliser ma position actuelle' triggers geolocation and renders OpenStreetMap iframe (correct bbox) with 'Repositionner' + 'Voir sur Maps' + visible lat/lng, order submission with Wave payment creates order and redirects to /suivi/{code} with correct item + total; backend persists customer.lat and customer.lng as verified via /api/orders/track/{code}.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/public/reviews", "issue": "Posting a review recomputes rating_avg/rating_count purely from the reviews collection, which overwrites the (synthetic) seeded aggregate. A seeded product with rating_count=12 drops to rating_count=1 after the first real review is posted. Not a bug per se, but a seed/UX inconsistency: seeded rating_count values do not reflect real reviews."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/boutique/checkout cart row", "issues": ["The cart line item column is very narrow: size/color/price text (e.g., '38 · Marine') wraps vertically into a column of single letters next to the thumbnail. Readable but visually cramped."]},
+      {"screen": "public storefront pages", "issues": ["/api/auth/me returns 401 (expected for anon users) and the frontend calls it on every public page, producing noisy console errors. Consider skipping the call when no access_token cookie is present."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_storefront.py", "/app/test_reports/pytest/storefront.xml", "/app/test_reports/product_detail.png", "/app/test_reports/checkout_filled.png", "/app/test_reports/suivi.png"],
+  "action_items": [
+    "(Optional) Suppress /auth/me call on public /boutique/* and /suivi/* routes to clean up console 401 noise.",
+    "(Optional) When computing rating aggregate after a new review, blend with the seeded synthetic values OR drop synthetic rating_count on seed so there is no visible 'drop' when the first real review arrives."
+  ],
+  "critical_code_review_comments": [
+    "server.py is ~700 lines and getting dense; consider splitting (auth, catalog/public, orders, seed, ai) into separate modules.",
+    "/public/orders accepts arbitrary customer dict with no validation — fine for lat/lng flexibility but should at least validate phone/name non-empty server-side.",
+    "Seed assigns random rating_avg/rating_count to products that have 0 reviews, which breaks consistency when real reviews are posted (see minor backend issue)."
+  ],
+  "updated_files": ["/app/backend/tests/test_storefront.py"],
+  "success_rate": {"backend": "100% (8/8)", "frontend": "100% on happy path"},
+  "test_credentials": "No auth required for storefront flows (public endpoints).",
+  "seed_data_creation": "Created test review (TEST_review excellent / TEST_Cliente) and a test order (TEST_Buyer, GPS 5.36/-4.00, Wave) via backend tests and UI flow. These are prefixed with TEST_ in customer_name for easy cleanup.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "All 4 features (multi-image carousel, per-size stock labels + disabled OOS sizes, 5-star reviews with aggregate update, GPS pin on checkout with OSM iframe + lat/lng in order) are shipped and working end-to-end on the preview URL. Backend endpoints: GET /api/public/reviews/{pid}, POST /api/public/reviews, GET /api/public/product/{pid} with images[] + stock_by_size + rating_avg/count, POST /api/public/orders accepts customer.lat/lng. Data-testids used (all present): product-main-image, product-prev, product-next, product-thumb-{i}, product-size-{s}, product-add-cart, product-review-open, review-star-{1-5}, review-name, review-comment, review-submit, cart-item-{k}, cart-prev-{k}, cart-next-{k}, checkout-name, checkout-phone, checkout-zone, checkout-address, checkout-locate, checkout-map-iframe, checkout-cod, checkout-wave, checkout-submit, catalog-card-{id}. Only cosmetic cart row layout + /auth/me 401 noise remain, both non-blocking."
+}
