@@ -4,7 +4,7 @@ import { Gift, Star, Users } from "lucide-react";
 
 export default function Loyalty() {
   const [c, setC] = useState([]);
-  useEffect(()=>{api.get("/customers").then(r=>setC(r.data));},[]);
+  useEffect(() => { api.get("/customers").then(r=>setC(r.data)).catch(()=>{}); }, []);
   const byTier = c.reduce((a,x)=>{a[x.tier]=(a[x.tier]||0)+1;return a;},{});
   return (
     <div className="space-y-5">

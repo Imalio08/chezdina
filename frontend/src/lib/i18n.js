@@ -1,0 +1,31 @@
+export const T = {
+  fr: {
+    dashboard:"Tableau de bord", pos:"Caisse", orders:"Commandes", deliveries:"Livraisons",
+    products:"Produits", stock:"Stock", purchases:"Achats", suppliers:"Fournisseurs",
+    customers:"Clientes", loyalty:"Fidélité", promotions:"Promotions",
+    invoicing:"Facturation", expenses:"Dépenses", stats:"Statistiques", team:"Équipe",
+    integrations:"Intégrations", settings:"Paramètres", site:"Site vitrine",
+    reviews:"Avis", alerts:"Alertes", abandoned:"Paniers abandonnés",
+    today:"Aujourd'hui", yesterday:"Hier", week:"7 jours", month:"30 jours",
+    lastMonth:"Mois dernier", quarter:"90 jours", year:"12 mois",
+    search:"Rechercher produit, SKU, cliente, commande…",
+    online:"En ligne", offline:"Hors ligne", logout:"Déconnexion",
+    viewDetails:"Voir détails", vs:"vs", save:"Enregistrer", cancel:"Annuler",
+    delete:"Supprimer", edit:"Modifier", new:"Nouveau", export:"Exporter",
+  },
+  en: {
+    dashboard:"Dashboard", pos:"POS", orders:"Orders", deliveries:"Deliveries",
+    products:"Products", stock:"Stock", purchases:"Purchases", suppliers:"Suppliers",
+    customers:"Customers", loyalty:"Loyalty", promotions:"Promotions",
+    invoicing:"Invoicing", expenses:"Expenses", stats:"Statistics", team:"Team",
+    integrations:"Integrations", settings:"Settings", site:"Storefront",
+    reviews:"Reviews", alerts:"Alerts", abandoned:"Abandoned carts",
+    today:"Today", yesterday:"Yesterday", week:"7 days", month:"30 days",
+    lastMonth:"Last month", quarter:"90 days", year:"12 months",
+    search:"Search product, SKU, customer, order…",
+    online:"Online", offline:"Offline", logout:"Logout",
+    viewDetails:"View details", vs:"vs", save:"Save", cancel:"Cancel",
+    delete:"Delete", edit:"Edit", new:"New", export:"Export",
+  },
+};
+export const useT = (lang) => (k) => (T[lang]||T.fr)[k] || k;

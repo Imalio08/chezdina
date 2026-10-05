@@ -10,8 +10,8 @@ export default function Products() {
   const [cat, setCat] = useState("Tous");
   const [showForm, setShowForm] = useState(false);
   const [edit, setEdit] = useState(null);
-  const load = () => api.get("/products").then(r=>setProducts(r.data));
-  useEffect(load, []);
+  const load = async () => { try { const r = await api.get("/products"); setProducts(r.data); } catch { toast.error("Erreur"); } };
+  useEffect(() => { load(); }, []);
   const cats = useMemo(()=>["Tous", ...Array.from(new Set(products.map(p=>p.category)))], [products]);
   const filtered = products.filter(p => (cat==="Tous"||p.category===cat) && (!q||p.name.toLowerCase().includes(q.toLowerCase())||p.sku?.includes(q)));
 

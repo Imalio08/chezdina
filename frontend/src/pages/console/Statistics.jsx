@@ -5,7 +5,7 @@ import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGri
 
 export default function Statistics() {
   const [k, setK] = useState(null);
-  useEffect(()=>{api.get("/dashboard/kpis").then(r=>setK(r.data));},[]);
+  useEffect(() => { api.get("/dashboard/kpis").then(r=>setK(r.data)).catch(()=>{}); }, []);
   if (!k) return <div className="text-sm text-[#666]">Chargement…</div>;
   return (
     <div className="space-y-5">

@@ -4,7 +4,7 @@ import { fcfa, dateFmt } from "@/lib/format";
 
 export default function Purchases() {
   const [sups, setSups] = useState([]); const [pos, setPos] = useState([]);
-  useEffect(()=>{Promise.all([api.get("/suppliers"),api.get("/purchase-orders")]).then(([a,b])=>{setSups(a.data);setPos(b.data);});},[]);
+  useEffect(() => { Promise.all([api.get("/suppliers"),api.get("/purchase-orders")]).then(([a,b])=>{setSups(a.data);setPos(b.data);}).catch(()=>{}); }, []);
   return (
     <div className="space-y-5">
       <div><h1 className="font-serif text-3xl">Achats & fournisseurs</h1></div>

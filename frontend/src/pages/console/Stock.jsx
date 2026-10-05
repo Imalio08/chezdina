@@ -4,7 +4,7 @@ import { fcfa } from "@/lib/format";
 
 export default function Stock() {
   const [products, setProducts] = useState([]);
-  useEffect(() => { api.get("/products").then(r=>setProducts(r.data)); }, []);
+  useEffect(() => { api.get("/products").then(r=>setProducts(r.data)).catch(()=>{}); }, []);
   const totalValue = products.reduce((s,p)=>s+p.stock*p.cost,0);
   const retailValue = products.reduce((s,p)=>s+p.stock*p.price,0);
   const low = products.filter(p=>p.stock<5);

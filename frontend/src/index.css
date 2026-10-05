@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Serif:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=Sora:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -12,8 +12,8 @@
   --dina-pink: #fde8e8;
   --dina-pink-light: #fff5f5;
   --dina-blue: #b02a2a;
-  --dina-blue-light: #3242e8;
-  --dina-blue-alt: #5867fd;
+  --dina-blue-light: #d94848;
+  --dina-blue-alt: #e86464;
   --dina-gray: #666666;
   --dina-bg: #f5f5f5;
   --dina-card: #f8f8f8;
@@ -27,12 +27,12 @@
   :root {
     --background: 0 0% 100%;
     --foreground: 0 0% 11%;
-    --card: 0 0% 97.3%;
+    --card: 0 0% 100%;
     --card-foreground: 0 0% 11%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 11%;
-    --primary: 40 90% 56%;
-    --primary-foreground: 0 0% 11%;
+    --primary: 0 61% 43%;
+    --primary-foreground: 0 0% 100%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 11%;
     --muted: 0 0% 96.1%;
@@ -43,7 +43,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 0 0% 92.5%;
     --input: 0 0% 92.5%;
-    --ring: 232 100% 40%;
+    --ring: 0 61% 43%;
     --radius: 0.75rem;
     --chart-1: 0 61% 43%;
     --chart-2: 40 90% 56%;
@@ -52,47 +52,51 @@
     --chart-5: 0 0% 11%;
   }
   .dark {
-    --background: 0 0% 7%;
+    --background: 0 0% 8%;
     --foreground: 0 0% 95%;
     --card: 0 0% 11%;
     --card-foreground: 0 0% 95%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 95%;
-    --primary: 0 61% 43%;
+    --primary: 0 61% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 95%;
+    --border: 0 0% 20%;
+    --input: 0 0% 18%;
     --muted: 0 0% 15%;
     --muted-foreground: 0 0% 65%;
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 95%;
-    --destructive: 0 65% 47%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 0 0% 18%;
-    --input: 0 0% 18%;
-    --ring: 0 61% 43%;
   }
 }
+
+html.dark {
+  --dina-black: #f5f5f5;
+  --dina-bg: #0f0f0f;
+  --dina-card: #1a1a1a;
+  --dina-border: #2a2a2a;
+  --dina-gray: #a0a0a0;
+  --dina-pink-light: #1a0f0f;
+}
+
+html.dark body { background: #0f0f0f; color: #f0f0f0; }
+html.dark .dina-card, html.dark .dina-card-white { background: #1a1a1a; border-color: #2a2a2a; color: #f0f0f0; }
+html.dark .dina-input { background: #1a1a1a; border-color: #2a2a2a; color: #f0f0f0; }
+html.dark .dina-chip { background: #1a1a1a; border-color: #2a2a2a; color: #e0e0e0; }
+html.dark .dina-table thead th { background: #1a1a1a; color: #a0a0a0; border-color: #2a2a2a; }
+html.dark .dina-table tbody td { border-color: #2a2a2a; color: #f0f0f0; }
+html.dark .dina-table tbody tr:nth-child(even) { background: #141414; }
+html.dark .dina-table tbody tr:hover { background: #2a1818; }
+html.dark .dina-btn-secondary { background: #1a1a1a; color: #f0f0f0; border-color: #f0f0f0; }
 
 * { border-color: hsl(var(--border)); }
 
 html, body, #root { height: 100%; }
 
-body {
-  margin: 0;
-  background: #ffffff;
-  color: var(--dina-black);
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-feature-settings: 'cv02','cv03','cv04','cv11';
-  -webkit-font-smoothing: antialiased;
-}
+body { margin: 0; background: #ffffff; color: var(--dina-black); font-family: 'Sora','Inter',-apple-system,sans-serif; -webkit-font-smoothing: antialiased; }
 
-h1,h2,h3,h4,h5,.font-serif { font-family: 'IBM Plex Serif', Georgia, serif; letter-spacing: -0.01em; }
+h1,h2,h3,.font-serif { font-family: 'IBM Plex Serif', Georgia, serif; letter-spacing: -0.01em; }
+.font-sora { font-family: 'Sora', 'Inter', sans-serif; }
 
 .tabular { font-variant-numeric: tabular-nums; }
 
-.dina-card { background: var(--dina-card); border: 1px solid var(--dina-border); border-radius: 12px; }
-.dina-card-white { background: #fff; border: 1px solid var(--dina-border); border-radius: 12px; }
+.dina-card { background: #ffffff; border: 1px solid var(--dina-border); border-radius: 12px; }
+.dina-card-white { background: #ffffff; border: 1px solid var(--dina-border); border-radius: 12px; }
 
 .dina-btn-primary { background: var(--dina-yellow); color: #fff; font-weight: 600; border-radius: 10px; padding: 10px 16px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: background .15s ease, transform .05s ease; }
 .dina-btn-primary:hover { background: var(--dina-yellow-dark); }
@@ -105,21 +109,26 @@ h1,h2,h3,h4,h5,.font-serif { font-family: 'IBM Plex Serif', Georgia, serif; lett
 .dina-btn-danger { background: transparent; color: var(--dina-error); border: 1px solid var(--dina-error); font-weight: 600; border-radius: 10px; padding: 10px 16px; }
 
 .dina-input { background: #fff; border: 1px solid var(--dina-border); border-radius: 8px; padding: 10px 12px; width: 100%; font-size: 14px; color: var(--dina-black); outline: none; transition: border-color .15s; }
-.dina-input:focus { border-color: var(--dina-blue); box-shadow: 0 0 0 1px var(--dina-blue); }
+.dina-input:focus { border-color: var(--dina-yellow); box-shadow: 0 0 0 1px var(--dina-yellow); }
 
-.dina-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--dina-border); background: #fff; }
+.dina-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid var(--dina-border); background: #fff; color: var(--dina-black); }
 
 .dina-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; }
-.dina-table thead th { position: sticky; top: 0; background: #fff; text-align: left; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--dina-gray); padding: 12px 14px; border-bottom: 1px solid var(--dina-border); }
+.dina-table thead th { position: sticky; top: 0; background: #fff; text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--dina-gray); padding: 12px 14px; border-bottom: 1px solid var(--dina-border); }
 .dina-table tbody td { padding: 12px 14px; border-bottom: 1px solid var(--dina-border); color: var(--dina-black); }
-.dina-table tbody tr:nth-child(even) { background: var(--dina-card); }
-.dina-table tbody tr:hover { background: var(--dina-yellow-light); }
+.dina-table tbody tr:nth-child(even) { background: #fafafa; }
+.dina-table tbody tr:hover { background: #fff5f5; }
 
-.dina-sidebar-link { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; font-size: 14px; color: #e8e8e8; transition: background .15s; }
+.dina-sidebar-section { padding: 10px 14px 4px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: #777; }
+.dina-sidebar-link { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-radius: 10px; font-size: 13px; color: #d8d8d8; transition: background .15s; }
 .dina-sidebar-link:hover { background: #2a2a2a; color: #fff; }
 .dina-sidebar-link.active { background: var(--dina-yellow); color: #fff; font-weight: 600; }
 
 .scrollbar-thin::-webkit-scrollbar { width: 6px; height: 6px; }
 .scrollbar-thin::-webkit-scrollbar-thumb { background: #d8d8d8; border-radius: 3px; }
+html.dark .scrollbar-thin::-webkit-scrollbar-thumb { background: #333; }
 
 .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+
+@keyframes shimmer { 0%{background-position:-200% 0}100%{background-position:200% 0} }
+.shimmer { background: linear-gradient(90deg,#eee 25%,#ddd 50%,#eee 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }

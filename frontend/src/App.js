@@ -20,9 +20,11 @@ import Invoicing from "@/pages/console/Invoicing";
 import Expenses from "@/pages/console/Expenses";
 import Statistics from "@/pages/console/Statistics";
 import Team from "@/pages/console/Team";
-import AskDina from "@/pages/console/AskDina";
+import Reviews from "@/pages/console/Reviews";
+import AlertsAndCarts from "@/pages/console/AlertsAndCarts";
 import Integrations from "@/pages/console/Integrations";
 import Settings from "@/pages/console/Settings";
+import SiteSettings from "@/pages/console/SiteSettings";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
 import Catalog from "@/pages/storefront/Catalog";
@@ -54,7 +56,6 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/suivi/:code" element={<Tracking />} />
-            {/* Public storefront */}
             <Route path="/boutique" element={<StorefrontLayout />}>
               <Route index element={<Home />} />
               <Route path="catalog" element={<Catalog />} />
@@ -62,7 +63,6 @@ export default function App() {
               <Route path="checkout" element={<Checkout />} />
               <Route path="account" element={<Account />} />
             </Route>
-            {/* Console */}
             <Route path="/console" element={<Protected><ConsoleLayout /></Protected>}>
               <Route index element={<Dashboard />} />
               <Route path="pos" element={<POS />} />
@@ -71,14 +71,16 @@ export default function App() {
               <Route path="produits" element={<Products />} />
               <Route path="stock" element={<Stock />} />
               <Route path="achats" element={<Purchases />} />
+              <Route path="avis" element={<Reviews />} />
               <Route path="clients" element={<Customers />} />
               <Route path="fidelite" element={<Loyalty />} />
               <Route path="promotions" element={<Promotions />} />
+              <Route path="alertes" element={<AlertsAndCarts />} />
               <Route path="facturation" element={<Invoicing />} />
               <Route path="depenses" element={<Expenses />} />
               <Route path="statistiques" element={<Statistics />} />
               <Route path="equipe" element={<Team />} />
-              <Route path="assistant" element={<AskDina />} />
+              <Route path="site" element={<SiteSettings />} />
               <Route path="integrations" element={<Integrations />} />
               <Route path="parametres" element={<Settings />} />
             </Route>
