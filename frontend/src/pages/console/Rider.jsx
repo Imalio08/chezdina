@@ -29,7 +29,7 @@ export default function Rider() {
   return (
     <div className="min-h-screen bg-[#f5f5f5] max-w-md mx-auto flex flex-col">
       <header className="bg-[#1c1c1c] text-white p-4 flex items-center justify-between sticky top-0 z-20">
-        <div><div className="font-serif text-xl">Dina Livraison</div><div className="text-xs text-[#999]">{user?.name}</div></div>
+        <div><div className="font-serif text-xl">Chez Dina · Livreurs</div><div className="text-xs text-[#999]">{user?.name}</div></div>
         <button onClick={async()=>{await logout();nav("/login");}} className="text-[#999]" data-testid="rider-logout"><LogOut size={18}/></button>
       </header>
       <main className="flex-1 pb-20 p-4 space-y-3">
@@ -38,7 +38,7 @@ export default function Rider() {
             <div className="flex justify-between items-start mb-1"><div className="font-semibold text-sm">{o.code}</div><span className="dina-chip" style={{color:statusColor[o.status]}}><span className="status-dot" style={{background:statusColor[o.status]}}/>{statusLabel[o.status]}</span></div>
             <div className="text-sm font-medium">{o.customer?.name}</div>
             <div className="text-xs text-[#666] flex items-center gap-1 mt-1"><MapPin size={11}/>{o.delivery_zone}</div>
-            <div className="flex justify-between items-end mt-3"><div className="text-xs text-[#666]">{o.items.length} articles · {o.payment_method==="cod"?"Cash à collecter":"Déjà payé"}</div><div className="tabular font-semibold">{fcfa(o.total)}</div></div>
+            <div className="flex justify-between items-end mt-3"><div className="text-xs text-[#666]">{o.items.length} articles · {o.payment_method==="cod"?"Paiement à la livraison":"Déjà payé"}</div><div className="tabular font-semibold">{fcfa(o.total)}</div></div>
           </div>
         )) : <div className="text-center text-sm text-[#666] py-10">Aucune course active</div>)}
 

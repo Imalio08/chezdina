@@ -42,8 +42,7 @@ const SECTIONS = [
 
 export default function ConsoleLayout() {
   const { user, logout } = useAuth();
-  const { setStoreId, theme, setTheme, lang, setLang, online, t } = useApp();
-  const [stores, setStores] = useState([]);
+  const { theme, setTheme, online, t } = useApp();
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [showNotif, setShowNotif] = useState(false);
@@ -78,7 +77,16 @@ export default function ConsoleLayout() {
   const [showAi, setShowAi] = useState(false);
   const nav = useNavigate();
 
-  useEffect(() => { api.get("/stores").then((r) => setStores(r.data)).catch(()=>{}); }, []);
+  useEffect(() => { 
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        document.querySelector('[data-testid="global-search"]')?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const doSearch = async (v) => {
     setSearch(v);
@@ -132,16 +140,14 @@ export default function ConsoleLayout() {
       <main className="flex-1 min-w-0 flex flex-col">
         <header className="h-16 bg-white dark:bg-[#1a1a1a] border-b border-[#ececec] dark:border-[#2a2a2a] px-5 flex items-center gap-3 sticky top-0 z-30">
           <div className="flex items-center gap-2">
-            <Store size={16} className="text-[#666]"/>
-            <select onChange={(e)=>setStoreId(e.target.value)} className="text-sm font-medium bg-transparent focus:outline-none dark:text-white" data-testid="store-selector">
-              <option value="all">Chez Dina (toutes)</option>
-              {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            <div className="w-9 h-9 rounded-lg bg-[#fde8e8] dark:bg-[#2a1818] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>
+            <div className="font-serif text-lg leading-none">Chez Dina<span className="block text-[10px] text-[#999] tracking-widest uppercase mt-0.5">Console</span></div>
           </div>
           <div className="flex-1 max-w-xl mx-4 relative">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]"/>
-              <input className="dina-input pl-9" placeholder={t("search")} value={search} onChange={(e)=>doSearch(e.target.value)} data-testid="global-search"/>
+              <input className="dina-input pl-9 pr-16" placeholder="Rechercher produits, variantes, clientes, commandes…" value={search} onChange={(e)=>doSearch(e.target.value)} data-testid="global-search"/>
+              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex items-center text-[10px] text-[#999] border border-[#ececec] dark:border-[#2a2a2a] rounded px-1.5 py-0.5">Ctrl+K</kbd>
             </div>
             {searchResults && (
               <div className="absolute top-11 left-0 right-0 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-lg p-2 max-h-96 overflow-y-auto scrollbar-thin z-40" data-testid="search-results">
@@ -155,8 +161,7 @@ export default function ConsoleLayout() {
           <div className={`dina-chip ${online?"":"!border-[#c62828] !text-[#c62828]"}`} data-testid="sync-indicator">
             {online ? <><Wifi size={12}/>En ligne</> : <><WifiOff size={12}/>Hors ligne</>}
           </div>
-          <button onClick={()=>setLang(lang==="fr"?"en":"fr")} className="dina-chip" data-testid="lang-toggle">{lang.toUpperCase()}</button>
-          <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip" data-testid="theme-toggle">{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
+          <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
           <div className="relative">
             <button onClick={()=>setShowNotif(!showNotif)} className="dina-chip relative" data-testid="notifications-button">
               <Bell size={12}/>{unreadCount>0 && <span className="absolute -top-1 -right-1 bg-[#c62828] text-white text-[9px] rounded-full min-w-[16px] h-4 px-1 grid place-items-center font-bold">{unreadCount}</span>}

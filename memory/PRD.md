@@ -1,4 +1,66 @@
-# Chez Dina Boutique — PRD
+# Chez Dina — PRD
+
+## Problem Statement
+**Chez Dina** — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). Single codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. **Français uniquement**, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
+
+## Session 1 (Feb 6 2026) — Globals intro + 10 bugs P0
+### Rebrand & langue
+- Rebrand complet "Chez Dina" partout (API title, business doc, storefront footer, login footer, invoicing header + PDF export, POS receipt, rider header). "Dina Store"/"Chez Dina Boutique" → **Chez Dina**.
+- `index.html` title → "Chez Dina — Console".
+- **Toggle langue retiré** du topbar (français only).
+- **Store selector retiré** du topbar (single store, `store_id` reste en DB pour multi-store futur).
+
+### Error Boundaries
+- Nouveau composant `/app/frontend/src/components/ErrorBoundary.jsx` (mode page ou widget compact).
+- Chaque route Console enveloppée dans `<ErrorBoundary>` dans `App.js` → un onglet qui crash affiche une carte "Oups, un problème est survenu · Réessayer / Recharger" en français avec détails techniques repliables. Le reste de l'app continue de tourner.
+- Même protection sur Rider.
+
+### P0 bugs fixés
+1. **Onglets qui crashaient** → protégés par ErrorBoundary + bugs structurels corrigés en sessions précédentes (useEffect retournant Promise, rendering d'objets).
+2. **Search bar** → raccourci **Ctrl+K / Cmd+K** actif, placeholder enrichi (produits/variantes/clientes/commandes).
+3. **Bell notifications** → endpoint réel `/api/notifications` (session précédente).
+4. **Dark mode** → polish complet (session précédente).
+5. **Toggle langue** → **retiré**.
+6. **AI assistant** → gestion d'erreur francisée : "Je n'arrive pas à récupérer la réponse IA pour le moment. Voici un résumé local…" (plus de `(Erreur IA : ...)` technique). Flag `error: True` renvoyé pour que le front affiche un bouton Réessayer.
+7. **POS "Tous"** → grille déjà uniforme (vérifiée).
+8. **Chart legends** → `wrapperStyle` déjà toujours visible dans Dashboard/Statistics (session précédente).
+9. **Voir détails** → drill-down vers onglets filtrés (session précédente).
+10. **Rider** → "Dina Livraison" → "Chez Dina · Livreurs". Flow stable.
+
+### Labels paiement humanisés
+- "Cash", "Cash à collecter", "Cash à livrer", "À livrer" (bouton POS) → **"Paiement à la livraison"** partout (Deliveries, POS, Rider, Storefront).
+
+## Architecture
+- **Backend**: FastAPI `/api`, MongoDB motor, JWT cookie + Bearer, bcrypt, PIN 4-chiffres.
+- **Frontend**: React 19, React Router 7, Tailwind + Shadcn + Recharts + sonner + lucide-react, **Sora** (body) + IBM Plex Serif (titres), palette red/pink #b02a2a.
+- **AI**: Claude Sonnet 5.5 via Emergent Universal Key — floating "Dina IA" sur chaque page Console.
+- **Routes**: `/boutique` (public), `/console/*` (back-office), `/console/livreur` (mobile rider), `/suivi/:code` (public tracking), `/login`.
+
+## Credentials (`/app/memory/test_credentials.md`)
+- Admin: `aouattaraesca@gmail.com` / `Admin123!` · PIN 1234
+- Manager: `manager.cocody@dinastore.ci` / `Manager123!` · PIN 2222 (emails techniques conservés)
+- Rider: `rider1@dinastore.ci` / `Rider123!` · PIN 5555
+
+## Backlog (sessions suivantes)
+### Session 2 — Section 2 (UX globales, fondations)
+- Composants partagés : `PeriodSelector` (presets + custom range + comparison), `FiltersPanel` (side-sheet avec saved views + URL state), `KPICard` enrichi (sparkline, info tooltip, Voir détails), `ViewToggle` (Tableau/Grille/Graphique/Kanban), `CreateOnFlyDropdown`, `ImageUpload` (drag+drop, multi, WebP compression), détail page template.
+
+### Section 3 — Navigation + Dina IA
+- Sidebar refactor en sections collapsibles (10 groupes du cahier des charges).
+- Topbar quick-actions "+" (Nouvelle vente, Nouvelle commande, Nouveau produit, Nouvel appro, Nouvelle dépense, Nouveau client).
+- Dina IA avec **tool-calling** (get_sales, get_top_products, get_stock_alerts, …), vision multimodale (photos produits, factures fournisseurs → OCR + pré-remplissage), création catalogue/promos/affectations par langage naturel avec carte de confirmation + log + undo 10min.
+
+### Sections 4-11 (à faire)
+- Section 4 : Dashboard refondu + Statistiques (14 onglets de rapports, KPI dictionary complet avec formules).
+- Section 5 : POS enrichi + Commandes avec édition complète + Factures/devis + reçu redesigné 80mm.
+- Section 6 : Delivery full redesign — Journées de livraison, Réconciliation du soir, Fiches colis QR, Rider space v2.
+- Section 7 : Catalogue — statuts produits, création avec variant matrix, Approvisionnements 4-steps, Fournisseurs stats, Scan barcode/QR.
+- Section 8 : Clients deep + Paniers abandonnés auto + Avis + Fidélité configurable + Parrainage + Promotions avec affiches + Campagnes WhatsApp.
+- Section 9 : Dépenses + Employés + Rôles & permissions matrix + Pointage kiosk.
+- Section 10 : Storefront CMS + section builder + account par code secret 4-6 chiffres.
+- Section 11 : Paramètres + Intégrations (WhatsApp Business Embedded Signup, Meta/TikTok Pixel, Wave, imprimante WiFi).
+- Section 12 : Checklist d'acceptation.
+
 
 ## Problem Statement
 Chez Dina Boutique — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). One codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. French-first, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.

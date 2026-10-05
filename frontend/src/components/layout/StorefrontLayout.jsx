@@ -36,12 +36,12 @@ export default function StorefrontLayout() {
       <a href="https://wa.me/2250777926179" target="_blank" rel="noreferrer" className="fixed bottom-5 right-5 bg-[#1f8a4c] text-white rounded-full w-14 h-14 grid place-items-center shadow-lg" data-testid="storefront-whatsapp"><MessageCircle size={22}/></a>
       <footer className="border-t border-[#ececec] mt-20 py-10 text-sm text-[#666] bg-[#fff5f5]">
         <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-4 gap-6">
-          <div><div className="font-serif text-xl text-[#b02a2a] mb-2">Chez Dina Boutique</div><p>Mode féminine · Abidjan.<br/>Livraison partout en Côte d'Ivoire.</p><div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c]">+225 07 77 92 61 79</strong></div></div>
+          <div><div className="font-serif text-xl text-[#b02a2a] mb-2">Chez Dina</div><p>Mode féminine · Abidjan.<br/>Livraison partout en Côte d'Ivoire.</p><div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c]">+225 07 77 92 61 79</strong></div></div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li>Nouveautés</li><li>Promotions</li><li>Guide des tailles</li></ul></div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Aide</div><ul className="space-y-1"><li>Livraison & retours</li><li>Suivi de commande</li><li>Contact</li></ul></div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Suivez-nous</div><ul className="space-y-1"><li><a href="https://www.tiktok.com/@dinoush04" target="_blank" rel="noreferrer">TikTok @dinoush04</a></li><li><a href="https://wa.me/2250777926179" target="_blank" rel="noreferrer">WhatsApp</a></li></ul></div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 mt-8 text-xs text-[#999]">© 2026 Chez Dina Boutique · Abidjan</div>
+        <div className="max-w-6xl mx-auto px-4 mt-8 text-xs text-[#999]">© 2026 Chez Dina · Abidjan</div>
       </footer>
     </div>
   );

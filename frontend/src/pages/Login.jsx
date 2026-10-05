@@ -60,7 +60,7 @@ export default function Login() {
               <div className="bg-white/5 border border-white/10 rounded-xl p-3 backdrop-blur"><Sparkles size={14} className="text-[#ffb3b3] mb-1"/><div className="text-xs font-semibold">Assistant IA</div><div className="text-[11px] text-[#d0c0c0]">Posez une question à Dina</div></div>
             </div>
           </div>
-          <div className="text-xs text-[#c0a8a8] flex items-center justify-between"><span>© 2026 Chez Dina Boutique · Abidjan</span><a href="/boutique" className="hover:text-white underline flex items-center gap-1" data-testid="login-view-shop">Voir le site vitrine <ChevronRight size={12}/></a></div>
+          <div className="text-xs text-[#c0a8a8] flex items-center justify-between"><span>© 2026 Chez Dina · Abidjan</span><a href="/boutique" className="hover:text-white underline flex items-center gap-1" data-testid="login-view-shop">Voir le site vitrine <ChevronRight size={12}/></a></div>
         </div>
       </div>
 

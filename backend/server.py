@@ -18,7 +18,7 @@ logger = logging.getLogger("dina")
 client = AsyncIOMotorClient(os.environ['MONGO_URL'])
 db = client[os.environ['DB_NAME']]
 
-app = FastAPI(title="Dina Store API")
+app = FastAPI(title="Chez Dina API")
 api = APIRouter(prefix="/api")
 
 JWT_SECRET = os.environ.get("JWT_SECRET", "dina-dev-secret")
@@ -940,7 +940,7 @@ async def update_site(body: Dict[str,Any], user: dict = Depends(require_role("ad
 @api.get("/business")
 async def get_business(user: dict = Depends(get_user)):
     b = await db.business.find_one({"id":"main"})
-    return clean(b or {"name":"Chez Dina Boutique","phone":"+225 07 77 92 61 79","address":"Cocody, Abidjan","tiktok":"@dinoush04","whatsapp":"2250777926179","currency":"XOF"})
+    return clean(b or {"name":"Chez Dina","phone":"+225 07 77 92 61 79","address":"Cocody, Abidjan","tiktok":"@dinoush04","whatsapp":"2250777926179","currency":"XOF"})
 
 @api.patch("/business")
 async def update_business(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
@@ -1001,15 +1001,15 @@ async def ask_dina(body: AskIn, user: dict = Depends(get_user)):
     for o in recent:
         for it in o.get("items",[]): tops[it["name"]] = tops.get(it["name"],0) + it["qty"]
     best = sorted(tops.items(), key=lambda x:-x[1])[:5]
-    ctx = f"Chez Dina Boutique (Abidjan). Produits: {products_cnt}. Clientes: {customers_cnt}. CA récent (100 cmd): {rev:,} FCFA. Top: {', '.join(f'{n} ({q})' for n,q in best)}."
+    ctx = f"Chez Dina (Abidjan). Produits: {products_cnt}. Clientes: {customers_cnt}. CA récent (100 cmd): {rev:,} FCFA. Top: {', '.join(f'{n} ({q})' for n,q in best)}."
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-{user['id']}", system_message=f"Tu es 'Dina', l'assistante IA de Chez Dina Boutique à Abidjan. Réponds TOUJOURS en français, bref, chiffré, actionnable. Données: {ctx}").with_model("anthropic","claude-sonnet-4-5-20250929")
+        chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-{user['id']}", system_message=f"Tu es 'Dina IA', l'assistante de Chez Dina à Abidjan. Réponds TOUJOURS en français, bref, chiffré, actionnable. Jamais d'erreur technique brute. Données: {ctx}").with_model("anthropic","claude-sonnet-4-5-20250929")
         reply = await chat.send_message(UserMessage(text=body.question))
         return {"answer": str(reply)}
     except Exception as ex:
         logger.exception("AI")
-        return {"answer": f"Résumé local : CA récent ≈ {rev:,} FCFA. Top produits : {', '.join(n for n,_ in best)}. (Erreur IA : {ex})"}
+        return {"answer": f"Je n'arrive pas à récupérer la réponse IA pour le moment. Voici un résumé local : CA récent ≈ {rev:,} FCFA, top produits : {', '.join(n for n,_ in best) or '—'}. Réessayez dans un instant.", "error": True}
 
 # ---------- Seed ----------
 IVORIAN = ["Aminata Koné","Fatou Traoré","Mariam Diallo","Awa Ouattara","Rokia Bamba","Sarah Yao","Christelle Brou","Nadège Kouassi","Fatim Cissé","Hawa Touré","Grace N'Guessan","Linda Zoro","Priscille Konan","Chantal Adou","Mireille Gnamien","Audrey Diomandé","Esther Soro","Céline Kouadio","Rachel Toto","Diane Assi","Mélanie Boni","Judith Kipré","Léa Yapo","Olivia Konate","Carine Bakayoko"]
@@ -1056,7 +1056,7 @@ async def seed_if_empty():
         await db.zones.insert_many([{"id": new_id(), "name": n, "fee": f, "created_at": now_iso()} for n,f in ZONES])
     # Business
     if await db.business.count_documents({}) == 0:
-        await db.business.insert_one({"id":"main","name":"Chez Dina Boutique","phone":"+225 07 77 92 61 79","address":"Cocody Angré 7e, Abidjan","tiktok":"@dinoush04","whatsapp":"2250777926179","currency":"XOF","created_at":now_iso()})
+        await db.business.insert_one({"id":"main","name":"Chez Dina","phone":"+225 07 77 92 61 79","address":"Cocody Angré 7e, Abidjan","tiktok":"@dinoush04","whatsapp":"2250777926179","currency":"XOF","created_at":now_iso()})
     # Products
     if await db.products.count_documents({}) == 0:
         products = []
@@ -1198,7 +1198,7 @@ async def reseed(force: bool = False, user: dict = Depends(require_role("admin")
     return {"ok": True}
 
 @api.get("/")
-async def root(): return {"name":"Dina Store API","v":"2.0"}
+async def root(): return {"name":"Chez Dina API","v":"2.0"}
 
 app.include_router(api)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])

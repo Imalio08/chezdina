@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Login from "@/pages/Login";
 import ConsoleLayout from "@/components/layout/ConsoleLayout";
 import StorefrontLayout from "@/components/layout/StorefrontLayout";
@@ -64,27 +65,27 @@ export default function App() {
               <Route path="account" element={<Account />} />
             </Route>
             <Route path="/console" element={<Protected><ConsoleLayout /></Protected>}>
-              <Route index element={<Dashboard />} />
-              <Route path="pos" element={<POS />} />
-              <Route path="commandes" element={<Orders />} />
-              <Route path="livraisons" element={<Deliveries />} />
-              <Route path="produits" element={<Products />} />
-              <Route path="stock" element={<Stock />} />
-              <Route path="achats" element={<Purchases />} />
-              <Route path="avis" element={<Reviews />} />
-              <Route path="clients" element={<Customers />} />
-              <Route path="fidelite" element={<Loyalty />} />
-              <Route path="promotions" element={<Promotions />} />
-              <Route path="alertes" element={<AlertsAndCarts />} />
-              <Route path="facturation" element={<Invoicing />} />
-              <Route path="depenses" element={<Expenses />} />
-              <Route path="statistiques" element={<Statistics />} />
-              <Route path="equipe" element={<Team />} />
-              <Route path="site" element={<SiteSettings />} />
-              <Route path="integrations" element={<Integrations />} />
-              <Route path="parametres" element={<Settings />} />
+              <Route index element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
+              <Route path="pos" element={<ErrorBoundary><POS /></ErrorBoundary>} />
+              <Route path="commandes" element={<ErrorBoundary><Orders /></ErrorBoundary>} />
+              <Route path="livraisons" element={<ErrorBoundary><Deliveries /></ErrorBoundary>} />
+              <Route path="produits" element={<ErrorBoundary><Products /></ErrorBoundary>} />
+              <Route path="stock" element={<ErrorBoundary><Stock /></ErrorBoundary>} />
+              <Route path="achats" element={<ErrorBoundary><Purchases /></ErrorBoundary>} />
+              <Route path="avis" element={<ErrorBoundary><Reviews /></ErrorBoundary>} />
+              <Route path="clients" element={<ErrorBoundary><Customers /></ErrorBoundary>} />
+              <Route path="fidelite" element={<ErrorBoundary><Loyalty /></ErrorBoundary>} />
+              <Route path="promotions" element={<ErrorBoundary><Promotions /></ErrorBoundary>} />
+              <Route path="alertes" element={<ErrorBoundary><AlertsAndCarts /></ErrorBoundary>} />
+              <Route path="facturation" element={<ErrorBoundary><Invoicing /></ErrorBoundary>} />
+              <Route path="depenses" element={<ErrorBoundary><Expenses /></ErrorBoundary>} />
+              <Route path="statistiques" element={<ErrorBoundary><Statistics /></ErrorBoundary>} />
+              <Route path="equipe" element={<ErrorBoundary><Team /></ErrorBoundary>} />
+              <Route path="site" element={<ErrorBoundary><SiteSettings /></ErrorBoundary>} />
+              <Route path="integrations" element={<ErrorBoundary><Integrations /></ErrorBoundary>} />
+              <Route path="parametres" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
             </Route>
-            <Route path="/console/livreur" element={<ProtectedRider><Rider /></ProtectedRider>} />
+            <Route path="/console/livreur" element={<ProtectedRider><ErrorBoundary><Rider /></ErrorBoundary></ProtectedRider>} />
             <Route path="/" element={<Navigate to="/console" replace />} />
             <Route path="*" element={<Navigate to="/console" replace />} />
           </Routes>

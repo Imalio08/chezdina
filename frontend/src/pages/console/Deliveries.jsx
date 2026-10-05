@@ -67,7 +67,7 @@ export default function Deliveries() {
             <div className="space-y-2 max-h-[600px] overflow-y-auto scrollbar-thin">{toShip.map(o=>(
               <div key={o.id} className="border border-[#ececec] rounded-lg p-3" data-testid={`dispatch-order-${o.code}`}>
                 <div className="flex justify-between items-start"><div><div className="font-medium text-sm">{o.code}</div><div className="text-xs text-[#666]">{o.customer?.name} · {o.delivery_zone||"—"}</div></div><div className="tabular font-semibold text-sm">{fcfa(o.total)}</div></div>
-                <div className="text-xs text-[#666] mt-1 mb-2">{o.items.length} articles · {o.payment_method==="cod"?"Cash":"Payé"}</div>
+                <div className="text-xs text-[#666] mt-1 mb-2">{o.items.length} articles · {o.payment_method==="cod"?"Paiement à la livraison":"Déjà payé"}</div>
                 <select onChange={e=>{ const sid=e.target.value; if(sid) addToSession(sid, o.id); }} defaultValue="" className="dina-input !py-1.5 text-xs" data-testid={`assign-session-${o.code}`}>
                   <option value="" disabled>Ajouter à une journée…</option>
                   {openSessions.map(s=><option key={s.id} value={s.id}>{s.rider_name} · {s.date}</option>)}
@@ -122,7 +122,7 @@ export default function Deliveries() {
                     <td className="font-medium">{o.code}</td>
                     <td>{o.customer?.name}</td>
                     <td>{o.delivery_zone}</td>
-                    <td className="text-xs capitalize">{o.payment_method==="cod"?"Cash à livrer":o.payment_method}</td>
+                    <td className="text-xs capitalize">{o.payment_method==="cod"?"Paiement à la livraison":o.payment_method}</td>
                     <td><span className="dina-chip" style={{color:statusColor[o.status]}}>{statusLabel[o.status]}</span></td>
                     <td className="text-right tabular">{fcfa(o.subtotal)}</td>
                     <td className="text-right tabular text-[#666]">{fcfa(o.delivery_fee||0)}</td>

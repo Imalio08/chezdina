@@ -158,7 +158,7 @@ export default function POS() {
         <div className="grid grid-cols-3 gap-2 mt-3">
           <button onClick={()=>setMethod("cash")} className={`py-2 text-xs rounded-lg border ${method==="cash"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="pay-cash"><Wallet size={14} className="inline mr-1"/>Espèces</button>
           <button onClick={()=>setMethod("wave")} className={`py-2 text-xs rounded-lg border ${method==="wave"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="pay-wave"><Smartphone size={14} className="inline mr-1"/>Wave</button>
-          <button onClick={()=>setMethod("cod")} className={`py-2 text-xs rounded-lg border ${method==="cod"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="pay-cod"><CreditCard size={14} className="inline mr-1"/>À livrer</button>
+          <button onClick={()=>setMethod("cod")} className={`py-2 text-xs rounded-lg border ${method==="cod"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="pay-cod"><CreditCard size={14} className="inline mr-1"/>Paiement à la livraison</button>
         </div>
         {method==="cash" && <div className="mt-2 flex items-center gap-2 text-sm"><span className="text-[#666] w-20">Reçu</span><input type="number" className="dina-input tabular" value={cash} onChange={e=>setCash(e.target.value)} data-testid="pos-cash"/><span className="text-[#1f8a4c] tabular whitespace-nowrap">Rendu: {fcfa(change)}</span></div>}
         <button onClick={pay} disabled={!cart.length} className="dina-btn-primary w-full mt-3" data-testid="pos-checkout">{mode==="delivery"?"Commander · ":"Encaisser · "}{fcfa(total)}</button>
@@ -206,7 +206,7 @@ function Receipt({ data, onClose }) {
       <div className="bg-white rounded-xl p-6 w-80 font-sora" onClick={e=>e.stopPropagation()}>
         <div className="text-center mb-3">
           <div className="w-12 h-12 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div>
-          <div className="font-serif text-lg mt-2">Chez Dina Boutique</div>
+          <div className="font-serif text-lg mt-2">Chez Dina</div>
           <div className="text-[10px] text-[#666]">Cocody Angré 7e · +225 07 77 92 61 79</div>
           <div className="text-[10px] text-[#666]">TikTok @dinoush04</div>
         </div>

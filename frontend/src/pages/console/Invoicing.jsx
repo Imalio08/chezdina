@@ -11,13 +11,13 @@ export default function Invoicing() {
   useEffect(() => { load(); }, []);
 
   const shareWA = (inv) => {
-    const text = `Facture ${inv.number} - ${fcfa(inv.total)} - Chez Dina Boutique`;
+    const text = `Facture ${inv.number} - ${fcfa(inv.total)} - Chez Dina`;
     const phone = inv.customer?.phone?.replace(/\D/g,"") || "";
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
   };
   const downloadPdf = (inv) => {
     const w = window.open("", "_blank");
-    w.document.write(`<html><head><title>${inv.number}</title><style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:30px} h1{color:#b02a2a} table{width:100%;border-collapse:collapse;margin:20px 0} td{padding:8px;border-bottom:1px solid #eee}</style></head><body><h1>Chez Dina Boutique</h1><p>Facture <b>${inv.number}</b><br>Date: ${dateFmt(inv.created_at)}<br>Cliente: ${inv.customer?.name||"—"}</p><table><tr><td colspan="2"><b>Articles</b></td></tr>${(inv.items||[]).map(it=>`<tr><td>${it.qty}× ${it.name}</td><td style="text-align:right">${fcfa(it.qty*it.price)}</td></tr>`).join("")}<tr><td><b>TOTAL</b></td><td style="text-align:right"><b>${fcfa(inv.total)}</b></td></tr></table><p style="color:#666;font-size:12px">Merci de votre confiance.<br>+225 07 77 92 61 79 · TikTok @dinoush04</p><script>setTimeout(()=>window.print(),500)</script></body></html>`);
+    w.document.write(`<html><head><title>${inv.number}</title><style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:30px} h1{color:#b02a2a} table{width:100%;border-collapse:collapse;margin:20px 0} td{padding:8px;border-bottom:1px solid #eee}</style></head><body><h1>Chez Dina</h1><p>Facture <b>${inv.number}</b><br>Date: ${dateFmt(inv.created_at)}<br>Cliente: ${inv.customer?.name||"—"}</p><table><tr><td colspan="2"><b>Articles</b></td></tr>${(inv.items||[]).map(it=>`<tr><td>${it.qty}× ${it.name}</td><td style="text-align:right">${fcfa(it.qty*it.price)}</td></tr>`).join("")}<tr><td><b>TOTAL</b></td><td style="text-align:right"><b>${fcfa(inv.total)}</b></td></tr></table><p style="color:#666;font-size:12px">Merci de votre confiance.<br>+225 07 77 92 61 79 · TikTok @dinoush04</p><script>setTimeout(()=>window.print(),500)</script></body></html>`);
   };
 
   return (
@@ -53,7 +53,7 @@ export default function Invoicing() {
       {preview && (
         <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={()=>setPreview(null)}>
           <div className="bg-white rounded-2xl p-8 w-full max-w-lg font-sora" onClick={e=>e.stopPropagation()}>
-            <div className="text-center mb-4"><div className="w-14 h-14 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div><div className="font-serif text-2xl mt-2">Chez Dina Boutique</div><div className="text-xs text-[#666]">Cocody Angré · +225 07 77 92 61 79</div></div>
+            <div className="text-center mb-4"><div className="w-14 h-14 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div><div className="font-serif text-2xl mt-2">Chez Dina</div><div className="text-xs text-[#666]">Cocody Angré · +225 07 77 92 61 79</div></div>
             <div className="border-t border-dashed my-3"/>
             <div className="text-sm space-y-1 mb-3"><div className="font-semibold">Facture {preview.number}</div><div className="text-[#666]">{dateFmt(preview.created_at)}</div><div className="text-[#666]">Cliente : {preview.customer?.name}</div></div>
             <div className="border-t border-dashed my-3"/>
