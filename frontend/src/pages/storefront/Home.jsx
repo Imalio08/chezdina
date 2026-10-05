@@ -57,7 +57,7 @@ export default function Home() {
           {products.slice(0,8).map(p=>(
             <Link key={p.id} to={`/boutique/product/${p.id}`} className="group" data-testid={`storefront-product-${p.id}`}>
               <div className="aspect-[4/5] bg-[#fff5f5] rounded-xl overflow-hidden"><img src={p.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition"/></div>
-              <div className="mt-2"><div className="text-xs text-[#b02a2a] uppercase tracking-wide">{p.category}</div><div className="text-sm font-medium truncate">{p.name}</div><div className="tabular font-semibold text-sm mt-0.5">{fcfa(p.price)}</div></div>
+              <div className="mt-2"><div className="text-xs text-[#b02a2a] uppercase tracking-wide">{p.category}</div><div className="text-sm font-medium truncate">{p.name}</div><div className="flex items-center justify-between mt-0.5"><div className="tabular font-semibold text-sm">{fcfa(p.price)}</div>{p.rating_avg>0 && <div className="text-xs text-[#666] flex items-center gap-0.5"><span className="text-[#f4b12c]">★</span>{p.rating_avg}</div>}</div></div>
             </Link>
           ))}
         </div>

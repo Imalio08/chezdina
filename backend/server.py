@@ -342,6 +342,32 @@ async def kpis(user: dict = Depends(get_user), store_id: Optional[str] = None):
         "avg_basket": int(sum(o.get("total",0) for o in orders_all) / max(1, len(orders_all))),
     }
 
+class ReviewIn(BaseModel):
+    product_id: str
+    rating: int
+    comment: str = ""
+    customer_name: str = "Cliente"
+    customer_phone: Optional[str] = None
+
+# ---------- Reviews ----------
+@api.get("/public/reviews/{pid}")
+async def public_reviews(pid: str):
+    rows = await db.reviews.find({"product_id": pid}).sort("created_at", -1).to_list(100)
+    return clean(rows)
+
+@api.post("/public/reviews")
+async def create_review(body: ReviewIn):
+    if body.rating < 1 or body.rating > 5:
+        raise HTTPException(400, "Note entre 1 et 5")
+    doc = body.model_dump()
+    doc.update({"id": new_id(), "created_at": now_iso()})
+    await db.reviews.insert_one(doc)
+    # update aggregate on product
+    rows = await db.reviews.find({"product_id": body.product_id}).to_list(500)
+    avg = round(sum(r["rating"] for r in rows) / max(1, len(rows)), 1)
+    await db.products.update_one({"id": body.product_id}, {"$set": {"rating_avg": avg, "rating_count": len(rows)}})
+    return clean(doc)
+
 # ---------- Site CMS ----------
 @api.get("/public/site")
 async def public_site():
@@ -523,15 +549,20 @@ async def seed_if_empty():
             sizes = SHOE_SIZES if cat == "Chaussures" else (CLOTH_SIZES if cat in ("Robes","Hauts","Jupes","Pantalons","Ensembles") else [])
             price = random.choice([5000,7500,9500,12500,15000,18500,22000,27500,32500,38000,45000,55000,65000,75000,85000])
             cost = int(price * random.uniform(0.4,0.65))
+            prod_sizes = random.sample(sizes, min(len(sizes), random.randint(3,6))) if sizes else []
+            prod_cols = random.sample(COLORS, random.randint(2,4))
+            stock_by_size = {s: random.randint(0, 8) for s in prod_sizes} if prod_sizes else {}
+            total_stock = sum(stock_by_size.values()) if stock_by_size else random.randint(5, 30)
             products.append({
                 "id": new_id(), "name": f"{cat} {random.choice(['Lagune','Baobab','Attiéké','Riviera','Palm','Akwaba','Doumbé','Zenith','Soleil','Harmattan'])} {random.randint(1,99)}",
                 "category": cat, "brand": random.choice(BRANDS), "price": price, "cost": cost,
                 "description": f"Pièce {cat.lower()} tendance, idéale pour la saison. Matière premium.",
                 "image": random.choice(IMG_POOL[cat]),
-                "images": random.sample(IMG_POOL[cat], min(len(IMG_POOL[cat]), random.randint(3,5))), "sizes": random.sample(sizes, min(len(sizes), random.randint(3,6))) if sizes else [],
-                "colors": random.sample(COLORS, random.randint(2,4)),
-                "stock": random.randint(0, 45), "store_id": random.choice(["store-cocody","store-marcory"]),
+                "images": random.sample(IMG_POOL[cat], min(len(IMG_POOL[cat]), random.randint(3,5))),
+                "sizes": prod_sizes, "colors": prod_cols, "stock_by_size": stock_by_size,
+                "stock": total_stock, "store_id": random.choice(["store-cocody","store-marcory"]),
                 "visibility": "both", "sku": f"DN-{10000+i}", "barcode": f"590{random.randint(1000000000,9999999999)}",
+                "rating_avg": round(random.uniform(3.8, 5.0), 1), "rating_count": random.randint(0, 25),
                 "created_at": now_iso()
             })
         await db.products.insert_many(products)

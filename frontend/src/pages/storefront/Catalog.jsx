@@ -22,7 +22,7 @@ export default function Catalog() {
         {filtered.map(p=>(
           <Link key={p.id} to={`/boutique/product/${p.id}`} className="group" data-testid={`catalog-card-${p.id}`}>
             <div className="aspect-[4/5] bg-[#f5f5f5] rounded-xl overflow-hidden"><img src={p.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition"/></div>
-            <div className="mt-2"><div className="text-xs text-[#666]">{p.category}</div><div className="text-sm font-medium truncate">{p.name}</div><div className="tabular font-semibold text-sm">{fcfa(p.price)}</div>{p.stock<5 && <div className="text-xs text-[#c62828]">Plus que {p.stock} !</div>}</div>
+            <div className="mt-2"><div className="text-xs text-[#666]">{p.category}</div><div className="text-sm font-medium truncate">{p.name}</div><div className="flex items-center justify-between mt-0.5"><div className="tabular font-semibold text-sm">{fcfa(p.price)}</div>{p.rating_avg>0 && <div className="text-xs text-[#666] flex items-center gap-0.5"><span className="text-[#f4b12c]">★</span>{p.rating_avg}</div>}</div>{p.stock<5 && <div className="text-xs text-[#c62828]">Plus que {p.stock} !</div>}</div>
           </Link>
         ))}
       </div>
