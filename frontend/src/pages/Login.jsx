@@ -26,19 +26,20 @@ export default function Login() {
   return (
     <div className="min-h-screen grid lg:grid-cols-2">
       <div className="hidden lg:flex relative bg-[#1c1c1c] text-white p-10 flex-col justify-between">
-        <div>
-          <div className="font-serif text-3xl tracking-tight">Dina Store</div>
-          <div className="text-sm text-[#999] mt-1">Système de gestion retail · Abidjan</div>
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div>
+          <div><div className="font-serif text-2xl tracking-tight">Chez Dina</div><div className="text-xs uppercase tracking-widest text-[#999]">boutique · Abidjan</div></div>
         </div>
         <div>
-          <div className="text-5xl font-serif leading-tight">La boutique.<br/>Toute entière,<br/><span className="text-[#f4b12c]">dans votre main.</span></div>
-          <p className="text-sm text-[#bbb] mt-6 max-w-md">Caisse, commandes, stock, livraisons et boutique en ligne — un seul espace, en temps réel, même hors ligne.</p>
+          <div className="text-5xl font-serif leading-tight">La boutique.<br/>Toute entière,<br/><span className="text-[#b02a2a]">dans votre main.</span></div>
+          <p className="text-sm text-[#bbb] mt-6 max-w-md">Caisse, commandes, stock, livraisons et site vitrine — un seul espace, en temps réel.</p>
+          <a href="/boutique" className="inline-block mt-6 text-xs text-[#b02a2a] underline" data-testid="login-view-shop">→ Voir le site vitrine</a>
         </div>
-        <div className="text-xs text-[#777]">© 2026 Dina Store · Abidjan, Côte d'Ivoire</div>
+        <div className="text-xs text-[#777]">© 2026 Chez Dina Boutique · Abidjan</div>
       </div>
       <div className="flex items-center justify-center p-6 bg-white">
         <form onSubmit={submit} className="w-full max-w-sm" data-testid="login-form">
-          <div className="lg:hidden font-serif text-2xl mb-6">Dina Store</div>
+          <div className="lg:hidden font-serif text-2xl mb-6 text-[#b02a2a]">Chez Dina Boutique</div>
           <h1 className="font-serif text-3xl mb-1">Connexion</h1>
           <p className="text-sm text-[#666] mb-6">Accédez à votre console.</p>
 

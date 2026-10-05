@@ -56,7 +56,7 @@ export default function POS() {
         </div>
         <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-3 overflow-y-auto scrollbar-thin flex-1">
           {filtered.map(p=>(
-            <button key={p.id} onClick={()=>addToCart(p,1,p.sizes?.[0],p.colors?.[0])} className="text-left bg-white border border-[#ececec] rounded-xl overflow-hidden hover:border-[#f4b12c] transition" data-testid={`pos-product-${p.id}`}>
+            <button key={p.id} onClick={()=>addToCart(p,1,p.sizes?.[0],p.colors?.[0])} className="text-left bg-white border border-[#ececec] rounded-xl overflow-hidden hover:border-[#b02a2a] transition" data-testid={`pos-product-${p.id}`}>
               <div className="aspect-square bg-[#f5f5f5]"><img src={p.image} alt="" className="w-full h-full object-cover"/></div>
               <div className="p-2.5">
                 <div className="text-xs text-[#666]">{p.category}</div>
@@ -72,7 +72,7 @@ export default function POS() {
         <div className="flex items-center justify-between mb-3"><div className="font-semibold">Panier</div>{cart.length>0 && <button onClick={clearCart} className="text-xs text-[#c62828]" data-testid="pos-clear">Vider</button>}</div>
         <div className="mb-3">
           {customer ? (
-            <div className="flex items-center justify-between p-2 bg-[#fff8e9] border border-[#ffdc98] rounded-lg text-sm">
+            <div className="flex items-center justify-between p-2 bg-[#fff5f5] border border-[#fde8e8] rounded-lg text-sm">
               <div><div className="font-medium">{customer.name}</div><div className="text-xs text-[#666]">{customer.phone} · {customer.loyalty_points||0} pts</div></div>
               <button onClick={()=>setCustomer(null)}><X size={14}/></button>
             </div>

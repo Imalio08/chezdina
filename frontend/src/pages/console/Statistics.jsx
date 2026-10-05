@@ -17,7 +17,7 @@ export default function Statistics() {
         <div className="dina-card-white p-5"><div className="text-xs uppercase text-[#666] mb-2">Articles vendus</div><div className="font-serif text-2xl tabular">{k.items_sold}</div></div>
       </div>
       <div className="dina-card-white p-5"><div className="font-semibold mb-4">CA par jour (14j)</div>
-        <ResponsiveContainer width="100%" height={300}><BarChart data={k.sales_series}><CartesianGrid stroke="#f0f0f0" vertical={false}/><XAxis dataKey="date" fontSize={11} stroke="#999"/><YAxis fontSize={11} stroke="#999" tickFormatter={(v)=>`${(v/1000).toFixed(0)}k`}/><Tooltip formatter={(v)=>fcfa(v)}/><Bar dataKey="value" fill="#f4b12c" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer>
+        <ResponsiveContainer width="100%" height={300}><BarChart data={k.sales_series}><CartesianGrid stroke="#f0f0f0" vertical={false}/><XAxis dataKey="date" fontSize={11} stroke="#999"/><YAxis fontSize={11} stroke="#999" tickFormatter={(v)=>`${(v/1000).toFixed(0)}k`}/><Tooltip formatter={(v)=>fcfa(v)}/><Bar dataKey="value" fill="#b02a2a" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer>
       </div>
       <div className="dina-card-white p-5">
         <div className="font-semibold mb-3">Top produits (quantité)</div>

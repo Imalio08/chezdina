@@ -36,8 +36,8 @@ export default function ConsoleLayout() {
     <div className="min-h-screen flex bg-[#f5f5f5]">
       <aside className="w-[260px] shrink-0 bg-[#1c1c1c] text-white flex flex-col sticky top-0 h-screen">
         <div className="px-5 py-5 border-b border-[#2a2a2a]">
-          <div className="font-serif text-2xl tracking-tight">Dina Store</div>
-          <div className="text-xs text-[#999] mt-0.5">Console back-office</div>
+          <div className="flex items-center gap-2"><div className="w-9 h-9 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div><div><div className="font-serif text-xl tracking-tight">Chez Dina</div><div className="text-[10px] uppercase tracking-widest text-[#999]">boutique</div></div></div>
+          <a href="/boutique" target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs text-[#b02a2a] hover:text-white"><Store size={12}/>Voir le site vitrine →</a>
         </div>
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-3 py-3 space-y-0.5">
           {MENU.map(({ to, icon: Icon, label, end }) => (
@@ -48,7 +48,7 @@ export default function ConsoleLayout() {
         </nav>
         <div className="px-4 py-4 border-t border-[#2a2a2a] text-xs">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-full bg-[#f4b12c] text-[#1c1c1c] font-semibold grid place-items-center">{(user?.name||"?").slice(0,1)}</div>
+            <div className="w-9 h-9 rounded-full bg-[#b02a2a] text-[#1c1c1c] font-semibold grid place-items-center">{(user?.name||"?").slice(0,1)}</div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium">{user?.name}</div>
               <div className="text-[#999] capitalize">{user?.role}</div>

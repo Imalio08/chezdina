@@ -342,6 +342,18 @@ async def kpis(user: dict = Depends(get_user), store_id: Optional[str] = None):
         "avg_basket": int(sum(o.get("total",0) for o in orders_all) / max(1, len(orders_all))),
     }
 
+# ---------- Site CMS ----------
+@api.get("/public/site")
+async def public_site():
+    s = await db.site_settings.find_one({"id": "main"})
+    return clean(s or {})
+
+@api.patch("/site")
+async def update_site(body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("_id", None)
+    await db.site_settings.update_one({"id": "main"}, {"$set": {**body, "id": "main", "updated_at": now_iso()}}, upsert=True)
+    return {"ok": True}
+
 # ---------- Public storefront ----------
 @api.get("/public/products")
 async def public_products(q: Optional[str] = None, category: Optional[str] = None):

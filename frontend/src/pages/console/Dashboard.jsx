@@ -18,7 +18,7 @@ export default function Dashboard() {
   const [k, setK] = useState(null);
   useEffect(() => { api.get(`/dashboard/kpis?store_id=${storeId}`).then(r=>setK(r.data)); }, [storeId]);
   if (!k) return <div className="text-sm text-[#666]">Chargement…</div>;
-  const COLORS = ["#f4b12c","#0021cc","#3242e8","#5867fd","#1c1c1c","#1f8a4c"];
+  const COLORS = ["#b02a2a","#0021cc","#3242e8","#5867fd","#1c1c1c","#1f8a4c"];
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -44,11 +44,11 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-4"><div className="font-semibold">Chiffre d'affaires · 14 derniers jours</div></div>
           <ResponsiveContainer width="100%" height={260}>
             <AreaChart data={k.sales_series}>
-              <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#f4b12c" stopOpacity={0.4}/><stop offset="100%" stopColor="#f4b12c" stopOpacity={0}/></linearGradient></defs>
+              <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#b02a2a" stopOpacity={0.4}/><stop offset="100%" stopColor="#b02a2a" stopOpacity={0}/></linearGradient></defs>
               <XAxis dataKey="date" fontSize={11} stroke="#999"/>
               <YAxis fontSize={11} stroke="#999" tickFormatter={(v)=>`${(v/1000).toFixed(0)}k`}/>
               <Tooltip formatter={(v)=>fcfa(v)} contentStyle={{borderRadius:8, border:"1px solid #ececec"}}/>
-              <Area type="monotone" dataKey="value" stroke="#f4b12c" strokeWidth={2} fill="url(#g)"/>
+              <Area type="monotone" dataKey="value" stroke="#b02a2a" strokeWidth={2} fill="url(#g)"/>
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -86,7 +86,7 @@ export default function Dashboard() {
         <div className="dina-card-white p-5">
           <div className="font-semibold mb-3 flex items-center gap-2"><AlertTriangle size={16} className="text-[#e4991e]"/>Alertes</div>
           <div className="space-y-2 text-sm">
-            <div className="flex justify-between p-3 bg-[#fff8e9] rounded-lg border border-[#ffdc98]"><span>Stock faible</span><strong>{k.low_stock} variantes</strong></div>
+            <div className="flex justify-between p-3 bg-[#fff5f5] rounded-lg border border-[#fde8e8]"><span>Stock faible</span><strong>{k.low_stock} variantes</strong></div>
             <div className="flex justify-between p-3 bg-[#f5f5f5] rounded-lg border border-[#ececec]"><span>Commandes à confirmer</span><strong>{k.pending_orders}</strong></div>
             <div className="flex justify-between p-3 bg-[#f5f5f5] rounded-lg border border-[#ececec]"><span>Factures impayées</span><strong>2</strong></div>
           </div>

@@ -52,14 +52,14 @@ export default function Rider() {
 
         {tab==="encaissements" && (
           <div className="space-y-3">
-            <div className="bg-white border border-[#ececec] rounded-xl p-4"><div className="text-xs uppercase text-[#666] mb-1">À remettre à la boutique</div><div className="font-serif text-3xl tabular text-[#f4b12c]">{fcfa(cash)}</div></div>
+            <div className="bg-white border border-[#ececec] rounded-xl p-4"><div className="text-xs uppercase text-[#666] mb-1">À remettre à la boutique</div><div className="font-serif text-3xl tabular text-[#b02a2a]">{fcfa(cash)}</div></div>
             {history.filter(o=>o.payment_method==="cod" && o.status==="livree").map(o=><div key={o.id} className="bg-white border border-[#ececec] rounded-xl p-3 flex justify-between"><div><div className="text-sm font-medium">{o.code}</div><div className="text-xs text-[#666]">{o.customer?.name}</div></div><div className="tabular font-semibold">{fcfa(o.total)}</div></div>)}
           </div>
         )}
 
         {tab==="profil" && user && (
           <div className="bg-white border border-[#ececec] rounded-xl p-5 space-y-2">
-            <div className="w-16 h-16 rounded-full bg-[#f4b12c] text-[#1c1c1c] grid place-items-center font-serif text-2xl mx-auto">{user.name?.[0]}</div>
+            <div className="w-16 h-16 rounded-full bg-[#b02a2a] text-[#1c1c1c] grid place-items-center font-serif text-2xl mx-auto">{user.name?.[0]}</div>
             <div className="text-center font-semibold text-lg">{user.name}</div>
             <div className="text-center text-xs text-[#666] capitalize">{user.role}</div>
             <div className="text-sm text-[#666] text-center">{user.phone}</div>
@@ -69,7 +69,7 @@ export default function Rider() {
       </main>
       <nav className="fixed bottom-0 inset-x-0 bg-white border-t border-[#ececec] max-w-md mx-auto grid grid-cols-4 h-16">
         {TABS.map(({key,label,icon:Icon})=>(
-          <button key={key} onClick={()=>setTab(key)} className={`flex flex-col items-center justify-center text-[11px] ${tab===key?"text-[#f4b12c] font-semibold":"text-[#666]"}`} data-testid={`rider-tab-${key}`}><Icon size={18}/>{label.split(" ")[0]}</button>
+          <button key={key} onClick={()=>setTab(key)} className={`flex flex-col items-center justify-center text-[11px] ${tab===key?"text-[#b02a2a] font-semibold":"text-[#666]"}`} data-testid={`rider-tab-${key}`}><Icon size={18}/>{label.split(" ")[0]}</button>
         ))}
       </nav>
 

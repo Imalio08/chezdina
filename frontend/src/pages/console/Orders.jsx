@@ -59,7 +59,7 @@ export default function Orders() {
               <div className="font-semibold text-xs uppercase mb-2" style={{color:statusColor[s]}}>{statusLabel[s]} ({orders.filter(o=>o.status===s).length})</div>
               <div className="space-y-2">
                 {orders.filter(o=>o.status===s).slice(0,8).map(o=>(
-                  <div key={o.id} onClick={()=>setSelected(o)} className="bg-white rounded-lg border border-[#ececec] p-2 cursor-pointer hover:border-[#f4b12c]" data-testid={`kanban-card-${o.code}`}>
+                  <div key={o.id} onClick={()=>setSelected(o)} className="bg-white rounded-lg border border-[#ececec] p-2 cursor-pointer hover:border-[#b02a2a]" data-testid={`kanban-card-${o.code}`}>
                     <div className="text-xs font-medium">{o.code}</div><div className="text-xs text-[#666]">{o.customer?.name||"—"}</div><div className="tabular text-sm font-semibold">{fcfa(o.total)}</div>
                   </div>
                 ))}

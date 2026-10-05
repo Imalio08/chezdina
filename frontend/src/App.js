@@ -83,8 +83,8 @@ export default function App() {
               <Route path="parametres" element={<Settings />} />
             </Route>
             <Route path="/console/livreur" element={<ProtectedRider><Rider /></ProtectedRider>} />
-            <Route path="/" element={<Navigate to="/boutique" replace />} />
-            <Route path="*" element={<Navigate to="/boutique" replace />} />
+            <Route path="/" element={<Navigate to="/console" replace />} />
+            <Route path="*" element={<Navigate to="/console" replace />} />
           </Routes>
         </BrowserRouter>
       </AppProvider>
