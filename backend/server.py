@@ -417,15 +417,74 @@ COLORS = ["Noir","Blanc","Rouge","Beige","Doré","Marine","Rose poudré","Camel"
 SHOE_SIZES = ["36","37","38","39","40","41","42"]
 CLOTH_SIZES = ["XS","S","M","L","XL","XXL"]
 ZONES = ["Cocody","Riviera","Angré","Plateau","Marcory","Zone 4","Treichville","Koumassi","Yopougon","Abobo","Adjamé","Port-Bouët","Bingerville","Songon","Grand-Bassam"]
-IMG = {
-  "Chaussures": "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600",
-  "Robes": "https://images.unsplash.com/photo-1709809081557-78f803ce93a0?w=600",
-  "Hauts": "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=600",
-  "Jupes": "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=600",
-  "Pantalons": "https://images.unsplash.com/photo-1584370848010-d7fe6bc767ec?w=600",
-  "Ensembles": "https://images.unsplash.com/photo-1764265149928-9b29e483fe8d?w=600",
-  "Sacs": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600",
-  "Accessoires": "https://images.unsplash.com/photo-1611923134239-b9be5bfe39e7?w=600",
+IMG_POOL = {
+  "Chaussures": [
+    "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800",
+    "https://images.unsplash.com/photo-1515347619252-60a4bf4fff4f?w=800",
+    "https://images.unsplash.com/photo-1596703263926-eb0762ee17e4?w=800",
+    "https://images.unsplash.com/photo-1573100925118-870b8efc799c?w=800",
+    "https://images.unsplash.com/photo-1562183241-b937e95585b6?w=800",
+    "https://images.unsplash.com/photo-1549298916-b41d501d3772?w=800",
+    "https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=800",
+    "https://images.unsplash.com/photo-1631985561086-91ca9b4b65f3?w=800",
+  ],
+  "Robes": [
+    "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=800",
+    "https://images.unsplash.com/photo-1612336307429-8a898d10e223?w=800",
+    "https://images.unsplash.com/photo-1583846783214-7229a91b20ed?w=800",
+    "https://images.unsplash.com/photo-1566174053879-31528523f8ae?w=800",
+    "https://images.unsplash.com/photo-1551803091-e20673f15770?w=800",
+    "https://images.unsplash.com/photo-1572804013309-59a88b7e92f1?w=800",
+    "https://images.unsplash.com/photo-1623609163859-ca93c959b98a?w=800",
+    "https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=800",
+  ],
+  "Hauts": [
+    "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800",
+    "https://images.unsplash.com/photo-1554568218-0f1715e72254?w=800",
+    "https://images.unsplash.com/photo-1564257631407-4deb1f99d992?w=800",
+    "https://images.unsplash.com/photo-1551488831-00ddcb6c6bd3?w=800",
+    "https://images.unsplash.com/photo-1485968579580-b6d095142e6e?w=800",
+    "https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=800",
+  ],
+  "Jupes": [
+    "https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=800",
+    "https://images.unsplash.com/photo-1577900232427-18219b9166a0?w=800",
+    "https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=800",
+    "https://images.unsplash.com/photo-1551163943-3f6a855d1153?w=800",
+    "https://images.unsplash.com/photo-1548624313-0396c75f8dca?w=800",
+  ],
+  "Pantalons": [
+    "https://images.unsplash.com/photo-1584370848010-d7fe6bc767ec?w=800",
+    "https://images.unsplash.com/photo-1548883354-94bcfe321cbb?w=800",
+    "https://images.unsplash.com/photo-1594938328870-9623159c8c99?w=800",
+    "https://images.unsplash.com/photo-1509631179647-0177331693ae?w=800",
+    "https://images.unsplash.com/photo-1552902019-ebcd97aa9aa0?w=800",
+  ],
+  "Ensembles": [
+    "https://images.unsplash.com/photo-1764265149928-9b29e483fe8d?w=800",
+    "https://images.unsplash.com/photo-1709809081557-78f803ce93a0?w=800",
+    "https://images.unsplash.com/photo-1613968988915-1309a52d8e8e?w=800",
+    "https://images.unsplash.com/photo-1550614000-4895a10e1bfd?w=800",
+    "https://images.unsplash.com/photo-1583846112692-5a7bdcedc67d?w=800",
+  ],
+  "Sacs": [
+    "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800",
+    "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800",
+    "https://images.unsplash.com/photo-1591561954555-607968c989ab?w=800",
+    "https://images.unsplash.com/photo-1559563458-527698bf5295?w=800",
+    "https://images.unsplash.com/photo-1535043934128-cf0b28d52f95?w=800",
+    "https://images.unsplash.com/photo-1566150905458-1bf1fc113f0d?w=800",
+    "https://images.unsplash.com/photo-1590874103328-eac38a683ce7?w=800",
+    "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800",
+  ],
+  "Accessoires": [
+    "https://images.unsplash.com/photo-1611923134239-b9be5bfe39e7?w=800",
+    "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800",
+    "https://images.unsplash.com/photo-1601924994987-69e26d50dc26?w=800",
+    "https://images.unsplash.com/photo-1620625515032-6ed0c1790c75?w=800",
+    "https://images.unsplash.com/photo-1573551565102-52d7bdd4e5cf?w=800",
+    "https://images.unsplash.com/photo-1618436917352-cd3d11ea4d15?w=800",
+  ],
 }
 
 async def seed_if_empty():
@@ -468,7 +527,8 @@ async def seed_if_empty():
                 "id": new_id(), "name": f"{cat} {random.choice(['Lagune','Baobab','Attiéké','Riviera','Palm','Akwaba','Doumbé','Zenith','Soleil','Harmattan'])} {random.randint(1,99)}",
                 "category": cat, "brand": random.choice(BRANDS), "price": price, "cost": cost,
                 "description": f"Pièce {cat.lower()} tendance, idéale pour la saison. Matière premium.",
-                "image": IMG[cat], "sizes": random.sample(sizes, min(len(sizes), random.randint(3,6))) if sizes else [],
+                "image": random.choice(IMG_POOL[cat]),
+                "images": random.sample(IMG_POOL[cat], min(len(IMG_POOL[cat]), random.randint(3,5))), "sizes": random.sample(sizes, min(len(sizes), random.randint(3,6))) if sizes else [],
                 "colors": random.sample(COLORS, random.randint(2,4)),
                 "stock": random.randint(0, 45), "store_id": random.choice(["store-cocody","store-marcory"]),
                 "visibility": "both", "sku": f"DN-{10000+i}", "barcode": f"590{random.randint(1000000000,9999999999)}",
@@ -598,7 +658,10 @@ async def startup():
     logger.info("Dina Store API ready.")
 
 @api.post("/seed")
-async def reseed(user: dict = Depends(require_role("admin"))):
+async def reseed(force: bool = False, user: dict = Depends(require_role("admin"))):
+    if force:
+        await db.products.delete_many({})
+        await db.orders.delete_many({})
     await seed_if_empty()
     return {"ok": True}
 
