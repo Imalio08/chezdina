@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend smoke + feature-surface testing on Chez Dina console. 18/19 console tabs load without crashes. Statistiques page CRASHES with 'Objects are not valid as a React child' because /console/statistiques still uses old shape (k.rev_month etc.) while backend /dashboard/kpis now returns {value,prev,delta,description} objects. All other new features (period filter, KPI deltas, drill-down, global search, theme/lang toggles, notifications panel, floating AI chat, POS modes + new customer modal, Customers segments + CRUD, Promotions form, Deliveries 4 tabs + zones, Reviews 3 tabs, Alerts 2 tabs, Site/Settings/Team pages) render and all documented data-testid selectors are present and clickable.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Statistics (/console/statistiques)", "issue": "Page crashes with 'Objects are not valid as a React child (found: object with keys {value, prev, delta, description})'. Statistics.jsx was NOT rewritten in this iteration — it still renders primitives like fcfa(k.rev_month) and k.orders_count directly, but /api/dashboard/kpis now returns objects {value,prev,delta,description}. Entire page is blank (body length 0). React error boundary logged. Note: review request mentions 'Statistics.jsx - full rewrite with 6 charts' but file in repo is the old 30-line version.", "selector": "/console/statistiques", "priority": "CRITICAL"},
+      {"component": "Dashboard drill-down modal", "issue": "Clicking kpi-orders-detail does not expose role='dialog'. Likely a custom overlay without ARIA role. Low priority — functionally may still work, only automation/a11y impacted.", "selector": "[data-testid=kpi-orders-detail]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "URGENT: Rewrite /app/frontend/src/pages/console/Statistics.jsx to consume the new KPI object shape (k.rev_month.value, k.orders_count.value, etc.) and add the 6 charts promised (hour/category/sizes/colors/top10/expenses by cat/status). Current file is the old 30-line version — appears the rewrite was not committed.",
+    "Minor: add role='dialog' to Dashboard drill-down modal container for accessibility/testability.",
+    "Minor: review mentions 'hero-save' testid; actual element uses 'site-save' — align docs or add alias."
+  ],
+  "critical_code_review_comments": [
+    "Statistics.jsx not updated to match new API contract — classic breaking change not propagated. Suggests the file was never saved from the iteration described in review request.",
+    "No ErrorBoundary around route content; a single component crash blanks the whole page instead of a scoped fallback."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (not tested per request)", "frontend": "94% (18/19 tabs OK; Statistiques crashes)"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! · PIN 1234 (login works)",
+  "seed_data_creation": "None — used existing seed",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Login works via first 2 input fields + 'Se connecter' button. All documented data-testid selectors verified present on their pages. The ONLY crashing tab is /console/statistiques — the file at /app/frontend/src/pages/console/Statistics.jsx is still the old 30-line version that reads k.rev_month as a primitive; backend now returns {value,prev,delta,description}. Fixing Statistics.jsx to use .value accessors (or rewriting as per review spec) should bring frontend to 100%.",
+  "rca of the issue": "Backend /api/dashboard/kpis contract changed from returning primitive numbers to {value,prev,delta,description} objects (new Delta model). Dashboard.jsx was rebuilt to consume this shape, but Statistics.jsx was left as the old implementation that renders {fcfa(k.rev_month)} — React chokes trying to render a plain object as a child. Fix: either update Statistics.jsx to read k.rev_month.value / k.orders_count.value / k.avg_basket.value / k.items_sold.value, or ship the promised full rewrite with the 6 charts."
+}
