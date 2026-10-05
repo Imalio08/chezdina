@@ -1,0 +1,105 @@
+{
+  "project_name": "Dina Store",
+  "archetype": "The Performance Pro / Swiss Luxury Hybrid",
+  "locale_and_currency": {
+    "currency_code": "XOF",
+    "currency_label": "FCFA",
+    "formatting_example": "25 000 FCFA",
+    "languages": ["fr", "en"],
+    "default_language": "fr",
+    "phone_format": "+225 XX XX XX XX XX",
+    "timezone": "Africa/Abidjan"
+  },
+  "typography": {
+    "headings": {
+      "font_family": "'IBM Plex Serif', Georgia, serif",
+      "weights": ["600", "700"],
+      "sizes": {
+        "page_title": "text-2xl sm:text-3xl lg:text-[32px] font-bold tracking-tight text-[#1c1c1c]",
+        "section_header": "text-lg sm:text-xl lg:text-[22px] font-semibold text-[#1c1c1c]",
+        "subsection_header": "text-base sm:text-lg font-semibold text-[#1c1c1c]"
+      }
+    },
+    "body_and_ui": {
+      "font_family": "'Inter Display', 'Inter', -apple-system, sans-serif",
+      "body_text": "text-sm sm:text-base text-[#1c1c1c] leading-relaxed",
+      "secondary_text": "text-sm text-[#666666]",
+      "labels_and_captions": "text-xs sm:text-[13px] font-medium tracking-wide text-[#666666] uppercase",
+      "kpi_and_tables": "tabular-nums font-mono sm:font-sans font-semibold"
+    }
+  },
+  "colors": {
+    "primary_black": "#1c1c1c",
+    "primary_yellow": "#f4b12c",
+    "primary_blue": "#0021cc",
+    "pure_black": "#000000",
+    "gray_secondary": "#666666",
+    "light_gray_bg": "#f5f5f5",
+    "lighter_gray_card": "#f8f8f8",
+    "light_yellow_highlight": "#ffdc98",
+    "dark_yellow_hover": "#e4991e",
+    "blue_light_chart": "#3242e8",
+    "blue_alt_chart": "#5867fd",
+    "status": {
+      "success": "#1f8a4c",
+      "warning": "#e4991e",
+      "error": "#c62828"
+    },
+    "border_color": "#ececec",
+    "rules": "No gradients, no neon colors, strict 1px solid borders #ececec. High contrast, clean surfaces."
+  },
+  "layout_and_grids": {
+    "console_back_office": {
+      "target_device": "Desktop & Tablet First",
+      "navigation": "Left sticky sidebar with collapsible sub-navigation and top bar with search, multi-store selector, language toggle (FR/EN), dark/light mode toggle, offline status indicator.",
+      "grid_mode": "High Density Grid (MODE B) with tight gaps (gap-4 or gap-6) for dashboards, tabular data, POS split view."
+    },
+    "delivery_space": {
+      "target_device": "Mobile-First Phone App",
+      "touch_targets": "Minimum 48px height/width for touch actions",
+      "navigation": "Bottom tab bar with 4 tabs: Mes courses, Historique, Encaissements, Profil"
+    },
+    "public_storefront": {
+      "target_device": "Mobile-First E-Commerce",
+      "navigation": "Header with brand logo, search bar, language/currency indicator, cart drawer trigger, customer account menu",
+      "grid_mode": "Tetris & Product Cards Grid (MODE A) with 2-4 columns on desktop, 1-2 on mobile"
+    }
+  },
+  "components_and_styling": {
+    "cards": "rounded-[12px] border border-[#ececec] bg-[#f8f8f8] p-5 shadow-none transition-colors hover:border-[#f4b12c]/50",
+    "primary_button": "bg-[#f4b12c] text-[#1c1c1c] font-semibold rounded-lg px-4 py-2.5 hover:bg-[#e4991e] active:scale-[0.98] transition-all min-h-[44px] flex items-center justify-center gap-2",
+    "secondary_button": "bg-white text-[#1c1c1c] border border-[#1c1c1c] font-semibold rounded-lg px-4 py-2.5 hover:bg-[#f5f5f5] active:scale-[0.98] transition-all min-h-[44px]",
+    "destructive_button": "bg-transparent text-[#c62828] border border-[#c62828] font-semibold rounded-lg px-4 py-2.5 hover:bg-[#c62828]/10 transition-all",
+    "data_tables": "sticky header, search input, filter popovers, sortable columns, pagination bar, bulk action toolbar, export CSV/PDF button, zebra striping with #f8f8f8 and hover highlight with #ffdc98",
+    "inputs_and_selects": "use custom styled inputs/selects with border-[#ececec] focus:border-[#0021cc] focus:ring-1 focus:ring-[#0021cc] bg-white rounded-md text-sm p-2.5"
+  },
+  "image_urls": {
+    "fashion_hero_and_banner": "https://images.unsplash.com/photo-1750032607523-0eb7857fac36?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHw0fHxhZnJpY2FuJTIwZmFzaGlvbiUyMHdvbWFuJTIwbHV4dXJ5JTIwZHJlc3N8ZW58MHx8fHwxNzkxMjIwODcyfDA&ixlib=rb-4.1.0&q=85",
+    "african_woman_dress_1": "https://images.unsplash.com/photo-1709809081557-78f803ce93a0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHxfHxhZnJpY2FuJTIwZmFzaGlvbiUyMHdvbWFuJTIwbHV4dXJ5JTIwZHJlc3N8ZW58MHx8fHwxNzkxMjIwODcyfDA&ixlib=rb-4.1.0&q=85",
+    "african_woman_dress_2": "https://images.unsplash.com/photo-1764265149928-9b29e483fe8d?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzNDR8MHwxfHNlYXJjaHwzfHxhZnJpY2FuJTIwZmFzaGlvbiUyMHdvbWFuJTIwbHV4dXJ5JTIwZHJlc3N8ZW58MHx8fHwxNzkxMjIwODcyfDA&ixlib=rb-4.1.0&q=85",
+    "gucci_black_bag": "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHw0fHxsdXh1cnklMjBsZWF0aGVyJTIwaGFuZGJhZyUyMGhpZ2glMjBmYXNoaW9ufGVufDB8fHx8MTc5MTIyMDg3Mnww&ixlib=rb-4.1.0&q=85",
+    "white_handbag": "https://images.unsplash.com/photo-1682745230951-8a5aa9a474a0?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHxfHxsdXh1cnklMjBsZWF0aGVyJTIwaGFuZGJhZyUyMGhpZ2glMjBmYXNoaW9ufGVufDB8fHx8MTc5MTIyMDg3Mnww&ixlib=rb-4.1.0&q=85",
+    "black_leather_bag_yellow_bg": "https://images.unsplash.com/photo-1705909237050-7a7625b47fac?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwyfHxsdXh1cnklMjBsZWF0aGVyJTIwaGFuZGJhZyUyMGhpZ2glMjBmYXNoaW9ufGVufDB8fHx8MTc5MTIyMDg3Mnww&ixlib=rb-4.1.0&q=85",
+    "red_leather_handbag": "https://images.unsplash.com/photo-1584917865442-de89df76afd3?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMzl8MHwxfHNlYXJjaHwzfHxsdXh1cnklMjBsZWF0aGVyJTIwaGFuZGJhZyUyMGhpZ2glMjBmYXNoaW9ufGVufDB8fHx8MTc5MTIyMDg3Mnww&ixlib=rb-4.1.0&q=85",
+    "rider_scooter_city": "https://images.unsplash.com/photo-1784026823195-f9d48c9e00d9?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2OTV8MHwxfHNlYXJjaHw0fHxkZWxpdmVyeSUyMHJpZGVyJTIwc2Nvb3RlciUyMHVyYmFuJTIwY2l0eXxlbnwwfHx8fDE3OTEyMjA4NzJ8MA&ixlib=rb-4.1.0&q=85",
+    "rider_scooter_urban": "https://images.unsplash.com/photo-1777905233022-196bb7c03036?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjA2OTV8MHwxfHNlYXJjaHxfHxkZWxpdmVyeSUyMHJpZGVyJTIwc2Nvb3RlciUyMHVyYmFuJTIwY2l0eXxlbnwwfHx8fDE3OTEyMjA4NzJ8MA&ixlib=rb-4.1.0&q=85"
+  },
+  "testing_and_accessibility": {
+    "data_testid_convention": "All interactive elements (buttons, links, inputs, tables, rows, tabs, dropdown items, KPI blocks) MUST carry `data-testid` formatted in kebab-case e.g. `data-testid=\"pos-add-to-cart-button\"`, `data-testid=\"storefront-product-card-1\"`, `data-testid=\"rider-tab-mes-courses\"`",
+    "toast_notifications": "Use `sonner` via `toast.success()`, `toast.error()`, `toast.info()` for instant feedback across POS actions, delivery status updates, order checkout, and settings saving."
+  },
+  "instructions_to_main_agent": [
+    "Build a unified application with three clear view modes: (1) Back-Office Console, (2) Delivery Rider Mobile Space, (3) Public Storefront.",
+    "Support offline-first behavior in POS and Delivery space with local state sync indicators.",
+    "Implement bilingual support (French default + English toggle) with local storage persistence and FCFA formatting ('25 000 FCFA').",
+    "Enforce strict 1px solid borders (#ececec), cards with 12px radius, yellow accent buttons, and IBM Plex Serif for headings.",
+    "Ensure all interactive elements have data-testid attributes for automated test coverage."
+  ],
+  "UNIVERSAL GUIDELINES FOR MAIN AGENT": {
+    "no_gradients": true,
+    "no_neon": true,
+    "contrast": "Ensure WCAG AA contrast against backgrounds.",
+    "toasts": "Use sonner for notifications",
+    "file_extension": "Use .js and .jsx files as this project is structured in JavaScript React."
+  }
+}
