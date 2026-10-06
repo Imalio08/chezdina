@@ -103,6 +103,14 @@ class CustomerIn(BaseModel):
 class CustomerLoginIn(BaseModel): identifier: str; password: str
 class ExpenseIn(BaseModel):
     category: str; amount: int; note: str = ""; payment_method: str = "cash"
+    label: str = ""
+    type: str = "variable"  # "fixe" | "variable"
+    paid_at: Optional[str] = None  # ISO date string
+    receipt: Optional[str] = None  # base64 data URL (image/pdf)
+    supplier: Optional[str] = None
+class ExpenseCategoryIn(BaseModel):
+    name: str
+    type: str = "variable"  # "fixe" | "variable"
 class SupplierIn(BaseModel):
     name: str
     trade_name: Optional[str] = None
@@ -1120,18 +1128,69 @@ async def delete_zone(zid: str, user: dict = Depends(require_role("admin","manag
 
 # ---------- Expenses / Suppliers / Purchases ----------
 @api.get("/expenses")
-async def expenses(user: dict = Depends(get_user)):
-    return clean(await db.expenses.find({}).sort("created_at", -1).to_list(1000))
+async def expenses(user: dict = Depends(get_user),
+                   category: Optional[str] = None, type: Optional[str] = None,
+                   q: Optional[str] = None, days: Optional[int] = None):
+    f: Dict[str, Any] = {}
+    if category: f["category"] = category
+    if type: f["type"] = type
+    if days:
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        f["created_at"] = {"$gte": cutoff}
+    rows = await db.expenses.find(f).sort("created_at", -1).to_list(2000)
+    if q:
+        ql = q.lower()
+        rows = [r for r in rows if ql in (r.get("label","") + " " + r.get("note","") + " " + r.get("category","")).lower()]
+    return clean(rows)
 
 @api.post("/expenses")
 async def create_expense(body: ExpenseIn, user: dict = Depends(get_user)):
     doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso(), "created_by": user.get("name"), "store_id":"store-cocody"})
+    if not doc.get("paid_at"): doc["paid_at"] = doc["created_at"]
     await db.expenses.insert_one(doc)
     return clean(doc)
+
+@api.patch("/expenses/{eid}")
+async def update_expense(eid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("id", None); body.pop("_id", None)
+    await db.expenses.update_one({"id": eid}, {"$set": body})
+    return {"ok": True}
+
+@api.post("/expenses/{eid}/receipt")
+async def upload_expense_receipt(eid: str, body: Dict[str,Any], user: dict = Depends(get_user)):
+    receipt = body.get("receipt")
+    if not receipt or not isinstance(receipt, str): raise HTTPException(400, "receipt (base64) requis")
+    await db.expenses.update_one({"id": eid}, {"$set": {"receipt": receipt, "receipt_uploaded_at": now_iso()}})
+    return {"ok": True}
 
 @api.delete("/expenses/{eid}")
 async def delete_expense(eid: str, user: dict = Depends(require_role("admin","manager"))):
     await db.expenses.delete_one({"id": eid})
+    return {"ok": True}
+
+# ---------- Expense Categories ----------
+@api.get("/expense-categories")
+async def list_expense_categories(user: dict = Depends(get_user)):
+    rows = await db.expense_categories.find({}).sort("name", 1).to_list(500)
+    return clean(rows)
+
+@api.post("/expense-categories")
+async def create_expense_category(body: ExpenseCategoryIn, user: dict = Depends(require_role("admin","manager"))):
+    existing = await db.expense_categories.find_one({"name": body.name})
+    if existing: raise HTTPException(400, "Catégorie déjà existante")
+    doc = {"id": new_id(), "name": body.name, "type": body.type, "created_at": now_iso()}
+    await db.expense_categories.insert_one(doc)
+    return clean(doc)
+
+@api.patch("/expense-categories/{cid}")
+async def update_expense_category(cid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("id", None); body.pop("_id", None)
+    await db.expense_categories.update_one({"id": cid}, {"$set": body})
+    return {"ok": True}
+
+@api.delete("/expense-categories/{cid}")
+async def delete_expense_category(cid: str, user: dict = Depends(require_role("admin","manager"))):
+    await db.expense_categories.delete_one({"id": cid})
     return {"ok": True}
 
 @api.get("/suppliers")
@@ -4153,6 +4212,17 @@ async def seed_if_empty():
     # Zones
     if await db.zones.count_documents({}) == 0:
         await db.zones.insert_many([{"id": new_id(), "name": n, "fee": f, "created_at": now_iso()} for n,f in ZONES])
+    # Expense Categories (default list for Finances page)
+    if await db.expense_categories.count_documents({}) == 0:
+        DEFAULT_EXP_CATS = [
+            ("Loyer", "fixe"), ("Électricité", "variable"), ("Eau", "variable"),
+            ("Salaires", "fixe"), ("Transport", "variable"), ("Marketing", "variable"),
+            ("Internet", "fixe"), ("Fournitures", "variable"), ("Taxes", "fixe"),
+            ("Emballage", "variable"), ("Carburant livreurs", "variable"), ("Autre", "variable"),
+        ]
+        await db.expense_categories.insert_many([
+            {"id": new_id(), "name": n, "type": t, "created_at": now_iso()} for n, t in DEFAULT_EXP_CATS
+        ])
 
 # ---------- Fix pack 2 : Roles & permissions, Approvals, Audit, Attendance ----------
 
@@ -4696,16 +4766,31 @@ async def _seed_demo_content_legacy():
             {"id":new_id(),"code":"FLASH20","type":"percent","value":20,"active":True,"uses":12,"starts_at":now.isoformat(),"ends_at":(now+timedelta(days=3)).isoformat(),"channel":"boutique","flash":True,"min_order":15000,"usage_limit":100,"created_at":now_iso()},
             {"id":new_id(),"code":"LIVRAISON","type":"free_delivery","value":0,"active":True,"uses":78,"starts_at":(now-timedelta(days=30)).isoformat(),"ends_at":(now+timedelta(days=60)).isoformat(),"channel":"all","flash":False,"min_order":25000,"usage_limit":0,"created_at":now_iso()},
         ])
+    # Expense Categories (default list)
+    if await db.expense_categories.count_documents({}) == 0:
+        DEFAULT_CATS = [
+            ("Loyer", "fixe"), ("Électricité", "variable"), ("Eau", "variable"),
+            ("Salaires", "fixe"), ("Transport", "variable"), ("Marketing", "variable"),
+            ("Internet", "fixe"), ("Fournitures", "variable"), ("Taxes", "fixe"),
+            ("Emballage", "variable"), ("Carburant livreurs", "variable"), ("Autre", "variable"),
+        ]
+        await db.expense_categories.insert_many([
+            {"id": new_id(), "name": n, "type": t, "created_at": now_iso()} for n, t in DEFAULT_CATS
+        ])
     # Expenses
     if await db.expenses.count_documents({}) == 0:
         cats = ["Loyer","CIE","SODECI","Internet","Salaires","Carburant livreurs","Emballage","Publicité"]
+        FIXED = {"Loyer","Internet","Salaires"}
         exps = []
         for m in range(6):
             for c in cats:
-                exps.append({"id": new_id(), "category": c,
+                created_at = (datetime.now(timezone.utc)-timedelta(days=30*m+random.randint(0,25))).isoformat()
+                exps.append({"id": new_id(), "category": c, "label": f"{c} - mois M-{m}",
                              "amount": random.choice([25000,45000,75000,120000,250000,350000,500000]) if c in ("Loyer","Salaires") else random.choice([5000,15000,25000,45000,65000]),
                              "note": f"{c} - mois M-{m}", "store_id":"store-cocody", "payment_method":"cash",
-                             "created_at": (datetime.now(timezone.utc)-timedelta(days=30*m+random.randint(0,25))).isoformat(),
+                             "type": "fixe" if c in FIXED else "variable",
+                             "paid_at": created_at,
+                             "created_at": created_at,
                              "created_by":"Aïcha Ouattara"})
         await db.expenses.insert_many(exps)
     # Orders

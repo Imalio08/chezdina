@@ -62,6 +62,7 @@ import Messagerie from "@/pages/console/Messagerie";
 import Segments from "@/pages/console/Segments";
 import Campagnes from "@/pages/console/Campagnes";
 import Statistiques from "@/pages/console/Statistiques";
+import Finances from "@/pages/console/Finances";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
@@ -156,7 +157,7 @@ export default function App() {
               <Route path="apparence" element={<ErrorBoundary><SiteAppearance/></ErrorBoundary>} />
               <Route path="accueil" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
               <Route path="apercu" element={<Navigate to="/boutique" replace/>} />
-              <Route path="finances" element={<Navigate to="/console/resultat" replace/>} />
+              <Route path="finances" element={<ErrorBoundary><Finances/></ErrorBoundary>} />
               <Route path="statistiques" element={<ErrorBoundary><Statistiques/></ErrorBoundary>} />
               <Route path="segments" element={<ErrorBoundary><Segments/></ErrorBoundary>} />
               <Route path="campagnes" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
