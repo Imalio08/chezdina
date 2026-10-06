@@ -141,6 +141,24 @@ class HoldIn(BaseModel):
     customer: Optional[Dict[str, Any]] = None
     note: Optional[str] = ""
     expires_in_hours: Optional[int] = 24
+class WaBroadcastIn(BaseModel):
+    segment: str  # all | active | inactive | vip | blacklist
+    message: str
+    product_id: Optional[str] = None
+class LoyaltySettingsIn(BaseModel):
+    points_per_fcfa: int = 500  # 1 point per 500 FCFA spent
+    tiers: List[Dict[str, Any]] = []  # [{name, min_points, discount_pct, free_delivery}]
+    referral_bonus_parrain: int = 1000  # wallet credit for the referrer
+    referral_bonus_filleul: int = 500   # wallet credit for the referee
+    enabled: bool = True
+class ReferralApplyIn(BaseModel):
+    code: str          # parrain's referral_code
+    customer_id: str   # filleul (new customer)
+class RolesPermissionsIn(BaseModel):
+    matrix: Dict[str, Dict[str, bool]]  # {role: {permission_key: true/false}}
+class AttendancePunchIn(BaseModel):
+    code: str
+    kind: str = "in"  # in | out
 
 # ---------- Auth ----------
 @api.post("/auth/login")
@@ -379,15 +397,81 @@ async def update_order(oid: str, body: Dict[str, Any], user: dict = Depends(get_
     await db.orders.update_one({"id": oid}, {"$set": body})
     return {"ok": True}
 
+WA_MANAGER_FALLBACK = "2250777926179"
+
+def _wa_message_for_status(order: dict, status: str) -> Optional[str]:
+    """French WhatsApp template per order status. Return None to skip enqueue."""
+    name = (order.get("customer") or {}).get("name", "Cliente")
+    first = name.split(" ")[0] if name else "Cliente"
+    code = order.get("code", "")
+    total = int(order.get("total", 0))
+    zone = order.get("delivery_zone") or ""
+    rider = order.get("rider_name") or ""
+    is_cod = order.get("payment_method") == "cod"
+    base = f"Bonjour {first} 👋 Chez Dina Boutique."
+    if status == "confirmee":
+        return f"{base}\nVotre commande {code} ({total} FCFA) est confirmée. Nous préparons tout avec soin. Merci 💕"
+    if status == "prete":
+        return f"{base}\nVotre commande {code} est prête ! Elle part en livraison très bientôt vers {zone}. 📦"
+    if status == "assignee":
+        extra = f" avec notre livreur {rider}" if rider else ""
+        return f"{base}\nVotre commande {code} est en route{extra}. Il vous appellera à l'approche. {'Préparez ' + str(total) + ' FCFA en espèces.' if is_cod else 'Déjà payée, aucun paiement à prévoir.'} 🛵"
+    if status == "en_livraison":
+        return f"{base}\nVotre colis {code} est en livraison. {'À encaisser : ' + str(total) + ' FCFA.' if is_cod else ''} 📍"
+    if status == "livree":
+        return f"{base}\nMerci pour votre commande {code} ! 💐\nNous serions ravies d'avoir votre avis en 10s : https://chezdina.ci/noter/{code}"
+    if status == "echouee":
+        return f"{base}\nNous avons rencontré un souci avec votre colis {code}. Nous vous recontactons rapidement pour reprogrammer. Pardon pour la gêne 🙏"
+    if status == "annulee":
+        return f"{base}\nVotre commande {code} a été annulée. N'hésitez pas à nous recontacter si vous changez d'avis 💕"
+    if status == "confirmee" or status == "nouvelle":
+        return None
+    return None
+
+async def _enqueue_wa(order: dict, status: str, by_name: Optional[str] = None):
+    """Enqueue a WhatsApp message in whatsapp_outbox based on order status."""
+    settings = await db.site_settings.find_one({"id": "main"}) or {}
+    if settings.get("whatsapp_auto") is False:
+        return
+    msg = _wa_message_for_status(order, status)
+    if not msg: return
+    phone = (order.get("customer") or {}).get("phone") or ""
+    phone_digits = "".join(c for c in phone if c.isdigit())
+    if not phone_digits: return
+    link = f"https://wa.me/{phone_digits}?text={_url_quote(msg)}"
+    doc = {
+        "id": new_id(),
+        "order_id": order.get("id"), "order_code": order.get("code"),
+        "customer_name": (order.get("customer") or {}).get("name"),
+        "phone": phone, "phone_digits": phone_digits,
+        "status_trigger": status, "message": msg, "link": link,
+        "created_at": now_iso(), "created_by": by_name,
+        "sent": False, "sent_at": None, "sent_by": None,
+        "kind": "status",
+    }
+    await db.whatsapp_outbox.insert_one(doc)
+
+def _url_quote(s: str) -> str:
+    try:
+        from urllib.parse import quote
+        return quote(s, safe="")
+    except Exception:
+        return s
+
 @api.patch("/orders/{oid}/status")
 async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get_user)):
     o = await db.orders.find_one({"id": oid})
     if not o: raise HTTPException(404)
+    prev = o.get("status")
     tl = o.get("timeline", []); tl.append({"status": body.status, "at": now_iso(), "by": user.get("name"), "reason": body.reason, "next_date": body.next_date})
     upd = {"status": body.status, "timeline": tl}
     if body.reason: upd["last_reason"] = body.reason
     if body.next_date: upd["rescheduled_for"] = body.next_date
     await db.orders.update_one({"id": oid}, {"$set": upd})
+    # Auto WhatsApp enqueue only on real status changes
+    if prev != body.status:
+        fresh = await db.orders.find_one({"id": oid})
+        await _enqueue_wa(fresh, body.status, user.get("name"))
     return {"ok": True}
 
 @api.get("/orders/track/{code}")
@@ -1152,6 +1236,173 @@ async def abandoned_cart(body: Dict[str,Any]):
 @api.get("/abandoned-carts")
 async def list_abandoned(user: dict = Depends(get_user)):
     return clean(await db.abandoned_carts.find({"recovered": False}).sort("created_at", -1).to_list(200))
+
+# ---------- WhatsApp Outbox (campagnes) ----------
+@api.get("/whatsapp-outbox")
+async def wa_outbox(user: dict = Depends(get_user), status: Optional[str] = None, kind: Optional[str] = None):
+    f = {}
+    if status == "pending": f["sent"] = False
+    elif status == "sent": f["sent"] = True
+    if kind: f["kind"] = kind
+    rows = await db.whatsapp_outbox.find(f).sort("created_at", -1).to_list(500)
+    return clean(rows)
+
+@api.post("/whatsapp-outbox/{mid}/mark-sent")
+async def wa_mark_sent(mid: str, user: dict = Depends(get_user)):
+    await db.whatsapp_outbox.update_one({"id": mid}, {"$set": {"sent": True, "sent_at": now_iso(), "sent_by": user.get("name")}})
+    return {"ok": True}
+
+@api.delete("/whatsapp-outbox/{mid}")
+async def wa_delete(mid: str, user: dict = Depends(require_role("admin","manager"))):
+    await db.whatsapp_outbox.delete_one({"id": mid})
+    return {"ok": True}
+
+def _segment_filter(seg: str) -> Dict[str, Any]:
+    if seg == "vip": return {"loyalty_points": {"$gt": 500}}
+    if seg == "blacklist": return {"status": "blacklist"}
+    if seg == "inactive":
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        return {"$or": [{"last_order_at": {"$lt": cutoff}}, {"last_order_at": None}]}
+    if seg == "active":
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        return {"last_order_at": {"$gte": cutoff}}
+    if seg == "nouvelles":
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+        return {"created_at": {"$gte": cutoff}}
+    return {}
+
+@api.get("/customer-segments")
+async def customer_segments(user: dict = Depends(get_user)):
+    """Return counts per segment for dashboard chips."""
+    out = {}
+    for seg in ["all", "active", "inactive", "vip", "blacklist", "nouvelles"]:
+        f = _segment_filter(seg) if seg != "all" else {}
+        out[seg] = await db.customers.count_documents(f)
+    return out
+
+@api.post("/whatsapp-outbox/broadcast")
+async def wa_broadcast(body: WaBroadcastIn, user: dict = Depends(require_role("admin","manager"))):
+    f = _segment_filter(body.segment)
+    customers = await db.customers.find(f).to_list(2000)
+    created = 0
+    for c in customers:
+        phone = c.get("phone") or ""
+        phone_digits = "".join(ch for ch in phone if ch.isdigit())
+        if not phone_digits: continue
+        msg = body.message.replace("{prenom}", (c.get("name") or "").split(" ")[0]).replace("{code}", c.get("referral_code") or "")
+        link = f"https://wa.me/{phone_digits}?text={_url_quote(msg)}"
+        await db.whatsapp_outbox.insert_one({
+            "id": new_id(), "customer_id": c.get("id"), "customer_name": c.get("name"),
+            "phone": phone, "phone_digits": phone_digits,
+            "message": msg, "link": link,
+            "kind": "broadcast", "segment": body.segment,
+            "sent": False, "created_at": now_iso(), "created_by": user.get("name"),
+        })
+        created += 1
+    return {"ok": True, "enqueued": created}
+
+# ---------- Loyalty settings ----------
+DEFAULT_LOYALTY = {
+    "points_per_fcfa": 500,
+    "enabled": True,
+    "referral_bonus_parrain": 1000,
+    "referral_bonus_filleul": 500,
+    "tiers": [
+        {"name": "Bronze", "min_points": 0, "discount_pct": 0, "free_delivery": False},
+        {"name": "Silver", "min_points": 500, "discount_pct": 5, "free_delivery": False},
+        {"name": "Gold", "min_points": 2000, "discount_pct": 10, "free_delivery": True},
+    ],
+}
+
+@api.get("/loyalty/settings")
+async def loyalty_settings(user: dict = Depends(get_user)):
+    s = await db.loyalty_settings.find_one({"id": "main"})
+    if not s:
+        s = {"id": "main", **DEFAULT_LOYALTY, "updated_at": now_iso()}
+        await db.loyalty_settings.insert_one(s)
+    return clean(s)
+
+@api.patch("/loyalty/settings")
+async def update_loyalty_settings(body: LoyaltySettingsIn, user: dict = Depends(require_role("admin","manager"))):
+    data = body.model_dump()
+    data["id"] = "main"; data["updated_at"] = now_iso()
+    await db.loyalty_settings.update_one({"id": "main"}, {"$set": data}, upsert=True)
+    return {"ok": True}
+
+# ---------- Referrals ----------
+@api.get("/referrals")
+async def list_referrals(user: dict = Depends(get_user)):
+    rows = await db.referrals.find({}).sort("created_at", -1).to_list(500)
+    return clean(rows)
+
+@api.get("/referrals/leaderboard")
+async def referrals_leaderboard(user: dict = Depends(get_user)):
+    rows = await db.customers.find({"referral_count": {"$gt": 0}}).sort("referral_count", -1).to_list(50)
+    return clean(rows)
+
+@api.post("/referrals/apply")
+async def apply_referral(body: ReferralApplyIn, user: dict = Depends(get_user)):
+    parrain = await db.customers.find_one({"referral_code": body.code.strip()})
+    if not parrain: raise HTTPException(404, "Code de parrainage introuvable")
+    filleul = await db.customers.find_one({"id": body.customer_id})
+    if not filleul: raise HTTPException(404, "Filleul introuvable")
+    if filleul.get("referred_by"): raise HTTPException(400, "Cette cliente a déjà utilisé un code")
+    if parrain.get("id") == filleul.get("id"): raise HTTPException(400, "Impossible de se parrainer soi-même")
+    settings = await db.loyalty_settings.find_one({"id": "main"}) or DEFAULT_LOYALTY
+    bp = int(settings.get("referral_bonus_parrain", 1000))
+    bf = int(settings.get("referral_bonus_filleul", 500))
+    await db.customers.update_one({"id": parrain["id"]}, {"$inc": {"wallet": bp, "referral_count": 1}})
+    await db.customers.update_one({"id": filleul["id"]}, {"$inc": {"wallet": bf}, "$set": {"referred_by": parrain["id"], "referred_by_code": body.code.strip()}})
+    doc = {
+        "id": new_id(), "parrain_id": parrain["id"], "parrain_name": parrain.get("name"),
+        "filleul_id": filleul["id"], "filleul_name": filleul.get("name"),
+        "code": body.code.strip(), "bonus_parrain": bp, "bonus_filleul": bf,
+        "created_at": now_iso(),
+    }
+    await db.referrals.insert_one(doc)
+    return {"ok": True, "referral": clean(doc)}
+
+# ---------- Roles & permissions matrix ----------
+DEFAULT_PERMS = {
+    "admin":   {"all": True},
+    "manager": {"pos": True, "orders": True, "deliveries": True, "products": True, "stock": True, "customers": True, "expenses": True, "team": False, "settings": False},
+    "sales":   {"pos": True, "orders": True, "deliveries": False, "products": False, "stock": True, "customers": True, "expenses": False, "team": False, "settings": False},
+    "stock_keeper": {"pos": False, "orders": True, "deliveries": False, "products": True, "stock": True, "customers": False, "expenses": False, "team": False, "settings": False},
+    "rider":   {"pos": False, "orders": False, "deliveries": True, "products": False, "stock": False, "customers": False, "expenses": False, "team": False, "settings": False},
+}
+
+@api.get("/roles-permissions")
+async def get_roles_permissions(user: dict = Depends(get_user)):
+    s = await db.roles_permissions.find_one({"id": "main"})
+    if not s:
+        s = {"id": "main", "matrix": DEFAULT_PERMS, "updated_at": now_iso()}
+        await db.roles_permissions.insert_one(s)
+    return clean(s)
+
+@api.patch("/roles-permissions")
+async def update_roles_permissions(body: RolesPermissionsIn, user: dict = Depends(require_role("admin"))):
+    await db.roles_permissions.update_one({"id": "main"}, {"$set": {"id": "main", "matrix": body.matrix, "updated_at": now_iso()}}, upsert=True)
+    return {"ok": True}
+
+# ---------- Attendance (kiosk) ----------
+@api.get("/attendance/today")
+async def attendance_today(user: dict = Depends(get_user)):
+    from datetime import datetime, timezone, timedelta
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    rows = await db.attendance.find({"at": {"$gte": start}}).sort("at", -1).to_list(500)
+    return clean(rows)
+
+@api.post("/attendance/punch-kiosk")
+async def attendance_punch_kiosk(body: AttendancePunchIn):
+    """Public kiosk endpoint: an employee enters their PIN to punch in/out."""
+    u = await db.users.find_one({"attendance_code": body.code.strip()})
+    if not u: raise HTTPException(403, "Code invalide")
+    doc = {
+        "id": new_id(), "user_id": u.get("id"), "user_name": u.get("name"),
+        "role": u.get("role"), "kind": body.kind, "at": now_iso(),
+    }
+    await db.attendance.insert_one(doc)
+    return {"ok": True, "name": u.get("name"), "role": u.get("role"), "kind": body.kind, "at": doc["at"]}
 
 @api.get("/notifications")
 async def notifications(user: dict = Depends(get_user)):

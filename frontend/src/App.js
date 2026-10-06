@@ -28,6 +28,10 @@ import Settings from "@/pages/console/Settings";
 import SiteSettings from "@/pages/console/SiteSettings";
 import Placeholder from "@/pages/console/Placeholder";
 import FichesColis from "@/pages/console/FichesColis";
+import WhatsAppCampaigns from "@/pages/console/WhatsAppCampaigns";
+import Referrals from "@/pages/console/Referrals";
+import RolesPermissions from "@/pages/console/RolesPermissions";
+import Kiosk from "@/pages/console/Kiosk";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
@@ -98,13 +102,13 @@ export default function App() {
               <Route path="liste-attente" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="fournisseurs" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="paniers-abandonnes" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="parrainage" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="campagnes-whatsapp" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="parrainage" element={<ErrorBoundary><Referrals/></ErrorBoundary>} />
+              <Route path="campagnes-whatsapp" element={<ErrorBoundary><WhatsAppCampaigns/></ErrorBoundary>} />
               <Route path="encaissements" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="resultat" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="employes" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="roles" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="pointage" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
+              <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
+              <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
               <Route path="apparence" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="pages" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="menus" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
