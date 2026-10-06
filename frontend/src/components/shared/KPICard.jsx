@@ -6,8 +6,9 @@ import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
 export default function KPICard({
   label,
   value,                   // string or number already formatted (e.g. "1 245 000 FCFA")
+  valueFull,               // optional full-precision string for native tooltip (compact display)
   unit,                    // optional "FCFA", "%", etc.
-  previousValue,           // number for delta computation (optional)
+  previousValue,           // number OR formatted string ("0%") for delta computation (optional)
   deltaLabel,              // "+12 % vs hier" — if omitted, computed from previousValue
   deltaDirection,          // "up" | "down" | "flat" | "auto" — auto uses previousValue
   inverse = false,         // true when rising is bad (cancellations, expenses) → red up
@@ -20,13 +21,28 @@ export default function KPICard({
   testid,
 }) {
   const [tipOpen, setTipOpen] = useState(false);
+  const toNum = (x) => {
+    if (x === undefined || x === null) return NaN;
+    if (typeof x === "number") return x;
+    const parsed = parseFloat(String(x).replace(/[^\d.-]/g, ""));
+    return parsed;
+  };
   let dir = deltaDirection, pct = null, abs = null;
-  if ((dir === "auto" || !dir) && previousValue !== undefined && previousValue !== null) {
-    const num = typeof value === "number" ? value : parseFloat(String(value).replace(/[^\d.-]/g,""));
-    if (!Number.isNaN(num) && previousValue !== 0) {
-      pct = ((num - previousValue) / previousValue) * 100;
-      abs = num - previousValue;
-      dir = Math.abs(pct) < 0.5 ? "flat" : pct > 0 ? "up" : "down";
+  if (dir === "auto" || !dir) {
+    const num = toNum(value);
+    const prevNum = toNum(previousValue);
+    if (!Number.isNaN(num) && !Number.isNaN(prevNum)) {
+      if (prevNum === 0 && num === 0) {
+        dir = "flat";
+      } else if (prevNum === 0) {
+        dir = num > 0 ? "up" : "down";
+        abs = num;
+        pct = null; // no meaningful %, show absolute instead
+      } else {
+        pct = ((num - prevNum) / Math.abs(prevNum)) * 100;
+        abs = num - prevNum;
+        dir = Math.abs(pct) < 0.5 ? "flat" : pct > 0 ? "up" : "down";
+      }
     } else {
       dir = "flat";
     }
@@ -57,13 +73,19 @@ export default function KPICard({
         <div className="absolute top-12 left-5 right-5 bg-[#1c1c1c] text-white text-xs rounded-lg p-2.5 z-20 shadow-lg pointer-events-none" data-testid={`${testid||label}-tooltip`}>{info}</div>
       )}
 
-      <div className={`font-serif tabular leading-none ${hero?"text-5xl":"text-3xl"} mb-2`}>{value}{unit && <span className="text-base ml-1 text-[#666]">{unit}</span>}</div>
+      <div className={`font-serif tabular leading-none ${hero?"text-5xl":"text-3xl"} mb-2 break-words`} title={valueFull || undefined}>{value}{unit && <span className="text-base ml-1 text-[#666]">{unit}</span>}</div>
 
       {dir && dir !== "flat" && (
         <div className="flex items-center gap-1 text-sm" style={{color: deltaColor}}>
           <Arrow size={13}/>
-          <span className="font-semibold tabular">{pct !== null ? `${pct>0?"+":""}${pct.toFixed(1)}%` : deltaLabel}</span>
-          {abs !== null && <span className="text-xs text-[#666] ml-1">· {abs>0?"+":""}{Math.round(abs).toLocaleString("fr-FR")}</span>}
+          <span className="font-semibold tabular">
+            {pct !== null && Number.isFinite(pct)
+              ? `${pct>0?"+":""}${pct.toFixed(1)}%`
+              : (abs !== null && Number.isFinite(abs)
+                  ? `${abs>0?"+":""}${Math.round(abs).toLocaleString("fr-FR").replace(/,/g," ")}`
+                  : (deltaLabel || ""))}
+          </span>
+          {abs !== null && Number.isFinite(abs) && pct !== null && Number.isFinite(pct) && <span className="text-xs text-[#666] ml-1">· {abs>0?"+":""}{Math.round(abs).toLocaleString("fr-FR").replace(/,/g," ")}</span>}
         </div>
       )}
       {deltaLabel && dir === "flat" && <div className="text-sm text-[#666]">{deltaLabel}</div>}

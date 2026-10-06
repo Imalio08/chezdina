@@ -104,23 +104,24 @@ function Kpi({ label, v, c = "#5867fd", sub }) {
 
 /* ===== TABS ===== */
 function SalesTab({ d }) {
+  const split = d.split || { orders: 0, delivered: 0, cancelled: 0, deferred: 0 };
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
-        <Kpi label="CA commandé" v={fcfa(d.split.orders)} c="#5867fd" />
-        <Kpi label="CA livré" v={fcfa(d.split.delivered)} c="#1f8a4c" />
-        <Kpi label="CA annulé" v={fcfa(d.split.cancelled)} c="#c62828" />
-        <Kpi label="CA reporté" v={fcfa(d.split.deferred)} c="#e4991e" />
-        <Kpi label="Taux annulation" v={`${d.cancel_rate}%`} c="#c62828" />
+        <Kpi label="CA commandé" v={fcfa(split.orders)} c="#5867fd" />
+        <Kpi label="CA livré" v={fcfa(split.delivered)} c="#1f8a4c" />
+        <Kpi label="CA annulé" v={fcfa(split.cancelled)} c="#c62828" />
+        <Kpi label="CA reporté" v={fcfa(split.deferred)} c="#e4991e" />
+        <Kpi label="Taux annulation" v={`${d.cancel_rate ?? 0}%`} c="#c62828" />
         <Kpi label="Panier moyen" v={fcfa(d.avg_basket)} c="#b02a2a" />
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <ChartCard title="Ventes par jour de la semaine">
-          <BarChart data={d.by_dow}><CartesianGrid stroke="#f0f0f0" vertical={false} /><XAxis dataKey="day" fontSize={11} /><YAxis fontSize={11} tickFormatter={v => `${(v/1000).toFixed(0)}k`} /><Tooltip formatter={v => fcfa(v)} /><Bar dataKey="value" fill="#b02a2a" radius={[4,4,0,0]} /></BarChart>
+          <BarChart data={d.by_dow || []}><CartesianGrid stroke="#f0f0f0" vertical={false} /><XAxis dataKey="day" fontSize={11} /><YAxis fontSize={11} tickFormatter={v => `${(v/1000).toFixed(0)}k`} /><Tooltip formatter={v => fcfa(v)} /><Bar dataKey="value" fill="#b02a2a" radius={[4,4,0,0]} /></BarChart>
         </ChartCard>
         <ChartCard title="Ventes par heure">
-          <BarChart data={d.by_hour}><CartesianGrid stroke="#f0f0f0" vertical={false} /><XAxis dataKey="hour" fontSize={10} interval={1} /><YAxis fontSize={11} tickFormatter={v => `${(v/1000).toFixed(0)}k`} /><Tooltip formatter={v => fcfa(v)} /><Bar dataKey="value" fill="#5867fd" radius={[4,4,0,0]} /></BarChart>
+          <BarChart data={d.by_hour || []}><CartesianGrid stroke="#f0f0f0" vertical={false} /><XAxis dataKey="hour" fontSize={10} interval={1} /><YAxis fontSize={11} tickFormatter={v => `${(v/1000).toFixed(0)}k`} /><Tooltip formatter={v => fcfa(v)} /><Bar dataKey="value" fill="#5867fd" radius={[4,4,0,0]} /></BarChart>
         </ChartCard>
       </div>
 
@@ -143,7 +144,17 @@ function SalesTab({ d }) {
 
 function HeatmapCard({ matrix }) {
   const days = ["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"];
-  const max = Math.max(...matrix.flat(), 1);
+  const safe = Array.isArray(matrix) && matrix.length ? matrix : [];
+  const flat = safe.flat();
+  const max = Math.max(...(flat.length ? flat : [1]), 1);
+  if (!safe.length) {
+    return (
+      <div className="dina-card-white p-4" data-testid="heatmap">
+        <div className="font-semibold mb-2 text-sm">Heatmap jour × heure</div>
+        <div className="text-sm text-[#666] text-center py-6">Aucune donnée pour cette période</div>
+      </div>
+    );
+  }
   return (
     <div className="dina-card-white p-4" data-testid="heatmap">
       <div className="font-semibold mb-2 text-sm">Heatmap jour × heure</div>
@@ -151,7 +162,7 @@ function HeatmapCard({ matrix }) {
         <div className="min-w-[720px]">
           <div className="grid grid-cols-[40px_repeat(24,1fr)] gap-0.5 text-[9px]">
             <div></div>{Array.from({length:24}).map((_,h)=><div key={h} className="text-center text-[#999]">{h}</div>)}
-            {matrix.map((row, d)=>(<React.Fragment key={d}><div className="text-[#666] text-right pr-1">{days[d]}</div>{row.map((v,h)=>{const i=v/max;return <div key={h} className="aspect-square rounded" style={{background:`rgba(176,42,42,${i})`}} title={`${days[d]} ${h}h · ${fcfa(v)}`}></div>;})}</React.Fragment>))}
+            {safe.map((row, d)=>(<React.Fragment key={d}><div className="text-[#666] text-right pr-1">{days[d]}</div>{(row||[]).map((v,h)=>{const i=v/max;return <div key={h} className="aspect-square rounded" style={{background:`rgba(176,42,42,${i})`}} title={`${days[d]} ${h}h · ${fcfa(v)}`}></div>;})}</React.Fragment>))}
           </div>
         </div>
       </div>
@@ -185,12 +196,14 @@ function ProductsTab({ d, period }) {
   );
 }
 function RankTable({ title, rows, field, format, onPick }) {
+  const safe = Array.isArray(rows) ? rows : [];
   return (
     <div className="dina-card-white p-4">
       <div className="font-semibold mb-2 text-sm">{title}</div>
+      {safe.length === 0 ? <div className="text-xs text-[#666] py-3">Aucune donnée pour cette période</div> : (
       <div className="space-y-1 max-h-80 overflow-y-auto">
-        {rows.slice(0,15).map((r,i)=>(<button key={r.id} onClick={()=>onPick&&onPick(r.id)} className="flex items-center gap-2 w-full text-left text-xs py-1 hover:bg-[#fafafa] dark:hover:bg-[#141414] rounded px-1"><span className="text-[#999] w-5">#{i+1}</span><img src={r.image} alt="" className="w-6 h-6 rounded object-cover"/><span className="flex-1 truncate">{r.name}</span><span className="tabular font-semibold">{format(r[field])}</span></button>))}
-      </div>
+        {safe.slice(0,15).map((r,i)=>(<button key={r.id} onClick={()=>onPick&&onPick(r.id)} className="flex items-center gap-2 w-full text-left text-xs py-1 hover:bg-[#fafafa] dark:hover:bg-[#141414] rounded px-1"><span className="text-[#999] w-5">#{i+1}</span><img src={r.image} alt="" className="w-6 h-6 rounded object-cover"/><span className="flex-1 truncate">{r.name}</span><span className="tabular font-semibold">{format(r[field])}</span></button>))}
+      </div>)}
     </div>
   );
 }
@@ -250,14 +263,14 @@ function OrdersDeliveryTab({ d }) {
 
 function ZonesTab({ period }) {
   const [data, setData] = useState(null);
-  useEffect(() => { api.get(`/stats/zones?period=${period}`).then(r=>setData(r.data)); }, [period]);
+  useEffect(() => { api.get(`/stats/zones?period=${period}`).then(r=>setData(r.data)).catch(()=>setData({zones:[]})); }, [period]);
   if (!data) return <div className="text-sm text-[#666]">Chargement…</div>;
-  const rows = data.zones || data || [];
+  const rows = Array.isArray(data) ? data : (data.zones || []);
   return (
     <div className="space-y-4">
       <div className="flex justify-end"><ExportBar rows={rows} name="zones" /></div>
-      <div className="dina-card-white overflow-x-auto"><table className="dina-table"><thead><tr><th>Zone</th><th>Clientes</th><th>Commandes</th><th className="text-right">CA</th><th className="text-right">Livrées</th><th className="text-right">Annulées</th></tr></thead><tbody>{rows.map((z,i)=>(<tr key={i}><td className="font-medium">{z.name}</td><td>{z.clients}</td><td>{z.orders}</td><td className="text-right tabular">{fcfa(z.revenue)}</td><td className="text-right text-[#1f8a4c]">{z.delivered}</td><td className="text-right text-[#c62828]">{z.cancelled}</td></tr>))}</tbody></table></div>
-      <div className="text-xs text-[#666]">💡 Carte Leaflet des zones disponible via /console/zones</div>
+      <div className="dina-card-white overflow-x-auto"><table className="dina-table"><thead><tr><th>Zone</th><th>Clientes</th><th>Commandes</th><th className="text-right">CA</th><th className="text-right">Livrées</th><th className="text-right">Annulées</th></tr></thead><tbody>{rows.length === 0 ? <tr><td colSpan={6} className="text-sm text-[#666] text-center py-6">Aucune donnée pour cette période</td></tr> : rows.map((z,i)=>(<tr key={i}><td className="font-medium">{z.name}</td><td>{z.clients}</td><td>{z.orders}</td><td className="text-right tabular">{fcfa(z.revenue)}</td><td className="text-right text-[#1f8a4c]">{z.delivered}</td><td className="text-right text-[#c62828]">{z.cancelled}</td></tr>))}</tbody></table></div>
+      <div className="text-xs text-[#666]">Carte Leaflet des zones disponible via /console/zones</div>
     </div>
   );
 }

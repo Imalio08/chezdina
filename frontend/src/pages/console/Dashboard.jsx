@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import { fcfa } from "@/lib/format";
+import { fcfa, fcfaCompact } from "@/lib/format";
 import { TrendingUp, ShoppingBag, Users, AlertTriangle, Truck, Receipt, Wallet, Package, X, RefreshCw, Percent, ArrowRight, ChevronRight, Clock } from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid, LineChart, Line } from "recharts";
 import PeriodSelector from "@/components/shared/PeriodSelector";
@@ -87,12 +87,12 @@ export default function Dashboard() {
         <div className="text-xs text-[#666]">Chiffre d'affaires, marge, panier, articles — vs {vs}</div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-        <KPICard label="CA période" value={fcfa(k.revenue.value)} previousValue={k.revenue.prev} info={k.revenue.description} icon={TrendingUp} color="#b02a2a" deltaLabel={`vs ${vs}`} hero/>
+        <KPICard label="CA période" value={fcfaCompact(k.revenue.value)} valueFull={fcfa(k.revenue.value)} previousValue={k.revenue.prev} info={k.revenue.description} icon={TrendingUp} color="#b02a2a" deltaLabel={`vs ${vs}`} hero/>
         <KPICard label="Commandes" value={k.orders_count.value} previousValue={k.orders_count.prev} info={k.orders_count.description} icon={Receipt} color="#0021cc" deltaLabel={`vs ${vs}`}/>
         <KPICard label="Articles vendus" value={k.items_sold.value} previousValue={k.items_sold.prev} info={k.items_sold.description} icon={ShoppingBag} color="#f4b12c" deltaLabel={`vs ${vs}`}/>
-        <KPICard label="Panier moyen" value={fcfa(k.avg_basket.value)} previousValue={k.avg_basket.prev} info={k.avg_basket.description} icon={Wallet} color="#5867fd" deltaLabel={`vs ${vs}`}/>
-        <KPICard label="Marge brute" value={fcfa(k.margin.value)} previousValue={k.margin.prev} info={k.margin.description} icon={TrendingUp} color="#1f8a4c" deltaLabel={`vs ${vs}`}/>
-        <KPICard label="Taux d'annulation" value={`${k.cancel_rate.value}%`} previousValue={k.cancel_rate.prev !== undefined ? `${k.cancel_rate.prev}%` : undefined} info={k.cancel_rate.description} icon={AlertTriangle} color="#c62828" inverse deltaLabel={`vs ${vs}`}/>
+        <KPICard label="Panier moyen" value={fcfaCompact(k.avg_basket.value)} valueFull={fcfa(k.avg_basket.value)} previousValue={k.avg_basket.prev} info={k.avg_basket.description} icon={Wallet} color="#5867fd" deltaLabel={`vs ${vs}`}/>
+        <KPICard label="Marge brute" value={fcfaCompact(k.margin.value)} valueFull={fcfa(k.margin.value)} previousValue={k.margin.prev} info={k.margin.description} icon={TrendingUp} color="#1f8a4c" deltaLabel={`vs ${vs}`}/>
+        <KPICard label="Taux d'annulation" value={`${k.cancel_rate.value}%`} previousValue={k.cancel_rate.prev} info={k.cancel_rate.description} icon={AlertTriangle} color="#c62828" inverse deltaLabel={`vs ${vs}`}/>
       </div>
 
       {/* Row 3 — Par catégorie */}
@@ -123,11 +123,14 @@ export default function Dashboard() {
 
       {/* Charts: CA & marge + Status split */}
       <div className="grid lg:grid-cols-2 gap-4">
-        <div className="dina-card-white p-5">
+        <div className="dina-card-white p-5" data-testid="chart-ca-margin">
           <div className="font-semibold">CA & marge par jour</div>
           <div className="text-xs text-[#666] mb-3">Chiffre d'affaires et marge brute quotidienne</div>
+          {(k.sales_series || []).length === 0 ? (
+            <div className="h-[260px] grid place-items-center text-sm text-[#666]">Aucune donnée pour cette période</div>
+          ) : (
           <ResponsiveContainer width="100%" height={260}>
-            <AreaChart data={k.sales_series} margin={{top:5,right:10,left:0,bottom:5}}>
+            <AreaChart data={k.sales_series || []} margin={{top:5,right:10,left:0,bottom:5}}>
               <defs>
                 <linearGradient id="gRev" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#b02a2a" stopOpacity={0.4}/><stop offset="100%" stopColor="#b02a2a" stopOpacity={0}/></linearGradient>
                 <linearGradient id="gMgn" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1f8a4c" stopOpacity={0.3}/><stop offset="100%" stopColor="#1f8a4c" stopOpacity={0}/></linearGradient>
@@ -141,13 +144,17 @@ export default function Dashboard() {
               <Area type="monotone" dataKey="margin" name="Marge brute" stroke="#1f8a4c" strokeWidth={2} fill="url(#gMgn)"/>
             </AreaChart>
           </ResponsiveContainer>
+          )}
         </div>
 
-        <div className="dina-card-white p-5">
+        <div className="dina-card-white p-5" data-testid="chart-orders-status">
           <div className="font-semibold">Commandes par statut (jour)</div>
           <div className="text-xs text-[#666] mb-3">Passées · livrées · annulées · reportées</div>
+          {(k.sales_series || []).length === 0 ? (
+            <div className="h-[260px] grid place-items-center text-sm text-[#666]">Aucune donnée pour cette période</div>
+          ) : (
           <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={k.sales_series} margin={{top:5,right:10,left:0,bottom:5}}>
+            <LineChart data={k.sales_series || []} margin={{top:5,right:10,left:0,bottom:5}}>
               <CartesianGrid stroke="#f0f0f0" vertical={false}/>
               <XAxis dataKey="date" fontSize={11} stroke="#999"/>
               <YAxis fontSize={11} stroke="#999" allowDecimals={false}/>
@@ -159,17 +166,22 @@ export default function Dashboard() {
               <Line type="monotone" dataKey="deferred" name="Reportées" stroke={STATUS_COLORS.deferred} strokeWidth={2} dot={false}/>
             </LineChart>
           </ResponsiveContainer>
+          )}
         </div>
       </div>
 
       {/* Channels + Top 5 */}
       <div className="grid lg:grid-cols-3 gap-4">
-        <div className="dina-card-white p-5">
+        <div className="dina-card-white p-5" data-testid="chart-channels">
           <div className="font-semibold">Ventes par canal</div>
           <div className="text-xs text-[#666] mb-3">Boutique, web, WhatsApp, social</div>
+          {(k.channels || []).length === 0 ? (
+            <div className="h-[200px] grid place-items-center text-sm text-[#666]">Aucune donnée pour cette période</div>
+          ) : (
+          <>
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
-              <Pie data={k.channels} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80} paddingAngle={2}>
+              <Pie data={k.channels || []} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80} paddingAngle={2}>
                 {(k.channels || []).map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
               </Pie>
               <Tooltip formatter={v=>fcfa(v)} contentStyle={{fontSize:12}}/>
@@ -178,13 +190,17 @@ export default function Dashboard() {
           <div className="space-y-1 text-xs mt-2">
             {(k.channels || []).map((c,i)=><div key={c.name} className="flex items-center justify-between"><span className="flex items-center gap-2 capitalize"><span className="status-dot" style={{background:COLORS[i%COLORS.length]}}/>{c.name}</span><span className="tabular">{fcfa(c.value)}</span></div>)}
           </div>
+          </>)}
         </div>
 
-        <div className="lg:col-span-2 dina-card-white p-5">
+        <div className="lg:col-span-2 dina-card-white p-5" data-testid="top-products-widget">
           <div className="flex items-center justify-between mb-3">
             <div><div className="font-semibold">Top 5 produits</div><div className="text-xs text-[#666]">Classement par quantité vendue</div></div>
             <Link to="/console/statistiques?tab=products" className="text-xs text-[#b02a2a] hover:underline flex items-center gap-1">Voir plus <ChevronRight size={12}/></Link>
           </div>
+          {(k.top_products || []).length === 0 ? (
+            <div className="text-sm text-[#666] text-center py-6">Aucune donnée pour cette période</div>
+          ) : (
           <div className="space-y-2">
             {(k.top_products || []).map((p,i)=>(
               <div key={i} className="flex items-center gap-3" data-testid={`top-product-${i}`}>
@@ -195,6 +211,7 @@ export default function Dashboard() {
               </div>
             ))}
           </div>
+          )}
         </div>
       </div>
 

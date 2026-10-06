@@ -50,8 +50,8 @@ export default function Orders() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Commandes</h1><p className="text-sm text-[#666]">Tous canaux · {orders.length} commandes</p></div>
         <div className="flex gap-2">
-          <button onClick={()=>setView("table")} className={`px-3 py-2 text-xs rounded-md border ${view==="table"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`}>Table</button>
-          <button onClick={()=>setView("kanban")} className={`px-3 py-2 text-xs rounded-md border ${view==="kanban"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`}>Kanban</button>
+          <button onClick={()=>setView("table")} className={`px-3 py-2 text-xs rounded-md border ${view==="table"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="orders-view-table">Table</button>
+          <button onClick={()=>setView("kanban")} className={`px-3 py-2 text-xs rounded-md border ${view==="kanban"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="orders-view-kanban">Kanban</button>
         </div>
       </div>
 
