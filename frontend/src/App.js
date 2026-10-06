@@ -3,6 +3,8 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
+import { registerSW } from "@/lib/sw";
+registerSW();
 import { CustomerProvider } from "@/context/CustomerContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Login from "@/pages/Login";

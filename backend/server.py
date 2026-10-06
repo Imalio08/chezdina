@@ -156,7 +156,9 @@ class ZoneIn(BaseModel): name: str; fee: int
 class ReviewIn(BaseModel):
     product_id: str; rating: int; comment: str = ""
     customer_name: str = "Cliente"; customer_phone: Optional[str] = None
-class ReviewModerationIn(BaseModel): status: str
+class ReviewModerationIn(BaseModel):
+    status: str
+    reply: Optional[str] = None
 class AskIn(BaseModel):
     question: str
     page: Optional[str] = None
@@ -3164,7 +3166,12 @@ async def all_reviews(user: dict = Depends(get_user), status: Optional[str] = No
 
 @api.patch("/reviews/{rid}")
 async def moderate_review(rid: str, body: ReviewModerationIn, user: dict = Depends(require_role("admin","manager"))):
-    await db.reviews.update_one({"id": rid}, {"$set": {"status": body.status}})
+    patch = {"status": body.status, "moderated_by": user.get("name"), "moderated_at": now_iso()}
+    if body.reply is not None:
+        patch["reply"] = body.reply
+        patch["reply_by"] = user.get("name")
+        patch["reply_at"] = now_iso()
+    await db.reviews.update_one({"id": rid}, {"$set": patch})
     # Recompute aggregate on product
     r = await db.reviews.find_one({"id": rid})
     if r:
@@ -4709,9 +4716,62 @@ def _match_tool(q: str) -> Optional[str]:
     if any(w in q for w in ["ca", "chiffre d'affaires", "chiffre affaires", "vente", "ventes"]): return "sales"
     return None
 
+async def _search_manual(q: str, role: str) -> Optional[Dict[str, Any]]:
+    """Search manual_modules for the top matching section. Returns {module, section, snippet, score}."""
+    ql = (q or "").lower().strip()
+    if not ql or len(ql) < 3: return None
+    tokens = [t for t in ql.replace("?","").replace("!","").split() if len(t) > 2]
+    if not tokens: return None
+    f = {"roles": role} if role else {}
+    modules = await db.manual_modules.find(f).to_list(100)
+    best = None
+    for m in modules:
+        for sec in m.get("sections") or []:
+            hay = (sec.get("heading","") + " " + " ".join(
+                (b.get("content","") or b.get("text","") or " ".join(b.get("items",[]) or []))
+                for b in sec.get("blocks") or []
+            )).lower()
+            score = sum(hay.count(t) for t in tokens)
+            if score > 0 and (not best or score > best["score"]):
+                snippet = hay[:220]
+                best = {"module_number": m["number"], "module_title": m["title"],
+                        "section_id": sec.get("id"), "section_heading": sec.get("heading"),
+                        "snippet": snippet, "score": score}
+    return best
+
 @api.post("/ai/ask")
 async def ask_dina(body: AskIn, user: dict = Depends(get_user)):
     q = body.question
+    # 0) Try manual first — "how-to" questions should get procedural answers
+    is_howto = any(w in (q or "").lower() for w in ["comment","how","faire","créer","créé","modifier","supprimer","remboursement","remise","préparer","clôturer","imprimer","exporter","ajouter","retrouver","trouver","configurer"])
+    if is_howto:
+        hit = await _search_manual(q, user.get("role",""))
+        if hit:
+            # Load the full section for a cleaner answer
+            m = await db.manual_modules.find_one({"number": hit["module_number"]})
+            sec = next((s for s in (m or {}).get("sections") or [] if s.get("id") == hit["section_id"]), None)
+            lines = [f"**Module {hit['module_number']} · {hit['module_title']}** — section « {hit['section_heading']} »:\n"]
+            for b in (sec or {}).get("blocks") or []:
+                if b.get("type") == "steps":
+                    for i, s in enumerate(b.get("items") or [], 1):
+                        lines.append(f"{i}. {s}")
+                elif b.get("type") == "list":
+                    for s in b.get("items") or []:
+                        lines.append(f"• {s}")
+                elif b.get("content"):
+                    lines.append(b["content"])
+                elif b.get("text"):
+                    lines.append(b["text"])
+            lines.append(f"\n👉 Voir dans le manuel : Module {hit['module_number']}, section « {hit['section_heading'] }»")
+            return {"answer": "\n".join(lines), "source": "manual", "manual_hint": {
+                "module_number": hit["module_number"], "section_id": hit["section_id"],
+                "deep_link": f"/console/manuel/{hit['module_number']}#{hit['section_id']}"
+            }}
+        else:
+            # Log unanswered how-to for the owner to complete the manual
+            try:
+                await db.manual_gaps.insert_one({"id": new_id(), "question": q, "asked_by": user.get("name"), "role": user.get("role"), "at": now_iso()})
+            except Exception: pass
     # 1) Try structured tool call first (never invents numbers)
     tool = _match_tool(q)
     try:
@@ -4745,7 +4805,62 @@ async def ask_dina(body: AskIn, user: dict = Depends(get_user)):
         logger.exception("AI")
         return {"answer": f"Je n'arrive pas à récupérer la réponse IA pour le moment. Voici un résumé local : CA récent ≈ {rev:,} FCFA, top produits : {', '.join(n for n,_ in best) or '—'}. Réessayez dans un instant.".replace(",", " "), "error": True, "source": "fallback"}
 
-# ---------- Seed ----------
+@api.get("/manual-gaps")
+async def manual_gaps(user: dict = Depends(require_role("admin"))):
+    rows = await db.manual_gaps.find({}).sort("at", -1).to_list(200)
+    return clean(rows)
+
+@api.post("/analytics/events")
+async def track_event(body: Dict[str, Any]):
+    doc = {
+        "id": new_id(),
+        "at": now_iso(),
+        "name": body.get("name"),
+        "visitor_id": body.get("visitor_id"),
+        "session_id": body.get("session_id"),
+        "page": body.get("page"),
+        "product_id": body.get("product_id"),
+        "value": body.get("value"),
+        "source": body.get("source"),
+        "utm_source": body.get("utm_source"),
+        "utm_medium": body.get("utm_medium"),
+        "utm_campaign": body.get("utm_campaign"),
+        "device": body.get("device"),
+        "consent": body.get("consent", False),
+    }
+    await db.events.insert_one(doc)
+    return {"ok": True, "id": doc["id"]}
+
+@api.get("/analytics/funnel")
+async def analytics_funnel(user: dict = Depends(require_role("admin","manager")), days: int = 7):
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    rows = await db.events.find({"at": {"$gte": cutoff}}).to_list(50000)
+    def count(name): return sum(1 for r in rows if r.get("name") == name)
+    visitors = len({r.get("visitor_id") for r in rows if r.get("visitor_id")})
+    pv = count("page_view")
+    pv_product = count("product_view")
+    atc = count("add_to_cart")
+    ck = count("checkout_started")
+    ord_ = count("order_placed")
+    conv = round((ord_ / visitors * 100), 2) if visitors else 0
+    return {
+        "visitors": visitors,
+        "page_views": pv,
+        "product_views": pv_product,
+        "add_to_cart": atc,
+        "checkout_started": ck,
+        "order_placed": ord_,
+        "conversion_rate": conv,
+        "funnel": [
+            {"step": "Visites uniques", "value": visitors},
+            {"step": "Vues produit", "value": pv_product},
+            {"step": "Ajout panier", "value": atc},
+            {"step": "Début checkout", "value": ck},
+            {"step": "Commande passée", "value": ord_},
+        ],
+        "days": days,
+    }
 IVORIAN = ["Aminata Koné","Fatou Traoré","Mariam Diallo","Awa Ouattara","Rokia Bamba","Sarah Yao","Christelle Brou","Nadège Kouassi","Fatim Cissé","Hawa Touré","Grace N'Guessan","Linda Zoro","Priscille Konan","Chantal Adou","Mireille Gnamien","Audrey Diomandé","Esther Soro","Céline Kouadio","Rachel Toto","Diane Assi","Mélanie Boni","Judith Kipré","Léa Yapo","Olivia Konate","Carine Bakayoko"]
 CATEGORIES = ["Chaussures","Robes","Hauts","Jupes","Pantalons","Ensembles","Sacs","Accessoires"]
 BRANDS = ["Dina Signature","Zara","Mango","Shein","H&M","Ivoire Chic","Afrik Luxe","Elegance CI"]

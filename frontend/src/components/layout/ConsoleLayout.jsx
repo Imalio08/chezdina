@@ -144,7 +144,10 @@ export default function ConsoleLayout() {
     <div className="min-h-screen flex bg-[#f5f5f5] dark:bg-[#0f0f0f]">
       <aside className="w-[260px] shrink-0 bg-[#1c1c1c] text-white flex flex-col sticky top-0 h-screen">
         <div className="px-5 py-5 border-b border-[#2a2a2a]">
-          <div className="flex items-center gap-2"><div className="w-9 h-9 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div><div><div className="font-serif text-xl tracking-tight">Chez Dina</div><div className="text-[10px] uppercase tracking-widest text-[#999]">console</div></div></div>
+          <div className="flex items-center gap-2">
+            {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-full object-cover bg-white"/> : <div className="w-9 h-9 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>}
+            <div><div className="font-serif text-xl tracking-tight">{site.name || "Chez Dina"}</div><div className="text-[10px] uppercase tracking-widest text-[#999]">console</div></div>
+          </div>
           <a href="/boutique" target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs text-[#b02a2a] hover:text-white" data-testid="view-storefront-link"><Store size={12}/>Voir le site vitrine →</a>
         </div>
         <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3">
@@ -187,8 +190,8 @@ export default function ConsoleLayout() {
       <main className="flex-1 min-w-0 flex flex-col">
         <header className="h-16 bg-white dark:bg-[#1a1a1a] border-b border-[#ececec] dark:border-[#2a2a2a] px-5 flex items-center gap-3 sticky top-0 z-30">
           <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-lg bg-[#fde8e8] dark:bg-[#2a1818] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>
-            <div className="font-serif text-lg leading-none">Chez Dina<span className="block text-[10px] text-[#999] tracking-widest uppercase mt-0.5">Console</span></div>
+            {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-lg object-cover"/> : <div className="w-9 h-9 rounded-lg bg-[#fde8e8] dark:bg-[#2a1818] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>}
+            <div className="font-serif text-lg leading-none">{site.name || "Chez Dina"}<span className="block text-[10px] text-[#999] tracking-widest uppercase mt-0.5">Console</span></div>
           </div>
           <div className="flex-1 max-w-xl mx-4 relative">
             <div className="relative">
