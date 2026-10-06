@@ -3,53 +3,55 @@
 ## Problem Statement
 Chez Dina — retail OS femme Abidjan Cocody Angré 7e. Français, FCFA, Africa/Abidjan. 3 faces: Console / Rider / Storefront. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
-## Session 13 (Feb 7 2026) — Storefront v3 + Rider offline sync
+## Session 14 (Feb 2026) — POS v3 Upgrade + Bugs Fix (Phase A)
 
-### Storefront refondu (acceptance checklist 6.8 bis)
-- **Home.jsx** réécrit en marketplace boutique : Hero carousel 4 slides, bandeau annonce, **Vente flash** gradient rouge avec countdown live (apparaît/disparaît auto selon `promotion.flash && ends_at > now`), tuiles **6 catégories**, **row Bons plans** triés par discount, **row Nouveautés**, **une row par catégorie** (jamais mélangées), **Lookbook** éditorial (grid image + 2-4 produits), **Meilleures ventes**, bandeau confiance 4 colonnes, **floating WhatsApp**.
-- **ProductCardV2** réutilisable partout : image portrait 3:4, max 2 badges prioritisés (-%, Flash, Nouveau, Top vente, Plus que 2, Bientôt de retour), cœur favoris (localStorage), color swatches, note si ≥3 avis, prix tabulaires + ancien prix barré, **bouton + Ajouter** → bottom sheet taille avec sold-out grisées, "🔥 X vendus" si >20.
-- **Bons plans** `/boutique/bons-plans` : chips Tout/Flash/-30%/<10k/<20k/Derniers articles, bannières de promotions actives linkées, tri Discount/Prix/Nouveautés.
-- **SearchBar** avec suggestions tolérantes aux fautes (`escarpain` → match `escarpin`), recherches récentes localStorage, fallback "Aucun résultat → Demander sur WhatsApp" + log dans `db.search_misses`.
-- **WelcomePopup** : config `/public/popup` (enabled, image, title, offer, code, delay_s). Affiché 1x par session après délai configurable.
+### Backend (server.py)
+- **Fuzzy search fix** : `/public/search-suggestions`, `/public/best-sellers`, `/public/lookbook` acceptent désormais produits sans champ `active` (seed historique). Les typos « chausures », « rbe », « escarpain » retournent bien des produits.
+- **POS shortcuts** : `GET /api/pos/shortcuts?limit=8` → top 8 best-sellers des 7 derniers jours avec `sold_count`.
+- **Shared cart** : `POST /api/pos/shared-cart` crée un panier partageable (expires 48h), `GET /api/public/shared-cart/{id}` récupère sans auth, `POST /api/public/shared-cart/{id}/confirm` crée l'ordre et décrémente le stock. Les commandes sont taguées `channel=shared_cart` + `placed_by_agent`.
+- **Waitlist** : `POST /api/waitlist` (auth) & `POST /api/public/waitlist`, `GET /api/waitlist` enrichi avec product_name/image, `DELETE /api/waitlist/{wid}` marque notified.
+- **AI parse-order** : `POST /api/ai/parse-order` {text} → Claude Sonnet via EMERGENT_LLM_KEY, retourne `{items, customer_hint, confidence}` avec product_id matché depuis le catalogue (≤200 produits en contexte).
+- **PDF receipt data** : `GET /api/pos/pdf-receipt/{oid}` retourne {order, business} pour génération client-side.
+- EMERGENT_LLM_KEY mise à jour dans `/app/backend/.env` (ancienne clé invalide).
 
-### Backend endpoints ajoutés
-- `GET /public/search-suggestions?q=` : fuzzy match (startsWith, contains, short-substring, char-overlap ≥80%)
-- `GET /public/best-sellers?limit=` : pipeline aggregation orders → produits les plus vendus
-- `GET /public/lookbook` : récupère `site_settings.lookbook` ou génère un lookbook démo
-- `GET /public/popup`, `/public/announcement` : paramétrables en console
-- `GET /public/products/{pid}/delivery-estimate?zone=` : fee + delay par zone
-- `POST /sync/batch` (rider auth) : accepte `ops:[{type:status|contact,...}]` pour rejouer les actions hors-ligne
+### Frontend — POS v3 (`/app/frontend/src/pages/console/POS.jsx`)
+- Grille produits **identique pour toutes les catégories** (y compris « Tous ») avec cartes complètes : image, marque, nom, prix (avec ancien prix barré + -%), stock badge, résumé variantes (`7 pointures · 3 couleurs`).
+- **Raccourcis Top 8** 7 derniers jours en row horizontale (uniquement en vue « Tous »).
+- **Recherche enrichie** : nom, marque, SKU, barcode, et typing d'un nombre matche les produits ayant cette taille disponible.
+- Produits en **liste d'attente** affichés grisés avec overlay (non cliquables), produits inactifs masqués.
+- **Tap produit** → `PosProductSheet` (nouveau) : couleur swatches + grille tailles avec stock par taille, taille sold-out → bouton liste d'attente pour la cliente rattachée.
+- **Bloc client** enrichi : tier, points, wallet balance, pointure, taille, alerte blacklist.
+- **« + Nouvelle cliente »** → `PosNewCustomer` (nouveau) : Prénom/Nom/Tél/WhatsApp/Email/commune/quartier/repère/zone/pointure/taille/anniversaire/source/code parrain/consentement WA. Vérification doublon téléphone.
+- **Flow livraison** complet : zone (frais auto), adresse, date, créneau, instructions livreur.
+- **Partager le panier** : POST shared-cart → ouvre WhatsApp pré-rempli ou copie le lien.
+- **Partager produit** par WhatsApp.
+- **« Coller WA »** → `PosPasteWA` (nouveau) : analyse Dina IA, remplit le panier et pré-remplit la cliente/zone/adresse.
+- **Écran paiement** `PosPayment` (nouveau) : Espèces / Wave / Orange Money / MTN MoMo / Moov Money / Porte-monnaie / Points / Mixte / Paiement à la livraison. Cash avec quick buttons (exact, 10k, 20k, 50k) + rendu, Wave avec référence + bouton envoi lien WA.
+- **Mobile** : panier en bottom-sheet déclenchable avec FAB flottant montrant nb articles + total.
+- **PDF reçu** via jsPDF (80mm) + bouton envoi reçu WA.
 
-### Rider offline sync
-- **`/app/frontend/src/lib/offlineQueue.js`** : `enqueue(op)`, `queueSize()`, `flushQueue()`, `startAutoSync()` — queue localStorage avec replay auto sur `online` event + poll 30s + flush au mount du RiderShell.
-- Backend `POST /sync/batch` rejoue status change + contact-log en marquant `timeline.offline=true` et `contact_log.offline=true` pour que la gérante voie les actions différées.
+### Frontend — Storefront (`/app/frontend/src/pages/storefront/SharedCart.jsx`)
+- Page `/boutique/panier-partage/:id` : liste modifiable (changer qty, retirer), choix paiement (COD / Wave), confirmation → ordre créé, redirect vers suivi.
 
 ### Routes App.js ajoutées
-- `/boutique/bons-plans` → BonsPlans.jsx
-- RiderShell importe `offlineQueue.startAutoSync()` au mount
+- `/boutique/panier-partage/:id` → SharedCart.jsx
 
-### Testing manuel (curl)
-- `/public/search-suggestions?q=robe` → produits + catégories ✅
-- `/public/lookbook` → 1 look ✅
-- `/public/popup` → {enabled:false} par défaut ✅
-- `/public/products/{id}/delivery-estimate?zone=Cocody` → fee 1500, delay 24h ✅
-- `/sync/batch` avec 1 op contact → `{results:[{ok:true}], synced_at}` ✅
+### Non livré (Phase B + C — à venir)
+- **Produits tab v3** : KPI cards, Grille/Tableau toggle, filtres avancés, vue read-only, form full-page, matrice taille×couleur, Marques CRUD, liste d'attente admin, statuts avancés.
+- **Scanner QR/code-barres caméra** (html5-qrcode installé mais pas câblé).
+- **Marques page** CRUD complet avec logo/stats.
+- **Admin CMS « Apparence »** : sous-onglets popup/bandeau/lookbook (UI au lieu de JSON).
+- **Favoris merge** au login.
+- **Mobile bottom-sheet filtres** catalog (pointure/couleur/talon/prix) + guide tailles.
+- **Flash sales countdowns** live sur Home, boutons « Commander sur WhatsApp », estimations livraison par zone sur fiche produit.
+- **Rider offline queue** sync réel (foundation posée).
 
-### Non livré (deferred)
-- Admin UI pour éditer `welcome_popup`, `announcement`, `lookbook` (actuellement JSON direct dans site_settings)
-- Mega-menu desktop avec sous-catégories (actuellement nav simple)
-- Zoom au tap sur Product.jsx + bouton "Commander sur WhatsApp" pre-filled (endpoint prêt, UI à ajouter)
-- Favoris merge au login (local → compte serveur)
-- Service worker PWA complet (actuellement queue localStorage sans background sync)
-- Filters bottom-sheet mobile avec pointure/couleur/talon sur Catalog
-- Guide des tailles tooltip, estimation de livraison dans fiche produit
-
-## Sessions précédentes
-- S12 : Rider Space v2 (5 bottom tabs, preuve code/photo/signature, score, offline queue)
-- S11 : Rebrand + CMS pages + Caisse + Encaissements + P&L + Marques/Catégories
-- S10 : CMS Vitrine SectionBuilder + Compte Cliente code secret
-- S9 : WhatsApp auto + Fidélité + Parrainage + Rôles + Kiosk
-- S8 : Board DnD + Réconciliation PIN + GPS Leaflet + Wizard 4-steps + QR
+## Session 13 — Storefront v3 initial + Rider offline (voir sections précédentes du PRD)
+## Session 12 — Rider Space v2 (5 tabs, preuve code/photo/signature, score)
+## Session 11 — Rebrand + CMS pages + Caisse + Encaissements + P&L + Marques/Catégories
+## Session 10 — CMS Vitrine SectionBuilder + Compte Cliente code secret
+## Session 9 — WhatsApp auto + Fidélité + Parrainage + Rôles + Kiosk
+## Session 8 — Board DnD + Réconciliation PIN + GPS Leaflet + Wizard 4-steps + QR
 
 ## Credentials
 - Admin `aouattaraesca@gmail.com` / `Admin123!` · PIN 1234
@@ -58,14 +60,16 @@ Chez Dina — retail OS femme Abidjan Cocody Angré 7e. Français, FCFA, Africa/
 - Cliente démo `+225 07 60 17 28 21` · code `142085`
 
 ## Backlog
-### P0
-- UI admin pour welcome_popup/announcement/lookbook/trust_band
-- "Commander sur WhatsApp" sur Product.jsx (endpoint prêt)
-- Favoris merge au login
-### P1
-- Mega-menu desktop sous-catégories
-- Bottom sheet filtres mobile pour Catalog
-- Service worker PWA + background sync réel
-- QR scanner caméra rider (html5-qrcode)
+### P0 (Phase B — prochaine itération)
+- Produits tab v3 (KPI, Grille/Tableau, vue read-only, form pleine page, matrice variantes, statuts, waitlist admin)
+- Marques CRUD complet
+- Scanner QR caméra POS (html5-qrcode)
+### P1 (Phase C)
+- Admin CMS popup/bandeau/lookbook (UI)
+- Favoris merge login
+- Bottom-sheet filtres mobile catalog + guide tailles
+- Flash sales live countdowns + estimations livraison fiche produit
+- Rider offline queue sync réel
 ### P2
-- Multi-store réel, Dina IA rédige diffusions WA
+- Service worker PWA full
+- Multi-store réel
