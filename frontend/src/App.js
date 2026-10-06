@@ -58,7 +58,7 @@ function Protected({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
   if (!user) return <Navigate to="/login" replace />;
-  if (user.role === "rider") return <Navigate to="/console/livreur" replace />;
+  if (user.role === "rider") return <Navigate to="/rider" replace />;
   return children;
 }
 function ProtectedRider({ children }) {
@@ -77,7 +77,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/suivi/:code" element={<Tracking />} />
-            <Route path="/rider" element={<Protected><RiderShell /></Protected>}>
+            <Route path="/rider" element={<ProtectedRider><RiderShell /></ProtectedRider>}>
               <Route index element={<ErrorBoundary><RiderCourses /></ErrorBoundary>} />
               <Route path="carte" element={<ErrorBoundary><RiderCarte /></ErrorBoundary>} />
               <Route path="historique" element={<ErrorBoundary><RiderHistorique /></ErrorBoundary>} />

@@ -583,15 +583,15 @@ async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get
     if body.next_date: upd["rescheduled_for"] = body.next_date
     # When status becomes "en_livraison" (En route), generate delivery_code and enqueue WA
     if body.status == "en_livraison" and prev != "en_livraison" and not o.get("delivery_code"):
-        code = str(secrets.randbelow(10000)).zfill(4)
-        upd["delivery_code"] = code
-        upd["delivery_code_attempts"] = 0
-        settings = await db.site_settings.find_one({"id":"main"}) or {}
-        tpl = (settings.get("delivery_templates") or {}).get("code_sms_text") or "Votre code de livraison Chez Dina : {code}."
-        text = tpl.replace("{code}", code)
         phone = (o.get("customer") or {}).get("phone") or ""
         pd = "".join(c for c in phone if c.isdigit())
         if pd:
+            code = str(secrets.randbelow(10000)).zfill(4)
+            upd["delivery_code"] = code
+            upd["delivery_code_attempts"] = 0
+            settings = await db.site_settings.find_one({"id":"main"}) or {}
+            tpl = (settings.get("delivery_templates") or {}).get("code_sms_text") or "Votre code de livraison Chez Dina : {code}."
+            text = tpl.replace("{code}", code)
             await db.whatsapp_outbox.insert_one({
                 "id": new_id(), "order_id": oid, "order_code": o.get("code"),
                 "customer_name": (o.get("customer") or {}).get("name"),
@@ -693,9 +693,10 @@ async def upload_my_photo(body: RiderPhotoIn, user: dict = Depends(get_user)):
 
 @api.patch("/users/me/prefs")
 async def set_my_prefs(body: Dict[str, Any], user: dict = Depends(get_user)):
-    body.pop("role", None); body.pop("id", None); body.pop("_id", None); body.pop("password_hash", None)
-    await db.users.update_one({"id": user["id"]}, {"$set": {"prefs": body, "updated_at": now_iso()}})
-    return {"ok": True}
+    ALLOWED = {"theme", "wa", "sound", "language", "notifications"}
+    prefs = {k: v for k, v in body.items() if k in ALLOWED}
+    await db.users.update_one({"id": user["id"]}, {"$set": {"prefs": prefs, "updated_at": now_iso()}})
+    return {"ok": True, "prefs": prefs}
 
 @api.get("/riders/{rid}/score")
 async def rider_score(rid: str, user: dict = Depends(get_user)):

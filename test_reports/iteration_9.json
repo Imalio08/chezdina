@@ -1,0 +1,38 @@
+{
+  "summary": "Rider Space v2 (section 6.8) end-to-end verified. Backend: 17/17 pytest cases pass in test_rider_v2.py — rider login (role=rider), /delivery-templates returns 4 WA templates + proof settings + score weights (PATCH admin/manager only, 403 for rider), /riders/me/today returns orders/counts/to_collect/collected/balance_to_hand_over, /riders/me/history masks customer.phone (phone_masked = '07 •• •• •• XX'), status→en_livraison on COD generates 4-digit delivery_code via secrets.randbelow and is idempotent (no regen), POST /orders/{id}/deliver with method=code returns 401 'Code invalide (N/3)' on wrong code, locks on 3rd attempt → 4th returns 423 'verrouillée', correct code marks status=livree + proof.code_verified=true, method=photo requires photo+signature, high-value ≥50000 FCFA requires valid manager_pin (403 PIN required / 403 PIN invalide / 200 with PIN 1234), low value doesn't need PIN, method=thirdparty requires thirdparty_name (400 without), contact-log appends {kind:'whatsapp',template_key:'en_route'} to order.contact_log, /riders/{id}/score returns score(0-100)+level+weights+components(5 keys)+stats, /riders/{id}/reviews hides hidden reviews for rider self and strips customer.phone (only first_name+quartier), PATCH /users/me/photo persists photo URL on user, PATCH /users/me/prefs persists under prefs and strips role/password_hash, PATCH /reviews/{id}/moderate is admin/manager only (403 for rider). Frontend: After fix (see 'updated_files'), rider login now redirects to /rider (NOT /console/livreur). All 5 bottom tabs render (rider-tab-courses|carte|historique|performance|profil). Courses page shows KPIs + 7 filter chips (filter-all|a_livrer|en_route|livrees|annulees|reportees|echecs) + rider-scan button. Carte: rider-map LeafletMap + map-filter-todo + map-optimize. Historique: 4 periods (hist-period-1|7|30|90) + 5 status tabs (hist-tab-toutes|livrees|annulees|reportees|echecs). Performance: rider-score shows '80 / Or', 5 progress bars perf-delivery_rate|punctuality|rating|cash|proof. Profil: profil-photo file input, theme-light|dark|auto buttons, wa-standard|wa-business toggle, profil-call-manager|profil-wa-manager|profil-report CTAs. Theme toggle actually adds html.dark class. No console errors on any route.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_rider_v2.py",
+    "/app/test_reports/pytest/rider_v2.xml"
+  ],
+  "action_items": [
+    "App.js had TWO blocking bugs preventing /rider from EVER being reachable by riders — I fixed both: (a) line 61 Protected() wrapper redirected rider→/console/livreur, which contradicted the spec AND created a loop since (b) /rider route was itself wrapped in <Protected>, so a rider could never reach /rider. Changed /rider wrapper to <ProtectedRider> and changed the role-based redirect target to /rider. Main agent must verify this is the intended final behaviour; the OLD /console/livreur (<Rider/>) route is still registered and may now be unreachable from UI (dead code).",
+    "Consider deleting /console/livreur route + legacy Rider component since RiderShell at /rider is the canonical rider UI per spec 6.8."
+  ],
+  "critical_code_review_comments": [
+    "App.js: /rider route was <Protected> which redirects rider→elsewhere, making it impossible for a rider to reach the new RiderShell — classic contradictory guard. Any role-gated route for a specific role should use a role-matched guard, never the generic one.",
+    "server.py /orders has no GET /orders/{oid} single-order endpoint — had to GET /orders and filter in tests. Minor DX issue; consider adding @api.get('/orders/{oid}').",
+    "server.py line 710: punctuality is HARDCODED to 90 in /riders/{id}/score (comment acknowledges 'approximate 90%'). This makes the component meaningless for ranking riders. Should compute from order.timeline en_livraison→livree duration vs créneau, or at least from timeline punctuality metric. Suggest adding a TODO or a feature flag that hides this component until real.",
+    "server.py /orders/{oid}/status PATCH generates delivery_code but does NOT verify order has payment_method=cod OR customer phone before generating — the enqueue is skipped if no phone digits but code is still written. Minor: should guard the whole block on phone presence (user-facing: 'why do I have a code with no SMS?').",
+    "DeliveryTemplatesIn model allows arbitrary partial PATCH — PATCH /delivery-templates fully replaces delivery_templates sub-document (uses $set with body.model_dump()). If admin PATCHes just {proof_threshold: 60000}, wa_templates/code_sms_text may be wiped. Confirmed by model=full dump including defaults, but any field with None default could clobber. Suggest $set per-field or merge.",
+    "/users/me/prefs stores the entire body under prefs — the test confirms role/password_hash are stripped BEFORE persisting (good), but ANY other arbitrary key (e.g. {admin:true} or large base64 blob) is accepted. Consider whitelisting {theme, wa, sound, language, notifications}.",
+    "RiderShell.jsx watches geolocation every mount and POSTs to /riders/location every 20s — no cleanup toast/error, battery impact. Also no permission-denied UX fallback.",
+    "RiderShell theme persists in localStorage BUT also user prefs via PATCH /users/me/prefs are not synced to localStorage on login — a rider setting dark mode on phone A will see light on phone B. Low priority."
+  ],
+  "updated_files": [
+    "/app/frontend/src/App.js (line 61 rider redirect → /rider ; /rider route wrapper → ProtectedRider)",
+    "/app/backend/tests/test_rider_v2.py (new, 17 tests)"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% (all 5 tabs + all 35 data-testids verified + theme toggle)"},
+  "test_credentials": "Rider rider1@dinastore.ci / Rider123! · PIN 5555, Admin aouattaraesca@gmail.com / Admin123! · PIN 1234, Manager manager.cocody@dinastore.ci / Manager123! · PIN 2222",
+  "seed_data_creation": "Each test that touches delivery flow creates its own TEST-XXXXXX COD order via POST /orders, triggers en_livraison, then delivers. ~7 TEST- orders left in db.orders per run (not auto-cleaned, prefixed for easy identification).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Regression: pytest /app/backend/tests/test_rider_v2.py /app/backend/tests/test_section11.py /app/backend/tests/test_section10.py /app/backend/tests/test_section8_9.py -v. If App.js is regenerated by main agent, re-verify /rider is wrapped in <ProtectedRider> (NOT <Protected>) and the generic Protected() redirects rider→/rider (NOT /console/livreur) — the entire frontend rider v2 UI depends on these 2 lines.",
+  "rca_of_the_issue": "Compile OK but functional dead-end: Main agent built the whole /rider nested route tree + RiderShell + 5 pages, but forgot to update the global <Protected> wrapper (line 61) that still forced rider→/console/livreur. Compounded by wrapping /rider in <Protected> itself (should be <ProtectedRider>), creating a logical impossibility (rider never reaches /rider). First browser test caught it immediately — URL ended in /console/livreur after login, old 4-tab Rider.jsx rendered. Fixed both lines; second run confirms every data-testid in the spec renders correctly and score=80/Or renders live from GET /api/riders/{id}/score."
+}
