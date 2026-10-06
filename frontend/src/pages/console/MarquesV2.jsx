@@ -180,7 +180,7 @@ function BrandDetail({ bid, onBack, onEdit }) {
       </div>
 
       <div className="dina-card-white p-5">
-        <div className="font-semibold mb-3">Produits de la marque ({b.products.length})</div>
+        <div className="font-semibold mb-3">Produits de la marque ({(b.products || []).length})</div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
           {b.products.map(p => (
             <div key={p.id} className="dina-card-white overflow-hidden" data-testid={`brand-prod-${p.sku}`}>
@@ -188,7 +188,7 @@ function BrandDetail({ bid, onBack, onEdit }) {
               <div className="p-2"><div className="text-[11px] font-medium line-clamp-2 leading-tight min-h-[2.2em]">{p.name}</div><div className="text-xs tabular font-bold text-[#b02a2a] mt-1">{fcfa(p.price)}</div></div>
             </div>
           ))}
-          {b.products.length === 0 && <div className="col-span-full text-sm text-[#666] py-6 text-center">Aucun produit pour cette marque</div>}
+          {(b.products || []).length === 0 && <div className="col-span-full text-sm text-[#666] py-6 text-center">Aucun produit pour cette marque</div>}
         </div>
       </div>
     </div>

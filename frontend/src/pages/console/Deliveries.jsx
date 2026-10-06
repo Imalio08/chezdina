@@ -164,7 +164,7 @@ export default function Deliveries() {
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <div className="font-serif text-xl">{s.rider_name}</div>
-                  <div className="text-xs text-[#666]">Journée du {s.date} · {s.orders.length} commande{s.orders.length > 1 ? "s" : ""}</div>
+                  <div className="text-xs text-[#666]">Journée du {s.date} · {(s.orders || []).length} commande{(s.orders || []).length > 1 ? "s" : ""}</div>
                 </div>
                 <button onClick={() => closeSession(s.id)} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid={`close-session-${s.id}`}>Clôturer journée</button>
               </div>

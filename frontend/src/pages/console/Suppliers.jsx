@@ -236,7 +236,7 @@ function SupplierDetail({ sid, onBack, onEdit }) {
             </table>}
         </div>
         <div className="dina-card-white p-5">
-          <div className="font-semibold mb-3">Produits fournis ({s.products.length})</div>
+          <div className="font-semibold mb-3">Produits fournis ({(s.products || []).length})</div>
           <div className="grid grid-cols-3 gap-2 max-h-72 overflow-y-auto">
             {s.products.slice(0, 24).map(p => (
               <div key={p.id} className="text-xs"><img src={p.image || p.images?.[0]} alt="" className="aspect-square object-cover rounded" /><div className="line-clamp-1 mt-1">{p.name}</div><div className="tabular font-semibold text-[#b02a2a]">{fcfa(p.price)}</div></div>

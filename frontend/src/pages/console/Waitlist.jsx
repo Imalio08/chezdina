@@ -56,7 +56,7 @@ export default function Waitlist() {
                 <div className="flex-1 min-w-0">
                   <div className="font-serif text-base leading-tight">{g.product?.name || "Produit"}</div>
                   <div className="text-xs text-[#666]">{g.product?.brand} · {[g.size, g.color].filter(Boolean).join(" · ") || "Toutes variantes"}</div>
-                  <div className="flex items-center gap-2 mt-1 text-xs"><Users size={11} className="text-[#b02a2a]"/><b>{g.customers.length}</b> client{g.customers.length>1?"es":"e"} en attente</div>
+                  <div className="flex items-center gap-2 mt-1 text-xs"><Users size={11} className="text-[#b02a2a]"/><b>{(g.customers || []).length}</b> client{(g.customers || []).length>1?"es":"e"} en attente</div>
                 </div>
               </div>
               <button onClick={()=>setOpen(open===i?null:i)} className="mt-3 text-xs text-[#5867fd] hover:underline" data-testid={`wl-expand-${i}`}>{open===i?"Masquer":"Voir les clientes"}</button>

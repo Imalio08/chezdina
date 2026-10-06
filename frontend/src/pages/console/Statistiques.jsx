@@ -127,9 +127,9 @@ function SalesTab({ d }) {
       <HeatmapCard matrix={d.heatmap} />
 
       <div className="grid lg:grid-cols-3 gap-4">
-        <ChartCard title="Par canal"><PieChart><Pie data={d.channels} dataKey="value" nameKey="name" outerRadius={70}>{d.channels.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>fcfa(v)}/><Legend wrapperStyle={{fontSize:10}}/></PieChart></ChartCard>
-        <ChartCard title="Par mode paiement"><PieChart><Pie data={d.payments} dataKey="value" nameKey="name" outerRadius={70}>{d.payments.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>fcfa(v)}/><Legend wrapperStyle={{fontSize:10}}/></PieChart></ChartCard>
-        <div className="dina-card-white p-4"><div className="font-semibold mb-2 text-sm">Par vendeuse</div>{d.sellers.slice(0,8).map((s,i)=>(<div key={i} className="flex justify-between text-xs py-1 border-b border-[#ececec] dark:border-[#2a2a2a] last:border-0"><span>{s.name}</span><span className="tabular font-semibold">{fcfa(s.revenue)}</span></div>))}</div>
+        <ChartCard title="Par canal"><PieChart><Pie data={d.channels || []} dataKey="value" nameKey="name" outerRadius={70}>{(d.channels || []).map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>fcfa(v)}/><Legend wrapperStyle={{fontSize:10}}/></PieChart></ChartCard>
+        <ChartCard title="Par mode paiement"><PieChart><Pie data={d.payments || []} dataKey="value" nameKey="name" outerRadius={70}>{(d.payments || []).map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>fcfa(v)}/><Legend wrapperStyle={{fontSize:10}}/></PieChart></ChartCard>
+        <div className="dina-card-white p-4"><div className="font-semibold mb-2 text-sm">Par vendeuse</div>{(d.sellers || []).slice(0,8).map((s,i)=>(<div key={i} className="flex justify-between text-xs py-1 border-b border-[#ececec] dark:border-[#2a2a2a] last:border-0"><span>{s.name}</span><span className="tabular font-semibold">{fcfa(s.revenue)}</span></div>))}</div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
@@ -176,9 +176,9 @@ function ProductsTab({ d, period }) {
       </div>
       {variant && <VariantMatrix v={variant} />}
       <div className="dina-card-white p-4">
-        <div className="flex items-center justify-between mb-2"><div className="font-semibold text-sm">Jamais vendus ({d.never_sold.length})</div><ExportBar rows={d.never_sold} name="jamais_vendus" /></div>
+        <div className="flex items-center justify-between mb-2"><div className="font-semibold text-sm">Jamais vendus ({(d.never_sold || []).length})</div><ExportBar rows={d.never_sold} name="jamais_vendus" /></div>
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2 max-h-72 overflow-y-auto">
-          {d.never_sold.slice(0,30).map(p=>(<div key={p.id} className="text-xs"><img src={p.image} alt="" className="aspect-square rounded object-cover"/><div className="line-clamp-1 mt-1">{p.name}</div><div className="text-[#666] text-[10px]">Stock: {p.stock}</div></div>))}
+          {(d.never_sold || []).slice(0,30).map(p=>(<div key={p.id} className="text-xs"><img src={p.image} alt="" className="aspect-square rounded object-cover"/><div className="line-clamp-1 mt-1">{p.name}</div><div className="text-[#666] text-[10px]">Stock: {p.stock}</div></div>))}
         </div>
       </div>
     </div>
@@ -204,8 +204,8 @@ function VariantMatrix({ v }) {
         <div><div className="font-semibold">{v.product.name}</div><div className="text-xs text-[#666]">Performance par variante</div></div>
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
-        <div><div className="text-xs uppercase font-semibold mb-2 text-[#666]">Ventes par taille</div><table className="dina-table text-xs"><thead><tr><th>Taille</th><th className="text-right">Vendu</th><th className="text-right">Stock</th></tr></thead><tbody>{sizes.map(s=>(<tr key={s}><td>{s}</td><td className="text-right tabular">{v.sales_by_size[s]||0}</td><td className="text-right tabular">{v.stock_by_size?.[s]||0}</td></tr>))}</tbody></table></div>
-        <div><div className="text-xs uppercase font-semibold mb-2 text-[#666]">Ventes par couleur</div><table className="dina-table text-xs"><thead><tr><th>Couleur</th><th className="text-right">Vendu</th></tr></thead><tbody>{colors.map(c=>(<tr key={c}><td>{c}</td><td className="text-right tabular">{v.sales_by_color[c]||0}</td></tr>))}</tbody></table></div>
+        <div><div className="text-xs uppercase font-semibold mb-2 text-[#666]">Ventes par taille</div><table className="dina-table text-xs"><thead><tr><th>Taille</th><th className="text-right">Vendu</th><th className="text-right">Stock</th></tr></thead><tbody>{sizes.map(s=>(<tr key={s}><td>{s}</td><td className="text-right tabular">{(v.sales_by_size || {})[s]||0}</td><td className="text-right tabular">{v.stock_by_size?.[s]||0}</td></tr>))}</tbody></table></div>
+        <div><div className="text-xs uppercase font-semibold mb-2 text-[#666]">Ventes par couleur</div><table className="dina-table text-xs"><thead><tr><th>Couleur</th><th className="text-right">Vendu</th></tr></thead><tbody>{colors.map(c=>(<tr key={c}><td>{c}</td><td className="text-right tabular">{(v.sales_by_color || {})[c]||0}</td></tr>))}</tbody></table></div>
       </div>
       <div className="mt-3">
         <div className="text-xs uppercase font-semibold mb-2 text-[#666]">Matrice taille × couleur (vendu / stock)</div>
@@ -220,7 +220,7 @@ function CategoriesTab({ d }) {
     <div className="space-y-4">
       <div className="flex justify-end"><ExportBar rows={d.rows} name="categories" /></div>
       <div className="dina-card-white overflow-x-auto"><table className="dina-table"><thead><tr><th>Catégorie</th><th className="text-right">CA</th><th className="text-right">Commandes</th><th className="text-right">Articles</th><th className="text-right">Panier moy.</th><th className="text-right">Marge</th><th className="text-right">Évolution</th><th>Top tailles</th><th>Top couleurs</th></tr></thead>
-        <tbody>{d.rows.map(r=>(<tr key={r.category} data-testid={`cat-${r.category}`}><td className="font-medium">{r.category}</td><td className="text-right tabular font-semibold">{fcfa(r.revenue)}</td><td className="text-right tabular">{r.orders}</td><td className="text-right tabular">{r.items}</td><td className="text-right tabular">{fcfa(r.avg_basket)}</td><td className="text-right tabular text-[#1f8a4c]">{r.margin_pct}%</td><td className={`text-right tabular ${r.delta_pct>=0?"text-[#1f8a4c]":"text-[#c62828]"}`}>{r.delta_pct>=0?"+":""}{r.delta_pct}%</td><td className="text-xs">{(r.top_sizes||[]).slice(0,3).map(t=>t.size).join(" · ")}</td><td className="text-xs">{(r.top_colors||[]).slice(0,3).map(t=>t.color).join(" · ")}</td></tr>))}</tbody></table></div>
+        <tbody>{(d.rows || []).map(r=>(<tr key={r.category} data-testid={`cat-${r.category}`}><td className="font-medium">{r.category}</td><td className="text-right tabular font-semibold">{fcfa(r.revenue)}</td><td className="text-right tabular">{r.orders}</td><td className="text-right tabular">{r.items}</td><td className="text-right tabular">{fcfa(r.avg_basket)}</td><td className="text-right tabular text-[#1f8a4c]">{r.margin_pct}%</td><td className={`text-right tabular ${r.delta_pct>=0?"text-[#1f8a4c]":"text-[#c62828]"}`}>{r.delta_pct>=0?"+":""}{r.delta_pct}%</td><td className="text-xs">{(r.top_sizes||[]).slice(0,3).map(t=>t.size).join(" · ")}</td><td className="text-xs">{(r.top_colors||[]).slice(0,3).map(t=>t.color).join(" · ")}</td></tr>))}</tbody></table></div>
     </div>
   );
 }
@@ -228,9 +228,9 @@ function CategoriesTab({ d }) {
 function StockPurchasesTab({ d }) {
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2"><Kpi label="Valeur stock" v={fcfa(d.stock_value)} c="#b02a2a"/><Kpi label="Rotation (×/an)" v={d.rotation} c="#5867fd"/><Kpi label="Ruptures" v={d.ruptures} c="#c62828"/><Kpi label="Stock bas" v={d.low} c="#e4991e"/><Kpi label="Dormants" v={d.dormant.length} c="#999"/></div>
-      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Fournisseurs</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Acheté</th><th className="text-right">Bons</th><th className="text-right">Délai</th></tr></thead><tbody>{d.suppliers.map(s=>(<tr key={s.supplier_id}><td className="font-medium">{s.name}</td><td className="text-right tabular font-semibold">{fcfa(s.purchased)}</td><td className="text-right">{s.pos}</td><td className="text-right">{s.avg_lead}j</td></tr>))}</tbody></table></div>
-      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Produits dormants (60j+ sans vente)</div><table className="dina-table"><thead><tr><th>Produit</th><th className="text-right">Stock</th></tr></thead><tbody>{d.dormant.slice(0,30).map(p=>(<tr key={p.id}><td>{p.name}</td><td className="text-right">{p.stock}</td></tr>))}</tbody></table></div>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-2"><Kpi label="Valeur stock" v={fcfa(d.stock_value)} c="#b02a2a"/><Kpi label="Rotation (×/an)" v={d.rotation} c="#5867fd"/><Kpi label="Ruptures" v={d.ruptures} c="#c62828"/><Kpi label="Stock bas" v={d.low} c="#e4991e"/><Kpi label="Dormants" v={(d.dormant || []).length} c="#999"/></div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Fournisseurs</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Acheté</th><th className="text-right">Bons</th><th className="text-right">Délai</th></tr></thead><tbody>{(d.suppliers || []).map(s=>(<tr key={s.supplier_id}><td className="font-medium">{s.name}</td><td className="text-right tabular font-semibold">{fcfa(s.purchased)}</td><td className="text-right">{s.pos}</td><td className="text-right">{s.avg_lead}j</td></tr>))}</tbody></table></div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Produits dormants (60j+ sans vente)</div><table className="dina-table"><thead><tr><th>Produit</th><th className="text-right">Stock</th></tr></thead><tbody>{(d.dormant || []).slice(0,30).map(p=>(<tr key={p.id}><td>{p.name}</td><td className="text-right">{p.stock}</td></tr>))}</tbody></table></div>
     </div>
   );
 }
@@ -240,8 +240,8 @@ function OrdersDeliveryTab({ d }) {
     <div className="space-y-4">
       <Kpi label="Frais de livraison encaissés" v={fcfa(d.fees_collected)} c="#1f8a4c"/>
       <div className="grid lg:grid-cols-2 gap-4">
-        <div className="dina-card-white p-4"><div className="font-semibold mb-2">Volume par statut</div>{d.by_status.map((s,i)=>(<div key={i} className="flex justify-between text-xs py-1"><span className="capitalize">{s.status.replace("_"," ")}</span><span className="dina-chip">{s.count}</span></div>))}</div>
-        <div className="dina-card-white p-4"><div className="font-semibold mb-2">Performance par livreur</div><table className="dina-table"><thead><tr><th>Nom</th><th>Livrées</th><th>Annulées</th><th className="text-right">CA</th></tr></thead><tbody>{d.riders.map(r=>(<tr key={r.rider_id}><td>{r.name}</td><td>{r.delivered}</td><td className="text-[#c62828]">{r.cancelled}</td><td className="text-right tabular">{fcfa(r.revenue)}</td></tr>))}</tbody></table></div>
+        <div className="dina-card-white p-4"><div className="font-semibold mb-2">Volume par statut</div>{(d.by_status || []).map((s,i)=>(<div key={i} className="flex justify-between text-xs py-1"><span className="capitalize">{s.status.replace("_"," ")}</span><span className="dina-chip">{s.count}</span></div>))}</div>
+        <div className="dina-card-white p-4"><div className="font-semibold mb-2">Performance par livreur</div><table className="dina-table"><thead><tr><th>Nom</th><th>Livrées</th><th>Annulées</th><th className="text-right">CA</th></tr></thead><tbody>{(d.riders || []).map(r=>(<tr key={r.rider_id}><td>{r.name}</td><td>{r.delivered}</td><td className="text-[#c62828]">{r.cancelled}</td><td className="text-right tabular">{fcfa(r.revenue)}</td></tr>))}</tbody></table></div>
       </div>
       <div className="grid lg:grid-cols-2 gap-4"><ReasonTable title="Motifs d'annulation" rows={d.cancel_reasons}/><ReasonTable title="Motifs de report" rows={d.defer_reasons}/></div>
     </div>
@@ -269,13 +269,13 @@ function CustomersTab({ d }) {
       <div className="dina-card-white p-4">
         <div className="font-semibold mb-3">Profil type des meilleures clientes</div>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
-          <div><div className="font-semibold mb-1">Zones</div>{d.best_profile.top_zones.map((z,i)=>(<div key={i} className="flex justify-between"><span>{z.zone}</span><span className="dina-chip text-[10px]">{z.count}</span></div>))}</div>
-          <div><div className="font-semibold mb-1">Catégories</div>{d.best_profile.top_cats.map((z,i)=>(<div key={i} className="flex justify-between"><span>{z.cat}</span><span className="dina-chip text-[10px]">{z.count}</span></div>))}</div>
-          <div><div className="font-semibold mb-1">Tailles</div>{d.best_profile.top_sizes.map((z,i)=>(<div key={i} className="flex justify-between"><span>{z.size}</span><span className="dina-chip text-[10px]">{z.count}</span></div>))}</div>
-          <div><div className="font-semibold mb-1">Canaux</div>{d.best_profile.top_channels.map((z,i)=>(<div key={i} className="flex justify-between"><span className="capitalize">{z.channel}</span><span className="dina-chip text-[10px]">{z.count}</span></div>))}</div>
+          <div><div className="font-semibold mb-1">Zones</div>{(d.best_profile?.top_zones || []).map((z,i)=>(<div key={i} className="flex justify-between"><span>{z.zone}</span><span className="dina-chip text-[10px]">{z.count}</span></div>))}</div>
+          <div><div className="font-semibold mb-1">Catégories</div>{(d.best_profile?.top_cats || []).map((z,i)=>(<div key={i} className="flex justify-between"><span>{z.cat}</span><span className="dina-chip text-[10px]">{z.count}</span></div>))}</div>
+          <div><div className="font-semibold mb-1">Tailles</div>{(d.best_profile?.top_sizes || []).map((z,i)=>(<div key={i} className="flex justify-between"><span>{z.size}</span><span className="dina-chip text-[10px]">{z.count}</span></div>))}</div>
+          <div><div className="font-semibold mb-1">Canaux</div>{(d.best_profile?.top_channels || []).map((z,i)=>(<div key={i} className="flex justify-between"><span className="capitalize">{z.channel}</span><span className="dina-chip text-[10px]">{z.count}</span></div>))}</div>
         </div>
       </div>
-      <div className="dina-card-white overflow-x-auto"><table className="dina-table"><thead><tr><th>Cliente</th><th>Téléphone</th><th className="text-right">Dépensé</th><th className="text-right">Commandes</th></tr></thead><tbody>{d.best_customers.map(c=>(<tr key={c.id}><td className="font-medium">{c.name}</td><td className="text-xs">{c.phone}</td><td className="text-right tabular font-semibold">{fcfa(c.total_spent||0)}</td><td className="text-right">{c.total_orders||0}</td></tr>))}</tbody></table></div>
+      <div className="dina-card-white overflow-x-auto"><table className="dina-table"><thead><tr><th>Cliente</th><th>Téléphone</th><th className="text-right">Dépensé</th><th className="text-right">Commandes</th></tr></thead><tbody>{(d.best_customers || []).map(c=>(<tr key={c.id}><td className="font-medium">{c.name}</td><td className="text-xs">{c.phone}</td><td className="text-right tabular font-semibold">{fcfa(c.total_spent||0)}</td><td className="text-right">{c.total_orders||0}</td></tr>))}</tbody></table></div>
     </div>
   );
 }
@@ -283,8 +283,8 @@ function CustomersTab({ d }) {
 function DemandTab({ d }) {
   return (
     <div className="space-y-4">
-      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Liste d'attente par produit × variante ({d.waitlist.length})</div><table className="dina-table"><thead><tr><th>Produit</th><th>Taille</th><th>Couleur</th><th className="text-right">Demandes</th></tr></thead><tbody>{d.waitlist.slice(0,30).map((w,i)=>(<tr key={i}><td>{w.product_name}</td><td>{w.size||"—"}</td><td>{w.color||"—"}</td><td className="text-right tabular font-semibold">{w.count}</td></tr>))}</tbody></table></div>
-      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Recherches sans résultat</div>{d.searches_no_result.length === 0 ? <div className="text-xs text-[#666]">Aucune</div> : d.searches_no_result.map((s,i)=>(<div key={i} className="text-xs py-1 flex justify-between"><span>"{s.q}"</span><span className="text-[#999]">{s.at}</span></div>))}</div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Liste d'attente par produit × variante ({(d.waitlist || []).length})</div><table className="dina-table"><thead><tr><th>Produit</th><th>Taille</th><th>Couleur</th><th className="text-right">Demandes</th></tr></thead><tbody>{(d.waitlist || []).slice(0,30).map((w,i)=>(<tr key={i}><td>{w.product_name}</td><td>{w.size||"—"}</td><td>{w.color||"—"}</td><td className="text-right tabular font-semibold">{w.count}</td></tr>))}</tbody></table></div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Recherches sans résultat</div>{(d.searches_no_result || []).length === 0 ? <div className="text-xs text-[#666]">Aucune</div> : (d.searches_no_result || []).map((s,i)=>(<div key={i} className="text-xs py-1 flex justify-between"><span>"{s.q}"</span><span className="text-[#999]">{s.at}</span></div>))}</div>
     </div>
   );
 }
@@ -293,10 +293,10 @@ function MarketingTab({ d }) {
   return (
     <div className="space-y-4">
       <div className="grid lg:grid-cols-2 gap-4">
-        <div className="dina-card-white p-4"><div className="font-semibold mb-2">Codes promo</div><table className="dina-table"><thead><tr><th>Code</th><th>Type</th><th className="text-right">Utilisations</th></tr></thead><tbody>{d.promotions.map((p,i)=>(<tr key={i}><td className="font-mono">{p.code}</td><td className="text-xs">{p.type}</td><td className="text-right">{p.uses}</td></tr>))}</tbody></table></div>
-        <div className="dina-card-white p-4"><div className="font-semibold mb-2">Campagnes</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Envoyées</th><th className="text-right">CA</th></tr></thead><tbody>{d.campaigns.map((c,i)=>(<tr key={i}><td>{c.name}</td><td className="text-right">{c.stats?.sent||0}</td><td className="text-right tabular">{fcfa(c.stats?.revenue||0)}</td></tr>))}</tbody></table></div>
+        <div className="dina-card-white p-4"><div className="font-semibold mb-2">Codes promo</div><table className="dina-table"><thead><tr><th>Code</th><th>Type</th><th className="text-right">Utilisations</th></tr></thead><tbody>{(d.promotions || []).map((p,i)=>(<tr key={i}><td className="font-mono">{p.code}</td><td className="text-xs">{p.type}</td><td className="text-right">{p.uses}</td></tr>))}</tbody></table></div>
+        <div className="dina-card-white p-4"><div className="font-semibold mb-2">Campagnes</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Envoyées</th><th className="text-right">CA</th></tr></thead><tbody>{(d.campaigns || []).map((c,i)=>(<tr key={i}><td>{c.name}</td><td className="text-right">{c.stats?.sent||0}</td><td className="text-right tabular">{fcfa(c.stats?.revenue||0)}</td></tr>))}</tbody></table></div>
       </div>
-      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Sources d'acquisition</div><table className="dina-table"><thead><tr><th>Source</th><th className="text-right">Clientes</th></tr></thead><tbody>{d.sources.map((s,i)=>(<tr key={i}><td>{s.source}</td><td className="text-right tabular font-semibold">{s.count}</td></tr>))}</tbody></table></div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Sources d'acquisition</div><table className="dina-table"><thead><tr><th>Source</th><th className="text-right">Clientes</th></tr></thead><tbody>{(d.sources || []).map((s,i)=>(<tr key={i}><td>{s.source}</td><td className="text-right tabular font-semibold">{s.count}</td></tr>))}</tbody></table></div>
     </div>
   );
 }
@@ -315,8 +315,8 @@ function EncaissementsTab({ d }) {
     <div className="space-y-4">
       <Kpi label="Total encaissé" v={fcfa(d.total)} c="#b02a2a"/>
       <div className="grid lg:grid-cols-3 gap-4">
-        <ChartCard title="Par mode"><PieChart><Pie data={d.by_method} dataKey="value" nameKey="name" outerRadius={70}>{d.by_method.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>fcfa(v)}/><Legend wrapperStyle={{fontSize:10}}/></PieChart></ChartCard>
-        <ChartCard title="Par source"><PieChart><Pie data={d.by_source} dataKey="value" nameKey="name" outerRadius={70}>{d.by_source.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>fcfa(v)}/><Legend wrapperStyle={{fontSize:10}}/></PieChart></ChartCard>
+        <ChartCard title="Par mode"><PieChart><Pie data={d.by_method || []} dataKey="value" nameKey="name" outerRadius={70}>{(d.by_method || []).map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>fcfa(v)}/><Legend wrapperStyle={{fontSize:10}}/></PieChart></ChartCard>
+        <ChartCard title="Par source"><PieChart><Pie data={d.by_source || []} dataKey="value" nameKey="name" outerRadius={70}>{(d.by_source || []).map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={v=>fcfa(v)}/><Legend wrapperStyle={{fontSize:10}}/></PieChart></ChartCard>
         <ChartCard title="Par jour"><LineChart data={d.by_day}><CartesianGrid stroke="#f0f0f0"/><XAxis dataKey="day" fontSize={9}/><YAxis fontSize={10} tickFormatter={v=>`${(v/1000).toFixed(0)}k`}/><Tooltip formatter={v=>fcfa(v)}/><Line dataKey="value" stroke="#b02a2a" strokeWidth={2} dot={false}/></LineChart></ChartCard>
       </div>
       <ExportBar rows={d.by_day} name="encaissements" />
@@ -327,8 +327,8 @@ function EncaissementsTab({ d }) {
 function TeamTab({ d }) {
   return (
     <div className="space-y-4">
-      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Ventes par vendeuse</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Commandes</th><th className="text-right">CA</th></tr></thead><tbody>{d.sellers.map((s,i)=>(<tr key={i}><td>{s.name}</td><td className="text-right">{s.orders}</td><td className="text-right tabular font-semibold">{fcfa(s.revenue)}</td></tr>))}</tbody></table></div>
-      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Ponctualité</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Présent</th><th className="text-right">Retards</th><th className="text-right">Absents</th></tr></thead><tbody>{d.attendance.map((a,i)=>(<tr key={i}><td>{a.name}</td><td className="text-right text-[#1f8a4c]">{a.present}</td><td className="text-right text-[#e4991e]">{a.late}</td><td className="text-right text-[#c62828]">{a.absent}</td></tr>))}</tbody></table></div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Ventes par vendeuse</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Commandes</th><th className="text-right">CA</th></tr></thead><tbody>{(d.sellers || []).map((s,i)=>(<tr key={i}><td>{s.name}</td><td className="text-right">{s.orders}</td><td className="text-right tabular font-semibold">{fcfa(s.revenue)}</td></tr>))}</tbody></table></div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-2">Ponctualité</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Présent</th><th className="text-right">Retards</th><th className="text-right">Absents</th></tr></thead><tbody>{(d.attendance || []).map((a,i)=>(<tr key={i}><td>{a.name}</td><td className="text-right text-[#1f8a4c]">{a.present}</td><td className="text-right text-[#e4991e]">{a.late}</td><td className="text-right text-[#c62828]">{a.absent}</td></tr>))}</tbody></table></div>
     </div>
   );
 }

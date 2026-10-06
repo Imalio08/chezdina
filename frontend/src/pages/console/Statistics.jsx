@@ -64,7 +64,7 @@ export default function Statistics() {
         !zones ? <div className="text-sm text-[#666]">Chargement des zones…</div> : (
           <>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Zones actives</div><div className="font-serif text-2xl tabular">{zones.zones.length}</div></div>
+              <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Zones actives</div><div className="font-serif text-2xl tabular">{(zones?.zones || []).length}</div></div>
               <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Clientes géolocalisées</div><div className="font-serif text-2xl tabular">{zones.total_customers}</div></div>
               <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Commandes</div><div className="font-serif text-2xl tabular">{zones.total_orders}</div></div>
               <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">CA total</div><div className="font-serif text-2xl tabular">{fcfa(zones.total_revenue)}</div></div>

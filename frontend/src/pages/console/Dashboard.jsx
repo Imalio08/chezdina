@@ -170,7 +170,7 @@ export default function Dashboard() {
           <ResponsiveContainer width="100%" height={200}>
             <PieChart>
               <Pie data={k.channels} dataKey="value" nameKey="name" innerRadius={45} outerRadius={80} paddingAngle={2}>
-                {k.channels.map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
+                {(k.channels || []).map((_,i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
               </Pie>
               <Tooltip formatter={v=>fcfa(v)} contentStyle={{fontSize:12}}/>
             </PieChart>
