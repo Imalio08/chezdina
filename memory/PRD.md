@@ -3,6 +3,25 @@
 ## Problem Statement
 **Chez Dina** — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). Single codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. **Français uniquement**, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
+## Session 4 (Feb 6 2026) — Section 4 Dashboard & Statistiques v2
+### Dashboard "À traiter maintenant"
+- Nouveau composant `/app/frontend/src/components/dashboard/ActionItems.jsx` au-dessus des KPI, mis à jour chaque minute.
+- 8 cartes action live, chacune cliquable vers la page filtrée : À confirmer · À préparer · À assigner (prêtes sans livreur) · En livraison (avec breakdown par livreur) · Ruptures · Stock bas · Paniers abandonnés · Avis à valider.
+- Badge rouge "⏱Xmin" sur la plus vieille commande en attente.
+- Nouveau endpoint backend **`GET /api/dashboard/action-items`** qui calcule tout en live depuis Mongo (count_documents + aggregation).
+- Les KPI existants sont désormais **groupés par domaine** (Ventes · Opérations) avec titres et sous-lignes contextuelles.
+
+### Statistiques — bibliothèque de rapports (tabs)
+- Nouvelle architecture en 5 tabs : Ventes & produits · **Zones géographiques** · Clientes · Livraisons · Finances.
+- **Nouveau tab Zones** : 4 KPI (zones actives, clientes géolocalisées, commandes, CA total), bar chart "Part du CA par zone" (top 8), bar chart "Commandes vs Livrées par zone", **tableau détail 10 colonnes** (zone, tarif, clientes, commandes, livrées, CA, part CA, panier moyen, taux annulation, frais encaissés).
+- Backend endpoint **`GET /api/stats/zones?period=`** qui calcule tout par zone depuis orders+customers+zones Mongo.
+- Nouveau tab Finances avec **Compte de résultat** : CA − coût marchandises = Marge brute − dépenses = Résultat net (coloré rouge/vert).
+- Tab Ventes & produits enrichi : ajout du **Taux de marge** (%) et des charts Top pointures + Top couleurs avec légendes toujours visibles.
+
+### Résultats testés en curl
+- Action items réels : 14 nouvelles / 27 préparation / 17 à assigner / 17 en livraison / 0 ruptures / 1 stock bas / 6 paniers / 0 avis
+- Zones (30j) : 13 zones actives · 300 clientes · 47 commandes · 5 280 500 FCFA · Top : Cocody 13.9% · Angré 10.6% · Port-Bouët 7.8%
+
 ## Session 3 (Feb 6 2026) — Navigation + Dina IA
 ### 3.1 Sidebar refaite en 10 sections dépliables
 - Pilotage · Ventes · Livraison · Catalogue & stock · Achats · Clientes & marketing · Finances · Équipe · Site vitrine · Paramètres

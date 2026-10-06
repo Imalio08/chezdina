@@ -5,6 +5,7 @@ import { TrendingUp, ShoppingBag, Users, AlertTriangle, Truck, Receipt, Wallet, 
 import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell, BarChart, Bar, CartesianGrid } from "recharts";
 import PeriodSelector from "@/components/shared/PeriodSelector";
 import KPICard from "@/components/shared/KPICard";
+import ActionItems from "@/components/dashboard/ActionItems";
 
 const COLORS = ["#b02a2a","#f4b12c","#0021cc","#1f8a4c","#5867fd","#d94848","#e4991e","#1c1c1c"];
 
@@ -84,13 +85,24 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <div className="space-y-1">
-        <div className="font-semibold text-sm">Chiffres clés</div>
-        <div className="text-xs text-[#666]">L'activité de la boutique en un coup d'œil</div>
+      {/* Row 1: À traiter maintenant */}
+      <ActionItems/>
+
+      {/* Row 2+: KPIs grouped by domain */}
+      <div className="space-y-1 pt-2">
+        <div className="font-semibold text-sm">Ventes</div>
+        <div className="text-xs text-[#666]">Chiffre d'affaires, panier, articles, nouvelles clientes</div>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
+        {kpis.filter(k=>["CA période","Commandes","Articles vendus","Panier moyen","Marge brute"].includes(k.label)).map(kpi => <KPICard key={kpi.label} {...kpi} deltaLabel={kpi.previousValue!==undefined?`vs ${vs}`:undefined} detailLink={kpi.onDetail?undefined:kpi.detailLink}/>)}
       </div>
 
+      <div className="space-y-1 pt-2">
+        <div className="font-semibold text-sm">Opérations</div>
+        <div className="text-xs text-[#666]">Clientes, livraisons, stock, dépenses</div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-        {kpis.map(kpi => <KPICard key={kpi.label} {...kpi} deltaLabel={kpi.previousValue!==undefined?`vs ${vs}`:undefined} detailLink={kpi.onDetail?undefined:kpi.detailLink} />)}
+        {kpis.filter(k=>["Nouvelles clientes","Livrées","En cours","Stock faible","Dépenses"].includes(k.label)).map(kpi => <KPICard key={kpi.label} {...kpi} deltaLabel={kpi.previousValue!==undefined?`vs ${vs}`:undefined} detailLink={kpi.onDetail?undefined:kpi.detailLink}/>)}
       </div>
 
       {/* onDetail wrappers (since KPICard uses Link, we wrap manually for drill-downs) */}

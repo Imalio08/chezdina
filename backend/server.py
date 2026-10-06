@@ -712,6 +712,80 @@ async def drill(kind: str, period: str = "30d", user: dict = Depends(get_user)):
         rows = []
     return clean(rows)
 
+@api.get("/dashboard/action-items")
+async def dashboard_actions(user: dict = Depends(get_user)):
+    """Row 1 'À traiter maintenant' — live counts of urgent actions, each clickable."""
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
+    nouvelles = await db.orders.count_documents({"status": "nouvelle"})
+    preparation = await db.orders.count_documents({"status": {"$in":["confirmee","en_preparation"]}})
+    pretes_non_affectees = await db.orders.count_documents({"status": "prete", "$or":[{"rider_id":None},{"rider_id":{"$exists":False}}]})
+    en_livraison = await db.orders.count_documents({"status": "en_livraison"})
+    # Riders active today
+    assigned = await db.orders.find({"status": "en_livraison"}).to_list(500)
+    rider_cnt: Dict[str,int] = {}
+    for o in assigned:
+        rn = o.get("rider_name") or "—"; rider_cnt[rn] = rider_cnt.get(rn,0)+1
+    # Oldest waiting
+    oldest_nouvelle = await db.orders.find({"status":"nouvelle"}).sort("created_at", 1).limit(1).to_list(1)
+    oldest_wait_min = None
+    if oldest_nouvelle:
+        try:
+            d = datetime.fromisoformat(oldest_nouvelle[0]["created_at"].replace("Z","+00:00"))
+            oldest_wait_min = int((now - d).total_seconds() / 60)
+        except Exception: pass
+    rupture = await db.products.count_documents({"stock": 0})
+    stock_bas = await db.products.count_documents({"stock": {"$gt":0, "$lt":5}})
+    paniers = await db.abandoned_carts.count_documents({"recovered": False})
+    reviews_pending = await db.reviews.count_documents({"status": "pending"})
+    return {
+        "nouvelles": {"count": nouvelles, "wait_min": oldest_wait_min, "link":"/console/commandes?status=nouvelle"},
+        "preparation": {"count": preparation, "link":"/console/commandes?status=en_preparation"},
+        "pretes_non_affectees": {"count": pretes_non_affectees, "link":"/console/livraisons"},
+        "en_livraison": {"count": en_livraison, "by_rider": [{"name":n,"count":c} for n,c in rider_cnt.items()], "link":"/console/livraisons"},
+        "rupture": {"count": rupture, "link":"/console/stock"},
+        "stock_bas": {"count": stock_bas, "link":"/console/stock"},
+        "paniers_abandonnes": {"count": paniers, "link":"/console/alertes"},
+        "avis_a_valider": {"count": reviews_pending, "link":"/console/avis"},
+    }
+
+@api.get("/stats/zones")
+async def stats_zones(user: dict = Depends(get_user), period: str = "30d"):
+    """Geographic breakdown by delivery zone."""
+    s, e, _, _ = period_range(period)
+    orders = await db.orders.find({"created_at": {"$gte": s, "$lte": e}}).to_list(10000)
+    customers = await db.customers.find({}).to_list(5000)
+    zones = await db.zones.find({}).to_list(100)
+    by_zone: Dict[str, Dict[str,Any]] = {}
+    for z in zones:
+        by_zone[z["name"]] = {"name":z["name"], "fee":z.get("fee",0), "clients":0, "orders":0, "revenue":0, "cancelled":0, "postponed":0, "delivered":0, "fees_collected":0}
+    unknown = {"name":"— Zone inconnue —","fee":0,"clients":0,"orders":0,"revenue":0,"cancelled":0,"postponed":0,"delivered":0,"fees_collected":0}
+    # Clients by zone (based on their last address zone)
+    for c in customers:
+        z = (c.get("addresses",[]) or [{}])[0].get("zone") if c.get("addresses") else c.get("delivery_zone")
+        bucket = by_zone.get(z, unknown)
+        bucket["clients"] += 1
+    # Orders aggregation
+    for o in orders:
+        z = o.get("delivery_zone")
+        bucket = by_zone.get(z, unknown)
+        bucket["orders"] += 1
+        bucket["revenue"] += o.get("total",0)
+        bucket["fees_collected"] += o.get("delivery_fee",0)
+        if o.get("status") == "livree": bucket["delivered"] += 1
+        if o.get("status") == "annulee": bucket["cancelled"] += 1
+    rows = [b for b in by_zone.values() if b["orders"]>0 or b["clients"]>0]
+    if unknown["orders"]>0 or unknown["clients"]>0: rows.append(unknown)
+    for r in rows:
+        r["avg_basket"] = int(r["revenue"]/r["orders"]) if r["orders"] else 0
+        r["cancel_rate"] = round(r["cancelled"]/r["orders"]*100,1) if r["orders"] else 0
+    rows.sort(key=lambda x:-x["revenue"])
+    total_rev = sum(r["revenue"] for r in rows) or 1
+    for r in rows: r["share"] = round(r["revenue"]/total_rev*100,1)
+    return {"zones": rows, "total_customers": sum(r["clients"] for r in rows), "total_orders": sum(r["orders"] for r in rows), "total_revenue": sum(r["revenue"] for r in rows)}
+
+
+
 # ---------- Stats ----------
 @api.get("/stats/full")
 async def stats_full(user: dict = Depends(get_user), period: str = "30d"):
