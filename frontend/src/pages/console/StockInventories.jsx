@@ -45,12 +45,13 @@ export default function StockInventories() {
       <div><h1 className="font-serif text-3xl">Stock & inventaires</h1><p className="text-sm text-[#666]">Vue par variante · journal · demandes · inventaires aveugles</p></div>
 
       {kpis && (
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 lg:grid-cols-7 gap-2">
           <Kpi label="Valeur stock" v={fcfa(kpis.value)} c="#b02a2a" small />
           <Kpi label="Articles" v={kpis.items} c="#5867fd" />
           <Kpi label="Ruptures" v={kpis.ruptures} c="#c62828" />
           <Kpi label="Stock bas" v={kpis.low} c="#e4991e" />
           <Kpi label="Stock dormant" v={kpis.dormant} c="#999" />
+          <Kpi label="Immobilisé >60j" v={kpis.aged ?? 0} c="#c62828" />
           <Kpi label="Écarts du mois" v={kpis.ecarts_month} c="#5867fd" />
         </div>
       )}
@@ -69,17 +70,28 @@ export default function StockInventories() {
           </div>
           <div className="overflow-x-auto">
             <table className="dina-table">
-              <thead><tr><th>Produit</th><th>SKU</th><th>Variantes · Stock</th><th className="text-right">Total</th><th className="text-right">Valeur</th><th></th></tr></thead>
-              <tbody>{filtered.slice(0, 200).map(p => (
+              <thead><tr><th>Produit</th><th>SKU</th><th>Variantes · Stock</th><th className="text-right">Total</th><th className="text-right">Valeur</th><th>Âge</th><th></th></tr></thead>
+              <tbody>{filtered.slice(0, 200).map(p => {
+                const ageDays = p.created_at ? Math.floor((Date.now() - new Date(p.created_at).getTime()) / (24*3600*1000)) : null;
+                const aged = ageDays !== null && ageDays > 60 && (p.stock || 0) > 0;
+                return (
                 <tr key={p.id} data-testid={`stock-row-${p.sku}`}>
                   <td><div className="flex items-center gap-2"><div className="w-9 h-9 rounded bg-[#f5f5f5] overflow-hidden"><img src={p.image || p.images?.[0]} alt="" className="w-full h-full object-cover" /></div><div><div className="font-medium">{p.name}</div><div className="text-[10px] text-[#999]">{p.brand} · {p.category}</div></div></div></td>
                   <td className="font-mono text-xs">{p.sku}</td>
                   <td className="text-xs text-[#666]">{Object.entries(p.stock_by_size || {}).map(([s, v]) => <span key={s} className="inline-block mr-2">{s}:<b className={v === 0 ? "text-[#c62828]" : v < 3 ? "text-[#e4991e]" : "text-[#1f8a4c]"}>{v}</b></span>)}</td>
                   <td className="text-right tabular"><span className={p.stock < 5 ? "text-[#c62828] font-semibold" : ""}>{p.stock}</span></td>
                   <td className="text-right tabular">{fcfa(p.stock * p.cost)}</td>
+                  <td className="text-xs">{ageDays === null ? "—" : aged ? (
+                    <span className="dina-chip text-[10px] inline-flex items-center gap-1 !text-[#c62828] !border-[#c62828]" title="Produit immobilisé — pensez à une promo"><Clock size={9}/>{ageDays}j</span>
+                  ) : ageDays > 30 ? (
+                    <span className="dina-chip text-[10px] !text-[#e4991e] !border-[#e4991e]">{ageDays}j</span>
+                  ) : (
+                    <span className="text-[#1f8a4c]">{ageDays}j</span>
+                  )}</td>
                   <td className="text-right"><button onClick={() => setAdjust(p)} className="text-[#0021cc]" data-testid={`stock-adjust-${p.sku}`}><Edit size={13} /></button></td>
                 </tr>
-              ))}</tbody>
+                );
+              })}</tbody>
             </table>
           </div>
         </div>

@@ -94,12 +94,21 @@ function FlashLauncher({ onLaunch, onClose }) {
   const [code, setCode] = useState(() => `FLASH${Math.floor(Math.random()*900+100)}`);
   const [channel, setChannel] = useState("all");
   const [minOrder, setMinOrder] = useState(0);
+  const [scope, setScope] = useState("all");
+  const [products, setProducts] = useState([]);
+  const [selectedPids, setSelectedPids] = useState([]);
+  const [category, setCategory] = useState("");
+  useEffect(() => { api.get("/products").then(r => setProducts(r.data || [])).catch(() => {}); }, []);
+  const cats = Array.from(new Set(products.map(p => p.category).filter(Boolean)));
+  const toggleP = (pid) => setSelectedPids(s => s.includes(pid) ? s.filter(x => x !== pid) : [...s, pid]);
 
   const endsAt = customDate ? new Date(customDate).toISOString() : new Date(Date.now() + hours*3600*1000).toISOString();
   const endsLabel = new Date(endsAt).toLocaleString("fr-FR", { dateStyle:"short", timeStyle:"short" });
 
   const submit = () => {
     if (!code || discount <= 0) return toast.error("Code et % obligatoires");
+    if (scope === "products" && selectedPids.length === 0) return toast.error("Sélectionnez au moins un produit");
+    if (scope === "category" && !category) return toast.error("Choisissez une catégorie");
     onLaunch({
       code: code.toUpperCase(),
       type: "percent",
@@ -111,6 +120,9 @@ function FlashLauncher({ onLaunch, onClose }) {
       channel,
       active: true,
       flash: true,
+      scope,
+      products: scope === "products" ? selectedPids : [],
+      category: scope === "category" ? category : null,
     });
   };
 
@@ -165,6 +177,32 @@ function FlashLauncher({ onLaunch, onClose }) {
             <label className="text-xs uppercase text-[#666] font-semibold">Panier min. (FCFA, 0 = aucun)</label>
             <input type="number" className="dina-input mt-1" value={minOrder} onChange={e=>setMinOrder(e.target.value)} data-testid="flash-min"/>
           </div>
+
+          <div>
+            <label className="text-xs uppercase text-[#666] font-semibold">Périmètre</label>
+            <div className="flex gap-1 mt-1 flex-wrap">
+              {[["all","Tous"],["products","Produits ciblés"],["category","Catégorie"]].map(([v,l]) => (
+                <button key={v} onClick={()=>setScope(v)} className={`dina-chip text-[11px] ${scope===v?"!bg-[#b02a2a] !text-white":""}`} data-testid={`flash-scope-${v}`}>{l}</button>
+              ))}
+            </div>
+            {scope === "category" && (
+              <select className="dina-input mt-2" value={category} onChange={e=>setCategory(e.target.value)} data-testid="flash-category">
+                <option value="">Choisir une catégorie…</option>
+                {cats.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            )}
+            {scope === "products" && (
+              <div className="mt-2 border border-[#ececec] dark:border-[#2a2a2a] rounded-lg p-2 max-h-36 overflow-y-auto" data-testid="flash-products-picker">
+                <div className="text-[10px] text-[#666] mb-1">{selectedPids.length} produit(s) choisi(s)</div>
+                {products.slice(0, 100).map(p => (
+                  <label key={p.id} className="flex items-center gap-2 text-xs py-1 cursor-pointer hover:bg-[#fafafa] px-1 rounded">
+                    <input type="checkbox" checked={selectedPids.includes(p.id)} onChange={()=>toggleP(p.id)} className="accent-[#b02a2a]" data-testid={`flash-prod-${p.sku}`}/>
+                    <span className="flex-1 truncate">{p.name}</span><span className="text-[#666] font-mono">{p.sku}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="flex gap-2 mt-6">
@@ -177,19 +215,66 @@ function FlashLauncher({ onLaunch, onClose }) {
 }
 
 function PromoForm({ initial, types, onSave, onClose }) {
-  const [f, setF] = useState(initial || { code:"", type:(types[0]?.id)||"percent", value:10, starts_at:"", ends_at:"", usage_limit:0, min_order:0, channel:"all", active:true, flash:false });
+  const [f, setF] = useState(initial || { code:"", type:(types[0]?.id)||"percent", value:10, starts_at:"", ends_at:"", usage_limit:0, min_order:0, channel:"all", active:true, flash:false, scope:"all", products:[], category:"", buy_qty:2, get_qty:1, get_discount_pct:100 });
+  const [products, setProducts] = useState([]);
+  const [cats, setCats] = useState([]);
+  useEffect(() => {
+    api.get("/products").then(r => {
+      setProducts(r.data || []);
+      setCats(Array.from(new Set((r.data || []).map(p => p.category).filter(Boolean))));
+    }).catch(() => {});
+  }, []);
+  const mech = types.find(t => t.id === f.type)?.mechanic;
+  const needsProducts = mech === "bogo" || mech === "x_for_y" || f.scope === "products";
+  const toggleProduct = (pid) => setF(s => ({ ...s, products: (s.products || []).includes(pid) ? s.products.filter(x => x !== pid) : [...(s.products || []), pid] }));
   const toLocal = (iso) => iso ? iso.slice(0,16) : "";
   const toIso = (local) => local ? new Date(local).toISOString() : null;
   return (
     <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
         <div className="font-serif text-xl mb-4">{initial?"Modifier":"Nouvelle"} promotion</div>
         <div className="space-y-3 text-sm">
           <input className="dina-input" placeholder="Code (ex: FLASH25)" value={f.code} onChange={e=>setF({...f,code:e.target.value.toUpperCase()})} data-testid="promo-code"/>
           <div className="grid grid-cols-2 gap-2">
-            <select className="dina-input" value={f.type} onChange={e=>setF({...f,type:e.target.value})}>{(types||[]).map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select>
-            <input type="number" className="dina-input" placeholder="Valeur" value={f.value} onChange={e=>setF({...f,value:+e.target.value})} disabled={(types.find(t=>t.id===f.type)?.mechanic)==="free_delivery"}/>
+            <select className="dina-input" value={f.type} onChange={e=>setF({...f,type:e.target.value})} data-testid="promo-type">{(types||[]).map(t=><option key={t.id} value={t.id}>{t.label}</option>)}</select>
+            <input type="number" className="dina-input" placeholder="Valeur" value={f.value} onChange={e=>setF({...f,value:+e.target.value})} disabled={mech === "free_delivery" || mech === "bogo" || mech === "x_for_y"}/>
           </div>
+
+          {(mech === "bogo" || mech === "x_for_y") && (
+            <div className="grid grid-cols-3 gap-2 p-3 rounded-lg bg-[#fff5f5] dark:bg-[#2a1818]" data-testid="promo-bogo-box">
+              <div><label className="text-[10px] text-[#666] uppercase">Acheter N</label><input type="number" className="dina-input !py-1.5 tabular text-right" value={f.buy_qty} onChange={e=>setF({...f, buy_qty:+e.target.value})} data-testid="promo-buy-qty"/></div>
+              <div><label className="text-[10px] text-[#666] uppercase">Obtenir N</label><input type="number" className="dina-input !py-1.5 tabular text-right" value={f.get_qty} onChange={e=>setF({...f, get_qty:+e.target.value})} data-testid="promo-get-qty"/></div>
+              <div><label className="text-[10px] text-[#666] uppercase">% réduction</label><input type="number" className="dina-input !py-1.5 tabular text-right" value={f.get_discount_pct} onChange={e=>setF({...f, get_discount_pct:+e.target.value})} data-testid="promo-get-pct"/></div>
+            </div>
+          )}
+
+          <div>
+            <label className="text-[10px] uppercase text-[#666] font-semibold">Périmètre d'application</label>
+            <div className="flex gap-1 mt-1 flex-wrap">
+              {[["all","Tous les produits"],["products","Produits sélectionnés"],["category","Catégorie"]].map(([v,l]) => (
+                <button key={v} onClick={()=>setF({...f, scope:v})} className={`dina-chip text-[11px] ${f.scope===v?"!bg-[#b02a2a] !text-white":""}`} data-testid={`promo-scope-${v}`}>{l}</button>
+              ))}
+            </div>
+          </div>
+          {f.scope === "category" && (
+            <select className="dina-input" value={f.category || ""} onChange={e=>setF({...f, category:e.target.value})} data-testid="promo-category">
+              <option value="">Choisir une catégorie…</option>
+              {cats.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+          {needsProducts && (
+            <div className="border border-[#ececec] dark:border-[#2a2a2a] rounded-lg p-2 max-h-48 overflow-y-auto" data-testid="promo-products-picker">
+              <div className="text-[10px] text-[#666] mb-1">Sélectionnez les produits concernés ({(f.products || []).length} choisis)</div>
+              {products.map(p => (
+                <label key={p.id} className="flex items-center gap-2 text-xs py-1 hover:bg-[#fafafa] dark:hover:bg-[#141414] px-1 rounded cursor-pointer">
+                  <input type="checkbox" checked={(f.products || []).includes(p.id)} onChange={() => toggleProduct(p.id)} className="accent-[#b02a2a]" data-testid={`promo-prod-${p.sku}`}/>
+                  <span className="flex-1 truncate">{p.name}</span>
+                  <span className="text-[#666] font-mono">{p.sku}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
           <div>
             <label className="text-xs text-[#666] uppercase">Période de validité</label>
             <div className="grid grid-cols-2 gap-2 mt-1">

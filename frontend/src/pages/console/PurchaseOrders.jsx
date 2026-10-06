@@ -194,10 +194,15 @@ function Kpi({ label, v, c, small }) {
 function PoForm({ initial, sups, products, onSave, onClose }) {
   const [f, setF] = useState(initial || { supplier_id: "", items: [], extra_costs: [] });
   const supplier = sups.find(s => s.id === f.supplier_id);
-  const total = useMemo(() => (f.items || []).reduce((s, it) => s + (+it.qty || 0) * (+it.unit_cost || 0), 0) + (f.extra_costs || []).reduce((s, x) => s + (+x.amount || 0), 0), [f.items, f.extra_costs]);
+  const itemsTotal = useMemo(() => (f.items || []).reduce((s, it) => s + (+it.qty || 0) * (+it.unit_cost || 0), 0), [f.items]);
+  const extrasTotal = useMemo(() => (f.extra_costs || []).reduce((s, x) => s + (+x.amount || 0), 0), [f.extra_costs]);
+  const total = itemsTotal + extrasTotal;
   const addItem = () => setF({ ...f, items: [...(f.items || []), { product_id: "", qty: 1, unit_cost: 0 }] });
   const updItem = (i, patch) => setF({ ...f, items: f.items.map((x, idx) => idx === i ? { ...x, ...patch } : x) });
   const rmItem = (i) => setF({ ...f, items: f.items.filter((_, idx) => idx !== i) });
+  const addExtra = () => setF({ ...f, extra_costs: [...(f.extra_costs || []), { label: "", amount: 0 }] });
+  const updExtra = (i, patch) => setF({ ...f, extra_costs: f.extra_costs.map((x, idx) => idx === i ? { ...x, ...patch } : x) });
+  const rmExtra = (i) => setF({ ...f, extra_costs: f.extra_costs.filter((_, idx) => idx !== i) });
   const pickProd = (i, pid) => { const p = products.find(x => x.id === pid); if (!p) return; updItem(i, { product_id: p.id, product_name: p.name, sku: p.sku, unit_cost: p.cost || 0, size: (p.sizes || [])[0] || "", color: (p.colors || [])[0] || "", sell_price: p.price }); };
 
   const submit = () => {
@@ -230,6 +235,27 @@ function PoForm({ initial, sups, products, onSave, onClose }) {
             </div>
           ))}
           <div className="text-right text-sm tabular font-semibold pt-2 border-t">Total : <span className="text-[#b02a2a]">{fcfa(total)}</span></div>
+
+          {/* Coûts additionnels (fret, douane, manutention) */}
+          <div className="flex justify-between items-center pt-3 border-t border-[#ececec] dark:border-[#2a2a2a]">
+            <div>
+              <div className="font-semibold text-sm">Coûts additionnels ({(f.extra_costs || []).length})</div>
+              <div className="text-[10px] text-[#666]">Transport, douane, manutention — répartis sur chaque article pour le coût de revient (landed cost)</div>
+            </div>
+            <button onClick={addExtra} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="po-add-extra"><Plus size={11} />Ajouter</button>
+          </div>
+          {(f.extra_costs || []).map((x, i) => (
+            <div key={i} className="grid grid-cols-[1fr_120px_28px] gap-2 items-end" data-testid={`po-extra-${i}`}>
+              <input className="dina-input !py-1.5 text-xs" placeholder="Libellé (ex: Transport, Douane, Manutention)" value={x.label || ""} onChange={e => updExtra(i, { label: e.target.value })} data-testid={`po-extra-label-${i}`}/>
+              <input type="number" className="dina-input !py-1.5 text-xs tabular text-right" placeholder="Montant FCFA" value={x.amount || 0} onChange={e => updExtra(i, { amount: +e.target.value })} data-testid={`po-extra-amount-${i}`}/>
+              <button onClick={() => rmExtra(i)} className="text-[#c62828] pb-2"><Trash2 size={14} /></button>
+            </div>
+          ))}
+          {(f.extra_costs || []).length > 0 && (
+            <div className="text-xs text-[#666] text-right tabular">
+              Articles : <b className="text-[#1c1c1c] dark:text-white">{fcfa(itemsTotal)}</b> + Coûts additionnels : <b className="text-[#e4991e]">{fcfa(extrasTotal)}</b> = <b className="text-[#b02a2a]">{fcfa(total)}</b>
+            </div>
+          )}
         </div>
         <div className="flex gap-2 mt-5"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={submit} className="dina-btn-primary flex-1" data-testid="po-save">Enregistrer</button></div>
       </div>

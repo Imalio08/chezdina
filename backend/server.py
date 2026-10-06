@@ -152,6 +152,13 @@ class PromoIn(BaseModel):
     starts_at: Optional[str] = None; ends_at: Optional[str] = None
     usage_limit: int = 0; min_order: int = 0; channel: str = "all"; active: bool = True
     flash: bool = False
+    # Scope — which products the promo applies to
+    scope: str = "all"  # all | products | category
+    products: List[str] = []  # product_ids when scope=products OR for bogo/x_for_y target products
+    category: Optional[str] = None  # when scope=category
+    buy_qty: int = 2  # for bogo / x_for_y
+    get_qty: int = 1
+    get_discount_pct: int = 100  # 100 = free
 class ZoneIn(BaseModel): name: str; fee: int
 class ReviewIn(BaseModel):
     product_id: str; rating: int; comment: str = ""
@@ -1970,11 +1977,44 @@ async def stock_kpis(user: dict = Depends(get_user)):
         for it in o.get("items", []):
             if it.get("product_id"): sold_pids.add(it["product_id"])
     dormant = sum(1 for p in products if p["id"] not in sold_pids and (p.get("stock",0) or 0) > 0)
+    # Stock immobilisé (age > 60j depuis création produit, et aucune vente)
+    cutoff_age = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+    aged = sum(1 for p in products if (p.get("stock",0) or 0) > 0 and (p.get("created_at") or now_iso()) < cutoff_age and p["id"] not in sold_pids)
     # Écarts du mois
     cutoff30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
     adj = await db.stock_adjustments.find({"created_at": {"$gte": cutoff30}}).to_list(500)
     ecarts = sum(abs(int(a.get("qty_delta", 0) or 0)) for a in adj)
-    return {"value": int(total_stock_value), "items": int(items_in_stock), "ruptures": ruptures, "low": low, "dormant": dormant, "ecarts_month": ecarts}
+    return {"value": int(total_stock_value), "items": int(items_in_stock), "ruptures": ruptures, "low": low, "dormant": dormant, "aged": aged, "ecarts_month": ecarts}
+
+@api.get("/stock/aged")
+async def stock_aged(user: dict = Depends(get_user), days: int = 60):
+    """List products immobilized longer than `days` with no recent sale."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    products = await db.products.find({}).to_list(2000)
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
+    sold = set()
+    for o in orders:
+        for it in o.get("items", []):
+            if it.get("product_id"): sold.add(it["product_id"])
+    rows = []
+    now_dt = datetime.now(timezone.utc)
+    for p in products:
+        if (p.get("stock",0) or 0) <= 0: continue
+        if p["id"] in sold: continue
+        created = p.get("created_at") or now_iso()
+        try:
+            age_days = (now_dt - datetime.fromisoformat(created.replace("Z","+00:00"))).days
+        except Exception:
+            age_days = 0
+        if age_days < days: continue
+        rows.append({
+            "id": p["id"], "name": p.get("name"), "sku": p.get("sku"), "image": p.get("image"),
+            "stock": p.get("stock",0), "cost": p.get("cost",0),
+            "value": (p.get("stock",0) or 0) * (p.get("cost",0) or 0),
+            "age_days": age_days,
+        })
+    rows.sort(key=lambda r: -r["age_days"])
+    return {"days_threshold": days, "count": len(rows), "items": rows[:200]}
 
 @api.get("/stock/movements")
 async def stock_movements(user: dict = Depends(get_user)):
