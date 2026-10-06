@@ -1122,43 +1122,7 @@ async def public_product(pid: str):
     return clean(p)
 
 @api.post("/public/orders")
-
-@api.get("/public/order/{code}")
-async def public_order(code: str):
-    o = await db.orders.find_one({"code": code})
-    if not o: raise HTTPException(404, "Introuvable")
-    # Return only safe fields
-    return {
-        "code": o.get("code"), "status": o.get("status"),
-        "items": o.get("items", []),
-        "customer": {"name": o.get("customer",{}).get("name")},
-        "rider_name": o.get("rider_name"),
-        "delivered_at": o.get("delivered_at") or (o.get("created_at") if o.get("status")=="livree" else None),
-    }
-
-@api.post("/public/rate/{code}")
-async def public_rate(code: str, body: Dict[str, Any]):
-    o = await db.orders.find_one({"code": code})
-    if not o: raise HTTPException(404, "Introuvable")
-    rating = int(body.get("rating") or 0)
-    rider_rating = int(body.get("rider_rating") or rating)
-    comment = (body.get("comment") or "").strip()
-    recommend = body.get("recommend")
-    if not (1 <= rating <= 5): raise HTTPException(400, "Note invalide")
-    doc = {
-        "id": new_id(), "order_id": o["id"], "order_code": code,
-        "customer_id": o.get("customer",{}).get("id"),
-        "customer_name": o.get("customer",{}).get("name"),
-        "rating": rating, "rider_rating": rider_rating,
-        "rider_id": o.get("rider_id"), "rider_name": o.get("rider_name"),
-        "comment": comment, "recommend": recommend,
-        "created_at": now_iso(),
-    }
-    await db.order_ratings.insert_one(doc)
-    await db.orders.update_one({"id": o["id"]}, {"$set": {"rating": rating, "rider_rating": rider_rating, "rated_at": now_iso()}})
-    return {"ok": True}
-
-async def public_order(body: OrderIn):
+async def public_create_order(body: OrderIn):
     sub = sum(it.qty * it.price for it in body.items)
     total = sub + body.delivery_fee - body.discount
     code = gen_code()
@@ -1176,6 +1140,41 @@ async def public_order(body: OrderIn):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}, "$inc":{"loyalty_points": int(total/500)}})
     await db.orders.insert_one(doc)
     return {"code": code, "id": doc["id"]}
+
+@api.get("/public/order/{code}")
+async def public_order_fetch(code: str):
+    o = await db.orders.find_one({"code": code})
+    if not o: raise HTTPException(404, "Introuvable")
+    cust = o.get("customer") or {}
+    return {
+        "code": o.get("code"), "status": o.get("status"),
+        "items": o.get("items", []),
+        "customer": {"name": cust.get("name") if isinstance(cust, dict) else None},
+        "rider_name": o.get("rider_name"),
+        "delivered_at": o.get("delivered_at") or (o.get("created_at") if o.get("status")=="livree" else None),
+    }
+
+@api.post("/public/rate/{code}")
+async def public_rate(code: str, body: Dict[str, Any]):
+    o = await db.orders.find_one({"code": code})
+    if not o: raise HTTPException(404, "Introuvable")
+    rating = int(body.get("rating") or 0)
+    rider_rating = int(body.get("rider_rating") or rating)
+    comment = (body.get("comment") or "").strip()
+    recommend = body.get("recommend")
+    if not (1 <= rating <= 5): raise HTTPException(400, "Note invalide")
+    cust = o.get("customer") or {}
+    doc = {
+        "id": new_id(), "order_id": o["id"], "order_code": code,
+        "customer_name": cust.get("name") if isinstance(cust, dict) else None,
+        "rating": rating, "rider_rating": rider_rating,
+        "rider_id": o.get("rider_id"), "rider_name": o.get("rider_name"),
+        "comment": comment, "recommend": recommend,
+        "created_at": now_iso(),
+    }
+    await db.order_ratings.insert_one(doc)
+    await db.orders.update_one({"id": o["id"]}, {"$set": {"rating": rating, "rider_rating": rider_rating, "rated_at": now_iso()}})
+    return {"ok": True}
 
 # ---------- Share receipt / cart ----------
 @api.post("/share/order")

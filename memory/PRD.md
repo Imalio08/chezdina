@@ -3,6 +3,33 @@
 ## Problem Statement
 **Chez Dina** — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). Single codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. **Français uniquement**, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
+## Session 7 (Feb 6 2026) — Section 6 compléments + Section 7 Catalog v2
+### Section 6 compléments
+- **Bouton "Imprimer fiches du jour"** sur la page Livraisons → route directe vers `/console/fiches-colis` qui liste toutes les commandes prêtes/assignées/en_livraison.
+- Backend `public_order` + `public_rate` endpoints restaurés après conflit de nommage avec `public_create_order` (collision F811 ruff).
+
+### Section 7 Catalog v2 — Nouveau formulaire produit (`Products.jsx` refondu)
+- **Grid 2 colonnes** desktop : Informations générales (nom, catégorie **CreateOnFlySelect**, marque **CreateOnFlySelect**, matière, saison) · Prix & marge avec **marge calculée en live** (vert ≥40%, orange, rouge <20%).
+- **ImageUpload multi** (jusqu'à 6 photos, compression WebP ~400 Ko, première image = vitrine) remplaçant l'ancien input URL.
+- **Bouton "Rédiger avec l'IA"** sur la description → POST `/ai/ask` avec un prompt structuré (catégorie, marque, matière, prix) → insère la réponse dans le textarea.
+- **Pills tailles & couleurs** : pointures 36-41 si catégorie chaussure/mule/sandale, sinon XS-XXL. Pills couleurs standard. Sélection multi-click.
+- **Bouton "Générer la matrice de variantes"** → crée automatiquement `stock_by_size` avec 2 unités par taille sélectionnée. **Tableau variantes** : par taille, stock initial éditable, valeur au coût calculée, ligne Total en bas.
+- Toggle visibilité : Boutique + site · Boutique uniquement · Site uniquement.
+- Liste produits enrichie : colonne **Marge %** avec coloration (vert ≥40% / rouge <20%).
+
+### Composants partagés utilisés
+- `ImageUpload` (session 2) · `CreateOnFlySelect` (session 2) · `ErrorBoundary` auto via App.js.
+
+### Testé en curl
+- Backend health OK · Public fetch OK · Public rate submit OK · Frontend compile OK sans erreurs module.
+
+### Non livré dans cette session (deferred)
+- Journées de livraison avec drag&drop d'affectation (board unassigned/par livreur colonnes) — Deliveries actuel fonctionne par dropdown
+- Réconciliation du soir ligne-par-ligne avec validation PIN gérante — réconciliation existe mais sans PIN auth
+- GPS live rider tracking carte — pas de WebSocket actif
+- Approvisionnements 4-steps wizard — Purchases.jsx actuel reste en modal simple (CRUD complet session 2 déjà en place)
+- Étiquettes produits QR par variante à la réception
+
 ## Session 6 (Feb 6 2026) — Section 6 Delivery full redesign (partiel)
 ### Nouveaux endpoints backend
 - `GET /api/public/order/{code}` → récupère les infos safe d'une commande (nom cliente, items, livreur, date livraison) depuis l'extérieur sans auth, pour la page de notation

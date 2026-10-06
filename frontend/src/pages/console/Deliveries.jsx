@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { fcfa, dateFmt, statusLabel, statusColor, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Check, X, Phone, MessageCircle, MapPin, Pencil, Trash2 } from "lucide-react";
+import { Plus, Check, X, Phone, MessageCircle, MapPin, Pencil, Trash2, Printer } from "lucide-react";
+import { Link } from "react-router-dom";
 
 export default function Deliveries() {
   const [tab, setTab] = useState("dispatch");
@@ -44,6 +45,9 @@ export default function Deliveries() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Livraisons</h1><p className="text-sm text-[#666]">Journées livreurs, réconciliation, performance</p></div>
+        <div className="flex gap-2">
+          <Link to="/console/fiches-colis" className="dina-btn-secondary !min-h-[40px]" data-testid="print-today-labels"><Printer size={13}/>Imprimer fiches du jour</Link>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
