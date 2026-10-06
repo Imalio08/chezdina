@@ -1,0 +1,40 @@
+{
+  "summary": "Fix pack 2 backend testing complete — 17/17 pytest tests passed on the preview URL. Covered: role templates (gerante/livreur/caissiere), roles CRUD + builtin protection (PATCH/DELETE => 400), approval requests full flow, expense requests (approval auto-creates /expenses entry), audit-logs admin-only, cash declare-handover + validate-handover with gap => manager_balance entry, attendance (me / check-in with selfie + GPS, selfie-required 400, mandatory geofence refusal 400, today/calendar/stats), rider departure-without-reconciliation flag, working-hours PATCH, stock adjustments (admin immediate + non-admin creates approval_request).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/stock/adjustments",
+        "issue": "Dead code block at server.py L3147-3281 lives INSIDE the stock_adjust function body, after the `return` on L3145. Looks like an orphaned/duplicated seed block that was mistakenly nested inside the endpoint when Fix pack 2 was inserted. It is unreachable so does not affect behaviour, but it is misleading (grep for `insert_one.*business` lights up inside stock_adjust) and should be deleted. Live seed functions are at L2276 (seed_demo) and L2827 (seed_if_empty)."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack2.py",
+    "/app/test_reports/pytest/fixpack2_results.xml"
+  ],
+  "action_items": [
+    "Remove the dead orphaned seed block inside stock_adjust (server.py L3147-end-of-indented-block) — it is unreachable code after `return` on L3145.",
+    "server.py is now 3298 lines; strongly recommend splitting into routers (roles, approvals, attendance, cash, stock) before adding more endpoints. The previous orphaned-decorator bug and this orphaned-seed-block are both symptoms of inserting new sections into one giant file."
+  ],
+  "critical_code_review_comments": [
+    "Dead code inside POST /stock/adjustments (L3147+) — orphaned seed logic nested in the wrong function.",
+    "server.py >3000 lines; routers extraction overdue.",
+    "GET /audit-logs uses `{\"$regex\": action}` with raw user input — tiny ReDoS risk, consider anchoring/escaping or restricting to a whitelist.",
+    "declare_handover accepts amount from any authenticated user via Depends(get_user) — may want to restrict to manager/caissiere role (currently admin can also call it, livreur too). Not a security issue because handover_by is logged, but worth tightening.",
+    "manager_balance route uses require_role(\"admin\",\"manager\") — but any manager can read anyone's balance by passing another mid. Consider enforcing mid == current user for non-admins.",
+    "/attendance/check-in rider departure flag uses `user.get(\"role\") == \"rider\"`. If a seeded rider has role 'livreur' the flag will not fire — confirm the seed is consistent (test skipped-safely-handles this; in the preview env the seeded role is `rider`, flag fired correctly).",
+    "attendance_stats avg_arrival computes an int average of minutes without filtering timezone — adequate for display but assumes UTC-stored times."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixpack2.py (new)"
+  ],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "not tested (per request)"},
+  "test_credentials": "admin aouattaraesca@gmail.com / Admin123! OK · manager manager.cocody@dinastore.ci / Manager123! OK · rider rider1@dinastore.ci / Rider123! OK (role=rider)",
+  "seed_data_creation": "Each test creates and cleans up its own data: TEST roles (deleted), TEST_FP2_expense_<ts> expense (approved copy remains in db.expenses by design — identified by label prefix TEST_FP2_expense_), ephemeral cash_session + manager_balance entries (deleted), ephemeral delivery_session (deleted), today's attendance rows for rider1 (cleared at start). No long-lived test data except the TEST_FP2_expense_* expense which is intentional (proof of approval flow).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fix pack 2 fully green on preview. Reusable: /app/backend/tests/test_fixpack2.py. Note that /attendance/today was correctly renamed to /attendance/today-kiosk at L1735 so the new owner view at L3078 is reachable (verified). Known hygiene item: dead orphaned seed block inside stock_adjust (L3147+). The departure-without-reconciliation flag only triggers when user.role == 'rider' (not 'livreur').",
+  "rca of the issue": "No bug blocking Fix pack 2. Single hygiene finding: inserting the Fix pack 2 block before the pre-existing demo-seed block left the seed block nested inside the last defined endpoint (stock_adjust), after a `return`. Reproduction: `grep -n '^    # Business' server.py` returns a line inside stock_adjust's body. Mitigation: cut L3147 through the end of the orphaned block and either delete (if seed_if_empty at L2827 is authoritative) or move to the correct seed function."
+}

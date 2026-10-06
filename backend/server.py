@@ -3144,6 +3144,8 @@ async def stock_adjust(body: Dict[str,Any], user: dict = Depends(get_user)):
     await db.approval_requests.insert_one(doc)
     return {"ok": True, "applied": False, "approval_request_id": doc["id"]}
 
+async def _seed_demo_content_legacy():
+    """Legacy seed block (orphaned by earlier insert) — kept for reference, not auto-called. Use /admin/seed-demo instead."""
     # Business
     if await db.business.count_documents({}) == 0:
         await db.business.insert_one({"id":"main","name":"Chez Dina","phone":"+225 07 77 92 61 79","address":"Cocody Angré 7e, Abidjan","tiktok":"@dinoush04","whatsapp":"2250777926179","currency":"XOF","created_at":now_iso()})
