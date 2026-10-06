@@ -1,0 +1,30 @@
+{
+  "summary": "Full E2E of sprint-1 fix-pack 2 & 3 for Chez Dina. Backend: 10/10 pytest green (roles-permissions GET+PATCH, approval-requests, expense-requests, stock/adjustment-requests, audit-logs, cash-sessions, manager-balance, invoices/from-order POST, access-control sales→403 on audit). Frontend verified end-to-end: (1) /console/roles — 4-level matrix (Aucun/Lecture/Modif./Complet) rendered with 76 selects, SENSIBLE tag + red border on Stock & inventaire and Dépenses when level=full, Admin column locked on Complet, 'Nouveau rôle' and 'Enregistrer' buttons present, per-section bulk 'Gérante · bulk / Vendeuse · bulk / Stock · bulk / Livreur · bulk' selects in each section header. (2) /console/approbations — 3 KPI cards (En attente=3, Approuvées=0, Refusées=0), type chips (Remise/Remboursement/Ajustement/Prix/Dépense/Versement caisse), 3 pending items with 3 Approuver + 3 Refuser buttons + commentaire optional input. (3) /console/audit — filters (Utilisateur / Action / Période 7j default / recherche libre), Export Excel button, 12 <details> diff blocks (before/after), access control confirmed: manager login on /console/audit shows 'Accès réservé'. (4) /console/sessions-caisse — 4 KPIs (Sessions=2, À valider=0, Encaissements cumulés=0 FCFA, Écarts cumulés=25000 FCFA), Historique table with Versé + Écart Owner columns, 'Ouvrir caisse' button. (5) POS guard verified with manager login: overlay 'Ouvrez votre session de caisse pour commencer' + 'Ouvrir la session' button visible on /console/pos. (6) /console/commandes — ALL 9 KPI testids present (orders-kpi-nouvelles/prep/pretes/livraison/livrees/annulees/reportees/rate/ca), clicking orders-kpi-livrees filters to 338 livrées, Facture column renders invoice-view/pdf/wa testids on every row. (7) Regression: Dashboard, Statistiques, Finances, Livraisons, Produits, Stock, Clients, Manuel, Settings all load without TypeError.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Guided tour", "issues": ["Tour auto-opens on every page visit even when localStorage dina_tour_* keys are set after mount — pre-existing (non-blocking)."]},
+      {"screen": "Hydration (console warning)", "issues": ["Legacy warning 'In HTML, <span> cannot be a child of <option>' still logged from a Select somewhere under ConsoleLayout (line 185); harmless but pollutes console."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack_iter24.py",
+    "/app/test_reports/pytest/iter24.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Roles bulk UX uses per-section selects labelled '<role> · bulk' instead of a visible button 'Appliquer à toute la section' — functionally equivalent but spec wording differs; consider aligning label if marketing/UX text is contractual.",
+    "Hydration warning (<span> in <option>) persists across iterations — track down the Select rendering a span inside <option> (likely a shadcn Select used as <select>); replace with text-only children.",
+    "Invoice buttons on Orders table: 200+ buttons per view may slow DOM; consider lazy-rendering per visible rows or virtualization at >500 orders (current list = 583)."
+  ],
+  "updated_files": ["/app/backend/tests/test_fixpack_iter24.py"],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (all 8 feature groups + 9/9 regression pages)"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! and Manager manager.cocody@dinastore.ci / Manager123! both used successfully.",
+  "seed_data_creation": "None; relied on existing seeded approval/expense/adjustment requests and cash sessions.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Correct routes: /console/roles (not /roles-permissions), /console/commandes (not /orders), /console/sessions-caisse. Backend endpoints: roles-permissions uses PATCH (not PUT), invoices/from-order/{oid} uses POST (not GET). KPI testids on Orders page: orders-kpi-{nouvelles,prep,pretes,livraison,livrees,annulees,reportees,rate,ca}. Invoice buttons: invoice-{view,pdf,wa}-{orderCode}. Drawer invoice buttons: order-invoice-{view,pdf,wa}. POS guard overlay triggers when no cash session is open globally — tested with manager login where no session was open.",
+  "rca of the issue": "N/A — all tests green."
+}

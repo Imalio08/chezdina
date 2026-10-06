@@ -1,5 +1,22 @@
 # Chez Dina — PRD
 
+## P1 Sprint 1 (Feb 2026) — Fix packs 2 & 3 ✅
+
+### Nouvelles pages / composants
+- `RolesPermissions.jsx` — matrice 4 niveaux par cellule (Aucun / Lecture / Modif. / Complet), bordure rouge sur droits sensibles, bulk par section via `<select>` par rôle, bouton "Nouveau rôle" (vierge), suppression de rôles custom
+- `Approvals.jsx` (new, `/console/approbations`, owner only) — inbox unifiée approval_requests + expense_requests + stock_adjustment_requests, 3 KPI cards (pending/approved/rejected) cliquables, filtre par type, Approuver/Refuser avec commentaire
+- `Audit.jsx` (new, `/console/audit`, owner only) — filtres utilisateur/action/période/recherche libre, export Excel, diff before/after dans `<details>`
+- `POSSessionGuard.jsx` (new) — overlay bloquant "Ouvrez votre session de caisse pour commencer" si aucune session non closed ; bouton "Ouvrir la session" avec montant initial
+- `CashSessions.jsx` — rewritten : 4 KPI cards, flow Gérante déclare versement → Owner valide (modal avec écart temps réel) → écart appliqué au solde Gérante
+- `Orders.jsx` — rewritten : 9 KPI mini-cards cliquables (Nouvelles/À préparer/Prêtes/En livraison/Livrées/Annulées/Reportées/Taux/CA livré) + colonne Facture (Voir/PDF/WhatsApp) + bloc Facture dans OrderDrawer
+- `POS.jsx` — exports `POS` wrappé dans `POSSessionGuard` (POSInner = ancien composant)
+- `ConsoleLayout.jsx` — entrées sidebar "À approuver" + "Journal d'audit" (admin only)
+- `App.js` — routes `/console/approbations` + `/console/audit`
+
+### Testé (iteration_24)
+- Backend 10/10 pytest ✅ (roles-permissions, approvals, audit-logs, cash-sessions handover+validate, manager-balance, invoices/from-order, access-control sales→403)
+- Frontend 100% ✅ (8 groupes fonctionnels + 9/9 pages regression)
+
 ## P0 Stabilité (Feb 2026) — Fix pack 1 remnants ✅
 
 ### Backend
@@ -161,16 +178,10 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 
 ## Backlog (priorisé après P0 Feb 2026)
 
-### P1 — Fix packs 2 & 3 (brancher l'UI, backend déjà prêt)
-- Rôles & permissions UI 4 niveaux par cellule, toggles sensibles, "Appliquer à toute la section", créer rôle vierge
-- Page "À approuver" (owner only) : remises, remboursements, ajustements stock, prix, dépenses
-- Journal d'audit viewer (filtres user/action/date, before/after, export, trace ajustements directs owner)
-- Sessions de caisse UI : Gérante déclare → Owner valide/écart → ajout au solde Gérante
-- POS session guard : pas de vente sans session ouverte ("Ouvrez votre session de caisse")
-- Kiosk tablette boutique : Pointage PIN+selfie depuis l'écran verrouillé
-- Inventaire & réception à l'aveugle : `qty_counted` séparé de la quantité attendue
-- Commandes UI : colonne Facture (Voir, PDF, WhatsApp), KPI cards (nouvelles/à confirmer/en préparation/prêtes/en livraison/livrées/annulées/reportées/taux annulation/CA livré)
-- Préparation screen : scan article par article + fallback manuel avec motif obligatoire (loggé)
+### P1 — Fix packs 2 & 3 (Sprint 2 restant)
+- Kiosk tablette boutique : Pointage PIN+**selfie** depuis l'écran verrouillé (base PIN déjà faite dans `Kiosk.jsx`, ajouter capture selfie)
+- Blind inventory & reception : vérifier/garantir que `qty_counted` est séparé de la quantité attendue (déjà en place dans `StockInventories.jsx` — audit rapide)
+- Préparation screen : scan article par article + fallback manuel avec motif obligatoire (loggé dans audit)
 
 ### P2 — Fix pack 4 (Livraison)
 - 3 pages séparées : Journées / Livreurs / Zones & tarifs
