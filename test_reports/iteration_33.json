@@ -1,0 +1,33 @@
+{
+  "summary": "Iteration 33 retest of Wave 1 PO QR fix — BUG STILL PRESENT. The fix described in the review request ('wrapped in a Fragment that renders both <PoDetail/> and {labels && <LabelsPrintModal/>} sibling') is NOT in /app/frontend/src/pages/console/PurchaseOrders.jsx. Line 108 still reads: `if (detail) return <PoDetail poId={detail} .../>;` (single-element early return, no Fragment, no sibling modal). Playwright reproduction with aouattaraesca@gmail.com/Admin123! → /console/approvisionnements → BC-2026-213 (status=recu, qty_counted=8) → click [data-testid='po-qr'] → nothing happens; modal does not mount. DOM check: 'qr-sheet' absent, [data-testid='qr-print'] not found. No regression testing of other Wave 1 flows was performed because the referenced fix was never committed — main agent must apply the fix first.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "PurchaseOrders.jsx — LabelsPrintModal still unreachable from PoDetail",
+        "issue": "The patch described in the review request has NOT been applied. Line 108 is unchanged: `if (detail) return <PoDetail poId={detail} ... onQr={openQrLabels} user={user} />;` — a single bare element, not a Fragment. The `{labels && <LabelsPrintModal/>}` at line 179 lives in the main-return branch and is therefore never mounted while detail is active. Required patch: replace line 108 with `if (detail) return (<><PoDetail poId={detail} onBack={() => { setDetail(null); load(); }} onEdit={(p) => { setEdit(p); setOpen(true); setDetail(null); }} onReceive={(p) => { setReceive(p); setDetail(null); }} onPdf={printPdf} onXlsx={exportXlsx} onQr={openQrLabels} user={user} />{labels && <LabelsPrintModal labels={labels} onClose={() => setLabels(null)} />}</>);` — or hoist the whole thing into a single Fragment at the bottom.",
+        "selector": "[data-testid='po-qr']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/test_reports/iteration_32.json"],
+  "action_items": [
+    "APPLY the fix that was described but not committed: wrap the early-return in /app/frontend/src/pages/console/PurchaseOrders.jsx line 108 inside a Fragment and render `{labels && <LabelsPrintModal labels={labels} onClose={() => setLabels(null)} />}` as a sibling of <PoDetail/>. Verify by `grep -n 'if (detail)' /app/frontend/src/pages/console/PurchaseOrders.jsx` — expected to see a Fragment opening.",
+    "After patch, re-run playwright scenario: login → /console/approvisionnements → click BC-2026-213 → click [data-testid='po-qr'] → expect modal with .qr-sheet img and [data-testid='qr-print'] visible; first img src must contain `data=` with URL-encoded `/scan?sku=` substring (`%2Fscan%3Fsku%3D`). qr-print must open a new window."
+  ],
+  "critical_code_review_comments": [
+    "The review request claims the fix is already applied, but the file content disproves this — line 108 still returns a single <PoDetail/> element without a Fragment or LabelsPrintModal sibling. Main agent either forgot to save or edited a different file.",
+    "The same architectural issue affects BlindReceive conceptually, but since its launcher is in PoDetail and setReceive() is passed from the parent, setReceive clears detail (onReceive calls setReceive(p) then setDetail(null)), avoiding the problem — but LabelsPrintModal's onQr handler keeps detail open."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (not retested per request)", "frontend": "0% (QR fix not applied)"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! used.",
+  "seed_data_creation": "None.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Main agent must FIRST actually apply the Fragment-wrap fix at line 108 of PurchaseOrders.jsx. Current line 108 reads `if (detail) return <PoDetail .../>;` with no Fragment. After the fix is committed, retest by logging in and navigating to BC-2026-213 PO; the Étiquettes QR button is in the top-right of PoDetail with data-testid=po-qr. Other Wave 1 flows (regen-access-code, /scan redirects, DeliveryDays Fiches jsPDF) all passed in iter32 and were not retouched in the file tree, so they remain green.",
+  "rca of the issue": "Same RCA as iter32: parent PurchaseOrders() short-circuits at `if (detail) return <PoDetail .../>;` before reaching `{labels && <LabelsPrintModal/>}` in the main return. The claimed fix (Fragment wrap around PoDetail + LabelsPrintModal) was never committed to the file. Verified by direct file inspection and by live playwright reproduction (clicking po-qr yields no DOM mount of the modal)."
+}

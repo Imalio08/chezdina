@@ -105,7 +105,13 @@ export default function PurchaseOrders() {
     setLabels(labs);
   };
 
-  if (detail) return <PoDetail poId={detail} onBack={() => { setDetail(null); load(); }} onEdit={(p) => { setEdit(p); setOpen(true); setDetail(null); }} onReceive={(p) => { setReceive(p); setDetail(null); }} onPdf={printPdf} onXlsx={exportXlsx} onQr={openQrLabels} user={user} />;
+  if (detail) return (
+    <>
+      <PoDetail poId={detail} onBack={() => { setDetail(null); load(); }} onEdit={(p) => { setEdit(p); setOpen(true); setDetail(null); }} onReceive={(p) => { setReceive(p); setDetail(null); }} onPdf={printPdf} onXlsx={exportXlsx} onQr={openQrLabels} user={user} />
+      {labels && <LabelsPrintModal labels={labels} onClose={() => setLabels(null)} />}
+      {receive && <BlindReceive po={receive} user={user} onClose={() => setReceive(null)} onDone={() => { setReceive(null); load(); }} />}
+    </>
+  );
 
   return (
     <div className="space-y-5">
