@@ -1,0 +1,58 @@
+{
+  "summary": "Fix pack 3 backend testing — 20/20 pytest tests passed on preview URL. Covered: GET /waitlist/grouped shape + admin/manager access + POST /waitlist/{wid}/notify; POST /public/out-of-catalog (no auth) + GET /out-of-catalog grouped-by-keyword with counts; GET /abandoned-carts/{aid} enriched (customer_stats {orders_count,total_spent,tier,loyalty_points}, customer_full, reminders) + 404; POST /abandoned-carts/relaunch with explicit cart_ids (template placeholders {prénom}/{produits}/{code}/{date_fin}/{lien_panier} + whatsapp_outbox + cart_reminders + status→relance) and with period_from/period_to; role-enforced PATCH /orders/{oid}/status-v3 (manager→livree 403, rider→nouvelle 403, admin→livree OK with reason, 404 for unknown oid, auto-invoice on livree); GET /orders/{oid}/invoice shape + POST /orders/{oid}/generate-invoice idempotent. Fix pack 1+2 regression (auth/me, products, audit-logs admin-only, roles) also green.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "PATCH /api/orders/{oid}/status-v3",
+        "issue": "Admin override reason-requirement is unreachable code: ROLE_ALLOWED_STATUSES['admin']=None so `allowed is not None` is False — the whole override branch (403 + 400-missing-reason) never runs for admin. Admin can set `livree` without a reason. If the PRD requires admin to always provide a reason for terminal overrides, change ROLE_ALLOWED_STATUSES['admin'] to an explicit set or restructure the check. Current behaviour: admin can set any status, reason optional."
+      },
+      {
+        "endpoint": "PATCH /api/orders/{oid}/status-v3",
+        "issue": "Invoice status computation at L3306 — `'payee' if o.get('payment_status') == 'paye' or True else 'a_payer'` — the `or True` short-circuits to always True, so invoice.status is always 'payee'. Likely a leftover debug; drop the `or True`."
+      },
+      {
+        "endpoint": "PATCH /api/orders/{oid}/status-v3",
+        "issue": "Invoice number `INV-{int(time.time())%1000000}` is not collision-safe under concurrent deliveries (modulo 1e6 wraps every ~11 days). Consider a counter collection or UUID suffix."
+      },
+      {
+        "endpoint": "POST /api/abandoned-carts/relaunch",
+        "issue": "Default behaviour when neither cart_ids nor period_* provided: targets ALL non-recovered abandoned carts (potentially large blast). Consider requiring at least one of {cart_ids, period_from+period_to} to prevent accidental mass-WhatsApp."
+      },
+      {
+        "endpoint": "POST /api/public/out-of-catalog",
+        "issue": "No rate limit / anti-spam on the public endpoint. Any client can flood db.out_of_catalog. Add IP throttle or capcha."
+      }
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack3.py",
+    "/app/test_reports/pytest/fixpack3_results.xml"
+  ],
+  "action_items": [
+    "Remove `or True` in invoice-status ternary at server.py L3306 (status always resolves to 'payee').",
+    "Decide whether admin should be forced to provide a reason for terminal-status overrides; if yes, give admin an explicit allowed set in ROLE_ALLOWED_STATUSES so the override branch actually runs.",
+    "Make invoice number generation collision-safe (atomic counter or UUID).",
+    "Require at least cart_ids OR (period_from+period_to) for /abandoned-carts/relaunch to prevent accidental mass-send.",
+    "Rate-limit /public/out-of-catalog."
+  ],
+  "critical_code_review_comments": [
+    "server.py L3306 contains dead-logic `… or True else 'a_payer'` — invoice always 'payee'.",
+    "ROLE_ALLOWED_STATUSES['admin']=None makes the admin override reason-check unreachable (contradicts the stated spec 'admin can override terminal statuses only with reason').",
+    "Legacy order-status endpoint at /orders/{oid}/status still exists alongside /status-v3 — plan deprecation to avoid role-bypass via the old route.",
+    "server.py is 3489 lines; the orphaned seed block from iteration 13 was correctly wrapped in `_seed_demo_content_legacy` (not auto-called). Routers extraction still overdue.",
+    "clean(…) is applied to most responses — good. Confirmed no bare mongodb _id leaks in Fix pack 3 endpoints.",
+    "/abandoned-carts/relaunch builds the WhatsApp link with _url_quote on the full message — OK — but phone_digits strips '+' which is fine for wa.me."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixpack3.py (new)"
+  ],
+  "success_rate": {"backend": "100% (20/20)", "frontend": "not tested (per request)"},
+  "test_credentials": "admin aouattaraesca@gmail.com / Admin123! OK · manager manager.cocody@dinastore.ci / Manager123! OK · rider rider1@dinastore.ci / Rider123! OK",
+  "seed_data_creation": "Tests use existing demo data (orders, abandoned_carts, waitlist). Side-effects: one waitlist row marked notified via /waitlist/{wid}/notify (first pending entry); 2 rows inserted into out_of_catalog with keyword 'test_fp3_kw_<ts>' (easy to purge by prefix); 1 order transitioned to 'livree' by admin with reason 'test fp3 livraison admin' (auto-invoice generated); cart_reminders + whatsapp_outbox entries created for relaunch calls (status→relance on affected carts). None of these break regression tests on re-run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Fix pack 3 fully green on preview. Reusable: /app/backend/tests/test_fixpack3.py and test_fixpack2.py. Main caveat for next iteration: admin override reason-requirement is NOT enforced in current code (ROLE_ALLOWED_STATUSES['admin']=None short-circuits the check) — if the PRD says admin MUST provide a reason for terminal overrides, this needs a code change before testing can validate it. Likewise `or True` on L3306 forces invoice.status='payee' unconditionally.",
+  "rca of the issue": "Not a blocker. Two spec deviations found by code review (admin reason-requirement unreachable, invoice status short-circuit). Both are small ternary/branching errors in the Fix pack 3 block and can be fixed in-place at server.py ~L3281-3306."
+}
