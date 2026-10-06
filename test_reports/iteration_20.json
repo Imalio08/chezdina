@@ -1,0 +1,38 @@
+{
+  "summary": "Fix Pack 8 Wave C correction + Wave D fully validated end-to-end. BACKEND (13/13 pytest green on /app/backend/tests/test_fixpack8_waved.py): GET /public/site returns dict with sections default fallback; /public/storefront/sections exposes 3 enabled sections (hero + product_grid + trust_strip) — NO standalone 'mosaic' type (migration confirmed); hero.props.mosaic contains 24 migrated images; PATCH /site persists sibling dicts for sales/delivery/payments/documents/notifications/security (round-tripped via /public/site); GET/PATCH /business supports name/tagline/description/address/phone/whatsapp/email/hours/rccm/ncc; /api/export/all returns 200 JSON. STOREFRONT /boutique: data-testid='hero-mosaic' renders a 2-col grid (`grid grid-cols-2 gap-3 h-[520px] md:h-[560px] overflow-hidden`), 48 <img> nodes (24 images × 2 duplicate pass for seamless loop); translate3d transforms animate upward (t1=-43.25px → t2=-83.15px over 2.2s = ~18 px/s matching speed=18 for col1). No 'Mosaïque défilante' standalone section header anywhere in page HTML. CONSOLE SectionBuilder /console/site?tab=accueil: 'Ajouter' modal shows exactly the 6 types {hero, product_grid, banner, trust_strip, text_block, newsletter}, data-testid='add-mosaic' is absent (count=0). Editing hero section exposes hero-upload-dropzone + hero-upload-input (dropzone+file input) with ZERO image/URL inputs. Editing a freshly-added banner shows data-testid='banner-upload' SingleUpload component (no URL input). SETTINGS /console/parametres: left menu renders 11 sticky tabs (settings-tab-identite/coordonnees/ventes/livraison/paiements/documents/notifications/integrations/equipe/securite/donnees). All required data-testids are present per spec: logo-upload/logo-upload-btn/biz-name/biz-tagline/biz-description/identite-save; biz-address/biz-phone/coordonnees-save; discount-max/ventes-save; livraison-slots/proof-threshold/weight-on_time/weight-no_cancel/weight-rating/weight-proof/livraison-save; pay-cash/wave/orange/mtn/moov/card/cod + wave-link + paiements-save; receipt-footer/documents-save; notif-wa_order_confirm/wa_delivery_code/wa_delivery_update/wa_abandoned_cart/email_daily_summary + notifications-save; securite-save; export-all/seed-demo-button/delete-demo-button. Deep link ?tab=paiements correctly mounts tab-paiements. Identité save + Ventes save end-to-end verified (biz-name='TEST_WaveD Chez Dina' and discount_max=25 PATCHed successfully).",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console /console/site?tab=accueil", "issues": ["The info banner just above 'Apparence du site' says \"téléversez vos images (jamais d'URL)\" — matches the no-URL rule. Good UX note; just confirm this instruction is still accurate after cleanup."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack8_waved.py",
+    "/app/test_reports/pytest/fixpack8_waved.xml"
+  ],
+  "action_items": [
+    "No blocking actions. OPTIONAL polish: SectionBuilder.jsx still carries a dead `MosaicEditor` function + a 'mosaic' branch in PropsEditor (lines 202, 210-213) that are unreachable now that 'mosaic' is not in SECTION_TYPES. Safe to remove to keep the file DRY and avoid misleading future readers.",
+    "OPTIONAL: Settings.jsx uses window.confirm() in deleteDemo (DonneesTab) — same critique as previous iteration; consider replacing with a Dialog modal for better UX and testability.",
+    "OPTIONAL: /api/pages still lacks slug uniqueness enforcement (unchanged from iter_19 — not Wave D scope but still open)."
+  ],
+  "critical_code_review_comments": [
+    "SectionBuilder.jsx: dead `MosaicEditor` + unreachable `section.type === 'mosaic'` block remain after the removal of the standalone mosaic type. Remove them to prevent confusion.",
+    "Settings.jsx (393 lines) is clean and under the 700-line budget, but each tab component (IdentiteTab, LivraisonTab, PaiementsTab, etc.) could be split into /pages/console/settings/*Tab.jsx for easier maintenance as it grows (score_weights, cancel_reasons, methods already warrant their own files).",
+    "LivraisonTab initializes `s` with defaults AND merges server response via `setS({...s, ...})` inside useEffect — safe here but relies on stale closure on first mount; prefer functional updater `setS(prev => ({...prev, ...(r.data?.delivery||{})}))`. Same pattern repeated in VentesTab/PaiementsTab/DocumentsTab/NotificationsTab/SecuriteTab.",
+    "VentesTab/LivraisonTab/etc call `/public/site` to fetch private settings — exposes the full site dict publicly. For sales/delivery/payments/documents/notifications/security consider a protected `/site` GET for the console (admin role) so public endpoint does not leak e.g. receipt_footer, cancel_reasons, security.session_timeout_min to anonymous users. Low risk but worth hardening.",
+    "IdentiteTab PATCHes /business and /site in two separate calls — if the second fails, the UI will have reported partial success. Wrap in Promise.all and surface a single failure path, or use optimistic rollback.",
+    "Hero animation: HeroColumn useEffect uses `window.matchMedia` for reduced motion but does not re-subscribe if the user toggles the preference mid-session. Minor; add a matchMedia listener if strictly required."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixpack8_waved.py (new, 13 tests, 100% green in 2.1s)"
+  ],
+  "success_rate": { "backend": "100% (13/13)", "frontend": "100% — every required data-testid present and functional, deep-link works, hero mosaic animates, add-mosaic correctly absent, hero/banner editors upload-only" },
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! — OK",
+  "seed_data_creation": "Backend tests mutated /site: sales.discount_max=42 → then UI PATCH set discount_max=25; sales.float_default=15000; delivery.score_weights={on_time:35,no_cancel:25,rating:25,proof:15}; delivery.proof_threshold=60000; payments.methods={cash,wave,mtn,card,cod}=true, orange/moov=false; payments.wave_business='https://wave.com/biz/test'; documents.receipt_footer='TEST_footer waved', documents.show_qr=false; notifications flipped (wa_abandoned_cart=true, email_daily_summary=true, wa_order_confirm=false); security.session_timeout_min=45, two_factor=true. /business was PATCHed to TEST_ fields then UI identite-save re-set name='TEST_WaveD Chez Dina'. Main agent may want to reset these to pristine values before demo; otherwise the storefront payment icons / receipt footer will show TEST_ markers.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Regression suite at /app/backend/tests/test_fixpack8_waved.py (13 tests, ~2s). hero.mosaic currently contains 24 images (verified from live API). The storefront hero animates at ~18 and 22 px/s (col1 / col2) via rAF with offset=true on col2 for staggering. Settings data has been dirtied by tests — see seed_data_creation. Keep in mind: /public/site returns private settings dicts (documents, security, notifications) — Settings.jsx reads them from there. Dead code: SectionBuilder.jsx lines 202 + 210-213 (MosaicEditor + mosaic case) are now unreachable. Previous iter_19 open items (slug uniqueness on POST /api/pages, SEO share upload hidden input testid) are unchanged.",
+  "rca of the issue": "No bugs found in Wave C correction + Wave D scope. All acceptance criteria met."
+}

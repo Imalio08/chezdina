@@ -199,8 +199,6 @@ function PropsEditor({ section, onChange, onClose }) {
           </div>
         )}
 
-        {section.type === "mosaic" && <MosaicEditor p={p} onChange={onChange} />}
-
         <div className="text-xs text-[#666] mt-3">Les changements sont visibles après "Enregistrer" sur l'écran précédent.</div>
       </div>
     </div>
@@ -208,8 +206,9 @@ function PropsEditor({ section, onChange, onClose }) {
 }
 
 function MosaicEditor({ p, onChange }) {
-  // Legacy editor retained for compat; redirect to MultiUpload.
-  return <MultiUpload images={p.images || []} onChange={(images) => onChange({ images })} testId="mosaic-upload" />;
+  // Deprecated after fix 2026-02 — the standalone mosaic section was removed.
+  // Kept temporarily as a no-op to avoid import breakage.
+  return null;
 }
 
 function MultiUpload({ images, onChange, testId }) {

@@ -1,6 +1,28 @@
 # Chez Dina — PRD
 
-## Fix pack 8 Vague C (Feb 2026) — Site vitrine refonte ✅
+## Fix pack 8 Vague C (correctif) + Vague D (Feb 2026) ✅
+
+### Correctif Vague C — Hero mosaïque + Upload uniquement
+- Hero : 2 colonnes verticales défilant du bas vers le haut à vitesses alternées (18 et 22 px/s), prefers-reduced-motion respecté
+- Supprimé le type "Mosaïque défilante" standalone — intégré dans hero.mosaic (24 images migrées)
+- Section Builder : hero + banner acceptent uniquement l'upload (plus aucun champ URL)
+- Tests iteration_20 : backend 13/13, frontend 100% ✅
+
+### Vague D — Paramètres restructurés
+- `/console/parametres` : 11 onglets dans un menu latéral sticky
+  1. **Identité** — Logo centralisé (utilisé console/rider/vitrine/reçus/factures), nom, slogan, description, favicon
+  2. **Coordonnées** — adresse, téléphones, WhatsApp, email, horaires, RCCM/NCC
+  3. **Ventes & caisse** — remise max, règle rupture, politique échange, fond caisse, motifs annulation
+  4. **Livraison** — zones (link), créneaux, seuil preuve, 4 pondérations score livreur
+  5. **Paiements** — 7 modes togglables, lien Wave Business, numéros Mobile Money
+  6. **Documents** — pied reçu, pied facture, QR fiche colis, code-barres étiquette
+  7. **Notifications** — 5 toggles WhatsApp/email
+  8. **Intégrations** — link page dédiée
+  9. **Équipe** — links employés/rôles/pointage
+  10. **Sécurité** — PIN requis, timeout session, 2FA
+  11. **Données** — export JSON, add/delete démo
+- Backend : /site PATCH accepte sales/delivery/payments/documents/notifications/security
+
 
 ### Backend
 - `/public/site` GET expose `theme`, `social`, `seo`, `menu`, `footer`, `sections`
