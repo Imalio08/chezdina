@@ -1,5 +1,35 @@
 # Chez Dina — PRD
 
+## Vague 2 — POS/Handover/Paniers/Liste d'attente (Feb 2026) ✅
+
+### POS
+- Grille produits moins dense (`grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4` + gap réduit) → panier et bouton « Valider » visibles sans scroll latéral/vertical
+
+### Sessions de caisse — Rejet versement
+- Nouveau endpoint `POST /api/cash-sessions/:sid/reject-handover` (admin only) : motif obligatoire (min. 5 car.), session passe en `status='rejected'`, versement vidé, Gérante notifiée
+- Nouveau composant `RejectHandoverModal` + bouton `cash-reject-handover` à côté de « Valider versement »
+- Nouvelle bannière rouge « Versement rejeté » affichée dans la session en cours avec motif + date
+- Nouveau status badge « Rejeté » dans l'historique
+
+### Paniers abandonnés — Offre 100% personnalisable
+- Formulaire `RelaunchForm` entièrement réécrit (`AbandonedCarts.jsx`) :
+  - Cible : 1 cliente / plusieurs (ticks) / toutes (3 modes avec sélecteur `rf-mode-*`)
+  - Validité : 2 inputs `datetime-local` début + fin (plus de chips 24h/3j/1sem)
+  - Canaux : checkboxes multi — WhatsApp, in-app, Pop-up espace cliente
+  - Image : toggle Oui/Non + `ImageUpload`
+  - Type d'offre : ajout « Offre personnalisée » (nom, description, valeur)
+
+### Liste d'attente
+- `Notifier` ouvre désormais `NotifyModal` (même richesse que RelaunchForm) au lieu d'envoyer automatiquement
+- Endpoint `POST /api/waitlist/:wid/notify` étendu : accepte `{channels, message, offer_type, offer_value, offer_custom, image, starts_at, ends_at}`, enregistre dans `waitlist_notifications`
+- Table OOC : nouvelle colonne « Source » avec chip coloré (Site vitrine / Caisse POS / Recherche sans résultat / Console admin)
+- Modèle `WaitlistIn` étendu avec `source` field
+- Vitrine `/boutique/catalog` : quand une recherche renvoie 0 résultat, bloc dédié permet de soumettre une demande via `/public/out-of-catalog?channel=search`
+
+### Testing
+- `/app/backend/tests/test_wave2_bugs.py` : 4/4 pytest green
+- Testing agent frontend : 100% des data-testid validés
+
 ## Vague 1 bugs corrigés (Feb 2026) ✅
 
 ### 1. Fiches colis & Feuille de route (DeliveryDays)

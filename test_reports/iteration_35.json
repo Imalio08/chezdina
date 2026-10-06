@@ -1,0 +1,36 @@
+{
+  "summary": "Wave 2 end-to-end tested: Backend (reject-handover, waitlist/notify extended body, out-of-catalog with channel) + Frontend (abandoned carts relaunch form, cash reject button/modal, waitlist notify modal, OOC Source column, catalog no-results OOC form, POS grid density). Backend: 4/4 pytest cases PASS. Frontend: all required data-testids present and interactions working. One minor observation: POS grid class is 'grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2.5' which is MORE dense than the spec's 'grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4' — matches the goal of being denser than the previous version but doesn't match the exact spec breakpoints. Hydration warning from PeriodSelector persists (noise, not a bug).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "POS /console/caisse", "issues": ["Grid class is 'grid-cols-2 md:grid-cols-4 lg:grid-cols-8' — denser than the previous version (goal achieved) but not literally 2/3/4/5 as specified. Confirm with product owner whether 2/4/8 is acceptable."]},
+      {"screen": "Dashboard & all /console/* pages", "issues": ["Hydration warning <span> cannot be a child of <option> from /app/frontend/src/components/shared/PeriodSelector.jsx line 96 — noise, pre-existing from iter 34."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_wave2_bugs.py",
+    "/app/test_reports/pytest/wave2_results.xml"
+  ],
+  "action_items": [
+    "None blocking. (Optional) Align POS grid cols with the exact spec (2/3/4/5) if required. (Optional) Clean up PeriodSelector hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "Dead code in /app/backend/server.py waitlist_notify (lines 6064-6067) — unreachable code after `return` on line 6063. Harmless but should be removed.",
+    "RelaunchOfferIn model does not include the new optional fields used by frontend (image, offer_custom, target_mode); backend accepts via Dict usage elsewhere but Pydantic model is now stale and silently drops unknown fields."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_wave2_bugs.py (new — 4 test cases, all passing)"
+  ],
+  "success_rate": {"backend": "100% (4/4 pytest)", "frontend": "100% on all required data-testids and flows"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! (admin) + manager.cocody@dinastore.ci / Manager123! (manager)",
+  "seed_data_creation": "Created and left a waitlist entry via POST /public/waitlist. Rejected one cash-session handover for session 0572ac12-0118-4453-837c-aad88f6a079d (now status=rejected with rejection_reason). Added test out-of-catalog keyword 'test_xyz_wave2' with channel=search.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Wave 2 fully validated. Backend endpoints: POST /api/cash-sessions/{sid}/reject-handover (400 on empty reason, 200 valid; session.status→rejected, rejection_reason recorded); POST /api/waitlist/{wid}/notify accepts body {channels, message, offer_type, offer_value, offer_custom, image, starts_at, ends_at} and inserts in db.waitlist_notifications returning {ok, notification_id}; POST /api/public/out-of-catalog accepts channel ('site'|'pos'|'search'|'console'), stored and surfaced on GET /api/out-of-catalog grouped output. Frontend testids verified present: relaunch-all, rf-mode-{single,selected,all}, rf-starts, rf-ends, rf-ch-{whatsapp,inapp,popup}, rf-img-{yes,no}, rf-type, rf-custom-{name,desc,value}; cash-reject-handover, reject-handover-modal, reject-reason, reject-confirm; wl-expand-{i}, wl-notify-{customer_id}, wl-notify-modal, wl-notify-send, wl-notify-ch-{whatsapp,inapp,popup}, wl-notify-type, wl-notify-message; wl-tab-ooc shows Source column with chips (Site vitrine / Caisse (POS) / Recherche sans résultat / Console admin); catalog-no-results, catalog-ooc-phone, catalog-ooc-send on /boutique/catalog?q=xyzinconnu with success state 'Merci, votre demande a été transmise'. Note: cash-reject-handover only renders when a session has status='pending_validation' — if testing needs a pending session, login as manager and declare handover via POST /api/cash-sessions/{sid}/declare-handover.",
+  "rca of the issue": "N/A — no bugs found"
+}

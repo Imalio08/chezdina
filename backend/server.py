@@ -6061,10 +6061,6 @@ async def waitlist_notify(wid: str, body: Dict[str, Any] = None, user: dict = De
     await db.waitlist_notifications.insert_one(log)
     await db.waitlist.update_one({"id": wid}, {"$set": {"notified_at": now_iso(), "notified_by": user.get("name")}})
     return {"ok": True, "notification_id": log["id"]}
-    w = await db.waitlist.find_one({"id": wid})
-    if not w: raise HTTPException(404)
-    await _notify_waitlist(w["product_id"], w.get("size"))
-    return {"ok": True}
 
 class OutOfCatalogIn(BaseModel):
     keyword: str
