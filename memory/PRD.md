@@ -1,5 +1,22 @@
 # Chez Dina — PRD
 
+## Vague 3 — Appros, promos & stock (Feb 2026) ✅
+
+### Appros — Coûts additionnels dans le bon de commande
+- `PurchaseOrders.jsx` PoForm : ajout d'un éditeur « Coûts additionnels » (label + amount, add/remove) directement dans la création/édition du BC
+- Backend `PromoIn` schema inchangé (déjà `extra_costs: List[Dict]`), le landed cost se calcule à la réception comme prix achat + frais
+
+### Stock — Âge et alerte immobilisation
+- Nouveau endpoint `GET /api/stock/aged?days=60` → liste produits immobilisés + nombre de jours
+- `GET /api/stock/kpis` renvoie désormais le champ `aged` (compteur)
+- `StockInventories.jsx` : nouveau KPI « Immobilisé >60j » + colonne « Âge » dans la table (chip rouge >60j, orange >30j, vert <30j)
+
+### Promotions — Scope & 2 pour 1 ciblés
+- `PromoIn` étendu : `scope` (all/products/category), `products: List[str]`, `category`, `buy_qty`, `get_qty`, `get_discount_pct`
+- `FlashLauncher` : nouveau sélecteur Périmètre (Tous / Produits ciblés / Catégorie) + picker produits + sélecteur catégorie
+- `PromoForm` : même sélecteur Périmètre + bloc « Acheter N / Obtenir N / % » visible quand mécanique = bogo ou x_for_y + validation produits obligatoire
+- Vente flash et « 2 pour 1 » peuvent désormais s'appliquer à 1 produit, plusieurs, une catégorie ou tout le catalogue
+
 ## Vague 2 — POS/Handover/Paniers/Liste d'attente (Feb 2026) ✅
 
 ### POS

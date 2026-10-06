@@ -1,0 +1,37 @@
+{
+  "summary": "Wave 3 end-to-end tested (promos scope/bogo, stock aged, PO extras, flash scope, promo-form bogo). Backend 6/6 pytest PASS. Frontend: all required data-testids present and functional. One UX nit: 'Visite guidée' tour modal (dashboard tour) opens on first entry per page and blocks interactions until manually closed (an X in top-right dismisses it) — affects usability for first-time testers but not a bug.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "All /console/* pages", "issues": ["'Visite guidée · 1/7' onboarding tour modal appears on first visit per session and overlays the page, blocking clicks until dismissed. Testers (and users) must click the small X in the modal header to dismiss. Consider: (a) persist dismissal across pages, (b) make Escape key close it, (c) adopt a non-blocking spotlight overlay."]},
+      {"screen": "Dashboard / all consoles", "issues": ["Hydration warning <span> cannot be a child of <option> from /app/frontend/src/components/shared/PeriodSelector.jsx line 96 — carried over from previous iterations, pre-existing noise."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_wave3_bugs.py",
+    "/app/test_reports/pytest/wave3_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Make the 'Visite guidée' guided tour non-blocking or Escape-dismissible to improve UX and automated-testability.",
+    "(Optional, carried over) Clean up PeriodSelector <span>-in-<option> hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "server.py /stock/kpis `aged` computation uses `p.get('created_at') or now_iso()` — if a product has no created_at, the fallback becomes 'now' which is NOT < cutoff, so the product is correctly skipped (OK), but the same product WILL appear with age_days=0 in /stock/aged logic path only after age_days >= days threshold, so no false positives — behavior consistent.",
+    "server.py /stock/kpis counts `aged` as products created>60d ago AND not sold in last 60d AND stock>0 — matches /stock/aged default (days=60) ✓.",
+    "server.py line 2186 /promotions endpoint returns PromoIn fields intact (scope/products/category/buy_qty/get_qty/get_discount_pct) — verified via GET round-trip.",
+    "PurchaseOrders.jsx extras breakdown label is 'Coûts additionnels' (not 'Extras' literal) — matches spec wording from problem statement.",
+    "Promotions.jsx promo-form submit path: when scope=products with empty products[] a toast error is correctly surfaced (verified)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_wave3_bugs.py (new — 6 test cases, all PASS)"
+  ],
+  "success_rate": {"backend": "100% (6/6 pytest)", "frontend": "100% on required data-testids and flows"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! (admin)",
+  "seed_data_creation": "No lingering seed data — created a TESTBOGO_W3 promo and cleaned it up at end of test.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Wave 3 fully validated. Verified data-testids: po-add-extra, po-extra-label-0, po-extra-amount-0 on /console/achats (modal New PO shows 'Coûts additionnels' section with Articles + Coûts additionnels + Total breakdown). On /console/stock: KPI 'Immobilisé >60j' and column 'Âge' both present (CSS text-transform:uppercase renders them 'IMMOBILISÉ' / 'ÂGE' — use case-insensitive matcher). Table shows age chips: green <30j, orange >30j, red >60j with Clock icon. On /console/promotions FlashLauncher: flash-scope-{all,products,category} chips, flash-category <select>, flash-products-picker with checkboxes. On /console/promotions PromoForm (via 'Nouvelle promo' button): promo-type <select> has 7 options including bogo ('2 pour 1') and x_for_y ('X acheté Y offert'); selecting bogo reveals promo-buy-qty, promo-get-qty, promo-get-pct inputs AND promo-products-picker. promo-scope-{all,products,category} chips also present. Submitting scope=products with empty picker triggers an error toast. Backend endpoints verified: POST /api/promotions accepts & returns scope/products/category/buy_qty/get_qty/get_discount_pct intact. GET /api/stock/kpis returns new int field 'aged'. GET /api/stock/aged?days=N returns {days_threshold, count, items:[{id,name,sku,image,stock,cost,value,age_days}]} sorted by age_days desc, capped at 200. IMPORTANT UX NOTE: the 'Visite guidée · 1/7' onboarding tour modal appears on first page visit and blocks all interactions — Playwright must dismiss it (small X button in modal header) before testing. The provided JS snippet `document.querySelectorAll('*').filter(e=>e.textContent.startsWith('Visite guidée'))` + climbing to closest div + clicking the tiny svg button works reliably.",
+  "rca of the issue": "N/A — no bugs found. Initial playwright failures were due to (1) tour modal overlay blocking clicks and (2) using case-sensitive substring match against CSS-uppercase-transformed labels — not app bugs."
+}
