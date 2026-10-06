@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-import os, logging, uuid, random
+import os, logging, uuid, random, secrets
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
@@ -32,7 +32,7 @@ def make_token(uid, role, m=60*24*7):
     return jwt.encode({"sub": uid, "role": role, "exp": datetime.now(timezone.utc)+timedelta(minutes=m)}, JWT_SECRET, algorithm=JWT_ALG)
 def new_id(): return str(uuid.uuid4())
 def now_iso(): return datetime.now(timezone.utc).isoformat()
-def gen_access_code(): return str(random.randint(100000, 999999))
+def gen_access_code(): return str(secrets.randbelow(1_000_000)).zfill(6)
 def make_customer_token(cid: str, m: int = 60*24*30):
     return jwt.encode({"sub": cid, "kind": "customer", "exp": datetime.now(timezone.utc)+timedelta(minutes=m)}, JWT_SECRET, algorithm=JWT_ALG)
 def clean(d):

@@ -1,0 +1,35 @@
+{
+  "summary": "Section 10 (CMS Vitrine SectionBuilder + Compte Cliente by access_code) end-to-end verified. Backend: 18/18 pytest cases pass covering public storefront sections (default 3 returned, disabled filtered, no auth), auth GET returns all incl. disabled, PATCH /storefront/sections role gating (admin OK, manager OK, sales 403), POST /public/customer-login-code (Aminata +225 07 60 17 28 21 / 142085 returns token+customer+httpOnly cookie, wrong code → 401 'Code secret invalide', bad phone → 400, no match → 404), /public/account/me (401 w/o token, 401 w/ staff token kind=user, 200 via Bearer AND via cookie, returns customer+orders[]+metrics{total_orders,total_spent,referrals}), customer-logout clears cookie, POST /customers assigns 6-digit access_code, POST /customers/bulk (list payload) assigns per row, POST /public/customer-register assigns access_code, blacklisted customers cannot login-code. Frontend: /console/apparence renders 3 draggable rows (section-row-s1/s2/s3) with section-toggle/section-edit per row + global section-add/section-save/section-preview buttons; add picker exposes all 6 types (hero, product_grid, banner, trust_strip, text_block, newsletter); PropsEditor modal for hero shows hero-tagline/hero-title/hero-highlight inputs. /boutique renders dynamic sections from GET /public/storefront/sections — home-shop-now CTA visible + 8 storefront-product-* cards + trust strip. /boutique/account LoginForm (account-phone, account-code, account-login) correctly: wrong code shows 'Code secret invalide' toast and stays on form; correct 142085 logs in → Dashboard with account-logout, account-ref-code (DINA-1000) KPIs (wallet, points, orders, referrals), orders list; sessionStorage persistence confirmed via page reload. /console/clients shows cust-code-{phone} 6-digit access codes alongside each row's phone (200 cells rendered, e.g. 262714, 658901, 667812).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Multiple console pages", "issues": ["Carry-over React hydration warning '<span> cannot be a child of <option>' from devtools instrumentation in PeriodSelector. Cosmetic console noise only, same as iteration_5/6."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_section10.py",
+    "/app/test_reports/pytest/section10.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/public/customer-login-code iterates ALL customers linearly (async for row in db.customers.find(...)) matching last 8 digits of phone in Python. On a 300-row demo this is fine but will degrade at scale. Suggest normalizing & indexing a phone_digits_last8 field on write, or at least adding an index on 'phone' and switching to a regex query ending with tail.",
+  "No rate limiting on /public/customer-login-code — only 10^6 code space, so a bot could brute-force a customer's 6-digit code in minutes. Recommend: lock the customer (or IP) after N failed attempts within a window; same pattern already discussed for kiosk PIN.",
+    "/storefront/sections endpoints trust client-supplied id strings; two sections with the same id would silently de-dup in the UI drag-drop reorder. Add server-side uniqueness check (set(len(ids)) == len(sections)) before upsert.",
+    "StorefrontSectionsIn.sections has no per-item schema (likely Dict[str, Any]). Any shape is accepted, which means a malformed row from an older client could crash Home.jsx at render time. Consider a Pydantic discriminated union per section type.",
+    "Account.jsx stores the raw JWT in sessionStorage (KEY='dina_customer') — fine for session resumption, but defeats the httpOnly cookie's XSS protection, since a stored XSS payload could exfiltrate the token. Prefer relying on the cookie alone and dropping token from storage.",
+    "In Account.jsx loadMe effect [L28-30] uses an empty dep array but reads session?.token — ok for mount, but if the component later receives a new session via setSession, loadMe won't re-run (works today because onDone also calls loadMe explicitly). Minor foot-gun.",
+    "gen_access_code() uses random.randint — not cryptographically random. For a 6-digit customer secret this should be secrets.randbelow(1_000_000) to avoid predictability. Low risk on current prod threat model but trivial to fix."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_section10.py"
+  ],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "100% (all critical selectors + flows OK)"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123!, Manager manager.cocody@dinastore.ci / Manager123!, Sales agent1@dinastore.ci / Agent123!, Public cliente Aminata +225 07 60 17 28 21 / code 142085.",
+  "seed_data_creation": "Tests create & delete TEST_ prefixed customers (cleanup inline in each test). test_register_assigns_access_code may leave 1 TEST_Register row if the random phone is unique — safe for demo DB.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All Section 10 endpoints green. Rerun: pytest /app/backend/tests/test_section10.py -v. If an edit-modal selector flakes in future runs, allow 1-1.5s after clicking section-edit-* before querying hero-* inputs; it's just a React mount delay, not a bug. The sessions endpoint is global (site_settings doc 'main') — tests mutate it, which also changes what /boutique renders live. If visual regression is needed, restore defaults via admin PATCH with DEFAULT_SECTIONS.",
+  "rca_of_the_issue": "N/A — no bugs reproduced."
+}
