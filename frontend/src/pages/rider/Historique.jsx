@@ -30,7 +30,7 @@ export default function Historique() {
         {PERIODS.map(p => <button key={p.v} onClick={() => setPeriod(p.v)} className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${period === p.v ? "bg-[#1c1c1c] text-white dark:bg-white dark:text-[#1c1c1c] border-transparent" : "border-[#ececec]"}`} data-testid={`hist-period-${p.v}`}>{p.label}</button>)}
       </div>
       <div className="flex gap-1 overflow-x-auto scrollbar-thin -mx-3 px-3">
-        {["toutes", "livrees", "annulees", "reportees", "echecs"].map(t => <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${tab === t ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec]"}`} data-testid={`hist-tab-${t}`}>{t}</button>)}
+        {[["toutes","Toutes"],["livrees","Livrées"],["annulees","Annulées"],["reportees","Reportées"],["echecs","Échecs"]].map(([k,label]) => <button key={k} onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${tab === k ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec]"}`} data-testid={`hist-tab-${k}`}>{label}</button>)}
       </div>
 
       <div className="space-y-2">

@@ -2269,6 +2269,122 @@ async def product_history(pid: str, user: dict = Depends(get_user)):
     waitlist = await db.waitlist.find({"product_id": pid}).sort("created_at",-1).to_list(100)
     return {"sales": sales[:200], "sales_total": sum(s["qty"] for s in sales), "sales_revenue": sum(s["qty"]*s["price"] for s in sales), "waitlist": clean(waitlist)}
 
+# ---------- Fix pack 1 : demo data seeding (Super admin only) ----------
+DEMO_TAG = "DEMO_PACK1"
+
+@api.post("/admin/seed-demo")
+async def seed_demo(user: dict = Depends(require_role("admin"))):
+    """Populate realistic demo data across the platform (Fix pack 1)."""
+    import random as rnd
+    created = {"customers": 0, "orders": 0, "expenses": 0, "visits": 0, "waitlist": 0, "abandoned": 0, "suppliers": 0, "purchases": 0, "reviews": 0}
+    # Suppliers (5)
+    supp_names = ["Textile Afrik SARL", "Mode & Co Istanbul", "Chaussures Milano", "Accessoires Dakar", "Ivoire Fabric"]
+    if await db.suppliers.count_documents({}) < 5:
+        for s in supp_names:
+            await db.suppliers.insert_one({"id": new_id(), "name": s, "contact": f"+225 07 {rnd.randint(10,99)} {rnd.randint(10,99)} {rnd.randint(10,99)} {rnd.randint(10,99)}", "email": f"{s.lower().replace(' ','.')[:20]}@fournisseur.ci", "demo_tag": DEMO_TAG, "created_at": now_iso()})
+            created["suppliers"] += 1
+    # Customers (target 300)
+    first_names = ["Awa","Fatou","Aïcha","Kadidja","Mariame","Aminata","Rokhaya","Nafissa","Yasmine","Zahra","Sarah","Ines","Nadia","Léa","Chloé","Mélanie","Sophia","Carla","Diana","Lina","Rama","Khady","Mame","Astou","Oumou","Nabou","Djeïnaba","Hawa","Salimata","Binta"]
+    last_names = ["Diallo","Traoré","Ouattara","Konaté","Sow","Sanogo","Keita","Touré","Cissé","Koné","Camara","Fofana","Diabaté","Barry","Bamba","Yao","Kouassi","Konan","Kacou","N'Guessan"]
+    zones = ["Cocody","Riviera","Angré","Plateau","Marcory","Zone 4","Treichville","Koumassi","Yopougon","Abobo","Adjamé","Port-Bouët","Bingerville","Grand-Bassam"]
+    existing_c = await db.customers.count_documents({})
+    to_create = max(0, 300 - existing_c)
+    for i in range(to_create):
+        fn = rnd.choice(first_names); ln = rnd.choice(last_names)
+        c = {"id": new_id(), "name": f"{fn} {ln}", "phone": f"+225 0{rnd.randint(1,7)} {rnd.randint(10,99)} {rnd.randint(10,99)} {rnd.randint(10,99)} {rnd.randint(10,99)}",
+             "email": f"{fn.lower()}.{ln.lower()}{rnd.randint(10,99)}@mail.ci",
+             "address": f"{rnd.choice(zones)} · {rnd.choice(['près de la pharmacie','derrière l école','en face du marché'])}",
+             "zone": rnd.choice(zones), "shoe_size": rnd.choice(["36","37","38","39","40","41","42"]),
+             "clothing_size": rnd.choice(["XS","S","M","L","XL","XXL"]),
+             "loyalty_points": rnd.randint(0,2000), "wallet": rnd.randint(0,25000)*100,
+             "tier": rnd.choice(["Bronze","Argent","Or","Diamant"]),
+             "referral_code": f"DINA-{rnd.randint(1000,9999)}", "status":"active",
+             "created_at": (datetime.now(timezone.utc) - timedelta(days=rnd.randint(1,180))).isoformat(),
+             "last_order_at": (datetime.now(timezone.utc) - timedelta(days=rnd.randint(0,120))).isoformat() if rnd.random()>0.3 else None,
+             "demo_tag": DEMO_TAG}
+        await db.customers.insert_one(c); created["customers"] += 1
+    # Orders over 6 months (target 400+)
+    customers = await db.customers.find({}).to_list(500)
+    products = await db.products.find({}).to_list(500)
+    if customers and products and await db.orders.count_documents({}) < 400:
+        statuses = ["livree","confirmee","en_preparation","prete","en_livraison","annulee","retournee","nouvelle"]
+        payments = ["cash","wave","orange","mtn","moov","cod"]
+        channels = ["online","store","whatsapp","instagram"]
+        for i in range(300):
+            cust = rnd.choice(customers); n_items = rnd.randint(1,4)
+            picks = rnd.sample(products, min(n_items, len(products)))
+            items = [{"product_id":p["id"],"name":p["name"],"size":(p.get("sizes") or [""])[0],"color":(p.get("colors") or [""])[0] if p.get("colors") else "","qty":rnd.randint(1,2),"price":p.get("price",10000),"image":p.get("image")} for p in picks]
+            sub = sum(it["qty"]*it["price"] for it in items)
+            fee = rnd.choice([0,1000,1500,2000,2500]) if rnd.random()>0.3 else 0
+            disc = rnd.choice([0,0,0,1000,2000]) if rnd.random()>0.7 else 0
+            total = sub + fee - disc
+            created_at = (datetime.now(timezone.utc) - timedelta(days=rnd.randint(0,180), hours=rnd.randint(0,23))).isoformat()
+            status = rnd.choices(statuses, weights=[60,15,8,5,5,5,1,1])[0]
+            await db.orders.insert_one({"id": new_id(), "code": gen_code(), "items": items, "customer": {"id":cust["id"],"name":cust["name"],"phone":cust["phone"]},
+                "channel": rnd.choice(channels), "payment_method": rnd.choice(payments), "mode": "delivery" if fee>0 else "store", "store_id":"store-cocody",
+                "delivery_zone": cust.get("zone"), "delivery_fee": fee, "discount": disc, "subtotal": sub, "total": total,
+                "status": status, "payment_status": "paye" if status in ("livree",) else "en_attente",
+                "created_at": created_at, "created_by": "Système démo", "demo_tag": DEMO_TAG,
+                "timeline":[{"status": status,"at": created_at,"by":"Système démo"}]})
+            created["orders"] += 1
+    # Expenses 6 months
+    if await db.expenses.count_documents({}) < 50:
+        cats = ["Loyer","Électricité","Eau","Internet","Marketing","Achats fournitures","Salaires","Transport","Déplacement","Entretien","Impôts","Divers"]
+        for i in range(80):
+            await db.expenses.insert_one({"id": new_id(), "label": f"{rnd.choice(cats)} · {rnd.choice(['janvier','février','mars','avril','mai','juin'])}",
+                "amount": rnd.randint(5,250)*1000, "category": rnd.choice(cats), "paid_at": (datetime.now(timezone.utc)-timedelta(days=rnd.randint(0,180))).isoformat(),
+                "note":"", "demo_tag": DEMO_TAG, "created_at": now_iso()})
+            created["expenses"] += 1
+    # Storefront visits (90 days)
+    if await db.site_visits.count_documents({}) < 300:
+        pages = ["/boutique","/boutique/catalog","/boutique/product/x","/boutique/bons-plans","/boutique/compte"]
+        for i in range(500):
+            await db.site_visits.insert_one({"id": new_id(), "page": rnd.choice(pages), "zone": rnd.choice(zones),
+                "device": rnd.choice(["mobile","mobile","mobile","desktop","tablet"]),
+                "at": (datetime.now(timezone.utc)-timedelta(days=rnd.randint(0,90), hours=rnd.randint(0,23))).isoformat(),
+                "demo_tag": DEMO_TAG})
+            created["visits"] += 1
+    # Waitlist (20)
+    if products and customers:
+        for i in range(20):
+            p = rnd.choice(products); c = rnd.choice(customers)
+            await db.waitlist.insert_one({"id": new_id(), "product_id": p["id"], "size": rnd.choice(p.get("sizes") or [""]),
+                "phone": c["phone"], "name": c["name"], "notified_at": None,
+                "created_at": (datetime.now(timezone.utc)-timedelta(days=rnd.randint(0,30))).isoformat(),
+                "demo_tag": DEMO_TAG})
+            created["waitlist"] += 1
+    # Abandoned carts (30)
+    if customers and products:
+        for i in range(30):
+            c = rnd.choice(customers); picks = rnd.sample(products, 2)
+            items = [{"product_id":p["id"],"name":p["name"],"qty":1,"price":p.get("price",10000),"image":p.get("image")} for p in picks]
+            await db.abandoned_carts.insert_one({"id": new_id(), "customer": {"id":c["id"],"name":c["name"],"phone":c["phone"]},
+                "items": items, "total": sum(it["qty"]*it["price"] for it in items),
+                "created_at": (datetime.now(timezone.utc)-timedelta(hours=rnd.randint(1,72))).isoformat(),
+                "recovered": False, "demo_tag": DEMO_TAG})
+            created["abandoned"] += 1
+    # Reviews (30)
+    if products and customers:
+        for i in range(30):
+            p = rnd.choice(products); c = rnd.choice(customers)
+            await db.reviews.insert_one({"id": new_id(), "product_id": p["id"], "customer_name": c["name"],
+                "rating": rnd.choice([4,4,5,5,5,3]), "comment": rnd.choice(["Très satisfaite !","Taille bien, qualité au top","Belle couleur, livraison rapide","Un peu grand mais parfait","J'adore 💕"]),
+                "status":"pending" if rnd.random()>0.6 else "approved",
+                "created_at": (datetime.now(timezone.utc)-timedelta(days=rnd.randint(0,60))).isoformat(),
+                "demo_tag": DEMO_TAG})
+            created["reviews"] += 1
+    return {"ok": True, "created": created, "message": "Données de démonstration ajoutées"}
+
+@api.delete("/admin/demo-data")
+async def delete_demo_data(user: dict = Depends(require_role("admin"))):
+    """Super admin only: wipe only entries tagged DEMO_PACK1."""
+    deleted = {}
+    for coll in ["customers","orders","expenses","site_visits","waitlist","abandoned_carts","reviews","suppliers","purchases","delivery_days"]:
+        r = await db[coll].delete_many({"demo_tag": DEMO_TAG})
+        deleted[coll] = r.deleted_count
+    return {"ok": True, "deleted": deleted}
+
+
 @api.patch("/brands/{bid}")
 async def update_brand(bid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
     body.pop("_id",None); body.pop("id",None)

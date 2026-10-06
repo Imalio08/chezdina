@@ -146,7 +146,7 @@ export default function POS() {
 
   // --- UI ---
   return (
-    <div className="grid lg:grid-cols-[1fr_440px] gap-4 h-[calc(100vh-7rem)]">
+    <div className="grid lg:grid-cols-[1fr_min(400px,33vw)] gap-4 min-h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)]">
       {/* LEFT: Product area */}
       <div className="dina-card-white p-4 flex flex-col min-h-0">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -212,7 +212,7 @@ export default function POS() {
       </div>
 
       {/* RIGHT: Cart (desktop) + mobile bottom sheet */}
-      <div className={`dina-card-white p-4 flex flex-col min-h-0 ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 lg:static":"hidden lg:flex"}`}>
+      <div className={`dina-card-white p-4 flex flex-col min-h-0 overflow-y-auto scrollbar-thin ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 lg:static":"hidden lg:flex"}`}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">Panier · <span className="text-[#666] text-xs">{cart.length} article{cart.length>1?"s":""}</span></div>
           <div className="flex items-center gap-2">

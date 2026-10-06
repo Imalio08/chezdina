@@ -13,62 +13,57 @@ import {
 import ErrorBoundary from "@/components/ErrorBoundary";
 
 const SECTIONS = [
-  { label: "Pilotage", items: [
+  { label: "", items: [
     { to: "/console", icon: LayoutDashboard, label: "Tableau de bord", end: true },
-    { to: "/console/statistiques", icon: BarChart3, label: "Statistiques" },
   ]},
   { label: "Ventes", items: [
     { to: "/console/pos", icon: ShoppingCart, label: "Caisse" },
     { to: "/console/commandes", icon: Receipt, label: "Commandes" },
-    { to: "/console/facturation", icon: FileText, label: "Facturation" },
     { to: "/console/sessions-caisse", icon: ClipboardList, label: "Sessions de caisse" },
+    { to: "/console/liste-attente", icon: Hourglass, label: "Liste d'attente" },
+    { to: "/console/paniers-abandonnes", icon: ShoppingCart, label: "Paniers abandonnés" },
   ]},
   { label: "Livraison", items: [
     { to: "/console/livraisons", icon: Truck, label: "Journées de livraison" },
     { to: "/console/livreurs", icon: UserCheck, label: "Livreurs" },
     { to: "/console/zones", icon: MapPin, label: "Zones & tarifs" },
   ]},
-  { label: "Catalogue & stock", items: [
+  { label: "Produits & achats", items: [
     { to: "/console/produits", icon: Package, label: "Produits" },
     { to: "/console/marques", icon: Tag, label: "Marques" },
     { to: "/console/categories", icon: Layers, label: "Catégories & collections" },
-    { to: "/console/stock", icon: Boxes, label: "Stock & inventaires" },
-    { to: "/console/liste-attente", icon: Hourglass, label: "Liste d'attente" },
-  ]},
-  { label: "Achats", items: [
-    { to: "/console/achats", icon: ShoppingBag, label: "Approvisionnements" },
     { to: "/console/fournisseurs", icon: Building2, label: "Fournisseurs" },
+    { to: "/console/achats", icon: ShoppingBag, label: "Approvisionnements" },
+    { to: "/console/stock", icon: Boxes, label: "Stock & inventaires" },
   ]},
-  { label: "Clientes & marketing", items: [
-    { to: "/console/clients", icon: Users, label: "Clientes" },
-    { to: "/console/paniers-abandonnes", icon: ShoppingCart, label: "Paniers abandonnés" },
-    { to: "/console/avis", icon: Star, label: "Avis clientes" },
+  { label: "Clients & marketing", items: [
+    { to: "/console/clients", icon: Users, label: "Clients" },
+    { to: "/console/campagnes-whatsapp", icon: MessageSquare, label: "Messagerie" },
+    { to: "/console/segments", icon: Target, label: "Segments & campagnes" },
+    { to: "/console/promotions", icon: Megaphone, label: "Promotions" },
     { to: "/console/fidelite", icon: Gift, label: "Fidélité" },
     { to: "/console/parrainage", icon: Heart, label: "Parrainage" },
-    { to: "/console/promotions", icon: Megaphone, label: "Promotions" },
-    { to: "/console/campagnes-whatsapp", icon: MessageSquare, label: "Campagnes WhatsApp" },
-    { to: "/console/alertes", icon: Bell, label: "Alertes & paniers" },
-  ]},
-  { label: "Finances", items: [
-    { to: "/console/depenses", icon: Wallet, label: "Dépenses" },
-    { to: "/console/encaissements", icon: TrendingUp, label: "Encaissements" },
-    { to: "/console/resultat", icon: FileText, label: "Compte de résultat" },
+    { to: "/console/avis", icon: Star, label: "Avis clients" },
   ]},
   { label: "Équipe", items: [
     { to: "/console/equipe", icon: UserCog, label: "Employés" },
     { to: "/console/roles", icon: Shield, label: "Rôles & permissions", adminOnly: true },
-    { to: "/console/pointage", icon: Calendar, label: "Pointage & planning" },
+    { to: "/console/pointage", icon: Calendar, label: "Pointage" },
   ]},
   { label: "Site vitrine", items: [
     { to: "/console/apparence", icon: Palette, label: "Apparence" },
-    { to: "/console/pages", icon: BookOpen, label: "Pages" },
-    { to: "/console/menus", icon: Menu, label: "Menus & footer" },
+    { to: "/console/accueil", icon: LayoutDashboard, label: "Accueil" },
+    { to: "/console/pages", icon: BookOpen, label: "Pages & navigation" },
     { to: "/console/seo", icon: Target, label: "SEO & partage" },
-    { to: "/console/site", icon: Globe, label: "Aperçu & paramètres" },
+    { to: "/console/apercu", icon: Globe, label: "Aperçu" },
   ]},
-  { label: "Paramètres", adminOnly: true, items: [
+  { label: "Pilotage", items: [
+    { to: "/console/statistiques", icon: BarChart3, label: "Statistiques" },
+    { to: "/console/finances", icon: Wallet, label: "Finances" },
+  ]},
+  { label: "", adminOnly: true, items: [
     { to: "/console/parametres", icon: Cog, label: "Paramètres" },
-    { to: "/console/integrations", icon: Plug, label: "Intégrations" },
+    { to: "/console/manuel", icon: BookOpen, label: "Manuel d'utilisation" },
   ]},
 ];
 
@@ -151,12 +146,14 @@ export default function ConsoleLayout() {
             const open = openSections[sec.label] !== false;
             const items = sec.items.filter(it => !it.adminOnly || isAdmin);
             return (
-              <div key={sec.label} className="mb-1">
-                <button onClick={()=>toggleSection(sec.label)} className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-[#999] uppercase tracking-wider hover:text-white" data-testid={`sidebar-section-${sec.label}`}>
-                  <span>{sec.label}</span>
-                  {open ? <ChevronDown size={10}/> : <ChevronRight size={10}/>}
-                </button>
-                {open && items.map(({to, icon:Icon, label, end}) => (
+              <div key={sec.label || `top-${items[0]?.to}`} className="mb-1">
+                {sec.label ? (
+                  <button onClick={()=>toggleSection(sec.label)} className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-[#999] uppercase tracking-wider hover:text-white" data-testid={`sidebar-section-${sec.label}`}>
+                    <span>{sec.label}</span>
+                    {open ? <ChevronDown size={10}/> : <ChevronRight size={10}/>}
+                  </button>
+                ) : null}
+                {(!sec.label || open) && items.map(({to, icon:Icon, label, end}) => (
                   <NavLink key={to} to={to} end={end} className={({isActive}) => `dina-sidebar-link ${isActive?"active":""}`} data-testid={`nav-${label.toLowerCase().replace(/\s+/g,"-").replace(/é/g,"e").replace(/è/g,"e").replace(/&/g,"et").replace(/[^\w-]/g,"")}`}>
                     <Icon size={14}/><span className="truncate">{label}</span>
                   </NavLink>
@@ -247,14 +244,14 @@ export default function ConsoleLayout() {
         <div className="p-6 flex-1"><ErrorBoundary><Outlet /></ErrorBoundary></div>
       </main>
 
-      {/* Floating AI assistant */}
-      {!showAi && (
+      {/* Floating AI assistant — hidden on POS (would cover "Encaisser") */}
+      {!showAi && pathname !== "/console/pos" && (
         <button onClick={()=>{setShowAi(true); setAiMinimized(false);}} className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[#b02a2a] text-white grid place-items-center shadow-xl hover:bg-[#8e1f1f] transition z-40 group" data-testid="ai-floating-button">
           <Sparkles size={22}/>
           {aiMsgs.length>0 && <span className="absolute -top-1 -right-1 bg-[#f4b12c] text-[#1c1c1c] text-[9px] rounded-full min-w-[16px] h-4 px-1 grid place-items-center font-bold">{aiMsgs.filter(m=>m.role==="bot").length}</span>}
         </button>
       )}
-      {showAi && aiMinimized && (
+      {showAi && aiMinimized && pathname !== "/console/pos" && (
         <button onClick={()=>setAiMinimized(false)} className="fixed bottom-6 right-6 bg-[#b02a2a] text-white rounded-full px-4 py-2.5 shadow-xl flex items-center gap-2 z-40" data-testid="ai-restore">
           <Sparkles size={14}/><span className="text-sm">Dina IA</span><Maximize2 size={12}/>
         </button>

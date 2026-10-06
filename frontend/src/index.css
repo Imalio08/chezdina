@@ -115,8 +115,9 @@ html.dark [style*="background: #fde8e8"], html.dark [style*="background:#fde8e8"
 html, body, #root { height: 100%; }
 
 body { margin: 0; background: #ffffff; color: var(--dina-black); font-family: 'Sora','Inter',-apple-system,sans-serif; -webkit-font-smoothing: antialiased; }
+* { font-family: 'Sora','Inter',-apple-system,sans-serif; }
+h1,h2,h3,.font-serif { font-family: 'Sora','Inter',sans-serif; font-weight: 600; letter-spacing: -0.01em; }
 
-h1,h2,h3,.font-serif { font-family: 'IBM Plex Serif', Georgia, serif; letter-spacing: -0.01em; }
 .font-sora { font-family: 'Sora', 'Inter', sans-serif; }
 
 .tabular { font-variant-numeric: tabular-nums; }

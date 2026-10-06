@@ -136,6 +136,11 @@ export default function App() {
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
               <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
               <Route path="apparence" element={<ErrorBoundary><SiteAppearance/></ErrorBoundary>} />
+              <Route path="accueil" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
+              <Route path="apercu" element={<Navigate to="/boutique" replace/>} />
+              <Route path="finances" element={<Navigate to="/console/resultat" replace/>} />
+              <Route path="segments" element={<ErrorBoundary><WhatsAppCampaigns/></ErrorBoundary>} />
+              <Route path="manuel" element={<ErrorBoundary><Placeholder title="Manuel d'utilisation" subtitle="Guides et tutoriels — bientôt disponible"/></ErrorBoundary>} />
               <Route path="pages" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
               <Route path="menus" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
               <Route path="seo" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
