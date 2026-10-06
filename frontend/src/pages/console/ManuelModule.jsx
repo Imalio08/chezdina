@@ -4,10 +4,11 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import {
   ArrowLeft, ArrowRight, Check, CheckCircle2, Info, Lightbulb, AlertTriangle,
-  Pencil, Save, X, Target, GraduationCap, Image as ImageIcon
+  Pencil, Save, X, Target, GraduationCap, Image as ImageIcon, PlayCircle
 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import * as Lucide from "lucide-react";
+import AnnotatedScreenshot from "@/components/manual/AnnotatedScreenshot";
 
 export default function ManuelModule() {
   const { number } = useParams();
@@ -185,6 +186,43 @@ function Block({ b }) {
       <img src={b.image} alt={b.caption || ""} className="w-full"/>
       {b.caption && <div className="p-2 bg-[#fafafa] text-xs text-[#666]">{b.caption}</div>}
     </div>
+  );
+  if (b.type === "annotated") return (
+    <AnnotatedScreenshot screen={b.screen} callouts={b.callouts || []} caption={b.caption}/>
+  );
+  if (b.type === "video_placeholder") return (
+    <div className="rounded-xl border-2 border-dashed border-[#ececec] dark:border-[#2a2a2a] p-6 text-center bg-[#fafafa] dark:bg-[#141414]">
+      <PlayCircle size={32} className="mx-auto mb-2 text-[#b02a2a]"/>
+      <div className="font-serif text-sm text-[#1c1c1c] dark:text-white">{b.title || "Vidéo courte"}</div>
+      <div className="text-xs text-[#666] mt-1 italic">{b.caption || "Enregistrement 10–30 s à venir."}</div>
+    </div>
+  );
+  if (b.type === "memo") return (
+    <div className="rounded-xl border border-[#b02a2a] bg-white dark:bg-[#1a1a1a] p-4">
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-serif text-base">Mémo A4 · {b.role_label}</div>
+        <button onClick={() => window.print()} className="text-xs text-[#b02a2a] font-semibold hover:underline">Imprimer</button>
+      </div>
+      <ol className="list-decimal pl-5 space-y-1 text-sm">{(b.steps || []).map((s, i) => <li key={i}>{s}</li>)}</ol>
+    </div>
+  );
+  if (b.type === "glossary") return (
+    <dl className="divide-y divide-[#ececec] dark:divide-[#2a2a2a] rounded-lg border border-[#ececec] dark:border-[#2a2a2a]">
+      {(b.items || []).map((it, i) => (
+        <div key={i} className="grid grid-cols-[180px_1fr] gap-3 px-3 py-2">
+          <dt className="font-semibold text-sm">{it.term}</dt>
+          <dd className="text-sm text-[#666]">{it.def}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+  if (b.type === "faq") return (
+    <div className="space-y-2">{(b.items || []).map((q, i) => (
+      <details key={i} className="rounded-lg border border-[#ececec] dark:border-[#2a2a2a] px-3 py-2">
+        <summary className="cursor-pointer text-sm font-semibold">{q.q}</summary>
+        <div className="text-sm text-[#666] mt-2">{q.a}</div>
+      </details>
+    ))}</div>
   );
   return null;
 }

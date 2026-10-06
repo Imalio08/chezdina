@@ -1,5 +1,21 @@
 # Chez Dina — PRD
 
+## Manuel enrichi avec captures annotées (Feb 2026) ✅
+
+### Nouveau composant
+- `components/manual/AnnotatedScreenshot.jsx` : SVG mockup des écrans console (POS panier, Commandes, Préparation scan, Journée de livraison, Dashboard, Session caisse) + overlay de callouts numérotés rouges avec labels contextuels
+
+### Nouveaux types de blocs manuel
+- `annotated` : screenshot SVG + callouts [{x,y,n,label,w?,h?}] (coordonnées en %)
+- `video_placeholder` : encart pour vidéo 10–30 s à venir
+- `memo` : mémo A4 imprimable par rôle (Gérante / Livreur)
+- `glossary` : liste de définitions terme/définition
+- `faq` : questions fréquentes dépliantes
+
+### Backend
+- `POST /api/manual/reseed` (admin only, idempotent) : écrase les 4 modules clés avec la version illustrée — Prise en main, Faire une vente, Préparer et expédier une commande, Pour aller plus loin
+- Chaque module contient captures annotées + étapes numérotées + mémos + FAQ + glossaire
+
 ## P4 Horaires éditeur (Feb 2026) ✅
 
 ### Éditeur visuel

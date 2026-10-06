@@ -4821,6 +4821,233 @@ async def ask_dina(body: AskIn, user: dict = Depends(get_user)):
         logger.exception("AI")
         return {"answer": f"Je n'arrive pas à récupérer la réponse IA pour le moment. Voici un résumé local : CA récent ≈ {rev:,} FCFA, top produits : {', '.join(n for n,_ in best) or '—'}. Réessayez dans un instant.".replace(",", " "), "error": True, "source": "fallback"}
 
+@api.post("/manual/reseed")
+async def manual_reseed(user: dict = Depends(require_role("admin"))):
+    """Rebuild manual_modules with the richer illustrated version (annotated screenshots, FAQ, glossary, A4 memos).
+    Idempotent — overwrites existing docs by `number`.
+    """
+    RICH = [
+        {"number": 1, "title": "Prise en main", "icon": "LogIn",
+         "description": "Connexion, pointage à l'écran kiosk et navigation dans la console",
+         "roles": ["admin","manager","sales","stock_keeper","rider"],
+         "path_hints": ["/console", "/console/pointage"],
+         "sections": [
+            {"id": "s1-login", "heading": "Se connecter en 3 étapes",
+             "blocks": [
+                {"type": "steps", "items": [
+                    "Ouvrez l'adresse de la console sur votre tablette ou votre ordinateur",
+                    "Entrez votre email professionnel et votre mot de passe",
+                    "Cliquez sur « Se connecter » — vous arrivez sur le tableau de bord",
+                ]},
+                {"type": "annotated", "screen": "dashboard",
+                 "caption": "Après connexion vous voyez vos chiffres du jour en un coup d'œil",
+                 "callouts": [
+                    {"x": 25, "y": 10, "n": 1, "label": "Votre nom en haut à droite"},
+                    {"x": 68, "y": 10, "n": 2, "label": "Choisir la période"},
+                    {"x": 25, "y": 30, "n": 3, "w": 20, "h": 15, "label": "Vos KPI principaux"},
+                 ]},
+                {"type": "callout", "variant": "tip",
+                 "text": "Si vous oubliez votre mot de passe, demandez à la propriétaire — elle peut le réinitialiser depuis Équipe."},
+            ]},
+            {"id": "s1-kiosk", "heading": "Pointer à l'arrivée et au départ (kiosk)",
+             "blocks": [
+                {"type": "text", "content": "Le pointage se fait depuis l'onglet « Pointage » sur la tablette boutique. Pas besoin de connexion complète : juste votre code PIN à 4 chiffres."},
+                {"type": "steps", "items": [
+                    "Ouvrez l'onglet Pointage (ou laissez-le ouvert en mode kiosk sur la tablette)",
+                    "Choisissez « Arrivée » ou « Départ » (vert à l'arrivée, rouge au départ)",
+                    "Tapez vos 4 chiffres sur le pavé — un selfie est pris automatiquement",
+                    "Votre nom s'affiche en vert : c'est confirmé",
+                ]},
+                {"type": "callout", "variant": "info",
+                 "text": "Si la caméra ne fonctionne pas, le pointage marche quand même, sans selfie — un badge rouge le signale."},
+            ]},
+            {"id": "s1-nav", "heading": "Trouver un module rapidement",
+             "blocks": [
+                {"type": "list", "items": [
+                    "La barre de gauche regroupe tous vos modules par thème",
+                    "La barre de recherche en haut cherche produits, clientes et commandes en même temps",
+                    "Le bouton « Dina IA » en bas à droite répond à vos questions avec des étapes",
+                ]},
+                {"type": "faq", "items": [
+                    {"q": "Je ne vois pas certaines pages, c'est normal ?", "a": "Oui — chaque rôle voit uniquement les pages qui le concernent. Demandez à la propriétaire si vous avez besoin d'un accès."},
+                    {"q": "Puis-je ouvrir la console sur mon téléphone ?", "a": "Oui, tout est responsive. Pour un usage quotidien préférez une tablette ou un ordinateur."},
+                ]},
+            ]},
+         ]},
+        {"number": 2, "title": "Faire une vente à la caisse", "icon": "ShoppingCart",
+         "description": "Encaisser une cliente en moins de 60 secondes",
+         "roles": ["admin","manager","sales"],
+         "path_hints": ["/console/pos"],
+         "sections": [
+            {"id": "s2-session", "heading": "Ouvrir sa session de caisse",
+             "blocks": [
+                {"type": "text", "content": "Chaque jour, avant la première vente, vous devez ouvrir une session en comptant le fond de caisse. Sinon la caisse reste bloquée."},
+                {"type": "annotated", "screen": "cash_session",
+                 "caption": "La session en cours doit toujours afficher votre nom et l'heure d'ouverture",
+                 "callouts": [
+                    {"x": 15, "y": 32, "n": 1, "label": "Fond initial à saisir"},
+                    {"x": 50, "y": 65, "n": 2, "label": "Déclarer le versement à la propriétaire"},
+                    {"x": 82, "y": 65, "n": 3, "label": "La propriétaire valide"},
+                 ]},
+                {"type": "steps", "items": [
+                    "Comptez l'argent présent dans le tiroir",
+                    "Ouvrez l'onglet Caisse — un panneau rouge vous demande d'ouvrir la session",
+                    "Entrez le montant exact et cliquez « Ouvrir la session »",
+                    "La caisse est débloquée, bonne journée !",
+                ]},
+            ]},
+            {"id": "s2-sell", "heading": "Encaisser une vente",
+             "blocks": [
+                {"type": "annotated", "screen": "pos_cart",
+                 "caption": "L'écran de caisse en 3 zones : panier, totaux, paiement",
+                 "callouts": [
+                    {"x": 20, "y": 8, "n": 1, "label": "Choisir la cliente"},
+                    {"x": 35, "y": 35, "n": 2, "w": 45, "h": 25, "label": "Articles ajoutés"},
+                    {"x": 70, "y": 25, "n": 3, "label": "Choisir le mode de paiement"},
+                    {"x": 70, "y": 85, "n": 4, "label": "Encaisser"},
+                 ]},
+                {"type": "steps", "items": [
+                    "Sélectionnez la cliente (ou créez-la en 1 clic si c'est sa première visite)",
+                    "Scannez ou tapez les articles — le total se met à jour en direct",
+                    "Appliquez une remise seulement si la propriétaire l'a autorisée",
+                    "Choisissez le mode de paiement : Espèces, Wave, Orange Money, MTN, Mixte",
+                    "Cliquez « Encaisser » — le reçu s'imprime et s'envoie par WhatsApp",
+                ]},
+                {"type": "callout", "variant": "warning",
+                 "text": "Pas de remise sans accord de la propriétaire. Toute remise exceptionnelle doit être demandée via « À approuver »."},
+            ]},
+            {"id": "s2-close", "heading": "Clôturer la caisse et verser à la propriétaire",
+             "blocks": [
+                {"type": "steps", "items": [
+                    "En fin de journée, cliquez « Clôturer » dans l'onglet Sessions de caisse",
+                    "Comptez les espèces et saisissez le montant réel",
+                    "Validez avec votre PIN gérante",
+                    "Cliquez « Déclarer versement » et indiquez le montant remis à la propriétaire",
+                    "La propriétaire valide ensuite — un écart éventuel apparaît automatiquement",
+                ]},
+                {"type": "video_placeholder", "title": "Clôturer sa caisse (30 s)",
+                 "caption": "Vidéo d'exemple à venir — enregistrée dans la boutique"},
+            ]},
+            {"id": "s2-memo", "heading": "Mémo A4 Gérante",
+             "blocks": [
+                {"type": "memo", "role_label": "Gérante caisse",
+                 "steps": [
+                    "Avant l'ouverture : compter le fond, ouvrir la session",
+                    "Pendant la journée : encaisser, imprimer les reçus, pas de remise sans accord",
+                    "Avant la pause : vérifier le tiroir, noter les sorties exceptionnelles",
+                    "Fin de journée : clôturer, compter, déclarer le versement, remettre à la propriétaire",
+                 ]},
+            ]},
+         ]},
+        {"number": 3, "title": "Préparer et expédier une commande", "icon": "Package",
+         "description": "De la nouvelle commande à la livraison effective",
+         "roles": ["admin","manager","sales","stock_keeper"],
+         "path_hints": ["/console/commandes","/console/preparation","/console/livraisons"],
+         "sections": [
+            {"id": "s3-overview", "heading": "Lire les statuts d'une commande",
+             "blocks": [
+                {"type": "annotated", "screen": "orders_list",
+                 "caption": "Les KPI colorés en haut donnent la photo du jour",
+                 "callouts": [
+                    {"x": 10, "y": 22, "n": 1, "label": "Nouvelles à traiter"},
+                    {"x": 90, "y": 55, "n": 2, "label": "Icônes facture"},
+                 ]},
+                {"type": "statuses", "items": [
+                    {"name": "Nouvelle", "desc": "À confirmer avec la cliente"},
+                    {"name": "Confirmée", "desc": "Prête à préparer"},
+                    {"name": "En préparation", "desc": "Articles réservés et scannés"},
+                    {"name": "Prête", "desc": "Attend l'affectation à un livreur"},
+                    {"name": "En livraison", "desc": "En route chez la cliente"},
+                    {"name": "Livrée", "desc": "Preuve + code 4 chiffres validés"},
+                ]},
+            ]},
+            {"id": "s3-prepare", "heading": "Préparer une commande en scannant chaque article",
+             "blocks": [
+                {"type": "annotated", "screen": "preparation_scan",
+                 "caption": "Scannez les articles un par un — vert = OK, orange = override manuel",
+                 "callouts": [
+                    {"x": 40, "y": 20, "n": 1, "label": "Zone de scan"},
+                    {"x": 72, "y": 18, "n": 2, "label": "Valider"},
+                    {"x": 92, "y": 50, "n": 3, "label": "Override si étiquette illisible"},
+                    {"x": 50, "y": 92, "n": 4, "label": "Marquer Prête"},
+                 ]},
+                {"type": "steps", "items": [
+                    "Ouvrez l'onglet Préparation — choisissez la commande à préparer",
+                    "Scannez chaque article avec la douchette (ou tapez le SKU + Entrée)",
+                    "Un article scanné devient vert ; un article refusé reste à faire",
+                    "Si l'étiquette est illisible, cliquez « Manuel » et choisissez un motif obligatoire",
+                    "Quand tout est vert ou orange, cliquez « Marquer la commande comme Prête »",
+                ]},
+                {"type": "callout", "variant": "info",
+                 "text": "Les overrides manuels sont tracés dans le journal d'audit : la propriétaire voit qui a confirmé quoi et pourquoi."},
+            ]},
+            {"id": "s3-deliver", "heading": "Affecter à un livreur et suivre en direct",
+             "blocks": [
+                {"type": "annotated", "screen": "delivery_day",
+                 "caption": "L'onglet Suivi affiche la position des livreurs et les commandes du jour",
+                 "callouts": [
+                    {"x": 10, "y": 15, "n": 1, "label": "Journée du jour"},
+                    {"x": 35, "y": 55, "n": 2, "label": "Position livreur"},
+                    {"x": 60, "y": 45, "n": 3, "label": "Pins commandes colorés par statut"},
+                 ]},
+                {"type": "steps", "items": [
+                    "Ouvrez Livraisons → votre journée du jour",
+                    "Dans l'onglet Affectation, cochez les commandes prêtes à partir",
+                    "Cliquez « Suggérer une répartition » pour grouper par zone, puis Appliquer",
+                    "Allez dans l'onglet Suivi pour voir en direct les livreurs sur la carte",
+                ]},
+            ]},
+         ]},
+        {"number": 4, "title": "Pour aller plus loin", "icon": "GraduationCap",
+         "description": "Glossaire, questions fréquentes et bonnes pratiques",
+         "roles": ["admin","manager","sales","stock_keeper","rider"],
+         "path_hints": ["/console/manuel"],
+         "sections": [
+            {"id": "s4-glossary", "heading": "Glossaire",
+             "blocks": [
+                {"type": "glossary", "items": [
+                    {"term": "Session de caisse", "def": "Période ouverte par une gérante le matin et clôturée en fin de journée ; sert à tracer tous les mouvements d'espèces."},
+                    {"term": "Réconciliation", "def": "Comparer les ventes attendues au contenu réel du tiroir et expliquer l'écart."},
+                    {"term": "Variante", "def": "Combinaison taille × couleur réelle d'un produit. On ne crée que les combinaisons existantes."},
+                    {"term": "Liste d'attente", "def": "Clientes qui ont demandé à être prévenues du retour d'un produit en rupture."},
+                    {"term": "Approvisionnement", "def": "Commande passée à un fournisseur pour renouveler le stock."},
+                    {"term": "Preuve de livraison", "def": "Photo + code à 4 chiffres fournis par la cliente que le livreur enregistre à la remise."},
+                ]},
+            ]},
+            {"id": "s4-faq", "heading": "Questions fréquentes",
+             "blocks": [
+                {"type": "faq", "items": [
+                    {"q": "Comment faire un remboursement ?", "a": "Dans Commandes, ouvrez la commande concernée et choisissez « Rembourser ». La propriétaire valide via la page « À approuver »."},
+                    {"q": "Comment appliquer une remise exceptionnelle ?", "a": "Depuis la caisse, cliquez « Remise » et sélectionnez « Demande d'approbation ». La propriétaire reçoit la demande dans « À approuver »."},
+                    {"q": "Je n'arrive pas à scanner un article, que faire ?", "a": "Dans l'écran Préparation, cliquez « Manuel » sur la ligne concernée et choisissez un motif. L'action est tracée."},
+                    {"q": "Comment ajouter une nouvelle cliente ?", "a": "Depuis la caisse, cliquez sur la carte « Choisir la cliente » puis « + Nouvelle cliente ». Prénom, nom et téléphone suffisent."},
+                    {"q": "Comment imprimer une facture ?", "a": "Dans Commandes, à droite de la ligne : icône PDF. Vous pouvez aussi l'envoyer par WhatsApp en 1 clic."},
+                    {"q": "Comment pointer sans caméra ?", "a": "Pas de problème : le pointage marche sans selfie si la caméra est refusée — un badge rouge l'indique."},
+                ]},
+            ]},
+            {"id": "s4-rider-memo", "heading": "Mémo A4 Livreur",
+             "blocks": [
+                {"type": "memo", "role_label": "Livreur",
+                 "steps": [
+                    "Pointer à l'arrivée au dépôt",
+                    "Récupérer les commandes affectées — vérifier les fiches colis",
+                    "Appeler chaque cliente avant d'arriver",
+                    "À la livraison : photo + demander le code 4 chiffres",
+                    "Encaisser (COD) et marquer Livrée dans l'application",
+                    "Fin de tournée : pointer départ et verser l'argent au bureau",
+                 ]},
+            ]},
+         ]},
+    ]
+    now = now_iso()
+    for m in RICH:
+        existing = await db.manual_modules.find_one({"number": m["number"]})
+        if existing:
+            await db.manual_modules.update_one({"number": m["number"]}, {"$set": {**m, "updated_at": now}})
+        else:
+            await db.manual_modules.insert_one({**m, "id": new_id(), "created_at": now})
+    return {"ok": True, "updated": len(RICH)}
+
 @api.get("/manual-gaps")
 async def manual_gaps(user: dict = Depends(require_role("admin"))):
     rows = await db.manual_gaps.find({}).sort("at", -1).to_list(200)
