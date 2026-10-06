@@ -55,8 +55,12 @@ export default function Customers() {
   };
 
   const regenCode = async (c) => {
-    try { const r = await api.post(`/customers/${c.id}/regen-access-code`); setNewCode(r.data); toast.success("Nouveau code généré"); }
-    catch { toast.error("Erreur"); }
+    if (!window.confirm(`Régénérer le code d'accès de ${c.name} ?\n\nL'ancien code sera invalidé immédiatement.`)) return;
+    try {
+      const r = await api.post(`/customers/${c.id}/regen-access-code`);
+      setNewCode({ code: r.data.access_code, phone: r.data.phone || c.phone, name: r.data.name || c.name });
+      toast.success("Nouveau code généré");
+    } catch { toast.error("Erreur"); }
   };
 
   const openWa = (c, text) => {

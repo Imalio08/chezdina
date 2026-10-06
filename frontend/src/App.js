@@ -74,6 +74,7 @@ import Statistiques from "@/pages/console/Statistiques";
 import Finances from "@/pages/console/Finances";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
+import ScanRedirect from "@/pages/public/ScanRedirect";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
 import OpeningHoursBanner from "@/components/storefront/OpeningHoursBanner";
@@ -108,6 +109,7 @@ export default function App() {
           <Toaster position="top-right" richColors />
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/scan" element={<ScanRedirect />} />
             <Route path="/suivi/:code" element={<Tracking />} />
             <Route path="/boutique/panier-partage/:id" element={<SharedCart />} />
             <Route path="/rider" element={<ProtectedRider><RiderShell /></ProtectedRider>}>

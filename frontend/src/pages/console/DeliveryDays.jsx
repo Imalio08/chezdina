@@ -1,10 +1,53 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, statusLabel, statusColor, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Calendar, Package, DollarSign, AlertTriangle, CheckCircle2, Users, X, Printer, Map, Sparkles, UserPlus } from "lucide-react";
+import { Plus, Calendar, Package, DollarSign, AlertTriangle, CheckCircle2, Users, X, Printer, Map, Sparkles, UserPlus, FileText } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
 import LiveDeliveryMap from "@/components/delivery/LiveDeliveryMap";
+import jsPDF from "jspdf";
+
+/** Build a printable route-sheet PDF for a rider's day: list of orders with addresses, phones, amounts. */
+function printRouteSheetPDF(session, assigned) {
+  const doc = new jsPDF();
+  const pad = 15;
+  doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+  doc.text("Feuille de route livreur", pad, 18);
+  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+  doc.text(`Livreur : ${session.rider_name || "—"}`, pad, 26);
+  doc.text(`Journée : ${session.date || (session.created_at || "").slice(0,10)}`, pad, 32);
+  doc.text(`Commandes affectées : ${assigned.length}`, pad, 38);
+  const totalToCollect = assigned.reduce((s,o) => s + (o.payment_method === "cod" ? (o.total || 0) : 0), 0);
+  doc.text(`Total à encaisser (COD) : ${fcfa(totalToCollect)}`, pad, 44);
+  let y = 56;
+  doc.setFont("helvetica", "bold");
+  doc.text("#", pad, y);
+  doc.text("Code", pad + 10, y);
+  doc.text("Cliente / Téléphone", pad + 40, y);
+  doc.text("Adresse", pad + 95, y);
+  doc.text("À encaisser", 195, y, { align: "right" });
+  y += 2; doc.line(pad, y, 195, y); y += 5;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  assigned.forEach((o, i) => {
+    if (y > 275) { doc.addPage(); y = 20; }
+    const toCollect = o.payment_method === "cod" ? (o.total || 0) : 0;
+    doc.text(String(i + 1), pad, y);
+    doc.text((o.code || "").slice(0, 14), pad + 10, y);
+    doc.text(((o.customer?.name || "—") + " · " + (o.customer?.phone || "")).slice(0, 36), pad + 40, y);
+    const addr = ((o.delivery_zone || "") + " · " + (o.delivery_address || o.customer?.address || "")).slice(0, 50);
+    doc.text(addr, pad + 95, y);
+    doc.text(toCollect > 0 ? fcfa(toCollect) : "Payé", 195, y, { align: "right" });
+    y += 5;
+    if (o.notes) {
+      doc.setTextColor(120); doc.text(("Note : " + o.notes).slice(0, 90), pad + 10, y); doc.setTextColor(0); y += 5;
+    }
+    doc.setDrawColor(220); doc.line(pad, y - 1, 195, y - 1); doc.setDrawColor(0);
+  });
+  doc.setFont("helvetica", "italic"); doc.setFontSize(8);
+  doc.text("Signature livreur : _______________________    Signature bureau : _______________________", pad, 285);
+  doc.save(`feuille-route-${(session.rider_name || "livreur").replace(/\s+/g, "-")}-${session.date || "jour"}.pdf`);
+}
 
 export default function DeliveryDays() {
   const [sessions, setSessions] = useState([]);
@@ -106,6 +149,7 @@ function CreateDayModal({ riders, onClose, onDone }) {
 }
 
 function DayDetail({ session, orders, riders, onBack, onReload }) {
+  const nav = useNavigate();
   const [tab, setTab] = useState("affectation");
   const [selected, setSelected] = useState([]);
   const [assignTo, setAssignTo] = useState(null);
@@ -275,13 +319,28 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
       )}
 
       {tab === "fiches" && (
-        <div className="dina-card-white p-4">
-          <div className="font-serif text-lg mb-3">Fiches colis & feuilles de route</div>
+        <div className="dina-card-white p-4" data-testid="dd-fiches-tab">
+          <div className="font-serif text-lg mb-1">Fiches colis & feuille de route</div>
+          <div className="text-xs text-[#666] mb-3">{assigned.length} commande(s) affectée(s) à {session.rider_name || "ce livreur"}</div>
           <div className="flex gap-2 flex-wrap">
-            <button onClick={()=>window.print()} className="dina-btn-secondary"><Printer size={14}/>Imprimer les fiches colis</button>
-            <button onClick={()=>window.print()} className="dina-btn-secondary"><Printer size={14}/>Feuille de route livreur</button>
+            <button
+              onClick={() => {
+                if (!assigned.length) return toast.error("Aucune commande affectée");
+                const ids = assigned.map(o => o.id).join(",");
+                nav(`/console/fiches-colis?ids=${encodeURIComponent(ids)}`);
+              }}
+              className="dina-btn-secondary" data-testid="dd-print-fiches"
+            ><Printer size={14}/>Imprimer les fiches colis</button>
+            <button
+              onClick={() => {
+                if (!assigned.length) return toast.error("Aucune commande affectée");
+                printRouteSheetPDF(session, assigned);
+                toast.success("Feuille de route générée");
+              }}
+              className="dina-btn-primary" data-testid="dd-print-routesheet"
+            ><FileText size={14}/>Feuille de route livreur (PDF)</button>
           </div>
-          <div className="mt-4 text-xs text-[#666]">Compatible imprimante thermique 80 mm ou A4.</div>
+          <div className="mt-4 text-xs text-[#666]">La feuille de route liste cliente, téléphone, adresse et montant à encaisser pour chaque commande.<br/>Les fiches colis génèrent une étiquette imprimable par commande (format A4, A6 ou thermique 80 mm).</div>
         </div>
       )}
 

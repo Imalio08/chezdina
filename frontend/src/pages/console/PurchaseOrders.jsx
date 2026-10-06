@@ -12,6 +12,16 @@ const STATUSES = ["brouillon", "commande", "recu_partiel", "recu", "cloture"];
 const STATUS_LABEL = { brouillon: "Brouillon", commande: "Commandé", en_attente: "Commandé", recu_partiel: "Reçu partiellement", recu: "Reçu", receptionne: "Reçu", cloture: "Clôturé" };
 const STATUS_COLOR = { brouillon: "#999", commande: "#5867fd", en_attente: "#5867fd", recu_partiel: "#e4991e", recu: "#1f8a4c", receptionne: "#1f8a4c", cloture: "#666" };
 const QR_URL = (txt) => `https://api.qrserver.com/v1/create-qr-code/?size=90x90&data=${encodeURIComponent(txt)}`;
+// Builds a deep-link URL encoded in the QR that opens the right product variant when scanned
+const buildScanUrl = (sku, size, color, productId) => {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const params = new URLSearchParams();
+  if (sku) params.set("sku", sku);
+  if (size) params.set("size", size);
+  if (color) params.set("color", color);
+  if (productId) params.set("pid", productId);
+  return `${origin}/scan?${params.toString()}`;
+};
 
 export default function PurchaseOrders() {
   const { user } = useAuth();
@@ -85,8 +95,13 @@ export default function PurchaseOrders() {
     const items = (po.items || []).filter(it => (it.qty_counted ?? it.qty) > 0);
     const labs = items.flatMap(it => {
       const qty = Number(it.qty_counted ?? it.qty) || 0;
-      return Array.from({ length: qty }).map(() => ({ product_name: it.product_name, sku: it.sku, size: it.size, color: it.color, unit_cost: it.unit_cost, qr: `${it.sku}|${it.size || ""}|${it.color || ""}`, po_number: po.number }));
+      const url = buildScanUrl(it.sku, it.size, it.color, it.product_id);
+      return Array.from({ length: qty }).map(() => ({
+        product_name: it.product_name, sku: it.sku, size: it.size, color: it.color,
+        unit_cost: it.unit_cost, qr: url, po_number: po.number,
+      }));
     });
+    if (!labs.length) { toast.error("Aucune unité à étiqueter"); return; }
     setLabels(labs);
   };
 
@@ -339,29 +354,68 @@ function BlindReceive({ po, user, onClose, onDone }) {
 }
 
 function LabelsPrintModal({ labels, onClose }) {
-  const print = () => window.print();
-  return (
-    <div className="fixed inset-0 bg-black/60 z-50 p-0 md:p-4 overflow-y-auto print:bg-white print:inset-auto">
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-5xl mx-auto my-4 print:p-0 print:my-0 print:shadow-none print:bg-white">
-        <div className="flex justify-between items-start mb-4 print:hidden">
-          <div><div className="font-serif text-xl">Étiquettes QR · {labels.length} unité{labels.length > 1 ? "s" : ""}</div><div className="text-xs text-[#666]">Planche A4 — 24 par page (70×37mm)</div></div>
-          <div className="flex gap-2"><button onClick={print} className="dina-btn-primary" data-testid="qr-print"><Printer size={14} />Imprimer</button><button onClick={onClose} className="dina-btn-secondary"><X size={14} />Fermer</button></div>
+  const printInNewWindow = () => {
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) { toast.error("Pop-up bloquée — autorisez les pop-ups pour cette page"); return; }
+    const cells = labels.map(l => `
+      <div class="qr-cell">
+        <img src="${QR_URL(l.qr)}" alt="QR"/>
+        <div class="meta">
+          <div class="pname">${(l.product_name || "").replace(/</g, "&lt;")}</div>
+          <div>SKU: <b>${l.sku || ""}</b></div>
+          <div>T: <b>${l.size || "—"}</b> · C: <b>${l.color || "—"}</b></div>
+          <div class="muted">PA: ${fcfa(l.unit_cost)}</div>
+          <div class="muted">${l.po_number || ""}</div>
         </div>
-        <div className="qr-sheet grid grid-cols-3 gap-x-0 gap-y-0 bg-white text-black">
-          {labels.map((l, i) => (
+      </div>`).join("");
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Étiquettes QR · ${labels.length}</title>
+      <style>
+        * { box-sizing: border-box; }
+        body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 10mm; background: white; color: #1c1c1c; }
+        h1 { font-size: 14px; margin: 0 0 8mm 0; }
+        .sheet { display: grid; grid-template-columns: repeat(3, 70mm); gap: 0; }
+        .qr-cell { border: 1px solid #ddd; padding: 4px 6px; height: 37mm; display: flex; gap: 6px; align-items: center; page-break-inside: avoid; }
+        .qr-cell img { width: 22mm; height: 22mm; flex-shrink: 0; }
+        .meta { font-size: 9px; line-height: 1.2; min-width: 0; }
+        .meta .pname { font-weight: 700; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .meta .muted { color: #666; }
+        @page { size: A4; margin: 10mm; }
+        @media print { h1 { display: none; } body { padding: 0; } }
+      </style></head><body>
+      <h1>Étiquettes QR · ${labels.length} unité${labels.length > 1 ? "s" : ""} · impression A4 (24 par page)</h1>
+      <div class="sheet">${cells}</div>
+      <script>window.onload = () => { setTimeout(() => window.print(), 300); };</script>
+    </body></html>`);
+    w.document.close();
+  };
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-5xl mx-auto my-4" onClick={e => e.stopPropagation()}>
+        <div className="flex justify-between items-start mb-4">
+          <div>
+            <div className="font-serif text-xl">Étiquettes QR · {labels.length} unité{labels.length > 1 ? "s" : ""}</div>
+            <div className="text-xs text-[#666]">Planche A4 — 24 par page (70×37 mm) · scan ouvre la variante exacte</div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={printInNewWindow} className="dina-btn-primary" data-testid="qr-print"><Printer size={14} />Imprimer dans une nouvelle fenêtre</button>
+            <button onClick={onClose} className="dina-btn-secondary"><X size={14} />Fermer</button>
+          </div>
+        </div>
+        <div className="qr-sheet grid grid-cols-3 gap-0 bg-white text-black max-h-[70vh] overflow-y-auto border border-[#ececec] rounded">
+          {labels.slice(0, 24).map((l, i) => (
             <div key={i} className="qr-cell border border-[#ddd] p-2 flex gap-2 items-center" style={{ height: "37mm" }}>
               <img src={QR_URL(l.qr)} alt="QR" className="w-[22mm] h-[22mm] shrink-0" />
               <div className="flex-1 min-w-0 text-[9px] leading-tight">
                 <div className="font-semibold truncate text-[10px]">{l.product_name}</div>
                 <div className="truncate">SKU: <strong>{l.sku}</strong></div>
-                <div>Taille: <strong>{l.size || "—"}</strong> · Couleur: <strong>{l.color || "—"}</strong></div>
+                <div>T: <strong>{l.size || "—"}</strong> · C: <strong>{l.color || "—"}</strong></div>
                 <div className="text-[#666]">PA: {fcfa(l.unit_cost)}</div>
                 <div className="text-[#666]">{l.po_number}</div>
               </div>
             </div>
           ))}
         </div>
-        <style>{`@media print { body > *:not(.fixed) { display:none !important; } .fixed.inset-0 { position:static !important; background:white !important; padding:0 !important; } .qr-sheet { grid-template-columns: repeat(3, 70mm) !important; } .qr-cell { page-break-inside: avoid; } @page { size: A4; margin: 10mm; } }`}</style>
+        {labels.length > 24 && <div className="text-xs text-[#666] mt-2">+ {labels.length - 24} étiquettes supplémentaires imprimées dans la nouvelle fenêtre</div>}
       </div>
     </div>
   );

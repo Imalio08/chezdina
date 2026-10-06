@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ const QR_URL = (txt, size=120) => `https://api.qrserver.com/v1/create-qr-code/?s
 
 export default function FichesColis() {
   const nav = useNavigate();
+  const [params] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [format, setFormat] = useState("a4"); // 80mm | a6 | a4
@@ -16,8 +17,14 @@ export default function FichesColis() {
     api.get("/orders").then(r => {
       const ready = r.data.filter(o => ["prete","assignee","en_livraison"].includes(o.status));
       setOrders(ready);
+      // Preselect from ?ids=
+      const idsParam = params.get("ids");
+      if (idsParam) {
+        const ids = idsParam.split(",").filter(Boolean);
+        setSelected(new Set(ids.filter(id => ready.some(o => o.id === id))));
+      }
     });
-  }, []);
+  }, []); // eslint-disable-line
 
   const toggle = (id) => { const n = new Set(selected); n.has(id)?n.delete(id):n.add(id); setSelected(n); };
   const toggleAll = () => selected.size===orders.length ? setSelected(new Set()) : setSelected(new Set(orders.map(o=>o.id)));
