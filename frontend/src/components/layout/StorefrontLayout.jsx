@@ -1,11 +1,18 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket } from "lucide-react";
+import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket, Facebook, Instagram, Youtube, Linkedin, Hash, Share2 } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useCustomer } from "@/context/CustomerContext";
+import useSiteTheme from "@/hooks/useSiteTheme";
 import api from "@/lib/api";
 
+const SOCIAL_ICONS = {
+  facebook: Facebook, instagram: Instagram, tiktok: Hash,
+  whatsapp: Share2, snapchat: Share2, youtube: Youtube, linkedin: Linkedin,
+};
+
 export default function StorefrontLayout() {
+  useSiteTheme();
   const { cart } = useApp();
   const { customer, logout } = useCustomer();
   const count = cart.reduce((s,x)=>s+x.qty,0);
@@ -14,11 +21,13 @@ export default function StorefrontLayout() {
   const [sugg, setSugg] = useState([]);
   const [open, setOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
+  const [social, setSocial] = useState({});
   const umRef = useRef(null);
 
   useEffect(() => {
     const onClick = (e) => { if (umRef.current && !umRef.current.contains(e.target)) setUserMenu(false); };
     window.addEventListener("click", onClick);
+    api.get("/public/site").then(r => setSocial(r.data?.social || {})).catch(() => {});
     return () => window.removeEventListener("click", onClick);
   }, []);
 
@@ -133,7 +142,13 @@ export default function StorefrontLayout() {
           <div><div className="font-serif text-xl text-[#b02a2a] mb-2">Chez Dina</div><p>Mode féminine · Abidjan.<br/>Livraison partout en Côte d'Ivoire.</p><div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c]">+225 07 77 92 61 79</strong></div></div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li>Nouveautés</li><li>Promotions</li><li>Guide des tailles</li></ul></div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Aide</div><ul className="space-y-1"><li>Livraison & retours</li><li>Suivi de commande</li><li>Contact</li></ul></div>
-          <div><div className="font-semibold text-[#1c1c1c] mb-2">Suivez-nous</div><ul className="space-y-1"><li><a href="https://www.tiktok.com/@dinoush04" target="_blank" rel="noreferrer">TikTok @dinoush04</a></li><li><a href="https://wa.me/2250777926179" target="_blank" rel="noreferrer">WhatsApp</a></li></ul></div>
+          <div><div className="font-semibold text-[#1c1c1c] mb-2">Suivez-nous</div><ul className="space-y-1">
+            {Object.entries(social).filter(([k,v])=>v).map(([k,v])=>{
+              const Icon = SOCIAL_ICONS[k] || Share2;
+              return <li key={k}><a href={v} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid={`footer-social-${k}`}><Icon size={12}/>{k.charAt(0).toUpperCase()+k.slice(1)}</a></li>;
+            })}
+            {!Object.values(social).some(v=>v) && <li><a href="https://www.tiktok.com/@dinoush04" target="_blank" rel="noreferrer">TikTok @dinoush04</a></li>}
+          </ul></div>
         </div>
         <div className="max-w-6xl mx-auto px-4 mt-8 text-xs text-[#999]">© 2026 Chez Dina · Abidjan</div>
       </footer>

@@ -27,6 +27,7 @@ import AlertsAndCarts from "@/pages/console/AlertsAndCarts";
 import Integrations from "@/pages/console/Integrations";
 import Settings from "@/pages/console/Settings";
 import SiteSettings from "@/pages/console/SiteSettings";
+import SiteVitrine from "@/pages/console/SiteVitrine";
 import Placeholder from "@/pages/console/Placeholder";
 import FichesColis from "@/pages/console/FichesColis";
 import RiderShell from "@/pages/rider/RiderShell";
@@ -136,7 +137,7 @@ export default function App() {
               <Route path="depenses" element={<ErrorBoundary><Expenses /></ErrorBoundary>} />
               <Route path="statistiques" element={<ErrorBoundary><Statistiques /></ErrorBoundary>} />
               <Route path="equipe" element={<ErrorBoundary><Team /></ErrorBoundary>} />
-              <Route path="site" element={<ErrorBoundary><SiteSettings /></ErrorBoundary>} />
+              <Route path="site" element={<ErrorBoundary><SiteVitrine /></ErrorBoundary>} />
               <Route path="integrations" element={<ErrorBoundary><Integrations /></ErrorBoundary>} />
               <Route path="parametres" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
               {/* Placeholder routes for upcoming modules (keep sidebar functional) */}
@@ -158,8 +159,8 @@ export default function App() {
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
               <Route path="pointage" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
-              <Route path="apparence" element={<ErrorBoundary><SiteAppearance/></ErrorBoundary>} />
-              <Route path="accueil" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
+              <Route path="apparence" element={<Navigate to="/console/site?tab=apparence" replace/>} />
+              <Route path="accueil" element={<Navigate to="/console/site?tab=accueil" replace/>} />
               <Route path="apercu" element={<Navigate to="/boutique" replace/>} />
               <Route path="finances" element={<ErrorBoundary><Finances/></ErrorBoundary>} />
               <Route path="statistiques" element={<ErrorBoundary><Statistiques/></ErrorBoundary>} />
@@ -167,9 +168,9 @@ export default function App() {
               <Route path="campagnes" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
               <Route path="campagnes-whatsapp" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
               <Route path="manuel" element={<ErrorBoundary><Placeholder title="Manuel d'utilisation" subtitle="Guides et tutoriels — bientôt disponible"/></ErrorBoundary>} />
-              <Route path="pages" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
-              <Route path="menus" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
-              <Route path="seo" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
+              <Route path="pages" element={<Navigate to="/console/site?tab=pages" replace/>} />
+              <Route path="menus" element={<Navigate to="/console/site?tab=pages" replace/>} />
+              <Route path="seo" element={<Navigate to="/console/site?tab=seo" replace/>} />
               <Route path="checklist" element={<ErrorBoundary><AcceptanceChecklist/></ErrorBoundary>} />
               <Route path="fiches-colis" element={<ErrorBoundary><FichesColis/></ErrorBoundary>} />
             </Route>

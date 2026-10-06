@@ -51,11 +51,11 @@ const SECTIONS = [
     { to: "/console/pointage", icon: Calendar, label: "Pointage" },
   ]},
   { label: "Site vitrine", items: [
-    { to: "/console/apparence", icon: Palette, label: "Apparence" },
-    { to: "/console/accueil", icon: LayoutDashboard, label: "Accueil" },
-    { to: "/console/pages", icon: BookOpen, label: "Pages & navigation" },
-    { to: "/console/seo", icon: Target, label: "SEO & partage" },
-    { to: "/console/apercu", icon: Globe, label: "Aperçu" },
+    { to: "/console/site?tab=apparence", icon: Palette, label: "Apparence" },
+    { to: "/console/site?tab=accueil", icon: LayoutDashboard, label: "Accueil" },
+    { to: "/console/site?tab=pages", icon: BookOpen, label: "Pages & navigation" },
+    { to: "/console/site?tab=seo", icon: Target, label: "SEO & partage" },
+    { to: "/console/site?tab=apercu", icon: Globe, label: "Aperçu" },
   ]},
   { label: "Pilotage", items: [
     { to: "/console/statistiques", icon: BarChart3, label: "Statistiques" },
