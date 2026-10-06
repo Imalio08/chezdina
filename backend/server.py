@@ -68,6 +68,24 @@ class ProductIn(BaseModel):
     description: str = ""; image: str = ""; images: List[str] = []
     sizes: List[str] = []; colors: List[str] = []; stock_by_size: Dict[str,int] = {}
     stock: int = 0; sku: Optional[str] = None; visibility: str = "both"
+    # Phase B fields
+    price_old: Optional[int] = None
+    status: str = "actif"
+    collections: Optional[str] = None
+    tags: Optional[str] = None
+    material: Optional[str] = None
+    occasion: Optional[str] = None
+    heel_type: Optional[str] = None
+    care: Optional[str] = None
+    supplier: Optional[str] = None
+    alert_threshold: Optional[int] = 3
+    location: Optional[str] = None
+    featured: bool = False
+    is_new: bool = False
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+    promo_pct: Optional[int] = None
+    season: Optional[str] = None
 class OrderItem(BaseModel):
     product_id: str; name: str; size: Optional[str]=None; color: Optional[str]=None
     qty: int = 1; price: int; image: Optional[str] = None
@@ -2171,7 +2189,7 @@ async def products_bulk_status(body: Dict[str,Any], user: dict = Depends(require
 async def products_bulk_promo(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
     ids = body.get("ids") or []
     pct = int(body.get("discount_pct", 0))
-    if not ids or pct <= 0 or pct > 90: raise HTTPException(400)
+    if not ids or pct <= 0 or pct > 90: raise HTTPException(400, "ids et discount_pct (1-90) requis")
     for pid in ids:
         p = await db.products.find_one({"id": pid})
         if p:
@@ -2195,12 +2213,11 @@ async def product_history(pid: str, user: dict = Depends(get_user)):
 async def update_brand(bid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
     body.pop("_id",None); body.pop("id",None)
     body["updated_at"] = now_iso()
-    # If name change, update products
-    if body.get("name"):
-        old = await db.brands.find_one({"id": bid})
-        if old and old.get("name") and old["name"] != body["name"]:
-            await db.products.update_many({"brand": old["name"]}, {"$set": {"brand": body["name"]}})
-    await db.brands.update_one({"id": bid}, {"$set": body}, upsert=True)
+    old = await db.brands.find_one({"id": bid})
+    if not old: raise HTTPException(404, "Marque introuvable")
+    if body.get("name") and old.get("name") and old["name"] != body["name"]:
+        await db.products.update_many({"brand": old["name"]}, {"$set": {"brand": body["name"]}})
+    await db.brands.update_one({"id": bid}, {"$set": body})
     return {"ok": True}
 
 
