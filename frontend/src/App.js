@@ -32,6 +32,7 @@ import WhatsAppCampaigns from "@/pages/console/WhatsAppCampaigns";
 import Referrals from "@/pages/console/Referrals";
 import RolesPermissions from "@/pages/console/RolesPermissions";
 import Kiosk from "@/pages/console/Kiosk";
+import SectionBuilder from "@/pages/console/SectionBuilder";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
@@ -109,7 +110,7 @@ export default function App() {
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
               <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
-              <Route path="apparence" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="apparence" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
               <Route path="pages" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="menus" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="seo" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />

@@ -32,6 +32,9 @@ def make_token(uid, role, m=60*24*7):
     return jwt.encode({"sub": uid, "role": role, "exp": datetime.now(timezone.utc)+timedelta(minutes=m)}, JWT_SECRET, algorithm=JWT_ALG)
 def new_id(): return str(uuid.uuid4())
 def now_iso(): return datetime.now(timezone.utc).isoformat()
+def gen_access_code(): return str(random.randint(100000, 999999))
+def make_customer_token(cid: str, m: int = 60*24*30):
+    return jwt.encode({"sub": cid, "kind": "customer", "exp": datetime.now(timezone.utc)+timedelta(minutes=m)}, JWT_SECRET, algorithm=JWT_ALG)
 def clean(d):
     if isinstance(d, list): return [clean(x) for x in d]
     if isinstance(d, dict): return {k: clean(v) for k, v in d.items() if k != "_id"}
@@ -159,6 +162,11 @@ class RolesPermissionsIn(BaseModel):
 class AttendancePunchIn(BaseModel):
     code: str
     kind: str = "in"  # in | out
+class CustomerLoginCodeIn(BaseModel):
+    phone: str
+    code: str
+class StorefrontSectionsIn(BaseModel):
+    sections: List[Dict[str, Any]]  # ordered list: {id, type, enabled, props}
 
 # ---------- Auth ----------
 @api.post("/auth/login")
@@ -190,6 +198,20 @@ async def logout(response: Response):
     return {"ok": True}
 
 # ---------- Customer auth (phone/email + password) ----------
+async def get_customer(request: Request):
+    token = request.cookies.get("customer_token")
+    if not token:
+        h = request.headers.get("Authorization", "")
+        if h.startswith("Bearer "): token = h[7:]
+    if not token: raise HTTPException(401, "Non authentifié")
+    try: payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+    except Exception: raise HTTPException(401, "Session expirée")
+    if payload.get("kind") != "customer": raise HTTPException(401, "Token invalide")
+    c = await db.customers.find_one({"id": payload["sub"]})
+    if not c: raise HTTPException(401, "Compte introuvable")
+    for k in ("_id","password_hash"): c.pop(k, None)
+    return c
+
 @api.post("/public/customer-register")
 async def cust_register(body: CustomerIn):
     if not body.password: raise HTTPException(400, "Mot de passe requis")
@@ -198,6 +220,7 @@ async def cust_register(body: CustomerIn):
     doc = body.model_dump(exclude={"password"})
     doc.update({"id": new_id(), "created_at": now_iso(), "wallet": 0, "loyalty_points": 0,
                 "referral_code": f"DINA-{random.randint(1000,9999)}", "tier": "Bronze",
+                "access_code": gen_access_code(),
                 "password_hash": hash_pw(body.password), "status": "active"})
     await db.customers.insert_one(doc)
     doc.pop("password_hash", None); doc.pop("_id", None)
@@ -210,6 +233,45 @@ async def cust_login(body: CustomerLoginIn):
         raise HTTPException(401, "Identifiants incorrects")
     c.pop("password_hash", None); c.pop("_id", None)
     return clean(c)
+
+def _norm_phone(p: str) -> str:
+    return "".join(ch for ch in (p or "") if ch.isdigit())
+
+@api.post("/public/customer-login-code")
+async def cust_login_code(body: CustomerLoginCodeIn, response: Response):
+    """Phone + 6-digit secret access code login — no SMS OTP, no password."""
+    digits = _norm_phone(body.phone)
+    if not digits: raise HTTPException(400, "Numéro invalide")
+    # Match on phone (loose: last 8 digits)
+    tail = digits[-8:]
+    c = None
+    async for row in db.customers.find({"status": {"$ne": "blacklist"}}):
+        if _norm_phone(row.get("phone",""))[-8:] == tail:
+            c = row; break
+    if not c:
+        raise HTTPException(404, "Aucun compte trouvé avec ce numéro")
+    if (c.get("access_code") or "").strip() != body.code.strip():
+        raise HTTPException(401, "Code secret invalide")
+    token = make_customer_token(c["id"])
+    response.set_cookie("customer_token", token, httponly=True, secure=True, samesite="none", max_age=60*60*24*30, path="/")
+    for k in ("_id","password_hash"): c.pop(k, None)
+    return {"customer": clean(c), "token": token}
+
+@api.post("/public/customer-logout")
+async def cust_logout(response: Response):
+    response.delete_cookie("customer_token", path="/")
+    return {"ok": True}
+
+@api.get("/public/account/me")
+async def account_me(c: dict = Depends(get_customer)):
+    orders = await db.orders.find({"customer.id": c["id"]}).sort("created_at", -1).to_list(100)
+    total_spent = sum(o.get("total", 0) for o in orders)
+    referrals = await db.referrals.count_documents({"parrain_id": c["id"]})
+    return {
+        "customer": clean(c),
+        "orders": clean(orders),
+        "metrics": {"total_orders": len(orders), "total_spent": total_spent, "referrals": referrals},
+    }
 
 # ---------- Stores / Users ----------
 @api.get("/stores")
@@ -303,6 +365,7 @@ async def create_customer(body: CustomerIn, user: dict = Depends(get_user)):
     doc = body.model_dump(exclude={"password"})
     doc.update({"id": new_id(), "created_at": now_iso(), "wallet": 0, "loyalty_points": 0,
                 "referral_code": f"DINA-{random.randint(1000,9999)}", "tier": "Bronze",
+                "access_code": gen_access_code(),
                 "status": body.status or "active"})
     if body.password: doc["password_hash"] = hash_pw(body.password)
     await db.customers.insert_one(doc)
@@ -343,6 +406,7 @@ async def bulk_customers(body: List[CustomerIn], user: dict = Depends(require_ro
     for b in body:
         docs.append({**b.model_dump(exclude={"password"}), "id": new_id(), "created_at": now_iso(),
                      "wallet": 0, "loyalty_points": 0, "tier": "Bronze", "status": "active",
+                     "access_code": gen_access_code(),
                      "referral_code": f"DINA-{random.randint(1000,9999)}"})
     if docs: await db.customers.insert_many(docs)
     return {"inserted": len(docs)}
@@ -1468,10 +1532,61 @@ async def notifications(user: dict = Depends(get_user)):
 
 
 # ---------- Site CMS ----------
+DEFAULT_SECTIONS = [
+    {"id": "s_hero", "type": "hero", "enabled": True, "props": {
+        "tagline": "Collection Harmattan 2026",
+        "title": "Vos talons,",
+        "highlight": "votre allure.",
+        "subtitle": "Chaussures, robes, sacs et accessoires pour la femme ivoirienne. Livraison partout en Côte d'Ivoire.",
+        "cta_label": "Découvrir la collection",
+        "cta_link": "/boutique/catalog",
+        "mosaic": [
+            "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800",
+            "https://images.unsplash.com/photo-1709809081557-78f803ce93a0?w=800",
+            "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800",
+            "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800",
+        ],
+    }},
+    {"id": "s_featured", "type": "product_grid", "enabled": True, "props": {
+        "title": "Les coups de cœur", "eyebrow": "Nouveautés", "limit": 8, "source": "featured",
+    }},
+    {"id": "s_trust", "type": "trust_strip", "enabled": True, "props": {
+        "items": [
+            {"icon": "truck", "title": "Livraison rapide", "text": "Partout à Abidjan en 24h."},
+            {"icon": "shield", "title": "Paiement à la livraison", "text": "Espèces ou Wave à la réception."},
+            {"icon": "whatsapp", "title": "Conseillère WhatsApp", "text": "0777 92 61 79 · 7j/7."},
+        ],
+    }},
+]
+
 @api.get("/public/site")
 async def public_site():
     s = await db.site_settings.find_one({"id":"main"})
-    return clean(s or {})
+    data = clean(s or {})
+    if "sections" not in data or not data["sections"]:
+        data["sections"] = DEFAULT_SECTIONS
+    return data
+
+@api.get("/public/storefront/sections")
+async def public_sections():
+    s = await db.site_settings.find_one({"id":"main"})
+    secs = (s or {}).get("sections") or DEFAULT_SECTIONS
+    # Only enabled sections
+    return [sec for sec in secs if sec.get("enabled", True)]
+
+@api.get("/storefront/sections")
+async def list_sections(user: dict = Depends(get_user)):
+    s = await db.site_settings.find_one({"id":"main"}) or {}
+    return s.get("sections") or DEFAULT_SECTIONS
+
+@api.patch("/storefront/sections")
+async def update_sections(body: StorefrontSectionsIn, user: dict = Depends(require_role("admin","manager"))):
+    await db.site_settings.update_one(
+        {"id":"main"},
+        {"$set":{"id":"main","sections": body.sections,"updated_at":now_iso()}},
+        upsert=True,
+    )
+    return {"ok": True, "sections": body.sections}
 
 @api.patch("/site")
 async def update_site(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
@@ -1765,6 +1880,7 @@ async def seed_if_empty():
                           "wallet": random.choice([0,0,0,2500,5000,10000]), "loyalty_points": random.randint(0,1500),
                           "tier": random.choice(["Bronze","Bronze","Bronze","Silver","Silver","Gold"]),
                           "referral_code": f"DINA-{1000+i}", "status":"active",
+                          "access_code": str(100000 + i),
                           "last_order_at": last_order,
                           "created_at": (datetime.now(timezone.utc) - timedelta(days=dayago)).isoformat()})
         await db.customers.insert_many(custs)

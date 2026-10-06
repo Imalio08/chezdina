@@ -92,7 +92,7 @@ export default function Customers() {
           <tbody>{filtered.slice(0,200).map(x=>(
             <tr key={x.id} onClick={()=>setSelected(x)} className="cursor-pointer" data-testid={`customer-row-${x.phone}`}>
               <td className="font-medium">{x.name}</td>
-              <td className="text-[#666]">{x.phone}</td>
+              <td className="font-mono text-xs">{x.phone}<div className="text-[10px] text-[#999]">Code: <span className="font-mono text-[#b02a2a]" data-testid={`cust-code-${x.phone}`}>{x.access_code || "—"}</span></div></td>
               <td className="text-[#666] text-xs">{x.email || "—"}</td>
               <td className="text-xs text-[#666]">P.{x.shoe_size} · T.{x.clothing_size}</td>
               <td><span className="dina-chip">{x.tier||"Bronze"}</span></td>
