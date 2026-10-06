@@ -1,0 +1,38 @@
+{
+  "summary": "Iteration 32 — Wave 1 bug fixes validation. Backend: 7/7 pytest green (/app/backend/tests/test_wave1_bugs.py) covering regen-access-code and no-regression on /customers, /products, /purchase-orders, /orders, /delivery-sessions. Frontend playwright testing: (1) Customers Régénérer code → PASS: confirm dialog accepted, modal 'access-code-modal' opens, 'access-code-value' shows 6-digit code (e.g. 373492), 'access-code-copy' and 'access-code-wa' present, wa.me href contains the exact 6-digit code in the message. (2) /scan?sku=<valid> → PASS: ScanRedirect renders and redirects admin to /console/produits?highlight=<id>; /scan?sku=INVALID shows 'Produit introuvable'. (3) DeliveryDays → Fiches tab → PASS: 'dd-print-routesheet' triggers download of feuille-route-<rider>-<date>.pdf (real jsPDF file, not screenshot); 'dd-print-fiches' navigates to /console/fiches-colis?ids=... with 5/5 checkboxes preselected. (4) PurchaseOrders → Étiquettes QR → FAIL: clicking the 'po-qr' button inside the PoDetail view sets labels state but the LabelsPrintModal never renders because the parent PurchaseOrders component does early-return <PoDetail/> at line 108 BEFORE the `{labels && <LabelsPrintModal/>}` block at line 179. The modal is unreachable from the detail view where the button lives.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "PurchaseOrders.jsx (LabelsPrintModal unreachable from PoDetail)",
+        "issue": "The 'Étiquettes QR' button only exists inside <PoDetail/>. Parent returns `if (detail) return <PoDetail .../>` at line 108, bypassing the main return where `{labels && <LabelsPrintModal/>}` is rendered (line 179). openQrLabels() sets labels state but the modal is never mounted while a PO detail is open — so no QR preview and no 'Imprimer dans une nouvelle fenêtre' button appear. Fix: render LabelsPrintModal inside PoDetail (or hoist labels state and always render the modal alongside both branches, e.g. use a fragment: `return (<>{detail ? <PoDetail .../> : <KanbanView/>}{labels && <LabelsPrintModal/>}</>)`).",
+        "selector": "[data-testid='po-qr']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ConsoleLayout (regression)", "issues": ["Hydration warning '<span> cannot be a child of <option>' still present (dev-mode)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_wave1_bugs.py",
+    "/app/test_reports/pytest/iter32.xml"
+  ],
+  "action_items": [
+    "FIX PurchaseOrders.jsx: ensure <LabelsPrintModal/> is rendered when `labels` state is set, even while <PoDetail/> is active. Simplest patch: wrap the two branches in a Fragment and keep the modal outside the ternary, e.g. `return (<>{detail ? <PoDetail .../> : <main list/>}{labels && <LabelsPrintModal labels={labels} onClose={()=>setLabels(null)}/>}</>)`."
+  ],
+  "critical_code_review_comments": [
+    "PurchaseOrders.jsx line 108: early-return pattern pulls the component out of the main tree, so sibling modals declared below (lines 177-179) are unreachable from the detail view. Both BlindReceive and LabelsPrintModal are affected (Reset is only triggered from kanban/table list though, so only LabelsPrintModal is observably broken here — but BlindReceive would have the same issue if its launcher were in PoDetail).",
+    "buildScanUrl correctly composes `/scan?sku=&size=&color=&pid=` and URL-encodes params. Backend regen-access-code returns {ok, access_code, phone, name} as expected. ScanRedirect correctly resolves by pid then sku and distinguishes admin vs public destination.",
+    "DeliveryDays printRouteSheetPDF uses jsPDF to produce an actual PDF (verified via download capture of feuille-route-Kouamé-Serge-2026-10-06.pdf)."
+  ],
+  "updated_files": ["/app/backend/tests/test_wave1_bugs.py (new)"],
+  "success_rate": {"backend": "100%", "frontend": "75%"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! used.",
+  "seed_data_creation": "None; regen-access-code mutated 2 random customers' access_code (and marked access_code_must_change=true). Non-destructive.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression tests in /app/backend/tests/test_wave1_bugs.py (pytest, 7 tests, ~1.5s). Only remaining Wave 1 blocker is PurchaseOrders LabelsPrintModal not rendering when detail view is active — after main agent patches the render tree, re-run playwright: open /console/approvisionnements → click PO BC-2026-213 (recu, qty_counted=8) → click [data-testid='po-qr'] → expect `.qr-sheet img` nodes and [data-testid='qr-print'] button; the first QR src should contain `data=` with URL-encoded `/scan?sku=DN-10000...`. Note: GuidedTour overlay auto-shows on first login per user — dismiss via [data-testid='tour-close'] before interactive tests.",
+  "rca of the issue": "PurchaseOrders.jsx line 108 does `if (detail) return <PoDetail .../>` which short-circuits the main return (lines 110-181). The `{labels && <LabelsPrintModal/>}` conditional lives inside the main return at line 179, so when the user is inside the detail view and clicks Étiquettes QR, `setLabels(labs)` fires on the parent but the parent only renders <PoDetail/>, never the modal. State is set, modal never mounts. Mitigation: hoist the modal above the branching, e.g. return a Fragment that always renders `{labels && <LabelsPrintModal .../>}` regardless of whether <PoDetail/> or the list is shown."
+}
