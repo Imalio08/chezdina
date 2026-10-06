@@ -2203,8 +2203,6 @@ async def products_bulk_promo(body: Dict[str,Any], user: dict = Depends(require_
             await db.products.update_one({"id": pid}, {"$set": {"price_old": p.get("price"), "price": new_price, "promo_pct": pct, "updated_at": now_iso()}})
     return {"ok": True, "count": len(ids)}
 
-@api.get("/products/{pid}/history")
-
 # ---------- Favorites (per customer) ----------
 @api.get("/public/account/favorites")
 async def account_favorites(c: dict = Depends(get_customer)):
@@ -2256,6 +2254,10 @@ async def _notify_waitlist(product_id: str, size: Optional[str] = None):
         await db.waitlist.update_one({"id": w["id"]}, {"$set": {"notified_at": now_iso(), "notified_by": "auto-restock"}})
     return len(rows)
 
+async def _notify_waitlist_restock_dummy():
+    pass  # placeholder removed
+
+@api.get("/products/{pid}/history")
 async def product_history(pid: str, user: dict = Depends(get_user)):
     """Return a product's sales timeline + stock movements + waitlist entries."""
     orders = await db.orders.find({"items.product_id": pid, "status":{"$ne":"annulee"}}).sort("created_at",-1).to_list(500)

@@ -1,0 +1,39 @@
+{
+  "summary": "Phase C backend testing — 17/17 tests passed after fixing one critical regression. Favorites (toggle/list/merge) all work, auto-waitlist flips product status to liste_attente on stock=0, GET /customers/{cid} returns {customer, orders, metrics} as expected (route shadowing fix verified), and Phase A/B smoke tests pass. Found and fixed a critical regression: @api.get('/products/{pid}/history') decorator at server.py L2206 was orphaned (no function below it) causing (a) /products/{pid}/history to be bound to account_favorites and (b) product_history to be an unreachable function.",
+  "backend_issues": {
+    "critical": [
+      {
+        "endpoint": "GET /api/products/{pid}/history",
+        "issue": "Orphaned @api.get decorator at server.py L2206 — the Favorites section was inserted BETWEEN the decorator and the product_history function body. Result: /products/{pid}/history was shadowed by account_favorites (which has no pid param) and product_history became unreachable. Fixed by moving the decorator back directly above product_history. Regression test added (test_product_history_route_regression).",
+        "priority": "HIGH"
+      }
+    ],
+    "minor": []
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_phase_c.py",
+    "/app/test_reports/pytest/phase_c_results.xml"
+  ],
+  "action_items": [
+    "Review the fix I applied around server.py L2206-2270 (decorator relocation). The product_history function now has its decorator; it was previously orphaned.",
+    "Still open from iteration_11: extend ProductIn Pydantic schema with the 14 Phase B fields so POST /api/products persists them."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now ~2886 lines — continues to exceed the 700-line guideline. Split into routers (products, customers, orders, pos, cms, public_account).",
+    "The orphaned-decorator bug is a strong signal that inserting new endpoint groups mid-file is risky. Prefer appending new endpoint sections at the end of the file or in dedicated router modules.",
+    "Auto-waitlist logic in create_order runs a fresh find_one per item inside the loop — fine for small carts but N+1 pattern; consider batching if cart sizes grow.",
+    "/public/account/favorites/toggle does not validate that product_id refers to a real product — favorites can point at deleted/non-existent products. Minor but worth validating."
+  ],
+  "updated_files": [
+    "/app/backend/server.py (fixed orphaned @api.get decorator for /products/{pid}/history)",
+    "/app/backend/tests/test_phase_c.py (new)"
+  ],
+  "success_rate": {"backend": "100% (17/17 after fix)", "frontend": "not tested (per request)"},
+  "test_credentials": "admin aouattaraesca@gmail.com / Admin123! OK; cliente +225 07 60 17 28 21 / 142085 OK",
+  "seed_data_creation": "Test creates and deletes one TEST_AutoWaitlist_PhaseC product; toggles favorites on the demo cliente account (not cleaned — favorites list may contain the test product id for the demo customer).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Phase C fully green. Reusable test file: /app/backend/tests/test_phase_c.py. Known pre-existing issue from iteration_11: ProductIn schema missing Phase B fields on POST (not retested here). Server was restarted once during this iteration after fixing the decorator.",
+  "rca of the issue": "Reproduction: before fix, GET /api/products/{any_id}/history would call account_favorites (which Depends(get_customer)), so with admin bearer it would 401; the actual product_history logic was dead code. Root cause: when the Favorites block was inserted (lines 2208-2235), the pre-existing `@api.get('/products/{pid}/history')` decorator at the top of what became the Favorites section was separated from its target function `product_history` (which still lived at L2259 but lost its decorator). Fix applied: moved the decorator back directly above `async def product_history(...)` and removed the dangling line. Verified green via test_product_history_route_regression."
+}
