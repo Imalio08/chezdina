@@ -167,6 +167,31 @@ class CustomerLoginCodeIn(BaseModel):
     code: str
 class StorefrontSectionsIn(BaseModel):
     sections: List[Dict[str, Any]]  # ordered list: {id, type, enabled, props}
+class CmsPageIn(BaseModel):
+    slug: str  # about | delivery | terms | faq | custom-xxx
+    title: str
+    content: str = ""
+    enabled: bool = True
+    seo_title: Optional[str] = None
+    seo_description: Optional[str] = None
+class SimpleNameIn(BaseModel):
+    name: str
+    note: Optional[str] = None
+class CashSessionOpenIn(BaseModel):
+    opening_cash: float = 0
+    note: Optional[str] = None
+class CashSessionCloseIn(BaseModel):
+    closing_cash: float
+    pin: str  # manager PIN required
+    note: Optional[str] = None
+class IntegrationsIn(BaseModel):
+    whatsapp_auto: Optional[bool] = True
+    whatsapp_meta_token: Optional[str] = None
+    whatsapp_meta_phone_id: Optional[str] = None
+    meta_pixel_id: Optional[str] = None
+    tiktok_pixel_id: Optional[str] = None
+    wifi_printer_ip: Optional[str] = None
+    wifi_printer_port: Optional[int] = 9100
 
 # ---------- Auth ----------
 @api.post("/auth/login")
@@ -472,7 +497,7 @@ def _wa_message_for_status(order: dict, status: str) -> Optional[str]:
     zone = order.get("delivery_zone") or ""
     rider = order.get("rider_name") or ""
     is_cod = order.get("payment_method") == "cod"
-    base = f"Bonjour {first} 👋 Chez Dina Boutique."
+    base = f"Bonjour {first} 👋 Chez Dina."
     if status == "confirmee":
         return f"{base}\nVotre commande {code} ({total} FCFA) est confirmée. Nous préparons tout avec soin. Merci 💕"
     if status == "prete":
@@ -1592,6 +1617,215 @@ async def update_sections(body: StorefrontSectionsIn, user: dict = Depends(requi
 async def update_site(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
     body.pop("_id",None)
     await db.site_settings.update_one({"id":"main"}, {"$set":{**body,"id":"main","updated_at":now_iso()}}, upsert=True)
+    return {"ok": True}
+
+# ---------- CMS Pages (About / Delivery / Terms / FAQ / custom) ----------
+DEFAULT_PAGES = [
+    {"slug":"about","title":"À propos","content":"Chez Dina est une boutique de mode féminine à Cocody Angré 7e. Nous sélectionnons des pièces tendance pour la femme ivoirienne.","enabled":True},
+    {"slug":"delivery","title":"Livraison & retours","content":"Livraison 24h à Abidjan. Retour sous 48h sur articles non portés.","enabled":True},
+    {"slug":"terms","title":"CGV","content":"Conditions générales de vente — Chez Dina.","enabled":True},
+    {"slug":"faq","title":"FAQ","content":"Comment commander ? Via le site ou WhatsApp 0777 92 61 79.","enabled":True},
+]
+
+@api.get("/public/pages")
+async def public_pages():
+    rows = await db.cms_pages.find({"enabled": True}).to_list(50)
+    if not rows:
+        return DEFAULT_PAGES
+    return clean(rows)
+
+@api.get("/public/pages/{slug}")
+async def public_page(slug: str):
+    p = await db.cms_pages.find_one({"slug": slug})
+    if not p:
+        p = next((x for x in DEFAULT_PAGES if x["slug"] == slug), None)
+        if not p: raise HTTPException(404)
+    return clean(p)
+
+@api.get("/pages")
+async def list_pages(user: dict = Depends(get_user)):
+    rows = await db.cms_pages.find({}).to_list(100)
+    if not rows:
+        for p in DEFAULT_PAGES:
+            await db.cms_pages.insert_one({**p, "id": new_id(), "created_at": now_iso()})
+        rows = await db.cms_pages.find({}).to_list(100)
+    return clean(rows)
+
+@api.post("/pages")
+async def create_page(body: CmsPageIn, user: dict = Depends(require_role("admin","manager"))):
+    doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso()})
+    await db.cms_pages.insert_one(doc)
+    return clean(doc)
+
+@api.patch("/pages/{slug}")
+async def update_page(slug: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("_id", None); body.pop("id", None)
+    body["updated_at"] = now_iso()
+    await db.cms_pages.update_one({"slug": slug}, {"$set": body}, upsert=True)
+    return {"ok": True}
+
+@api.delete("/pages/{slug}")
+async def delete_page(slug: str, user: dict = Depends(require_role("admin"))):
+    await db.cms_pages.delete_one({"slug": slug})
+    return {"ok": True}
+
+# ---------- Brands & Categories ----------
+@api.get("/brands")
+async def list_brands(user: dict = Depends(get_user)):
+    # Derive from distinct product.brand + stored overrides
+    distinct = await db.products.distinct("brand")
+    stored = {b["name"]: b for b in await db.brands.find({}).to_list(200)}
+    out = []
+    for name in sorted(set(distinct) | set(stored.keys())):
+        cnt = await db.products.count_documents({"brand": name})
+        s = stored.get(name, {})
+        out.append({"id": s.get("id") or new_id(), "name": name, "product_count": cnt, "note": s.get("note","")})
+    return out
+
+@api.post("/brands")
+async def create_brand(body: SimpleNameIn, user: dict = Depends(require_role("admin","manager"))):
+    doc = {"id": new_id(), "name": body.name, "note": body.note or "", "created_at": now_iso()}
+    await db.brands.insert_one(doc)
+    return clean(doc)
+
+@api.delete("/brands/{bid}")
+async def delete_brand(bid: str, user: dict = Depends(require_role("admin","manager"))):
+    await db.brands.delete_one({"id": bid})
+    return {"ok": True}
+
+@api.get("/categories")
+async def list_categories(user: dict = Depends(get_user)):
+    distinct = await db.products.distinct("category")
+    stored = {c["name"]: c for c in await db.categories.find({}).to_list(200)}
+    out = []
+    for name in sorted(set(distinct) | set(stored.keys())):
+        cnt = await db.products.count_documents({"category": name})
+        s = stored.get(name, {})
+        out.append({"id": s.get("id") or new_id(), "name": name, "product_count": cnt, "note": s.get("note","")})
+    return out
+
+@api.post("/categories")
+async def create_category(body: SimpleNameIn, user: dict = Depends(require_role("admin","manager"))):
+    doc = {"id": new_id(), "name": body.name, "note": body.note or "", "created_at": now_iso()}
+    await db.categories.insert_one(doc)
+    return clean(doc)
+
+@api.delete("/categories/{cid}")
+async def delete_category(cid: str, user: dict = Depends(require_role("admin","manager"))):
+    await db.categories.delete_one({"id": cid})
+    return {"ok": True}
+
+# ---------- Cash sessions (open/close) ----------
+@api.get("/cash-sessions")
+async def list_cash_sessions(user: dict = Depends(get_user)):
+    rows = await db.cash_sessions.find({}).sort("opened_at", -1).to_list(50)
+    return clean(rows)
+
+@api.post("/cash-sessions/open")
+async def open_cash_session(body: CashSessionOpenIn, user: dict = Depends(get_user)):
+    exists = await db.cash_sessions.find_one({"closed": False})
+    if exists: raise HTTPException(400, "Une session de caisse est déjà ouverte")
+    doc = {"id": new_id(), "opened_at": now_iso(), "opened_by": user.get("name"),
+           "opening_cash": float(body.opening_cash), "closed": False, "note": body.note or ""}
+    await db.cash_sessions.insert_one(doc)
+    return clean(doc)
+
+@api.post("/cash-sessions/{sid}/close")
+async def close_cash_session(sid: str, body: CashSessionCloseIn, user: dict = Depends(get_user)):
+    approver = await db.users.find_one({"attendance_code": body.pin.strip(), "role": {"$in": ["admin","manager"]}, "active": True})
+    if not approver: raise HTTPException(403, "PIN gérante invalide")
+    s = await db.cash_sessions.find_one({"id": sid})
+    if not s: raise HTTPException(404)
+    # Compute cash in/out during session
+    start = s["opened_at"]
+    movements = await db.cash_movements.find({"created_at": {"$gte": start}}).to_list(500)
+    ins = sum(m["amount"] for m in movements if m["type"] == "in")
+    outs = sum(m["amount"] for m in movements if m["type"] == "out")
+    cash_sales = sum(o.get("total",0) for o in await db.orders.find({
+        "created_at": {"$gte": start},
+        "payment_method": "cash",
+        "status": {"$ne": "annulee"},
+    }).to_list(2000))
+    expected = s["opening_cash"] + cash_sales + ins - outs
+    ecart = body.closing_cash - expected
+    upd = {"closed": True, "closed_at": now_iso(), "closed_by": user.get("name"),
+           "approved_by": approver.get("name"),
+           "closing_cash": body.closing_cash, "cash_sales": cash_sales,
+           "ins": ins, "outs": outs, "expected": expected, "ecart": ecart,
+           "close_note": body.note or ""}
+    await db.cash_sessions.update_one({"id": sid}, {"$set": upd})
+    return {"ok": True, "summary": upd}
+
+# ---------- Encaissements (par mode de paiement) ----------
+@api.get("/encaissements")
+async def encaissements(user: dict = Depends(get_user), days: int = 7):
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    rows = await db.orders.find({"created_at": {"$gte": cutoff}, "status": {"$ne": "annulee"}}).to_list(3000)
+    by_method: Dict[str, Dict[str, Any]] = {}
+    daily: Dict[str, float] = {}
+    for o in rows:
+        m = o.get("payment_method", "cash")
+        total = o.get("total", 0)
+        by_method.setdefault(m, {"method": m, "count": 0, "total": 0})
+        by_method[m]["count"] += 1; by_method[m]["total"] += total
+        day = o.get("created_at", "")[:10]
+        daily[day] = daily.get(day, 0) + total
+    return {
+        "by_method": list(by_method.values()),
+        "daily": [{"date": d, "total": v} for d, v in sorted(daily.items())],
+        "total": sum(x["total"] for x in by_method.values()),
+        "count": sum(x["count"] for x in by_method.values()),
+    }
+
+# ---------- Compte de résultat ----------
+@api.get("/profit-loss")
+async def profit_loss(user: dict = Depends(get_user), days: int = 30):
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status": {"$ne": "annulee"}}).to_list(5000)
+    expenses = await db.expenses.find({"created_at": {"$gte": cutoff}}).to_list(1000)
+    revenue = sum(o.get("total", 0) for o in orders)
+    cogs = 0
+    for o in orders:
+        for it in o.get("items", []):
+            p = await db.products.find_one({"id": it.get("product_id")})
+            if p: cogs += it.get("qty", 0) * (p.get("cost", 0) or 0)
+    gross_margin = revenue - cogs
+    by_cat: Dict[str, float] = {}
+    for e in expenses:
+        c = e.get("category", "Autre")
+        by_cat[c] = by_cat.get(c, 0) + e.get("amount", 0)
+    total_expenses = sum(by_cat.values())
+    net = gross_margin - total_expenses
+    return {
+        "period_days": days,
+        "revenue": revenue, "cogs": cogs, "gross_margin": gross_margin,
+        "gross_margin_pct": round(gross_margin / revenue * 100, 1) if revenue else 0,
+        "expenses_total": total_expenses, "expenses_by_cat": [{"category": k, "amount": v} for k, v in sorted(by_cat.items(), key=lambda x: -x[1])],
+        "net": net,
+        "net_margin_pct": round(net / revenue * 100, 1) if revenue else 0,
+    }
+
+# ---------- Integrations (settings) ----------
+@api.get("/integrations")
+async def get_integrations(user: dict = Depends(get_user)):
+    s = await db.site_settings.find_one({"id": "main"}) or {}
+    integ = s.get("integrations") or {}
+    # Mask secrets in response
+    out = dict(integ)
+    if out.get("whatsapp_meta_token"):
+        out["whatsapp_meta_token"] = "****" + out["whatsapp_meta_token"][-4:]
+    return out
+
+@api.patch("/integrations")
+async def update_integrations(body: IntegrationsIn, user: dict = Depends(require_role("admin","manager"))):
+    data = {k: v for k, v in body.model_dump().items() if v is not None}
+    await db.site_settings.update_one(
+        {"id": "main"},
+        {"$set": {"id": "main", "integrations": data, "updated_at": now_iso()}},
+        upsert=True,
+    )
     return {"ok": True}
 
 # ---------- Business settings ----------

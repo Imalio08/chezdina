@@ -33,6 +33,18 @@ import Referrals from "@/pages/console/Referrals";
 import RolesPermissions from "@/pages/console/RolesPermissions";
 import Kiosk from "@/pages/console/Kiosk";
 import SectionBuilder from "@/pages/console/SectionBuilder";
+import CmsPages from "@/pages/console/CmsPages";
+import CashSessions from "@/pages/console/CashSessions";
+import Encaissements from "@/pages/console/Encaissements";
+import ProfitLoss from "@/pages/console/ProfitLoss";
+import BrandsCategories from "@/pages/console/BrandsCategories";
+import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
+import CmsPages from "@/pages/console/CmsPages";
+import CashSessions from "@/pages/console/CashSessions";
+import Encaissements from "@/pages/console/Encaissements";
+import ProfitLoss from "@/pages/console/ProfitLoss";
+import BrandsCategories from "@/pages/console/BrandsCategories";
+import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
@@ -94,26 +106,27 @@ export default function App() {
               <Route path="parametres" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
               {/* Placeholder routes for upcoming modules (keep sidebar functional) */}
               <Route path="factures" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="sessions-caisse" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="journees-livraison" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="livreurs" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="zones" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="marques" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="categories" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="liste-attente" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="fournisseurs" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="paniers-abandonnes" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="sessions-caisse" element={<ErrorBoundary><CashSessions/></ErrorBoundary>} />
+              <Route path="journees-livraison" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
+              <Route path="livreurs" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
+              <Route path="zones" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
+              <Route path="marques" element={<ErrorBoundary><BrandsCategories/></ErrorBoundary>} />
+              <Route path="categories" element={<ErrorBoundary><BrandsCategories/></ErrorBoundary>} />
+              <Route path="liste-attente" element={<ErrorBoundary><AlertsAndCarts/></ErrorBoundary>} />
+              <Route path="fournisseurs" element={<ErrorBoundary><Purchases/></ErrorBoundary>} />
+              <Route path="paniers-abandonnes" element={<ErrorBoundary><AlertsAndCarts/></ErrorBoundary>} />
               <Route path="parrainage" element={<ErrorBoundary><Referrals/></ErrorBoundary>} />
               <Route path="campagnes-whatsapp" element={<ErrorBoundary><WhatsAppCampaigns/></ErrorBoundary>} />
-              <Route path="encaissements" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="resultat" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="encaissements" element={<ErrorBoundary><Encaissements/></ErrorBoundary>} />
+              <Route path="resultat" element={<ErrorBoundary><ProfitLoss/></ErrorBoundary>} />
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
               <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
               <Route path="apparence" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
-              <Route path="pages" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="menus" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
-              <Route path="seo" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="pages" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
+              <Route path="menus" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
+              <Route path="seo" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
+              <Route path="checklist" element={<ErrorBoundary><AcceptanceChecklist/></ErrorBoundary>} />
               <Route path="fiches-colis" element={<ErrorBoundary><FichesColis/></ErrorBoundary>} />
             </Route>
             <Route path="/noter/:code" element={<ErrorBoundary><Rate/></ErrorBoundary>} />

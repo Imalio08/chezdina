@@ -47,7 +47,7 @@ export default function Login() {
         <div className="relative z-10 flex flex-col justify-between p-10 w-full">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div>
-            <div><div className="font-serif text-2xl tracking-tight">Chez Dina</div><div className="text-[10px] uppercase tracking-widest text-[#f0b8b8]">boutique · Abidjan</div></div>
+            <div><div className="font-serif text-2xl tracking-tight">Chez Dina</div><div className="text-[10px] uppercase tracking-widest text-[#f0b8b8]">Abidjan</div></div>
           </div>
           <div>
             <div className="inline-block px-3 py-1 rounded-full bg-[#b02a2a] text-xs font-semibold uppercase tracking-wider mb-5">Console admin</div>
@@ -68,7 +68,7 @@ export default function Login() {
         <form onSubmit={submit} className="w-full max-w-sm bg-white rounded-2xl border border-[#ececec] p-8 shadow-sm" data-testid="login-form">
           <div className="lg:hidden flex items-center gap-2 mb-6">
             <div className="w-10 h-10 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>
-            <div><div className="font-serif text-xl text-[#b02a2a]">Chez Dina</div><div className="text-[10px] uppercase tracking-widest text-[#666]">boutique</div></div>
+            <div><div className="font-serif text-xl text-[#b02a2a]">Chez Dina</div><div className="text-[10px] uppercase tracking-widest text-[#666]">Abidjan</div></div>
           </div>
           <h1 className="font-serif text-3xl mb-1">Connexion</h1>
           <p className="text-sm text-[#666] mb-6">Accédez à votre espace de gestion.</p>
@@ -88,8 +88,7 @@ export default function Login() {
           ) : (
             <>
               <label className="text-xs font-medium text-[#666] uppercase tracking-wide">Code PIN</label>
-              <input inputMode="numeric" className="dina-input mt-1 mb-3 text-center text-2xl tracking-[0.5em] font-serif" maxLength={6} value={pin} onChange={(e)=>setPin(e.target.value.replace(/\D/g,""))} data-testid="login-pin" />
-              <div className="bg-[#fff5f5] border border-[#fde8e8] rounded-lg p-3 mb-5 text-xs text-[#666]">PIN démo : 1234 (admin) · 2222 (manager) · 3333 (vendeuse) · 4444 (stock) · 5555 (livreur)</div>
+              <input inputMode="numeric" className="dina-input mt-1 mb-5 text-center text-2xl tracking-[0.5em] font-serif" maxLength={6} value={pin} onChange={(e)=>setPin(e.target.value.replace(/\D/g,""))} data-testid="login-pin" />
             </>
           )}
 

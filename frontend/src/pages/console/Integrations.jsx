@@ -1,49 +1,51 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { MessageCircle, Smartphone, Printer, Instagram, Facebook, MapPin, Mail, Check } from "lucide-react";
-
-const INTS = [
-  { key:"whatsapp", icon: MessageCircle, name:"WhatsApp Business", desc:"Confirmations, suivi, campagnes", field:"phone", placeholder:"Numéro WhatsApp (ex: 2250777926179)" },
-  { key:"wave", icon: Smartphone, name:"Wave Business", desc:"Lien de paiement envoyé par WhatsApp", field:"link", placeholder:"Votre lien Wave (https://pay.wave.com/...)" },
-  { key:"printer", icon: Printer, name:"Imprimante thermique Wi-Fi", desc:"Reçus, bons, étiquettes", field:"ip", placeholder:"Adresse IP (ex: 192.168.1.100)" },
-  { key:"instagram", icon: Instagram, name:"Instagram", desc:"Catalogue + inbox", field:"handle", placeholder:"@votre_compte" },
-  { key:"facebook", icon: Facebook, name:"Facebook Shops", desc:"Catalogue produit", field:"page", placeholder:"https://facebook.com/votre_page" },
-  { key:"tiktok", icon: MessageCircle, name:"TikTok", desc:"Pixel + catalogue", field:"handle", placeholder:"@dinoush04" },
-  { key:"maps", icon: MapPin, name:"Google Maps", desc:"Zones et suivi livreurs", field:"api_key", placeholder:"API key (optionnel)" },
-  { key:"email", icon: Mail, name:"Email", desc:"Factures et rapports par email", field:"from", placeholder:"from@dinaboutique.ci" },
-];
+import { Save, Zap, Image as ImageIcon, Printer } from "lucide-react";
 
 export default function Integrations() {
-  const [state, setState] = useState({});
-  useEffect(() => { const s = JSON.parse(localStorage.getItem("dina_integrations")||"{}"); setState(s); }, []);
-  const save = (key, value) => {
-    const next = {...state, [key]: {...state[key], value, connected: !!value}};
-    setState(next); localStorage.setItem("dina_integrations", JSON.stringify(next));
-    toast.success(value ? `${INTS.find(i=>i.key===key).name} connecté` : "Déconnecté");
+  const [f, setF] = useState({});
+  const [saving, setSaving] = useState(false);
+  useEffect(() => { api.get("/integrations").then(r => setF(r.data || {})).catch(() => { }); }, []);
+  const save = async () => {
+    setSaving(true);
+    try {
+      const payload = { ...f };
+      if (f.whatsapp_meta_token?.startsWith("****")) delete payload.whatsapp_meta_token;
+      await api.patch("/integrations", payload);
+      toast.success("Intégrations enregistrées");
+    } catch { toast.error("Erreur"); } finally { setSaving(false); }
   };
-
+  const S = ({ icon: Icon, title, children }) => (
+    <div className="dina-card-white p-5">
+      <div className="font-semibold mb-3 flex items-center gap-2"><Icon size={16} className="text-[#b02a2a]" />{title}</div>
+      {children}
+    </div>
+  );
+  const Field = ({ label, children }) => <div className="mb-3"><label className="text-xs uppercase font-semibold text-[#999]">{label}</label>{children}</div>;
   return (
     <div className="space-y-5">
-      <div><h1 className="font-serif text-3xl">Intégrations</h1><p className="text-sm text-[#666]">Mettez votre numéro ou lien — la connexion se fait automatiquement</p></div>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {INTS.map(i=>{
-          const val = state[i.key]?.value || "";
-          const connected = state[i.key]?.connected;
-          return (
-            <div key={i.key} className="dina-card-white p-5" data-testid={`integration-${i.key}`}>
-              <div className="flex items-start gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-[#fff5f5] text-[#b02a2a] grid place-items-center"><i.icon size={18}/></div>
-                <div className="flex-1"><div className="font-semibold">{i.name}</div><div className="text-xs text-[#666]">{i.desc}</div></div>
-                {connected && <span className="dina-chip" style={{color:"#1f8a4c"}}><Check size={10}/>Connecté</span>}
-              </div>
-              <div className="flex gap-2">
-                <input className="dina-input text-sm" placeholder={i.placeholder} defaultValue={val} onBlur={e=>save(i.key, e.target.value)} data-testid={`int-input-${i.key}`}/>
-              </div>
-            </div>
-          );
-        })}
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div><h1 className="font-serif text-3xl">Intégrations</h1><p className="text-sm text-[#666]">WhatsApp Meta, Pixels, imprimante Wi-Fi</p></div>
+        <button onClick={save} disabled={saving} className="dina-btn-primary !min-h-[40px]" data-testid="integ-save"><Save size={14} />{saving ? "…" : "Enregistrer"}</button>
+      </div>
+      <div className="grid lg:grid-cols-2 gap-4">
+        <S icon={Zap} title="WhatsApp Business">
+          <label className="flex items-center gap-2 text-sm mb-3"><input type="checkbox" checked={f.whatsapp_auto !== false} onChange={e => setF({ ...f, whatsapp_auto: e.target.checked })} className="accent-[#b02a2a]" data-testid="integ-wa-auto" />Messages automatiques sur changement de statut</label>
+          <Field label="Token Meta (Cloud API)"><input type="password" className="dina-input" placeholder="EAAG…" value={f.whatsapp_meta_token || ""} onChange={e => setF({ ...f, whatsapp_meta_token: e.target.value })} data-testid="integ-wa-token" /></Field>
+          <Field label="Phone number ID"><input className="dina-input" value={f.whatsapp_meta_phone_id || ""} onChange={e => setF({ ...f, whatsapp_meta_phone_id: e.target.value })} data-testid="integ-wa-phone" /></Field>
+          <div className="text-xs text-[#666]">Sans token : les messages sont enfilés dans Campagnes WhatsApp pour envoi manuel 1-clic. Avec token : envoi auto via Meta Cloud API.</div>
+        </S>
+        <S icon={ImageIcon} title="Pixels Marketing">
+          <Field label="Meta Pixel ID"><input className="dina-input" placeholder="123456789" value={f.meta_pixel_id || ""} onChange={e => setF({ ...f, meta_pixel_id: e.target.value })} data-testid="integ-meta-pixel" /></Field>
+          <Field label="TikTok Pixel ID"><input className="dina-input" placeholder="CXXXXXXX" value={f.tiktok_pixel_id || ""} onChange={e => setF({ ...f, tiktok_pixel_id: e.target.value })} data-testid="integ-tt-pixel" /></Field>
+          <div className="text-xs text-[#666]">Les pixels se chargent automatiquement sur la vitrine une fois enregistrés.</div>
+        </S>
+        <S icon={Printer} title="Imprimante Wi-Fi ESC/POS">
+          <Field label="Adresse IP"><input className="dina-input" placeholder="192.168.1.50" value={f.wifi_printer_ip || ""} onChange={e => setF({ ...f, wifi_printer_ip: e.target.value })} data-testid="integ-print-ip" /></Field>
+          <Field label="Port"><input type="number" className="dina-input" value={f.wifi_printer_port || 9100} onChange={e => setF({ ...f, wifi_printer_port: +e.target.value })} /></Field>
+          <div className="text-xs text-[#666]">Imprimante thermique 80mm compatible ESC/POS sur le réseau local.</div>
+        </S>
       </div>
     </div>
   );
