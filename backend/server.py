@@ -207,6 +207,10 @@ class LoyaltySettingsIn(BaseModel):
     referral_bonus_parrain: int = 1000  # wallet credit for the referrer
     referral_bonus_filleul: int = 500   # wallet credit for the referee
     enabled: bool = True
+    # Code format: prefix + random part length (default DINA-XXXX)
+    referral_code_prefix: str = "DINA"
+    referral_code_length: int = 4
+    referral_validity_days: int = 90  # how long the referral reward stays valid
 class ReferralApplyIn(BaseModel):
     code: str          # parrain's referral_code
     customer_id: str   # filleul (new customer)
@@ -5577,6 +5581,9 @@ async def reseed(force: bool = False, user: dict = Depends(require_role("admin")
 async def root(): return {"name":"Chez Dina API","v":"2.0"}
 
 app.include_router(api)
+# P5 Refactor scaffold — modular routers go here as domains get extracted from server.py.
+from routers.meta import router as meta_router
+app.include_router(meta_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")

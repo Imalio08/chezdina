@@ -17,6 +17,9 @@ export default function RiderShell() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const [theme, setTheme] = useState(() => localStorage.getItem("rider_theme") || "light");
+  const [site, setSite] = useState({});
+  useEffect(() => { api.get("/public/site").then(r => setSite(r.data || {})).catch(() => {}); }, []);
+  const logo = site.logo;
   const [checkedIn, setCheckedIn] = useState(null); // null = loading, true/false
   useEffect(() => {
     const root = document.documentElement;
@@ -46,11 +49,10 @@ export default function RiderShell() {
     <div className="min-h-screen bg-[#fff5f5] dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-white pb-20 font-sora">
       <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur border-b border-[#ececec] dark:border-[#2a2a2a] px-4 py-2.5 flex items-center justify-between" data-testid="rider-topbar">
         <div className="flex items-center gap-2">
-          {user?.photo ? <img src={user.photo} alt="" className="w-9 h-9 rounded-full object-cover" /> :
-            <div className="w-9 h-9 rounded-full bg-[#fde8e8] text-[#b02a2a] grid place-items-center text-sm font-bold">{user?.name?.[0] || "L"}</div>}
+          {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-lg object-cover bg-white"/> : (user?.photo ? <img src={user.photo} alt="" className="w-9 h-9 rounded-full object-cover" /> : <div className="w-9 h-9 rounded-full bg-[#fde8e8] text-[#b02a2a] grid place-items-center text-sm font-bold">{user?.name?.[0] || "L"}</div>)}
           <div>
             <div className="font-serif text-sm leading-none">Bonjour {user?.name?.split(" ")[0] || "Livreur"}</div>
-            <div className="text-[10px] text-[#999]">Chez Dina · Livreur · ● Pointé</div>
+            <div className="text-[10px] text-[#999]">{site.name || "Chez Dina"} · Livreur · ● Pointé</div>
           </div>
         </div>
         <button onClick={() => { logout(); nav("/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout"><LogOut size={11} />Sortir</button>

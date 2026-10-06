@@ -77,6 +77,24 @@ export default function Loyalty() {
                 <input type="number" className="dina-input tabular text-right" value={s.referral_bonus_filleul} onChange={e => update({ referral_bonus_filleul: +e.target.value })} data-testid="loyalty-bonus-filleul" />
               </div>
             </div>
+            <div className="pt-3 mt-3 border-t border-[#ececec] dark:border-[#2a2a2a]">
+              <div className="text-xs uppercase font-semibold text-[#666] mb-2">Code de parrainage</div>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="text-[10px] uppercase text-[#999]">Préfixe</label>
+                  <input className="dina-input !py-1.5 text-sm font-mono" value={s.referral_code_prefix || "DINA"} onChange={e => update({ referral_code_prefix: e.target.value.toUpperCase().slice(0, 8) })} data-testid="loyalty-code-prefix" placeholder="DINA"/>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase text-[#999]">Longueur</label>
+                  <input type="number" min="3" max="8" className="dina-input !py-1.5 text-sm tabular text-right" value={s.referral_code_length || 4} onChange={e => update({ referral_code_length: Math.max(3, Math.min(8, +e.target.value || 4)) })} data-testid="loyalty-code-length"/>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase text-[#999]">Validité (jours)</label>
+                  <input type="number" min="1" className="dina-input !py-1.5 text-sm tabular text-right" value={s.referral_validity_days || 90} onChange={e => update({ referral_validity_days: Math.max(1, +e.target.value || 90) })} data-testid="loyalty-validity"/>
+                </div>
+              </div>
+              <div className="mt-2 text-[11px] text-[#666]">Aperçu du code : <span className="font-mono bg-[#fff5f5] dark:bg-[#2a1818] px-2 py-0.5 rounded text-[#b02a2a]" data-testid="loyalty-code-preview">{(s.referral_code_prefix || "DINA")}-{"X".repeat(s.referral_code_length || 4)}</span> · récompenses valides {s.referral_validity_days || 90} jours</div>
+            </div>
           </div>
         </div>
 

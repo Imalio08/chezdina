@@ -1,5 +1,27 @@
 # Chez Dina — PRD
 
+## P4 Finitions bis + Logo partout + P5 scaffold (Feb 2026) ✅
+
+### Parrainage configurable
+- Backend `LoyaltySettingsIn` : `referral_code_prefix` (default DINA), `referral_code_length` (3-8, default 4), `referral_validity_days` (default 90)
+- Frontend `Loyalty.jsx` : nouvelle section "Code de parrainage" avec préfixe + longueur + validité jours + aperçu live `DINA-XXXX · récompenses valides N jours`
+
+### Horaires storefront
+- Nouveau composant `OpeningHoursBanner.jsx` : si l'heure courante est hors `opening_hours[today]` ou `today.closed=true`, affiche bandeau rouge "Boutique fermée actuellement · ouvre à HH:MM ou rouvre {jour} à HH:MM"
+- Monté sur `/boutique` dans `App.js`
+- Dismissible pour la session via sessionStorage
+
+### Logo partout
+- `RiderShell` : charge `/public/site`, montre `site.logo` dans la topbar (fallback photo rider → initiale), affiche `site.name` ("Chez Dina · Livreur · ● Pointé")
+- `pdfReceipt.js` : nouveau paramètre `business.logo` (base64/URL) rendu en vignette centrée 18 mm, `business.name` dans le titre
+- `POS.jsx` : `POSInner` et `Receipt` chargent `/public/site` et passent `logo + name + address + phone + tiktok` au PDF receipt
+- `ConsoleLayout.jsx` : logo + nom déjà propagés depuis iter28
+
+### P5 Refactor (scaffold)
+- `/app/backend/routers/__init__.py` : package avec roadmap de migration domaine par domaine (auth, catalog, stock, purchases, orders, pos, delivery, customers, marketing, stats, settings, storefront)
+- `/app/backend/routers/meta.py` : première slice extraite (`GET /api/health`)
+- `server.py` monte `routers.meta.router` sans toucher au reste — zero behaviour change, prêt pour migration incrémentale PR par PR
+
 ## P4 Finitions (Feb 2026) ✅
 
 ### Avis clientes

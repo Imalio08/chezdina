@@ -7,8 +7,15 @@ export function downloadReceiptPDF(order, business = {}) {
   const w = 80, h = 300; // mm
   const doc = new jsPDF({ unit: "mm", format: [w, h] });
   let y = 8;
+  // Logo (optional) — centered thumbnail, 18 mm wide
+  if (business.logo) {
+    try {
+      doc.addImage(business.logo, "PNG", (w - 18) / 2, y, 18, 18);
+      y += 20;
+    } catch { /* ignore malformed logo */ }
+  }
   doc.setFont("helvetica", "bold"); doc.setFontSize(14);
-  doc.text("Chez Dina", w/2, y, { align: "center" }); y += 5;
+  doc.text(business.name || "Chez Dina", w/2, y, { align: "center" }); y += 5;
   doc.setFont("helvetica", "normal"); doc.setFontSize(8);
   doc.text(business.address || "Cocody Angré 7e, Abidjan", w/2, y, { align: "center" }); y += 3.5;
   doc.text(business.phone || "+225 07 77 92 61 79", w/2, y, { align: "center" }); y += 3.5;

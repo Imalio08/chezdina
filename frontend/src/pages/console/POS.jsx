@@ -437,7 +437,8 @@ function POSInner() {
 }
 
 function Receipt({ data, onClose }) {
-  const bizRef = { tiktok:"@dinoush04", phone:"+225 07 77 92 61 79", address:"Cocody Angré 7e, Abidjan" };
+  const [bizRef, setBizRef] = useState({ tiktok:"@dinoush04", phone:"+225 07 77 92 61 79", address:"Cocody Angré 7e, Abidjan" });
+  useEffect(() => { api.get("/public/site").then(r => { const s = r.data || {}; setBizRef(b => ({ ...b, name: s.name || "Chez Dina", logo: s.logo || null, phone: s.phone || b.phone, address: s.address || b.address, tiktok: s.tiktok || b.tiktok })); }).catch(() => {}); }, []);
   return (
     <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-6 w-80 font-sora" onClick={e=>e.stopPropagation()}>

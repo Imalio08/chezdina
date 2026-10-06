@@ -76,6 +76,7 @@ import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
+import OpeningHoursBanner from "@/components/storefront/OpeningHoursBanner";
 import Catalog from "@/pages/storefront/Catalog";
 import ProductPage from "@/pages/storefront/Product";
 import Checkout from "@/pages/storefront/Checkout";
@@ -117,7 +118,7 @@ export default function App() {
               <Route path="profil" element={<ErrorBoundary><RiderProfil /></ErrorBoundary>} />
             </Route>
             <Route path="/boutique" element={<StorefrontLayout />}>
-              <Route index element={<Home />} />
+              <Route index element={<><OpeningHoursBanner/><Home /></>} />
               <Route path="catalog" element={<Catalog />} />
               <Route path="product/:id" element={<ProductPage />} />
               <Route path="checkout" element={<Checkout />} />
