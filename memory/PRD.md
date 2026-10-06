@@ -3,93 +3,88 @@
 ## Problem Statement
 **Chez Dina** — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). Single codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. **Français uniquement**, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
+## Session 9 (Feb 7 2026) — WhatsApp auto + Section 8 Marketing/Fidélité/Parrainage + Section 9 Rôles & Pointage
+
+### WhatsApp Auto Notifs (enqueue sur changement de statut)
+- **Hook `_enqueue_wa`** dans `PATCH /orders/{oid}/status` : à chaque transition de statut, génère un message FR via `_wa_message_for_status` (templates pour confirmee / prete / assignee / en_livraison / livree / echouee / annulee) et pousse une entrée dans `db.whatsapp_outbox` avec `kind:"status"`, `message`, `link` (wa.me/{digits}?text=encoded). Pas d'enqueue si le statut ne change pas (idempotence). Pas d'enqueue si `site_settings.whatsapp_auto === false`.
+
+### Section 8 — Campagnes WhatsApp / Fidélité / Parrainage
+- **Endpoints Outbox** : `GET /whatsapp-outbox` (filtres `?status=pending|sent`, `?kind=status|broadcast`), `POST /whatsapp-outbox/{mid}/mark-sent`, `DELETE /whatsapp-outbox/{mid}` (admin/manager).
+- **Diffusions** : `POST /whatsapp-outbox/broadcast` {segment, message} enfile un message par cliente du segment avec remplacement des variables `{prenom}` et `{code}`. 6 segments : all, active, inactive, vip, blacklist, nouvelles.
+- **Segments counts** : `GET /customer-segments` renvoie les comptes pour tous les segments.
+- **Loyalty settings** : `GET/PATCH /loyalty/settings` → points_per_fcfa, enabled, 3 paliers par défaut (Bronze 0 / Silver 500 / Gold 2000), bonus parrain/filleul configurables.
+- **Parrainage** : `POST /referrals/apply {code, customer_id}` → crédite wallet parrain (+1000) & filleul (+500), incrémente `referral_count` du parrain, pose `referred_by` sur le filleul, crée une ligne dans `db.referrals`. Erreurs : 404 code introuvable, 400 déjà parrainée, 400 auto-parrainage. `GET /referrals` et `GET /referrals/leaderboard`.
+- **Pages Console** :
+  - `/console/campagnes-whatsapp` (`WhatsAppCampaigns.jsx`) : 4 KPIs, filtres tabs (Tous / Notifs statut / Diffusions), tableau outbox avec bouton Envoyer (ouvre wa.me + mark-sent), **BroadcastModal** avec 6 segment cards + 4 templates rapides + textarea avec variables.
+  - `/console/fidelite` (`Loyalty.jsx` refondu) : règles éditables (points par FCFA, bonus parrain/filleul, toggle actif), éditeur de paliers (add/remove/edit nom/min_points/discount_pct/free_delivery), tableau top ambassadrices.
+  - `/console/parrainage` (`Referrals.jsx` nouveau) : 4 KPIs, classement cliquable pour copier le code, dernières conversions, modal "Appliquer un code" pour saisir manuellement un parrainage.
+
+### Section 9 — Rôles & Permissions / Pointage Kiosk
+- **Matrice droits** : `GET/PATCH /roles-permissions` (admin only pour PATCH). Matrix par défaut : admin all:true, manager (pos/orders/deliveries/products/stock/customers/expenses), sales (pos/orders/stock/customers), stock_keeper (orders/products/stock), rider (deliveries). Page `/console/roles` (`RolesPermissions.jsx`) : grille 9 permissions × 5 rôles avec boutons check/X verts/gris cliquables.
+- **Pointage kiosk** : endpoint **public** `POST /attendance/punch-kiosk {code, kind}` sans auth → vérifie PIN et logge dans `db.attendance`. 403 si PIN invalide. Page `/console/pointage` (`Kiosk.jsx` nouveau) : clavier numérique 0-9, boutons Arrivée/Départ, affichage PIN masqué, auto-submit à 4 chiffres, feedback "kiosk-last" après succès avec nom+rôle+heure, mode plein écran, liste des pointages du jour.
+
+### Testing (testing_agent_v3 itération 6)
+- **Backend pytest 21/21** : outbox CRUD + broadcast, auto-enqueue sur changement de statut (+ idempotence), segments, loyalty GET/PATCH, referral apply (+ 3 erreurs), roles-permissions GET/PATCH (admin only vs manager 403), kiosk punch (public PIN 1234 OK / 9999 403), /attendance/today auth required.
+- **Frontend 95%** : les 5 nouvelles pages rendent avec tous les data-testid attendus. PIN 1234 live kiosk → "Arrivée · Aïcha Ouattara". PIN 9999 → toast "Code invalide".
+- **1 micro-gap fixé** : segment `blacklist` ajouté au tableau SEGMENTS de WhatsAppCampaigns.jsx (le backend l'acceptait déjà). Dead code branch `confirmee or nouvelle` retiré de `_wa_message_for_status`.
+
+### Non livré dans cette session (deferred)
+- Rate limiting sur `/attendance/punch-kiosk` (actuellement sans limite anti-brute-force PIN)
+- Gating `/whatsapp-outbox` par rôle (actuellement tout authentifié lit tous les messages avec téléphones)
+- Modération avis en batch (page `Reviews.jsx` reste individuelle, UX actuelle suffit)
+- Panier abandonné auto-WhatsApp scheduler (actuellement relance manuelle depuis AlertsAndCarts)
+
 ## Session 8 (Feb 7 2026) — Section 6 finalisation + Section 7 reliquats
+- Board drag & drop livraisons, réconciliation PIN gérante avec écart, carte GPS live Leaflet/OSM, wizard Approvisionnements 4-steps avec landed cost proportionnel, étiquettes QR par variante planche A4 24 par page.
+- Bug critique Rider.jsx `useEffect(load, [])` → Promise cleanup crash corrigé.
 
-### Section 6 compléments livrés
-- **Board d'affectation drag & drop** (`Deliveries.jsx` tab `board`) : colonne gauche "À assigner" avec cartes draggables, colonnes par livreur à droite scrollables horizontalement. HTML5 DnD (`draggable`, `onDragStart`, `onDrop`) → `PATCH /delivery-sessions/{sid}/add-order`. "+ Ouvrir" crée la journée du livreur à la volée.
-- **Réconciliation ligne-par-ligne avec PIN gérante** : nouveau `ReconcileLineModal` ouvre pour chaque ligne COD avec input montant reçu + input PIN masqué (tracking large) + note. Backend `/delivery-sessions/{sid}/reconcile` étendu : si `collected:true`, vérifie `PIN` (admin/manager actif) et stocke objet `{collected, amount, due, ecart, approved_by, note, at}`. Écart affiché en vert (surplus) ou rouge (manque) dans le tableau Journées. 403 si PIN invalide, 400 si PIN manquant.
-- **Carte GPS live** : nouvel onglet `Carte GPS` avec composant `/components/shared/LeafletMap.jsx` (react-leaflet + OSM, icônes marker rouges via leaflet-color-markers, `FitBounds` auto). Rider.jsx push position toutes les 20s via `navigator.geolocation.watchPosition` → `POST /riders/location`. Console `GET /riders/locations` filtre les positions < 30 min. Rafraîchissement auto de la carte toutes les 30s.
+## Session 7 — Section 6 compléments + Section 7 Catalog v2
+- Fiches colis "Imprimer du jour", formulaire produit refondu (grid 2 colonnes, matrice variantes, images multi WebP, IA description).
 
-### Section 7 reliquats livrés
-- **Wizard 4 étapes Approvisionnements** (`PoWizard` dans `Purchases.jsx`) : Fournisseur → Articles (produit via select, taille+couleur suivant le produit, qté, coût unitaire) → Coûts annexes (fret, douane, commission avec libellé libre) → Récap. Landed unit cost calculé en live par répartition proportionnelle (`landed_u = unit_cost + (extras_total * share) / qty`). Stepper visuel avec check marks.
-- **Réception + étiquettes QR par variante** (`ReceiveModal` + `LabelsPrintModal`) : à la réception, ajustement qté reçue par ligne, backend `POST /purchase-orders/{pid}/receive` incrémente `stock_by_size[size]` + `stock` par ligne, applique les coûts annexes au landed cost, génère **une étiquette par unité** avec QR encodé `sku|size|color`. Planche A4 — 3 colonnes × 8 lignes (70×37mm par cellule). CSS `@page A4` et `page-break-inside:avoid` par cellule.
-
-### Backend endpoints ajoutés/modifiés
-- `POST /api/riders/location` (upsert rider_locations)
-- `GET /api/riders/locations` (filtre > 30 min)
-- `PATCH /api/delivery-sessions/{sid}/reconcile` étendu (amount, pin, note, ecart, approved_by)
-- `PATCH /api/purchase-orders/{pid}` (update générique)
-- `DELETE /api/purchase-orders/{pid}` (suppression)
-- `POST /api/purchase-orders/{pid}/receive` (reception + QR labels + stock inflow + landed cost)
-- Modèles: `ReconcileIn` étendu, `RiderLocationIn`, `POReceiveIn`, `PurchaseOrderIn` enrichi
-
-### Testing (testing_agent_v3)
-- **Backend pytest 10/10** : rider location upsert+list, reconcile PIN missing/bad/admin/manager, PO CRUD, PO receive avec landed cost proportionnel + 3 QR labels + incrément stock
-- **Frontend 100%** : Deliveries 5 onglets rendent, Board 4 colonnes livreurs + 31 cartes draggables, Carte GPS avec LeafletMap après push rider, Reconcile PIN 1234 OK/9999 KO, Wizard 4 étapes complète, Receive génère labels avec bouton `print-qr-labels` et <img alt="QR">
-- **1 bug critique corrigé** par testing agent : `Rider.jsx` `useEffect(load, [])` retournait une Promise → StrictMode `destroy is not a function` → ErrorBoundary. Fixé en `useEffect(() => { load(); }, [])`.
-
-### Non livré dans cette session (deferred backlog)
-- Section 8 — Clients & marketing : segments auto, campagnes WhatsApp panier abandonné, modération avis, fidélité + parrainage, scheduler ventes flash — **prochaine session**
-- Section 9 — Dépenses + employés + rôles & permissions matrix + pointage kiosk
-- Section 10 — Storefront CMS + section builder + account par code secret 4-6 chiffres
-- Section 11 — Paramètres & Intégrations (WhatsApp Meta, Pixels, imprimante Wi-Fi)
-- Section 12 — Checklist d'acceptation finale
-
-## Session 7 (Feb 6 2026) — Section 6 compléments + Section 7 Catalog v2
-### Section 6 compléments
-- Bouton "Imprimer fiches du jour" sur la page Livraisons → route directe vers `/console/fiches-colis` qui liste toutes les commandes prêtes/assignées/en_livraison.
-- Backend `public_order` + `public_rate` endpoints restaurés après conflit de nommage avec `public_create_order` (collision F811 ruff).
-
-### Section 7 Catalog v2 — Nouveau formulaire produit (`Products.jsx` refondu)
-- Grid 2 colonnes desktop, variant matrix auto, images multi (WebP compression), IA description, pills tailles/couleurs, tableau variantes.
-- Composants partagés utilisés : `ImageUpload`, `CreateOnFlySelect`, `ErrorBoundary`.
-
-## Session 6 (Feb 6 2026) — Section 6 Delivery full redesign (partiel)
-- Fiches colis QR imprimables, page publique `/noter/:code`, Rider.jsx refondu (bouton Gérante, strip 3 KPI live, statut `recuperee`, bottom-sheet avec actions, sheet Annulée + Reportée).
+## Session 6 — Section 6 Delivery full redesign (partiel)
+- Fiches colis QR imprimables, page publique `/noter/:code`, Rider.jsx avec sheet Annulée/Reportée.
 
 ## Session 5 — POS cash control
-- PIN auth (`/pos/pin-authorize`), cash movements, holds. `POSExtensions.jsx` : PinAuthModal, CashDrawer, HoldsPanel. Garde-fou remise >20% avec PIN.
+- PIN auth, cash movements, holds, garde-fou remise >20%.
 
 ## Session 4 — Dashboard & Statistiques v2
-- "À traiter maintenant" live, 8 cartes action. Statistiques en 5 tabs (Ventes & produits, Zones géographiques, Clientes, Livraisons, Finances) avec Compte de résultat.
+- "À traiter maintenant" live, 5 tabs rapports (Ventes, Zones, Clientes, Livraisons, Finances).
 
 ## Session 3 — Navigation + Dina IA
-- Sidebar 10 sections collapsibles (40+ liens), topbar "+ Créer" 6 raccourcis, Dina IA widget flottant avec tool-calling backend (6 outils).
+- Sidebar 10 sections collapsibles, Dina IA widget flottant avec tool-calling.
 
-## Session 2 — Section 2 Fondations UX
-- 7 composants partagés : PeriodSelector, KPICard, ViewToggle, FiltersPanel, CreateOnFlySelect, ImageUpload, EmptyState.
+## Session 2 — Fondations UX
+- 7 composants partagés (PeriodSelector, KPICard, ViewToggle, FiltersPanel, CreateOnFlySelect, ImageUpload, EmptyState).
 
 ## Session 1 — Rebrand & Langue
-- Rebrand complet "Chez Dina", français only, Sora + IBM Plex Serif, ErrorBoundary sur toutes les routes, labels paiement humanisés ("Paiement à la livraison").
+- "Chez Dina", français only, Sora + IBM Plex Serif, ErrorBoundary partout.
 
 ## Architecture
 - **Backend**: FastAPI `/api`, MongoDB motor, JWT cookie + Bearer, bcrypt, PIN 4-chiffres.
-- **Frontend**: React 19, React Router 7, Tailwind + Shadcn + Recharts + sonner + lucide-react + **react-leaflet** (OSM), **Sora** (body) + IBM Plex Serif (titres), palette red/pink #b02a2a.
-- **AI**: Claude Sonnet 5.5 via Emergent Universal Key — floating "Dina IA" sur chaque page Console.
-- **Routes**: `/boutique` (public), `/console/*` (back-office), `/console/livreur` (mobile rider), `/suivi/:code` (public tracking), `/noter/:code` (public rating), `/login`.
+- **Frontend**: React 19, Router 7, Tailwind + Shadcn + Recharts + sonner + lucide-react + **react-leaflet** (OSM), **Sora** + IBM Plex Serif, palette red/pink #b02a2a.
+- **AI**: Claude Sonnet 5.5 via Emergent Universal Key — floating "Dina IA".
+- **Routes**: `/boutique`, `/console/*`, `/console/livreur`, `/suivi/:code`, `/noter/:code`, `/login`.
+- **Collections DB** (ajouts session 9) : `whatsapp_outbox`, `loyalty_settings`, `referrals`, `roles_permissions`, `rider_locations`. Historique : `products`, `orders`, `customers`, `users`, `delivery_sessions`, `pos_holds`, `pos_authorizations`, `cash_movements`, `attendance`, `reviews`, `suppliers`, `purchase_orders`, `zones`, `expenses`, `promotions`, `stock_alerts`, `abandoned_carts`, `notifications`, `site_settings`, `stores`, `business`, `invoices`.
 
 ## Credentials (`/app/memory/test_credentials.md`)
 - Admin: `aouattaraesca@gmail.com` / `Admin123!` · PIN 1234
 - Manager: `manager.cocody@dinastore.ci` / `Manager123!` · PIN 2222
+- Sales: `agent1@dinastore.ci` / `Agent123!` · PIN 3333
+- Stock: `stock@dinastore.ci` / `Stock123!` · PIN 4444
 - Rider: `rider1@dinastore.ci` / `Rider123!` · PIN 5555
 
 ## Backlog
-### P0 — Section 8 (prochaine session)
-- Segments clients auto (VIP, Dormants, Nouveaux, Blacklist déjà existant)
-- Campagnes WhatsApp panier abandonné (scheduler + templates)
-- Modération avis par lot
-- Fidélité : règles configurables (points par X FCFA, paliers, cadeaux)
-- Parrainage : code unique par cliente + tracking conversions
-- Scheduler ventes flash avec affiche auto-générée
+### P0 — Durcir avant go-live
+- Rate limiting kiosk punch (brute-force PIN)
+- Gating `/whatsapp-outbox` admin/manager/sales uniquement (téléphones sensibles)
+- Scheduler panier abandonné → relance WhatsApp auto après 24h
 
-### P1 — Section 9
-- Dépenses : catégories custom + récurrence
-- Employés : fiches complètes + horaires
-- Rôles & permissions : matrix UI complète
-- Pointage kiosk : écran dédié + PIN
+### P1 — Sections restantes du cahier des charges
+- Section 10 — CMS Storefront : section builder drag & drop, pages custom, compte cliente par code secret 4-6 chiffres
+- Section 11 — Paramètres & Intégrations : WhatsApp Meta Business Embedded Signup, Pixels Meta/TikTok, imprimante Wi-Fi ESC/POS
+- Section 12 — Checklist d'acceptation finale
 
-### P2 — Sections 10, 11, 12
-- CMS site vitrine (section builder drag & drop)
-- Compte cliente par code secret 4-6 chiffres (pas d'SMS OTP)
-- Paramètres + Intégrations WhatsApp Meta, Pixels, imprimante Wi-Fi
-- Checklist d'acceptation finale (section 12 du cahier des charges)
+### P2 — Nice-to-have
+- Export factures ZIP
+- PWA offline (service worker + IndexedDB sync pour POS)
+- Multi-store réel (collection `stores` déjà en place, UI partielle)

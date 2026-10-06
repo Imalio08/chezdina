@@ -424,8 +424,6 @@ def _wa_message_for_status(order: dict, status: str) -> Optional[str]:
         return f"{base}\nNous avons rencontré un souci avec votre colis {code}. Nous vous recontactons rapidement pour reprogrammer. Pardon pour la gêne 🙏"
     if status == "annulee":
         return f"{base}\nVotre commande {code} a été annulée. N'hésitez pas à nous recontacter si vous changez d'avis 💕"
-    if status == "confirmee" or status == "nouvelle":
-        return None
     return None
 
 async def _enqueue_wa(order: dict, status: str, by_name: Optional[str] = None):

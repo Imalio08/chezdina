@@ -10,6 +10,7 @@ const SEGMENTS = [
   { v: "inactive", label: "Dormantes 30j+" },
   { v: "vip", label: "VIP (500+ pts)" },
   { v: "nouvelles", label: "Nouvelles (30j)" },
+  { v: "blacklist", label: "Liste noire" },
 ];
 
 const TEMPLATES = [
