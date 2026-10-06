@@ -85,7 +85,14 @@ class ExpenseIn(BaseModel):
 class SupplierIn(BaseModel):
     name: str; country: str = "CI"; phone: str = ""; email: Optional[str] = None; balance: int = 0; notes: str = ""
 class PurchaseOrderIn(BaseModel):
-    supplier_id: str; supplier_name: str; total: int; status: str = "en_attente"; items: List[Dict[str,Any]] = []
+    supplier_id: str
+    supplier_name: str
+    total: int = 0
+    status: str = "en_attente"
+    items: List[Dict[str, Any]] = []
+    extra_costs: List[Dict[str, Any]] = []
+    expected_at: Optional[str] = None
+    note: Optional[str] = None
 class PromoIn(BaseModel):
     code: str; type: str = "percent"; value: int = 10
     starts_at: Optional[str] = None; ends_at: Optional[str] = None
@@ -102,7 +109,21 @@ class AskIn(BaseModel):
 class StatusIn(BaseModel): status: str; reason: Optional[str] = None; next_date: Optional[str] = None
 class AssignIn(BaseModel): rider_id: str; rider_name: str
 class SessionIn(BaseModel): rider_id: str; rider_name: str; date: Optional[str] = None
-class ReconcileIn(BaseModel): order_id: str; collected: bool
+class ReconcileIn(BaseModel):
+    order_id: str
+    collected: bool
+    amount: Optional[float] = None
+    pin: Optional[str] = None
+    note: Optional[str] = None
+class RiderLocationIn(BaseModel):
+    lat: float
+    lng: float
+    accuracy: Optional[float] = None
+class POReceiveIn(BaseModel):
+    received_at: Optional[str] = None
+    items: List[Dict[str, Any]] = []  # [{product_id, product_name, sku, size, color, qty, unit_cost}]
+    extra_costs: List[Dict[str, Any]] = []  # [{label, amount}]
+    note: Optional[str] = None
 class StockAlertIn(BaseModel): product_id: str; size: Optional[str] = None; phone: str
 class UserIn(BaseModel):
     name: str; email: str; password: str; role: str; phone: str = ""; pin: str = ""
@@ -436,9 +457,58 @@ async def session_add_order(sid: str, body: Dict[str, Any], user: dict = Depends
 async def reconcile(sid: str, body: ReconcileIn, user: dict = Depends(require_role("admin","manager"))):
     s = await db.delivery_sessions.find_one({"id": sid})
     if not s: raise HTTPException(404)
-    rec = s.get("reconciliations", {}); rec[body.order_id] = body.collected
+    # Line-by-line cash reconciliation. If marking collected (True), require manager PIN
+    # and store actual amount + approver.
+    rec = s.get("reconciliations", {})
+    if body.collected:
+        if not body.pin:
+            raise HTTPException(400, "PIN gérante requis pour valider l'encaissement")
+        approver = await db.users.find_one({"attendance_code": body.pin.strip(), "role": {"$in": ["admin","manager"]}, "active": True})
+        if not approver:
+            raise HTTPException(403, "PIN invalide ou droits insuffisants")
+        # Compare to order total to compute écart
+        o = await db.orders.find_one({"id": body.order_id})
+        due = (o or {}).get("total", 0) if (o or {}).get("payment_method") == "cod" else 0
+        amount = float(body.amount) if body.amount is not None else float(due)
+        rec[body.order_id] = {
+            "collected": True,
+            "amount": amount,
+            "due": due,
+            "ecart": amount - due,
+            "approved_by": approver.get("name"),
+            "approved_by_id": approver.get("id"),
+            "note": body.note or "",
+            "at": now_iso(),
+        }
+    else:
+        rec[body.order_id] = {"collected": False, "at": now_iso()}
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"reconciliations": rec}})
+    return {"ok": True, "reconciliation": rec[body.order_id]}
+
+# ---------- Rider live GPS ----------
+@api.post("/riders/location")
+async def push_rider_location(body: RiderLocationIn, user: dict = Depends(get_user)):
+    doc = {
+        "rider_id": user.get("id"),
+        "rider_name": user.get("name"),
+        "lat": body.lat, "lng": body.lng, "accuracy": body.accuracy or 0,
+        "updated_at": now_iso(),
+    }
+    await db.rider_locations.update_one(
+        {"rider_id": user.get("id")},
+        {"$set": doc},
+        upsert=True,
+    )
     return {"ok": True}
+
+@api.get("/riders/locations")
+async def list_rider_locations(user: dict = Depends(get_user)):
+    rows = await db.rider_locations.find({}).to_list(100)
+    # Filter stale (>30min)
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+    rows = [r for r in rows if r.get("updated_at", "") >= cutoff]
+    return clean(rows)
 
 @api.patch("/delivery-sessions/{sid}/close")
 async def close_session(sid: str, user: dict = Depends(require_role("admin","manager"))):
@@ -526,6 +596,71 @@ async def create_po(body: PurchaseOrderIn, user: dict = Depends(require_role("ad
     doc = body.model_dump(); doc.update({"id": new_id(), "number": f"BC-2026-{200+cnt}", "created_at": now_iso()})
     await db.purchase_orders.insert_one(doc)
     return clean(doc)
+
+@api.patch("/purchase-orders/{pid}")
+async def update_po(pid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
+    body.pop("id", None); body.pop("_id", None)
+    await db.purchase_orders.update_one({"id": pid}, {"$set": body})
+    return {"ok": True}
+
+@api.delete("/purchase-orders/{pid}")
+async def delete_po(pid: str, user: dict = Depends(require_role("admin","manager"))):
+    await db.purchase_orders.delete_one({"id": pid})
+    return {"ok": True}
+
+@api.post("/purchase-orders/{pid}/receive")
+async def receive_po(pid: str, body: POReceiveIn, user: dict = Depends(require_role("admin","manager","stock_keeper"))):
+    """Mark a PO as received. Applies stock increments per variant (size)
+    and recomputes landed cost per unit including extra costs (fret, douane).
+    Returns the list of QR labels to print (one per unit received)."""
+    po = await db.purchase_orders.find_one({"id": pid})
+    if not po: raise HTTPException(404)
+    items = body.items or po.get("items", []) or []
+    extra_costs = body.extra_costs or po.get("extra_costs", []) or []
+    base_total = sum(float(it.get("qty",0)) * float(it.get("unit_cost",0)) for it in items)
+    extras_total = sum(float(x.get("amount",0)) for x in extra_costs)
+    total_qty = sum(float(it.get("qty",0)) for it in items) or 1
+    # Spread extras proportionally to each item's cost share → landed unit cost
+    labels = []
+    for it in items:
+        qty = int(it.get("qty", 0))
+        base_unit = float(it.get("unit_cost", 0))
+        share = (qty * base_unit) / max(base_total, 1)
+        landed_extra_per_unit = (extras_total * share) / max(qty, 1) if qty else 0
+        landed_unit = round(base_unit + landed_extra_per_unit)
+        it["landed_unit_cost"] = landed_unit
+        # Increment product stock_by_size + stock
+        if it.get("product_id") and it.get("size"):
+            await db.products.update_one(
+                {"id": it["product_id"]},
+                {"$inc": {f"stock_by_size.{it['size']}": qty, "stock": qty}}
+            )
+        # Generate one QR per unit
+        for i in range(qty):
+            sku = it.get("sku") or ""
+            size = it.get("size") or ""
+            color = it.get("color") or ""
+            qr_payload = f"{sku}|{size}|{color}"
+            labels.append({
+                "product_name": it.get("product_name", ""),
+                "sku": sku, "size": size, "color": color,
+                "unit_cost": landed_unit, "qr": qr_payload,
+                "po_number": po.get("number", ""),
+            })
+    await db.purchase_orders.update_one(
+        {"id": pid},
+        {"$set": {
+            "status": "receptionne",
+            "received_at": body.received_at or now_iso(),
+            "items": items,
+            "extra_costs": extra_costs,
+            "extras_total": extras_total,
+            "base_total": base_total,
+            "total": base_total + extras_total,
+            "receive_note": body.note or "",
+        }}
+    )
+    return {"ok": True, "labels": labels, "extras_total": extras_total, "base_total": base_total}
 
 # ---------- Promotions ----------
 @api.get("/promotions")

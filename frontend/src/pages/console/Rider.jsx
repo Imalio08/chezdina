@@ -28,6 +28,22 @@ export default function Rider() {
   const load = () => api.get("/deliveries").then(r => setOrders(r.data));
   useEffect(load, []);
 
+  // Live GPS: push position every 30s if geolocation is granted
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    let lastPush = 0;
+    const push = (pos) => {
+      const now = Date.now();
+      if (now - lastPush < 20000) return; // throttle 20s
+      lastPush = now;
+      api.post("/riders/location", {
+        lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy
+      }).catch(() => {});
+    };
+    const watchId = navigator.geolocation.watchPosition(push, () => {}, { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, []);
+
   const active = orders.filter(o => ["assignee","en_livraison","prete","recuperee"].includes(o.status));
   const history = orders.filter(o => ["livree","echouee","retournee","annulee"].includes(o.status));
   const delivered = history.filter(o => o.status === "livree");
