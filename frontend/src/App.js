@@ -44,6 +44,7 @@ import CmsPages from "@/pages/console/CmsPages";
 import CashSessions from "@/pages/console/CashSessions";
 import Encaissements from "@/pages/console/Encaissements";
 import ProfitLoss from "@/pages/console/ProfitLoss";
+import Pointage from "@/pages/console/Pointage";
 import SiteAppearance from "@/pages/console/SiteAppearance";
 import BrandsCategories from "@/pages/console/BrandsCategories";
 import Marques from "@/pages/console/Marques";
@@ -134,7 +135,7 @@ export default function App() {
               <Route path="resultat" element={<ErrorBoundary><ProfitLoss/></ErrorBoundary>} />
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
-              <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
+              <Route path="pointage" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
               <Route path="apparence" element={<ErrorBoundary><SiteAppearance/></ErrorBoundary>} />
               <Route path="accueil" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
               <Route path="apercu" element={<Navigate to="/boutique" replace/>} />

@@ -3,6 +3,7 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Package, Map, History, Trophy, User, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
+import CheckInGate from "@/components/rider/CheckInGate";
 
 const TABS = [
   { to: "/rider", end: true, icon: Package, label: "Courses" },
@@ -16,6 +17,7 @@ export default function RiderShell() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const [theme, setTheme] = useState(() => localStorage.getItem("rider_theme") || "light");
+  const [checkedIn, setCheckedIn] = useState(null); // null = loading, true/false
   useEffect(() => {
     const root = document.documentElement;
     const t = theme === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : theme;
@@ -23,15 +25,22 @@ export default function RiderShell() {
     localStorage.setItem("rider_theme", theme);
   }, [theme]);
   useEffect(() => {
+    api.get("/attendance/me").then(r => setCheckedIn(!!r.data.checked_in)).catch(() => setCheckedIn(true)); // on error, don't block
+  }, []);
+  useEffect(() => {
+    if (!checkedIn) return; // Don't track location before check-in
     if (!navigator.geolocation) return;
     let last = 0;
     const push = (p) => { const now = Date.now(); if (now - last < 20000) return; last = now; api.post("/riders/location", { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }).catch(() => { }); };
     const wid = navigator.geolocation.watchPosition(push, () => { }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
     return () => navigator.geolocation.clearWatch(wid);
-  }, []);
+  }, [checkedIn]);
   useEffect(() => {
     import("@/lib/offlineQueue").then(m => { const stop = m.startAutoSync(); return () => stop && stop(); });
   }, []);
+
+  if (checkedIn === null) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
+  if (!checkedIn) return <CheckInGate user={user} onDone={()=>setCheckedIn(true)}/>;
 
   return (
     <div className="min-h-screen bg-[#fff5f5] dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-white pb-20 font-sora">
@@ -41,7 +50,7 @@ export default function RiderShell() {
             <div className="w-9 h-9 rounded-full bg-[#fde8e8] text-[#b02a2a] grid place-items-center text-sm font-bold">{user?.name?.[0] || "L"}</div>}
           <div>
             <div className="font-serif text-sm leading-none">Bonjour {user?.name?.split(" ")[0] || "Livreur"}</div>
-            <div className="text-[10px] text-[#999]">Chez Dina · Livreur</div>
+            <div className="text-[10px] text-[#999]">Chez Dina · Livreur · ● Pointé</div>
           </div>
         </div>
         <button onClick={() => { logout(); nav("/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout"><LogOut size={11} />Sortir</button>

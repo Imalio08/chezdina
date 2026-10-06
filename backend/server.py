@@ -1731,9 +1731,9 @@ async def update_roles_permissions(body: RolesPermissionsIn, user: dict = Depend
     await db.roles_permissions.update_one({"id": "main"}, {"$set": {"id": "main", "matrix": body.matrix, "updated_at": now_iso()}}, upsert=True)
     return {"ok": True}
 
-# ---------- Attendance (kiosk) ----------
-@api.get("/attendance/today")
-async def attendance_today(user: dict = Depends(get_user)):
+# ---------- Attendance (kiosk, legacy) ----------
+@api.get("/attendance/today-kiosk")
+async def attendance_today_kiosk(user: dict = Depends(get_user)):
     from datetime import datetime, timezone, timedelta
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     rows = await db.attendance.find({"at": {"$gte": start}}).sort("at", -1).to_list(500)
@@ -2848,6 +2848,302 @@ async def seed_if_empty():
     # Zones
     if await db.zones.count_documents({}) == 0:
         await db.zones.insert_many([{"id": new_id(), "name": n, "fee": f, "created_at": now_iso()} for n,f in ZONES])
+
+# ---------- Fix pack 2 : Roles & permissions, Approvals, Audit, Attendance ----------
+
+ROLE_TEMPLATES = {
+    "gerante": {"name":"Gérante","color":"#5867fd","description":"Gestion quotidienne de la boutique","permissions":{
+        "pos.sell":"full","orders.read":"full","orders.update":"edit","orders.mark_delivered":"none","products.read":"read","products.edit":"none","products.cost":"none","purchases.read":"none","purchases.receive":"edit","stock.adjust_propose":"edit","stock.adjust_validate":"none","expenses.create":"none","expenses.request":"edit","cash.open_close":"full","cash.validate":"none","reconciliations":"edit","customers":"full","marketing":"full","deliveries.assign":"full","deliveries.update_status":"none","reports.read":"read","reports.margins":"none","suppliers.read":"none","settings":"none","team":"none"},
+        "limits":{"discount_pct_max":10,"refund":False,"void_sale":False}},
+    "livreur": {"name":"Livreur","color":"#e4991e","description":"Livraison et encaissement terrain","permissions":{
+        "pos.sell":"none","orders.read":"read","orders.update":"none","orders.mark_delivered":"edit","products.read":"read","products.edit":"none","products.cost":"none","expenses.create":"none","expenses.request":"none","cash.open_close":"none","cash.validate":"none","reconciliations":"read","deliveries.update_status":"edit","settings":"none","team":"none"},
+        "limits":{"discount_pct_max":0,"refund":False,"void_sale":False}},
+    "caissiere": {"name":"Caissière","color":"#1f8a4c","description":"Encaissement au comptoir","permissions":{
+        "pos.sell":"edit","orders.read":"read","orders.update":"none","orders.mark_delivered":"none","products.read":"read","products.cost":"none","customers":"edit","expenses.request":"edit","cash.open_close":"edit","cash.validate":"none","settings":"none","team":"none"},
+        "limits":{"discount_pct_max":5,"refund":False,"void_sale":False}},
+}
+
+@api.get("/role-templates")
+async def role_templates(user: dict = Depends(require_role("admin"))):
+    return ROLE_TEMPLATES
+
+@api.get("/roles")
+async def list_roles(user: dict = Depends(require_role("admin"))):
+    rows = await db.roles.find({}).to_list(100)
+    users = await db.users.find({}, {"name":1,"role":1}).to_list(500)
+    counts = {}
+    for u in users: counts[u.get("role","")] = counts.get(u.get("role",""),0) + 1
+    for r in rows: r["user_count"] = counts.get(r.get("key"), 0)
+    pending = await db.approval_requests.count_documents({"status":"pending"})
+    return {"roles": clean(rows), "pending_approvals": pending}
+
+@api.post("/roles")
+async def create_role(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    key = (body.get("key") or body.get("name","").lower().replace(" ","_"))[:40]
+    if key in ("admin","propriétaire","proprietaire"): raise HTTPException(400,"Clé réservée")
+    doc = {"id": new_id(), "key": key, "name": body.get("name"), "color": body.get("color","#5867fd"),
+           "description": body.get("description",""), "permissions": body.get("permissions") or {},
+           "limits": body.get("limits") or {}, "builtin": False, "created_at": now_iso(), "created_by": user.get("name")}
+    await db.roles.insert_one(doc)
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"role.create","entity_id":doc["id"],"after":{"name":body.get("name")},"at":now_iso()})
+    return clean(doc)
+
+@api.patch("/roles/{rid}")
+async def update_role(rid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    body.pop("_id",None); body.pop("id",None); body.pop("builtin",None); body["updated_at"] = now_iso()
+    before = await db.roles.find_one({"id": rid})
+    if not before: raise HTTPException(404)
+    if before.get("builtin"): raise HTTPException(400, "Rôle intégré non modifiable")
+    await db.roles.update_one({"id": rid}, {"$set": body})
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"role.update","entity_id":rid,"before":clean(before),"after":body,"at":now_iso()})
+    return {"ok": True}
+
+@api.delete("/roles/{rid}")
+async def delete_role(rid: str, user: dict = Depends(require_role("admin"))):
+    r = await db.roles.find_one({"id": rid})
+    if not r: raise HTTPException(404)
+    if r.get("builtin"): raise HTTPException(400, "Rôle intégré non supprimable")
+    await db.roles.delete_one({"id": rid})
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"role.delete","entity_id":rid,"before":clean(r),"at":now_iso()})
+    return {"ok": True}
+
+# -------- Approval requests (demandes d'approbation) --------
+@api.post("/approval-requests")
+async def create_approval(body: Dict[str,Any], user: dict = Depends(get_user)):
+    """Request owner's approval for a sensitive action (discount, refund, expense, price change, stock adjustment)."""
+    doc = {"id": new_id(), "kind": body.get("kind"), "requested_by_id": user.get("id"), "requested_by_name": user.get("name"),
+           "payload": body.get("payload") or {}, "reason": body.get("reason",""), "status":"pending",
+           "created_at": now_iso(), "decision_at": None, "decision_by": None, "decision_note": None}
+    await db.approval_requests.insert_one(doc)
+    await db.notifications.insert_one({"id":new_id(),"type":"approval","title":f"Demande d'approbation · {body.get('kind')}","msg":f"{user.get('name')} · {body.get('reason','')[:60]}","color":"#e4991e","at":now_iso(),"link":"/console/roles?tab=approvals"})
+    return clean(doc)
+
+@api.get("/approval-requests")
+async def list_approvals(user: dict = Depends(require_role("admin")), status: Optional[str] = None):
+    f = {}
+    if status: f["status"] = status
+    rows = await db.approval_requests.find(f).sort("created_at",-1).to_list(500)
+    return clean(rows)
+
+@api.post("/approval-requests/{aid}/decide")
+async def decide_approval(aid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    decision = body.get("decision")  # "approved" | "rejected"
+    if decision not in ("approved","rejected"): raise HTTPException(400)
+    await db.approval_requests.update_one({"id": aid}, {"$set": {"status": decision, "decision_at": now_iso(), "decision_by": user.get("name"), "decision_note": body.get("note","")}})
+    r = await db.approval_requests.find_one({"id": aid})
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":f"approval.{decision}","entity_id":aid,"after":{"kind":r.get("kind")},"at":now_iso()})
+    return clean(r)
+
+# -------- Expense requests (Gérante submits, owner approves) --------
+@api.post("/expense-requests")
+async def create_expense_request(body: Dict[str,Any], user: dict = Depends(get_user)):
+    doc = {"id": new_id(), "label": body.get("label"), "amount": int(body.get("amount",0)),
+           "category": body.get("category","Divers"), "note": body.get("note",""),
+           "receipt": body.get("receipt"), "requested_by_name": user.get("name"), "requested_by_id": user.get("id"),
+           "status":"pending", "created_at": now_iso()}
+    await db.expense_requests.insert_one(doc)
+    await db.notifications.insert_one({"id":new_id(),"type":"expense_request","title":"Demande de dépense","msg":f"{user.get('name')} · {body.get('label')} · {int(body.get('amount',0))} FCFA","color":"#e4991e","at":now_iso(),"link":"/console/depenses"})
+    return clean(doc)
+
+@api.get("/expense-requests")
+async def list_expense_requests(user: dict = Depends(require_role("admin")), status: Optional[str] = None):
+    f = {}
+    if status: f["status"] = status
+    rows = await db.expense_requests.find(f).sort("created_at",-1).to_list(500)
+    return clean(rows)
+
+@api.post("/expense-requests/{eid}/decide")
+async def decide_expense_request(eid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    decision = body.get("decision")
+    r = await db.expense_requests.find_one({"id": eid})
+    if not r: raise HTTPException(404)
+    await db.expense_requests.update_one({"id": eid}, {"$set": {"status": decision, "decision_at": now_iso(), "decision_by": user.get("name"), "decision_note": body.get("note","")}})
+    if decision == "approved":
+        exp = {"id": new_id(), "label": r.get("label"), "amount": r.get("amount"), "category": r.get("category"),
+               "paid_at": now_iso(), "note": f"Validée par {user.get('name')} · demandée par {r.get('requested_by_name')}",
+               "approved_from_request": eid, "receipt": r.get("receipt"), "created_at": now_iso()}
+        await db.expenses.insert_one(exp)
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":f"expense_request.{decision}","entity_id":eid,"at":now_iso()})
+    return {"ok": True}
+
+# -------- Audit log --------
+@api.get("/audit-logs")
+async def list_audit(user: dict = Depends(require_role("admin")), limit: int = 500, action: Optional[str] = None, user_id: Optional[str] = None):
+    f = {}
+    if action: f["action"] = {"$regex": action}
+    if user_id: f["user_id"] = user_id
+    rows = await db.audit_log.find(f).sort("at",-1).to_list(limit)
+    return clean(rows)
+
+# -------- Cash sessions handover & validation --------
+@api.post("/cash-sessions/{sid}/declare-handover")
+async def declare_handover(sid: str, body: Dict[str,Any], user: dict = Depends(get_user)):
+    """Gérante declares the amount handed to the owner. Session awaits owner validation."""
+    s = await db.cash_sessions.find_one({"id": sid})
+    if not s: raise HTTPException(404)
+    await db.cash_sessions.update_one({"id": sid}, {"$set": {
+        "handover_amount": int(body.get("amount",0)), "handover_at": now_iso(), "handover_by": user.get("name"),
+        "handover_note": body.get("note",""), "status": "pending_validation"
+    }})
+    await db.notifications.insert_one({"id":new_id(),"type":"handover","title":"Versement en attente","msg":f"{user.get('name')} a déposé {int(body.get('amount',0))} FCFA","color":"#5867fd","at":now_iso(),"link":"/console/sessions-caisse"})
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.declare_handover","entity_id":sid,"after":{"amount":body.get("amount")},"at":now_iso()})
+    return {"ok": True}
+
+@api.post("/cash-sessions/{sid}/validate-handover")
+async def validate_handover(sid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    """Owner validates the handover; session becomes 'closed' or 'gap'."""
+    s = await db.cash_sessions.find_one({"id": sid})
+    if not s: raise HTTPException(404)
+    expected = int(body.get("expected", s.get("handover_amount",0)))
+    actual = int(body.get("actual", s.get("handover_amount",0)))
+    gap = actual - expected
+    status = "validated" if gap == 0 else "gap"
+    await db.cash_sessions.update_one({"id": sid}, {"$set": {
+        "validated_at": now_iso(), "validated_by": user.get("name"), "validation_gap": gap,
+        "validation_note": body.get("note",""), "status": status, "closed_at": now_iso()
+    }})
+    # If gap, record it on the Gérante balance
+    if gap != 0 and s.get("manager_id"):
+        await db.manager_balance.insert_one({"id":new_id(),"manager_id":s.get("manager_id"),"session_id":sid,"amount":-gap,"reason":"Écart versement","at":now_iso()})
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.validate_handover","entity_id":sid,"after":{"gap":gap,"status":status},"at":now_iso()})
+    return {"ok": True, "gap": gap, "status": status}
+
+@api.get("/manager-balance/{mid}")
+async def manager_balance(mid: str, user: dict = Depends(require_role("admin","manager"))):
+    rows = await db.manager_balance.find({"manager_id": mid}).sort("at",-1).to_list(500)
+    total = sum(r.get("amount",0) for r in rows)
+    return {"balance": total, "entries": clean(rows)}
+
+# -------- Attendance (check-in with selfie + GPS + geofence) --------
+def _haversine_m(lat1, lon1, lat2, lon2):
+    import math
+    R = 6371000
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2-lat1); dl = math.radians(lon2-lon1)
+    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dl/2)**2
+    return int(2*R*math.asin(math.sqrt(a)))
+
+@api.get("/attendance/me")
+async def attendance_me(user: dict = Depends(get_user)):
+    today = datetime.now(timezone.utc).date().isoformat()
+    arr = await db.attendance.find_one({"user_id": user.get("id"), "day": today, "kind":"arrival"})
+    dep = await db.attendance.find_one({"user_id": user.get("id"), "day": today, "kind":"departure"})
+    return {"checked_in": bool(arr), "arrival": clean(arr), "departure": clean(dep)}
+
+@api.post("/attendance/check-in")
+async def check_in(body: Dict[str,Any], user: dict = Depends(get_user)):
+    """kind: 'arrival' | 'departure'. Requires selfie (b64) and GPS if method='phone'."""
+    kind = body.get("kind","arrival")
+    method = body.get("method","phone")  # phone | tablet
+    selfie = body.get("selfie")
+    lat = body.get("lat"); lng = body.get("lng")
+    if method == "phone" and not selfie:
+        raise HTTPException(400, "Selfie requis (caméra avant)")
+    biz = await db.business.find_one({"id":"main"}) or {}
+    geo = biz.get("geofence") or {"lat": 5.360, "lng": -3.994, "radius_m": 150, "mandatory": False}
+    distance = None; outside = False
+    if lat is not None and lng is not None and geo.get("lat"):
+        distance = _haversine_m(float(lat), float(lng), float(geo["lat"]), float(geo["lng"]))
+        outside = distance > int(geo.get("radius_m", 150))
+    if outside and geo.get("mandatory") and method == "phone":
+        raise HTTPException(400, f"Pointage refusé : vous êtes à {distance} m de la boutique (max {geo.get('radius_m')} m)")
+    today = datetime.now(timezone.utc).date().isoformat()
+    now = datetime.now(timezone.utc)
+    # Compute lateness vs role hours
+    hours = (biz.get("working_hours") or {}).get(user.get("role","")) or {"open":"08:00","tolerance_min":10}
+    late = False; late_min = 0
+    if kind == "arrival":
+        oh, om = (hours.get("open","08:00").split(":") + ["00"])[:2]
+        open_dt = now.replace(hour=int(oh), minute=int(om), second=0, microsecond=0)
+        tol = int(hours.get("tolerance_min",10))
+        delta = int((now - open_dt).total_seconds()/60)
+        if delta > tol: late = True; late_min = delta
+    # Departure without reconciliation flag (riders)
+    flags = []
+    if outside: flags.append("hors_boutique")
+    if kind == "departure" and user.get("role") == "rider":
+        pending_recon = await db.delivery_sessions.count_documents({"rider_id": user.get("id"), "status": {"$ne": "reconciled"}})
+        if pending_recon > 0:
+            flags.append("depart_sans_reconciliation")
+            await db.notifications.insert_one({"id":new_id(),"type":"attendance_alert","title":"Départ sans réconciliation","msg":f"{user.get('name')} a pointé le départ sans réconcilier ses livraisons","color":"#c62828","at":now_iso(),"link":"/console/livraisons"})
+    doc = {"id": new_id(), "user_id": user.get("id"), "user_name": user.get("name"), "user_role": user.get("role"),
+           "day": today, "kind": kind, "method": method, "at": now_iso(), "selfie": selfie,
+           "lat": lat, "lng": lng, "distance_m": distance, "outside": outside,
+           "late": late, "late_min": late_min, "flags": flags}
+    await db.attendance.insert_one(doc)
+    if outside:
+        await db.notifications.insert_one({"id":new_id(),"type":"attendance_alert","title":"Pointage hors boutique","msg":f"{user.get('name')} à {distance} m","color":"#e4991e","at":now_iso(),"link":"/console/pointage"})
+    return {"ok": True, "late": late, "late_min": late_min, "distance_m": distance, "outside": outside, "flags": flags, "at": doc["at"]}
+
+@api.get("/attendance/today")
+async def attendance_today(user: dict = Depends(require_role("admin","manager"))):
+    today = datetime.now(timezone.utc).date().isoformat()
+    rows = await db.attendance.find({"day": today}).sort("at",-1).to_list(200)
+    all_employees = await db.users.find({"role": {"$in": ["manager","rider","caissiere","stock_keeper"]}, "active": True}).to_list(200)
+    present_ids = {r["user_id"] for r in rows if r["kind"]=="arrival"}
+    not_checked = [{"id":u["id"],"name":u["name"],"role":u["role"]} for u in all_employees if u["id"] not in present_ids]
+    return {"today": clean(rows), "not_checked_in": not_checked, "present_count": len(present_ids), "total_employees": len(all_employees)}
+
+@api.get("/attendance/calendar/{eid}")
+async def attendance_calendar(eid: str, month: Optional[str] = None, user: dict = Depends(require_role("admin","manager"))):
+    """Return per-day status for a given employee and month (YYYY-MM)."""
+    now = datetime.now(timezone.utc)
+    ym = month or now.strftime("%Y-%m")
+    rows = await db.attendance.find({"user_id": eid, "day": {"$regex": f"^{ym}"}}).to_list(1000)
+    days = {}
+    for r in rows:
+        d = days.setdefault(r["day"], {"arrival": None, "departure": None, "late": False, "late_min": 0, "flags": []})
+        if r["kind"] == "arrival": d["arrival"] = r["at"]; d["late"] = r.get("late", False); d["late_min"] = r.get("late_min",0)
+        if r["kind"] == "departure": d["departure"] = r["at"]
+        d["flags"] = list(set(d["flags"] + (r.get("flags") or [])))
+    return {"month": ym, "days": days}
+
+@api.get("/attendance/stats/{eid}")
+async def attendance_stats(eid: str, days: int = 30, user: dict = Depends(require_role("admin","manager"))):
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+    rows = await db.attendance.find({"user_id": eid, "day": {"$gte": cutoff}}).to_list(1000)
+    worked_days = len({r["day"] for r in rows if r["kind"]=="arrival"})
+    late_count = sum(1 for r in rows if r["kind"]=="arrival" and r.get("late"))
+    total_late_min = sum(r.get("late_min",0) for r in rows)
+    outside = sum(1 for r in rows if r.get("outside"))
+    arrivals = [r for r in rows if r["kind"]=="arrival" and r.get("at")]
+    avg_arrival_h = None
+    if arrivals:
+        total_min = sum((datetime.fromisoformat(r["at"].replace("Z","+00:00")).hour*60 + datetime.fromisoformat(r["at"].replace("Z","+00:00")).minute) for r in arrivals)
+        avg = total_min // len(arrivals)
+        avg_arrival_h = f"{avg//60:02d}:{avg%60:02d}"
+    return {"worked_days": worked_days, "late_count": late_count, "late_min_total": total_late_min, "outside_count": outside,
+            "punctuality_pct": round((worked_days-late_count)/max(1,worked_days)*100, 1), "avg_arrival": avg_arrival_h}
+
+@api.patch("/business/geofence")
+async def update_geofence(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    """Set the store GPS, radius and mandatory flag."""
+    geo = {"lat": float(body.get("lat") or 0), "lng": float(body.get("lng") or 0),
+           "radius_m": int(body.get("radius_m", 150)), "mandatory": bool(body.get("mandatory", False))}
+    await db.business.update_one({"id":"main"}, {"$set": {"geofence": geo}}, upsert=True)
+    return {"ok": True, "geofence": geo}
+
+@api.patch("/business/working-hours")
+async def update_working_hours(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    await db.business.update_one({"id":"main"}, {"$set": {"working_hours": body.get("working_hours") or {}}}, upsert=True)
+    return {"ok": True}
+
+# -------- Stock adjustment with approval --------
+@api.post("/stock/adjustments")
+async def stock_adjust(body: Dict[str,Any], user: dict = Depends(get_user)):
+    """If user is admin, apply directly. Otherwise create approval request."""
+    pid = body.get("product_id"); delta = int(body.get("delta",0)); reason = body.get("reason","")
+    if not pid or delta == 0: raise HTTPException(400)
+    if user.get("role") == "admin":
+        await db.products.update_one({"id": pid}, {"$inc": {"stock": delta}})
+        await db.stock_movements.insert_one({"id":new_id(),"product_id":pid,"delta":delta,"reason":reason,"by":user.get("name"),"at":now_iso()})
+        await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"stock.adjust","entity_id":pid,"after":{"delta":delta,"reason":reason},"at":now_iso()})
+        return {"ok": True, "applied": True}
+    doc = {"id": new_id(), "kind": "stock_adjust", "requested_by_id": user.get("id"), "requested_by_name": user.get("name"),
+           "payload": {"product_id": pid, "delta": delta}, "reason": reason, "status":"pending", "created_at": now_iso()}
+    await db.approval_requests.insert_one(doc)
+    return {"ok": True, "applied": False, "approval_request_id": doc["id"]}
+
     # Business
     if await db.business.count_documents({}) == 0:
         await db.business.insert_one({"id":"main","name":"Chez Dina","phone":"+225 07 77 92 61 79","address":"Cocody Angré 7e, Abidjan","tiktok":"@dinoush04","whatsapp":"2250777926179","currency":"XOF","created_at":now_iso()})
