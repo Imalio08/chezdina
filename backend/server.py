@@ -1341,6 +1341,48 @@ async def list_rider_locations(user: dict = Depends(get_user)):
     rows = [r for r in rows if r.get("updated_at", "") >= cutoff]
     return clean(rows)
 
+@api.post("/deliveries/suggest-split")
+async def suggest_split(body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    """Propose a zone-based + load-balanced split of unassigned orders among active riders.
+    Body: { order_ids: [...], rider_ids: [...] }  (optional, defaults to all ready + all riders)
+    Returns: { suggestions: [{ rider_id, rider_name, orders: [oid,...], total_load, zones:[...] }], unassigned:[oid,...] }
+    """
+    requested_oids = body.get("order_ids") or []
+    requested_rids = body.get("rider_ids") or []
+    # Load candidates
+    order_filter = {"id": {"$in": requested_oids}} if requested_oids else {"mode": "delivery", "status": {"$in": ["prete","confirmee"]}, "rider_id": {"$in": [None, ""]}}
+    orders = await db.orders.find(order_filter).to_list(500)
+    rider_filter = {"id": {"$in": requested_rids}} if requested_rids else {"role": "rider", "active": {"$ne": False}}
+    riders = await db.users.find(rider_filter).to_list(200)
+    if not riders:
+        return {"suggestions": [], "unassigned": [o["id"] for o in orders], "message": "Aucun livreur actif"}
+    # Load current rider load (orders assigned today, not delivered)
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    load = {r["id"]: 0 for r in riders}
+    cur = await db.orders.find({"rider_id": {"$in": [r["id"] for r in riders]}, "created_at": {"$regex": f"^{today}"}, "status": {"$nin": ["livree","annulee","echouee"]}}).to_list(500)
+    for o in cur: load[o.get("rider_id")] = load.get(o.get("rider_id"), 0) + 1
+    # Group orders by zone, then round-robin to least-loaded rider — bias same rider for same zone
+    by_zone: Dict[str, List[dict]] = {}
+    for o in orders:
+        z = o.get("delivery_zone") or "—"
+        by_zone.setdefault(z, []).append(o)
+    suggestions = {r["id"]: {"rider_id": r["id"], "rider_name": r.get("name"), "orders": [], "zones": set(), "total_load": load.get(r["id"], 0)} for r in riders}
+    zone_rider: Dict[str, str] = {}
+    for z, zorders in by_zone.items():
+        for o in zorders:
+            # Prefer rider already handling this zone, else least-loaded
+            if z in zone_rider:
+                rid = zone_rider[z]
+            else:
+                rid = min(suggestions.keys(), key=lambda k: suggestions[k]["total_load"])
+                zone_rider[z] = rid
+            suggestions[rid]["orders"].append(o["id"])
+            suggestions[rid]["zones"].add(z)
+            suggestions[rid]["total_load"] += 1
+    out = [{"rider_id": s["rider_id"], "rider_name": s["rider_name"], "orders": s["orders"], "zones": sorted(list(s["zones"])), "total_load": s["total_load"]} for s in suggestions.values() if s["orders"]]
+    return {"suggestions": out, "unassigned": []}
+
 @api.patch("/delivery-sessions/{sid}/close")
 async def close_session(sid: str, user: dict = Depends(require_role("admin","manager"))):
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"closed": True, "closed_at": now_iso()}})

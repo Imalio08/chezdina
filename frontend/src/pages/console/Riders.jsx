@@ -99,6 +99,28 @@ export default function Riders() {
 }
 
 function RiderProfile({ rider, score, onBack }) {
+  const [history, setHistory] = useState([]);
+  const [from, setFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate()-14); return d.toISOString().slice(0,10); });
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0,10));
+
+  useEffect(() => {
+    api.get("/orders").then(r => {
+      const my = (r.data||[]).filter(o => o.rider_id === rider.id);
+      setHistory(my);
+    }).catch(()=>{});
+  }, [rider.id]);
+
+  const filtered = history.filter(o => {
+    const d = (o.created_at||"").slice(0,10);
+    return d >= from && d <= to;
+  });
+  const stats = {
+    total: filtered.length,
+    delivered: filtered.filter(o => o.status === "livree").length,
+    cancelled: filtered.filter(o => ["annulee","echouee"].includes(o.status)).length,
+    revenue: filtered.filter(o => o.status === "livree").reduce((s,o)=>s+(o.total||0),0),
+  };
+
   return (
     <div className="space-y-5" data-testid="rider-profile">
       <button onClick={onBack} className="text-sm text-[#666] hover:text-[#b02a2a]">← Retour aux livreurs</button>
@@ -110,6 +132,7 @@ function RiderProfile({ rider, score, onBack }) {
         </div>
         <a href={`https://wa.me/${(rider.phone||"").replace(/\D/g,"")}`} target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[36px] text-xs"><MessageCircle size={13}/>WhatsApp</a>
       </div>
+
       {score && (
         <div className="dina-card-white p-5">
           <div className="flex items-center justify-between mb-3"><div className="font-serif text-xl">Score · {score.score}/100 · {score.level}</div></div>
@@ -125,9 +148,49 @@ function RiderProfile({ rider, score, onBack }) {
               );
             })}
           </div>
-          <p className="text-[11px] text-[#999] mt-4 italic">Le score combine : 35 % taux de livraison réussie, 20 % ponctualité, 25 % note clientes, 10 % exactitude de caisse, 10 % preuves complètes (code utilisé).</p>
+          <p className="text-[11px] text-[#999] mt-4 italic">35 % livraisons réussies · 20 % ponctualité · 25 % note clientes · 10 % exactitude caisse · 10 % preuves complètes.</p>
         </div>
       )}
+
+      <div className="dina-card-white p-5">
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
+          <div className="font-serif text-xl">Historique · {filtered.length} commande(s)</div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <label className="text-xs text-[#666]">Du</label>
+            <input type="date" className="dina-input !py-1 text-xs" value={from} onChange={e=>setFrom(e.target.value)} data-testid="rider-hist-from"/>
+            <label className="text-xs text-[#666]">au</label>
+            <input type="date" className="dina-input !py-1 text-xs" value={to} onChange={e=>setTo(e.target.value)} data-testid="rider-hist-to"/>
+            <button onClick={() => { const d = new Date(); setFrom(new Date(d.getTime()-6*86400000).toISOString().slice(0,10)); setTo(d.toISOString().slice(0,10)); }} className="dina-chip text-[10px]" data-testid="rider-hist-7d">7j</button>
+            <button onClick={() => { const d = new Date(); setFrom(new Date(d.getTime()-29*86400000).toISOString().slice(0,10)); setTo(d.toISOString().slice(0,10)); }} className="dina-chip text-[10px]" data-testid="rider-hist-30d">30j</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+          <StatMini label="Total" value={stats.total} color="#5867fd"/>
+          <StatMini label="Livrées" value={stats.delivered} color="#1f8a4c"/>
+          <StatMini label="Annulées" value={stats.cancelled} color="#c62828"/>
+          <StatMini label="CA livré" value={stats.revenue.toLocaleString("fr-FR")+" FCFA"} color="#b02a2a" small/>
+        </div>
+        <div className="overflow-x-auto max-h-96">
+          <table className="dina-table" data-testid="rider-hist-table">
+            <thead><tr><th>Date</th><th>Commande</th><th>Cliente</th><th>Zone</th><th>Statut</th><th className="text-right">Total</th></tr></thead>
+            <tbody>{filtered.length === 0 ? <tr><td colSpan={6} className="text-center text-sm text-[#666] py-6">Aucune commande sur cette période</td></tr>
+            : filtered.slice(0,200).map(o => (
+              <tr key={o.id}>
+                <td className="text-xs text-[#666]">{(o.created_at||"").slice(0,10)}</td>
+                <td className="font-mono text-xs">{o.code}</td>
+                <td>{o.customer?.name || "—"}</td>
+                <td className="text-xs">{o.delivery_zone || "—"}</td>
+                <td><span className="dina-chip text-[10px]">{o.status}</span></td>
+                <td className="text-right tabular font-semibold">{o.total?.toLocaleString("fr-FR")} FCFA</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
+}
+
+function StatMini({ label, value, color, small }) {
+  return <div className="dina-card-white p-3"><div className="text-[9px] uppercase text-[#666] font-semibold">{label}</div><div className={`font-serif tabular leading-none mt-1 ${small?"text-sm":"text-xl"}`} style={{color}}>{value}</div></div>;
 }
