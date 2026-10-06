@@ -1,6 +1,24 @@
 # Chez Dina — PRD
 
+## Fix pack 9/9 (Feb 2026) — Manuel d'utilisation ✅
+
+### Backend
+- Collection `manual_modules` seedée au démarrage avec 16 modules complets (Prise en main → Espace livreur)
+- Collection `manual_progress` par utilisateur avec `read_sections[]`
+- Endpoints : GET /manual/modules (filtre `?role=`), GET /manual/modules/{n}, PATCH (admin/manager), GET+POST /manual/progress, GET /manual/search, GET /manual/module-for-path
+
+### Frontend
+- Route `/console/manuel` (Manuel.jsx) : header + barre de recherche live (debounce 200ms) + 6 filtres rôle + grid de 16 cartes modules avec progression (sections lues)
+- Route `/console/manuel/:number` (ManuelModule.jsx) : TOC gauche sticky, Objectifs du module (checklist), sections numérotées, Block renderer (text/list/steps/statuses/callout/screenshot), callouts stylisés (info bleu, astuce jaune, attention rouge), "Marquer comme lu", cartes prev/next, modal édition JSON pour admin/manager
+- `HelpButton.jsx` dans le header console : panneau latéral qui pop le module associé à la page courante via `/manual/module-for-path`
+- `GuidedTour.jsx` : visite guidée 4-7 étapes à la première connexion, personnalisée par rôle, rejouable via `window.dispatchEvent(new Event("dina-replay-tour"))`
+- Sidebar : entrée "Manuel d'utilisation" en bas avec icône GraduationCap
+
+### Modules mappés aux pages
+Dashboard→1, POS→3, Commandes→4, Livraisons→5, Produits→6, Fournisseurs→7, Stock→8, Clients→9, Promotions→10, Sessions caisse→11, Stats/Finances→12, Site→13, Équipe/Rôles/Pointage→14, Paramètres→15, Rider→16
+
 ## Fix pack 8 Vague C (correctif) + Vague D (Feb 2026) ✅
+
 
 ### Correctif Vague C — Hero mosaïque + Upload uniquement
 - Hero : 2 colonnes verticales défilant du bas vers le haut à vitesses alternées (18 et 22 px/s), prefers-reduced-motion respecté

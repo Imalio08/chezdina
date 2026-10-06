@@ -1,0 +1,22 @@
+{
+  "summary": "Pack 9/9 Manuel d'utilisation — Full backend + frontend verification. All 12 backend pytest tests pass (16 modules seeded, role filter, module detail with read flag, progress mark/get, search, module-for-path, admin PATCH, rider forbidden). Full frontend flow verified: sidebar entry, Manuel home with 16 cards, 6 role filter buttons, rider filter → 4 cards (modules 1/2/5/16), search 'livraison' → 6 results dropdown, Module 3 detail page with TOC(16), objectives, 12 steps, callout-warning, prev/next, mark-read persists with 'Lu' badge, admin edit button visible (hidden for rider), Help button on /console/pos opens side panel scoped to Module 3 (Caisse), guided tour appears on first login after localStorage clear with close/prev/next/finish buttons.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_manuel_pack9.py",
+    "/app/test_reports/pytest/manuel_pack9.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "seed_manual_modules() guards with count>=16 so existing seeded modules are not updated when MANUAL_MODULES_SEED code changes; consider upsert-by-number to keep seed content aligned with code.",
+    "GET /manual/search is a linear scan over all modules; fine for 16 items but should be indexed if content grows.",
+    "Rider role cannot access /console/* routes so /console/manuel is admin/manager/sales/stock only; rider help/manual is implicitly gated by role route guard — role filter is still exposed in server for completeness."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "Admin aouattaraesca@gmail.com/Admin123!, Rider rider1@dinastore.ci/Rider123!",
+  "seed_data_creation": "None (16 manual modules auto-seeded on backend startup)",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Pack 9 Manuel feature fully functional. Backend endpoints under /api/manual/* all working. Frontend uses testids: nav-manuel-dutilisation, manuel-search, manuel-results, manuel-role-{role}, manuel-card-{n}, manuel-toc, toc-item-{n}, manuel-objectives, step-{i}, callout-{variant}, mark-read-{sid}, prev-module, next-module, manuel-edit, manuel-save, manuel-sections-json, help-button, help-panel, help-section-{sid}, help-open-module, guided-tour, tour-close, tour-prev, tour-next, tour-finish. Guided tour localStorage key: dina_tour_done_{user_id} — clear localStorage to re-trigger."
+}
