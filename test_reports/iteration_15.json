@@ -1,0 +1,45 @@
+{
+  "summary": "Fix pack 4 (Rider) + Fix pack 5 (Products/Brands/Categories/Collections/Suppliers/PO/Stock) tested end-to-end on preview URL. Backend: 21/21 pytest cases green (AI desc+SEO; brands KPIs/full/detail; categories tree+kpis; collections CRUD; suppliers KPIs + admin-only detail with manager 403 + manager field redaction; PO KPIs + edit-guard + blind-receive gap detection + validate-gaps; stock KPIs + movements + adjustment-requests role split (admin auto-approve, manager pending) + blind inventory lines hidden from manager + close). Frontend: all Pack 5 pages render with correct KPIs, grille/tableau switches, Kanban 5-column PO board, 4-tab Stock page, 2-tab Catégories/Collections page. Manager suppliers view correctly hides 'Nouveau fournisseur' button + phone/email/manager fields with 'Informations masquées' notice. Admin ProductFormV3 shows 8 sections including 'Rédiger avec l'IA' button, SEO section with Aperçu Vitrine preview. Rider Performance tab displays 'Comment est calculé votre score ?' block with 5 weighted bars (Taux livraison 35%, Ponctualité 20%, Satisfaction 25%, Exactitude caisse 10%, Preuves 10%) summing to 100. Rider Courses tab correctly OMITS 'Scanner une fiche' button.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/stock/adjustment-requests (admin)", "issue": "Admin auto-apply path writes product stock without recording a stock_movement audit row — journal (Mouvements tab) will miss admin-driven adjustments. Managers' approved requests ARE journaled via /decide approve. Consider inserting a stock_movements doc in the admin auto-apply branch for parity."},
+      {"endpoint": "POST /api/purchase-orders/{pid}/blind-receive", "issue": "Blind-receive persists `qty_counted` back onto each line item BEFORE validation — if the receiver re-opens the PO after blind-receive but before admin validates, the ordered qty is overwritten. Store counted qty in `reception.counts` only; keep item.qty = ordered until validate-gaps."},
+      {"endpoint": "GET /api/stock/inventories (manager)", "issue": "Server hides qty_expected for open inventories (good) — but counted_by/updated_at are still copied back which could leak expected inferred values via `qty_counted` saved earlier. Confirm anti-peek on subsequent GETs after partial counts."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Login form (/login)", "issues": ["Email + password inputs lack data-testid / name / id / placeholder → unreliable for automated testing. Add data-testid='login-email' / 'login-password' / 'login-submit'."]},
+      {"screen": "All console pages with <select>", "issues": ["Hydration warning in console: '<span> cannot be a child of <option>' triggered by the visual-editor instrumentation (x-source-* span inside option in PeriodSelector.jsx and CreateOnFlySelect.jsx). Dev-only warning but noisy — wrap option children in a bare string, not <span>."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack5.py",
+    "/app/test_reports/pytest/fixpack5_results.xml"
+  ],
+  "action_items": [
+    "Add stock_movements row inside admin auto-apply branch of /stock/adjustment-requests for audit-trail parity.",
+    "Do NOT persist qty_counted onto PO item.qty inside /blind-receive — keep it on reception.counts until /validate-gaps commits.",
+    "Add data-testid to login email/password/submit (currently anonymous inputs break reliable e2e).",
+    "Fix React hydration warning: PeriodSelector option label + CreateOnFlySelect __add__ option both have a <span> child inside <option> (from visual-editor instrumentation)."
+  ],
+  "critical_code_review_comments": [
+    "server.py now 4098 lines — still monolithic; routers extraction overdue (previously flagged).",
+    "/suppliers list endpoint correctly strips sensitive fields for non-admin (verified via manager session).",
+    "Blind-reception + blind-inventory properly hide expected quantities from manager role (verified).",
+    "AI endpoints return a `fallback` key when the LLM call fails — frontend should optionally show a hint when fallback=true (currently silently used)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixpack5.py (new, 21 tests)"
+  ],
+  "success_rate": {"backend": "100% (21/21)", "frontend": "100% visual spot-checks for all Pack 5 pages + rider gating"},
+  "test_credentials": "admin aouattaraesca@gmail.com / Admin123! OK · manager manager.cocody@dinastore.ci / Manager123! OK · rider rider1@dinastore.ci / Rider123! OK (rider already pointé, CheckInGate bypassed)",
+  "seed_data_creation": "Collection TEST_FP5_Collection created + deleted. One PO TEST_FP5_PO created + blind-received (gap 10→8) + validated + deleted. One stock_adjustment_request (admin, qty_delta=0, 'TEST_FP5 admin') auto-approved. One manager-created adjustment request rejected by admin. One inventory 'TEST_FP5 Inv' created, counted (matching expected, no gap), and closed. All side-effects are safe/no-op on re-run.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Pack 4 + Pack 5 fully green on preview. Reusable regression: /app/backend/tests/test_fixpack5.py (also test_fixpack2.py + test_fixpack3.py from prior iterations). Known non-blocking issues: (a) admin-direct stock adjustment doesn't journal to stock_movements, (b) blind-receive mutates PO item.qty with counted value (data-integrity risk if PO reopened pre-validation), (c) login inputs still lack data-testid — tests use positional input.nth(0/1) selectors. React hydration warning on <select><option><span> from visual-editor instrumentation is a dev-only noise item.",
+  "rca of the issue": "No blockers. All stated acceptance criteria for Fix pack 4 Rider (no Scanner button on Courses, Performance score explanation with 5 weighted bars) and Fix pack 5 (Products 8 KPIs + AI describe + SEO section; Marques KPIs; Catégories/Collections two tabs; Suppliers admin-full/manager-redacted; PO 6 KPIs + Kanban + blind-receive + gap validation; Stock 6 KPIs + 4 tabs + role-split adjustment requests + blind inventory) verified both at API and UI level."
+}
