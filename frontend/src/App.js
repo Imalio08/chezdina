@@ -27,6 +27,8 @@ import Integrations from "@/pages/console/Integrations";
 import Settings from "@/pages/console/Settings";
 import SiteSettings from "@/pages/console/SiteSettings";
 import Placeholder from "@/pages/console/Placeholder";
+import FichesColis from "@/pages/console/FichesColis";
+import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
 import Catalog from "@/pages/storefront/Catalog";
@@ -107,7 +109,9 @@ export default function App() {
               <Route path="pages" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="menus" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="seo" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="fiches-colis" element={<ErrorBoundary><FichesColis/></ErrorBoundary>} />
             </Route>
+            <Route path="/noter/:code" element={<ErrorBoundary><Rate/></ErrorBoundary>} />
             <Route path="/console/livreur" element={<ProtectedRider><ErrorBoundary><Rider /></ErrorBoundary></ProtectedRider>} />
             <Route path="/" element={<Navigate to="/console" replace />} />
             <Route path="*" element={<Navigate to="/console" replace />} />

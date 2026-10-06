@@ -3,6 +3,41 @@
 ## Problem Statement
 **Chez Dina** — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). Single codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. **Français uniquement**, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
+## Session 6 (Feb 6 2026) — Section 6 Delivery full redesign (partiel)
+### Nouveaux endpoints backend
+- `GET /api/public/order/{code}` → récupère les infos safe d'une commande (nom cliente, items, livreur, date livraison) depuis l'extérieur sans auth, pour la page de notation
+- `POST /api/public/rate/{code}` → la cliente soumet rating (1-5), rider_rating, comment, recommend. Stocké dans `order_ratings` + agrégé sur `orders.rating`
+
+### Nouvelle page `/app/frontend/src/pages/console/FichesColis.jsx`
+- Accessible via sidebar **Livraison > Fiches colis** et route `/console/fiches-colis`.
+- Liste toutes les commandes en statuts prete/assignee/en_livraison avec checkbox sélection + "Tout sélectionner".
+- Sélecteur de format : **Thermique 80mm · A6 100×150mm · A4 — 4 par feuille**.
+- Bouton Imprimer déclenche `window.print()`, les éléments `.print:hidden` disparaissent.
+- Chaque fiche contient : logo Chez Dina + téléphone + TikTok, **QR code du code commande** (via api.qrserver.com), numéro large, date livraison, cliente avec téléphone en gras, zone + adresse + **mini-QR Google Maps pour itinéraire**, articles détaillés (qty × nom · taille · couleur), montants (articles / livraison / total), **badge "À encaisser X FCFA" en rouge** OU **"Déjà payé" en vert**, livreur assigné, notes italique.
+- CSS print rules pour pagination correcte selon le format.
+
+### Nouvelle page publique `/noter/:code`
+- Route publique dans App.js, lien envoyé par WhatsApp aux clientes après livraison.
+- Form : étoiles pour la commande (obligatoire), étoiles pour le livreur si assigné, textarea commentaire, boutons 👍/👎 "Recommanderiez-vous Chez Dina ?".
+- Design mobile-first avec logo rouge Chez Dina en haut, écran de succès "Merci {prénom} !" après soumission.
+
+### Rider.jsx entièrement refondu
+- Nouveau header avec bouton direct **"Gérante"** (WhatsApp vers manager) en plus du logout.
+- Strip 3 KPI live sur l'onglet Courses : **À livrer · Livrées · Collecté (FCFA)**.
+- Nouveau statut **"Récupérée" (recuperee)** entre Assignée et En livraison, ajouté dans `format.js` statusLabel/statusColor + supporté backend.
+- Cartes courses enrichies : affichage "À encaisser X FCFA" en rouge gras si COD, "Déjà payé" vert sinon.
+- Bottom-sheet commande détaillée :
+  - 3 gros boutons action : **Appeler (tel:) · WhatsApp vert · Itinéraire bleu (ouvre Google Maps directions avec adresse)**
+  - Articles détaillés avec taille/couleur, livraison séparée, total avec couleur selon mode paiement
+  - 5 boutons statuts : **Récupérée (pour assignee) → En route → Livrée verte → Reportée orange → Annulée/Échec rouge**
+  - **Sheet "Annulée"** : 7 motifs preset cliquables + commentaire optionnel, confirmer envoie reason au backend
+  - **Sheet "Reportée"** : date picker (demain par défaut) + motif, confirme → change status en "confirmee" avec next_date
+- Onglet Encaissements : 2 KPI (Collecté aujourd'hui vert / Reste à encaisser rouge) + détail des livraisons payées cash
+- Onglet Profil : KPIs (livraisons jour, taux de réussite, reste à encaisser) + bouton "Signaler un problème" → WhatsApp gérante
+
+### Testé en curl
+- Backend OK · Public order fetch OK · Public rate submit OK (5★ + commentaire) · Status 'recuperee' accepté par `/orders/{id}/status` ✅
+
 ## Session 5 (Feb 6 2026) — Section 5 POS cash control
 ### Nouveaux endpoints backend (contrôle caisse)
 - **`POST /api/pos/pin-authorize`** → vérifie le PIN d'un admin/gérante actif (`attendance_code` + role in admin/manager) et logge l'approbation dans `pos_authorizations` (requested_by/approved_by/action/amount). Retourne 403 si PIN invalide.
