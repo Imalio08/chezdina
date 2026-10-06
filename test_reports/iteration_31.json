@@ -1,0 +1,55 @@
+{
+  "summary": "Iteration 31 — Validated the illustrated manual (POST /api/manual/reseed + rich annotated screenshots/FAQ/glossary/memo blocks). Backend 100% green: 6/6 pytest in /app/backend/tests/test_manual_reseed.py pass. GET /api/manual/modules/2 returns the 'Faire une vente à la caisse' module with sections 'Ouvrir sa session de caisse', 'Encaisser une vente', 'Clôturer la caisse', 'Mémo A4 Gérante caisse' and blocks of type annotated (screens cash_session + pos_cart with callouts arrays), steps, memo, faq. GET /api/manual/modules/4 contains a glossary of 6 terms and an FAQ of 6 Q/A. POST /api/manual/reseed returns {ok:true, updated:4} for admin, 403 for sales, and is idempotent across repeat calls. Backend GET /api/manual/modules/4 returns 200 for the rider role as well. Frontend: /console/manuel/2 as admin renders the 4 expected section headings AND both annotated SVG figures (data-testid='annotated-cash_session' x1 and 'annotated-pos_cart' x1, 75 svg nodes total). /console/manuel/4 as admin shows the Glossaire <dl> with 6 <dt> terms, 6 <details> FAQ items (verified open attribute toggles), and the 'Mémo A4 Livreur' section. Rider access to /console/manuel/4 is BLOCKED by frontend routing (riders are hard-redirected to /rider by ProtectedRoute in App.js:92) — the FAQ/Mémo for rider is unreachable through the console; the rider shell exposes only a Placeholder 'Manuel d'utilisation — bientôt disponible' at /rider/manuel (App.js:184). Minor: AnnotatedScreenshot SVGs emit a React warning '<svg> attribute height: Expected length, \"auto\"'.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "App.js routing — rider access to manual",
+        "issue": "Riders cannot reach /console/manuel/4 (ProtectedRoute line 92 force-redirects any user whose role==='rider' to /rider). The rider-side /rider/manuel route (App.js:184) still renders a <Placeholder/> stating 'bientôt disponible' instead of the actual Manuel UI. Net effect: test case #5 (rider sees FAQ + Mémo A4 Livreur) fails end-to-end even though the backend serves module 4 to rider1 with 200.",
+        "selector": "/console/manuel/4 as rider role",
+        "priority": "HIGH"
+      },
+      {
+        "component": "AnnotatedScreenshot.jsx",
+        "issue": "React console error: '<svg> attribute height: Expected length, \"auto\"'. The root <svg> likely has height=\"auto\" which is not a valid SVG length attribute. Use CSS (style={{height:'auto'}}) or remove the attribute.",
+        "selector": "svg inside [data-testid^='annotated-']",
+        "priority": "LOW"
+      },
+      {
+        "component": "PeriodSelector.jsx (regression, unrelated to this iteration)",
+        "issue": "Hydration warning: '<span> cannot be a child of <option>' at PeriodSelector.jsx:96 — a dev-mode wrapper injects a <span style={{display:'contents'}}> inside <option>. Not blocking but pollutes console.",
+        "selector": "select.dina-chip > option",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_manual_reseed.py",
+    "/app/test_reports/pytest/iter31.xml"
+  ],
+  "action_items": [
+    "Decide the rider manual UX: either (a) relax ProtectedRoute so rider can read /console/manuel/* in read-only mode, or (b) replace the rider /rider/manuel Placeholder with a real list+detail view that reuses the same ManuelModule component — otherwise test case 5 cannot be satisfied through the UI.",
+    "Fix AnnotatedScreenshot SVG: remove height=\"auto\" (invalid as SVG attribute) — move to style/CSS."
+  ],
+  "critical_code_review_comments": [
+    "server.py manual_reseed() is clean, idempotent, protected by require_role('admin'), returns {ok,updated,modules}. Good.",
+    "AnnotatedScreenshot.jsx renders 6 screens with numbered callouts — verified visually on module 2 (cash_session + pos_cart). Only issue is the invalid SVG height='auto' attribute.",
+    "ManuelModule block renderer correctly handles annotated/memo/glossary/faq/steps — rendering verified for modules 2 and 4.",
+    "Rider role gating is enforced at the top-level ProtectedRoute (App.js:92) with no exception for the manual — this is the sole blocker for rider manual access."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_manual_reseed.py (new)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "80%"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123!, Sales agent1@dinastore.ci / Agent123! (403 confirmed), Rider rider1@dinastore.ci / Rider123! (backend 200, frontend blocked by rider redirect).",
+  "seed_data_creation": "POST /api/manual/reseed called twice as admin — both returned {ok:true, updated:4}. Idempotent as advertised.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend fully validated via /app/backend/tests/test_manual_reseed.py (6 tests, run with: pytest backend/tests/test_manual_reseed.py -v). Admin UI for /console/manuel/2 and /console/manuel/4 fully functional. Remaining open item: rider path to the manual — currently requires either loosening the rider ProtectedRoute or implementing /rider/manuel for real. Note: a GuidedTour overlay (data-testid='guided-tour') may auto-launch for freshly-logged-in admins and intercept pointer events on /console/manuel/4 — in tests, dismiss it or use JS setAttribute to toggle <details open>.",
+  "rca of the issue": "Rider manual gap — /app/frontend/src/App.js line 92 inside ProtectedRoute: `if (user.role === 'rider') return <Navigate to=\"/rider\" replace />;` applies to the whole /console tree, so /console/manuel/* can never be opened by a rider. The intended rider surface is /rider/manuel (line 184) but that route is wired to <Placeholder title=\"Manuel d'utilisation\" subtitle=\"Guides et tutoriels — bientôt disponible\"/>, not to the real <ManuelModule/>. Mitigation: swap the Placeholder with a Manuel/ManuelModule pair under /rider/manuel (and pass number via :number param), OR allow role==='rider' to pass through ProtectedRoute specifically for '/console/manuel' paths."
+}
