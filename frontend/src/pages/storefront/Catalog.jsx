@@ -10,12 +10,13 @@ export default function Catalog() {
   const [sp, setSp] = useSearchParams();
   const [products, setProducts] = useState([]);
   const [brands, setBrands] = useState([]);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState(sp.get("q") || "");
   const [sort, setSort] = useState("new");
   const [filters, setFilters] = useState({});
   const [sheetOpen, setSheetOpen] = useState(false);
   const cat = sp.get("category") || "all";
 
+  useEffect(() => { setQ(sp.get("q") || ""); }, [sp]);
   useEffect(() => {
     api.get(`/public/products?category=${cat}`).then(r => setProducts(r.data));
     api.get("/brands").then(r => setBrands(r.data || [])).catch(() => {});

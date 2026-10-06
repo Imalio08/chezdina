@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import ProductCardV2 from "@/components/storefront/ProductCardV2";
 import WelcomePopup from "@/components/storefront/WelcomePopup";
+import MosaicSection from "@/components/storefront/MosaicSection";
 import { Truck, Shield, MessageCircle, ChevronRight, Clock, Sparkles, Flame } from "lucide-react";
 
 function Countdown({ ends }) {
@@ -96,6 +97,18 @@ export default function Home() {
 
       <Row title="Bons plans" eyebrow="Promotions" products={bonsPlans} link="/boutique/bons-plans" />
       <Row title="Nouveautés" eyebrow="Fraîchement arrivé" products={nouveautes} link="/boutique/catalog?sort=new" />
+
+      {sections.filter(s => s.type === "mosaic" && (s.props?.images || []).length > 0).map((s, idx) => (
+        <MosaicSection
+          key={s.id || `mos-${idx}`}
+          title={s.props?.title}
+          eyebrow={s.props?.eyebrow}
+          subtitle={s.props?.subtitle}
+          images={s.props.images}
+          speed={s.props?.speed || 25}
+        />
+      ))}
+
       {categories.slice(0, 4).map(c => <Row key={c} title={c} products={byCat(c)} link={`/boutique/catalog?cat=${encodeURIComponent(c)}`} />)}
 
       {lookbook.length > 0 && lookbook[0].product_ids?.length > 0 && (

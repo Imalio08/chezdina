@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { Plus, Save, Trash2, GripVertical, Eye, EyeOff, ExternalLink, Image as ImageIcon, Grid3x3, Shield, Megaphone, Sparkles, FileText, X } from "lucide-react";
+import { Plus, Save, Trash2, GripVertical, Eye, EyeOff, ExternalLink, Image as ImageIcon, Grid3x3, Shield, Megaphone, Sparkles, FileText, X, Upload, Layers } from "lucide-react";
 import { Link } from "react-router-dom";
+import { toast as toast2 } from "sonner";
 
 const SECTION_TYPES = [
   { v: "hero", label: "Hero (mosaïque)", icon: ImageIcon, defaults: { tagline: "Nouvelle collection", title: "Vos talons,", highlight: "votre allure.", subtitle: "Description…", cta_label: "Découvrir", cta_link: "/boutique/catalog", mosaic: ["https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800", "https://images.unsplash.com/photo-1709809081557-78f803ce93a0?w=800", "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800", "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800"] } },
+  { v: "mosaic", label: "Mosaïque défilante", icon: Layers, defaults: { eyebrow: "Collection", title: "Nos coups de cœur", subtitle: "Faites défiler, cliquez pour explorer", images: [], speed: 25 } },
   { v: "product_grid", label: "Grille produits", icon: Grid3x3, defaults: { title: "Nos coups de cœur", eyebrow: "Nouveautés", limit: 8, source: "featured" } },
   { v: "banner", label: "Bannière image + CTA", icon: Megaphone, defaults: { title: "Soldes d'été", subtitle: "-30% sur la collection", image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1600", cta_label: "Profiter", cta_link: "/boutique/catalog" } },
   { v: "trust_strip", label: "Bandeau confiance", icon: Shield, defaults: { items: [{ icon: "truck", title: "Livraison 24h", text: "Partout à Abidjan." }, { icon: "shield", title: "Paiement à la livraison", text: "Espèces ou Wave." }, { icon: "whatsapp", title: "Conseillère", text: "0777 92 61 79" }] } },
@@ -198,7 +200,84 @@ function PropsEditor({ section, onChange, onClose }) {
           </div>
         )}
 
+        {section.type === "mosaic" && <MosaicEditor p={p} onChange={onChange} />}
+
         <div className="text-xs text-[#666] mt-3">Les changements sont visibles après "Enregistrer" sur l'écran précédent.</div>
+      </div>
+    </div>
+  );
+}
+
+function MosaicEditor({ p, onChange }) {
+  const images = p.images || [];
+  const fileRef = useRef(null);
+
+  const onFiles = (fileList) => {
+    const files = Array.from(fileList || []).filter(f => f.type.startsWith("image/"));
+    if (!files.length) return;
+    let loaded = 0;
+    const next = [...images];
+    files.forEach((f) => {
+      if (f.size > 3 * 1024 * 1024) { toast2.error(`${f.name}: max 3 Mo`); loaded++; return; }
+      const reader = new FileReader();
+      reader.onload = () => {
+        next.push({ src: reader.result, link: "", alt: f.name.replace(/\.[a-z]+$/i, ""), size: "md" });
+        loaded++;
+        if (loaded === files.length) onChange({ images: next });
+      };
+      reader.readAsDataURL(f);
+    });
+  };
+
+  const onDrop = (e) => { e.preventDefault(); onFiles(e.dataTransfer.files); };
+  const onDragOver = (e) => { e.preventDefault(); };
+
+  const update = (i, patch) => {
+    const next = [...images];
+    next[i] = { ...next[i], ...patch };
+    onChange({ images: next });
+  };
+  const remove = (i) => {
+    const next = images.filter((_, k) => k !== i);
+    onChange({ images: next });
+  };
+
+  return (
+    <div className="space-y-3">
+      <Field label="Eyebrow (petite étiquette)"><input className="dina-input" value={p.eyebrow || ""} onChange={e => onChange({ eyebrow: e.target.value })} /></Field>
+      <Field label="Titre"><input className="dina-input" value={p.title || ""} onChange={e => onChange({ title: e.target.value })} /></Field>
+      <Field label="Sous-titre"><input className="dina-input" value={p.subtitle || ""} onChange={e => onChange({ subtitle: e.target.value })} /></Field>
+      <Field label="Vitesse (px/s, défaut 25)"><input type="number" className="dina-input tabular" value={p.speed || 25} onChange={e => onChange({ speed: +e.target.value })} /></Field>
+
+      <div
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onClick={() => fileRef.current?.click()}
+        className="border-2 border-dashed border-[#ececec] dark:border-[#2a2a2a] rounded-xl p-6 text-center cursor-pointer hover:border-[#b02a2a] transition"
+        data-testid="mosaic-dropzone"
+      >
+        <Upload size={22} className="mx-auto text-[#999]" />
+        <div className="text-sm font-medium mt-2">Glissez des images ici</div>
+        <div className="text-xs text-[#666] mt-1">ou cliquez — multi-sélection, max 3 Mo par image</div>
+        <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={e => onFiles(e.target.files)} data-testid="mosaic-file-input" />
+      </div>
+
+      <div className="text-xs text-[#666]">{images.length} image(s)</div>
+      <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto">
+        {images.map((img, i) => (
+          <div key={i} className="border border-[#ececec] dark:border-[#2a2a2a] rounded-lg p-2 flex gap-2" data-testid={`mosaic-img-${i}`}>
+            <img src={img.src} alt="" className="w-14 h-14 object-cover rounded shrink-0" />
+            <div className="flex-1 min-w-0 space-y-1">
+              <input className="dina-input !h-7 !text-xs" placeholder="Lien (opt.)" value={img.link || ""} onChange={e => update(i, { link: e.target.value })} data-testid={`mosaic-link-${i}`} />
+              <select className="dina-input !h-7 !text-xs" value={img.size || "md"} onChange={e => update(i, { size: e.target.value })}>
+                <option value="sm">Petite</option>
+                <option value="md">Moyenne</option>
+                <option value="lg">Grande</option>
+              </select>
+            </div>
+            <button onClick={() => remove(i)} className="text-[#c62828] p-1 self-start" data-testid={`mosaic-remove-${i}`}><Trash2 size={14} /></button>
+          </div>
+        ))}
       </div>
     </div>
   );

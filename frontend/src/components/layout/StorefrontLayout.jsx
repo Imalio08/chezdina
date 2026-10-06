@@ -1,32 +1,91 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, User, Search, MessageCircle } from "lucide-react";
+import { ShoppingBag, User, Search, MessageCircle, X } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import api from "@/lib/api";
 
 export default function StorefrontLayout() {
   const { cart } = useApp();
   const count = cart.reduce((s,x)=>s+x.qty,0);
   const nav = useNavigate();
+  const [q, setQ] = useState("");
+  const [sugg, setSugg] = useState([]);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!q.trim() || q.trim().length < 2) { setSugg([]); return; }
+    const t = setTimeout(() => {
+      api.get(`/public/search-suggestions?q=${encodeURIComponent(q)}`)
+        .then(r => {
+          const d = r.data || {};
+          const items = [
+            ...(d.products || []).map(p => ({ type: "produit", id: p.id, name: p.name, image: p.image, link: `/boutique/product/${p.id}` })),
+            ...(d.categories || []).map(c => ({ type: "catégorie", name: c, link: `/boutique/catalog?category=${encodeURIComponent(c)}` })),
+            ...(d.brands || []).map(b => ({ type: "marque", name: b, link: `/boutique/catalog?brand=${encodeURIComponent(b)}` })),
+          ];
+          setSugg(items);
+        })
+        .catch(() => setSugg([]));
+    }, 200);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const submit = (e) => {
+    e?.preventDefault?.();
+    if (q.trim()) nav(`/boutique/catalog?q=${encodeURIComponent(q.trim())}`);
+    setOpen(false);
+  };
+
   return (
     <div className="min-h-screen bg-white">
       <div className="bg-[#b02a2a] text-white text-center text-xs py-1.5">Livraison 24h à Abidjan · Paiement à la livraison · WhatsApp 0777 92 61 79</div>
       <header className="sticky top-0 z-30 bg-white border-b border-[#ececec]">
-        <div className="max-w-6xl mx-auto px-4 h-20 flex items-center gap-4">
-          <Link to="/boutique" className="flex items-center gap-2" data-testid="storefront-logo">
+        <div className="max-w-6xl mx-auto px-4 h-20 flex items-center gap-3 md:gap-4">
+          <Link to="/boutique" className="flex items-center gap-2 shrink-0" data-testid="storefront-logo">
             <div className="w-11 h-11 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div>
-            <div className="leading-tight"><div className="font-serif text-xl text-[#b02a2a]">Chez Dina</div><div className="text-[10px] uppercase tracking-widest text-[#666]">boutique</div></div>
+            <div className="font-serif text-xl text-[#b02a2a] hidden sm:block">Chez Dina</div>
           </Link>
-          <nav className="hidden md:flex items-center gap-5 text-sm text-[#1c1c1c] ml-6">
+          <nav className="hidden lg:flex items-center gap-5 text-sm text-[#1c1c1c] ml-2">
             <Link to="/boutique/catalog" data-testid="nav-catalog">Catalogue</Link>
-            <Link to="/boutique/catalog?category=Chaussures">Talons & Chaussures</Link>
+            <Link to="/boutique/catalog?category=Chaussures">Talons</Link>
             <Link to="/boutique/catalog?category=Robes">Robes</Link>
             <Link to="/boutique/catalog?category=Sacs">Sacs</Link>
-            <Link to="/boutique/catalog?category=Accessoires">Accessoires</Link>
           </nav>
-          <div className="flex-1"/>
-          <button onClick={()=>nav("/boutique/catalog")} className="w-9 h-9 grid place-items-center" data-testid="storefront-search"><Search size={18}/></button>
-          <Link to="/boutique/account" className="w-9 h-9 grid place-items-center" data-testid="storefront-account"><User size={18}/></Link>
-          <Link to="/boutique/checkout" className="relative w-9 h-9 grid place-items-center" data-testid="storefront-cart">
+          <form onSubmit={submit} className="flex-1 max-w-xl relative" data-testid="storefront-search-form">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none" />
+            <input
+              type="search"
+              className="w-full h-10 pl-9 pr-9 rounded-full border border-[#ececec] bg-[#fafafa] focus:bg-white focus:border-[#b02a2a] text-sm transition outline-none"
+              placeholder="Rechercher un produit, une marque…"
+              value={q}
+              onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+              onFocus={() => setOpen(true)}
+              onBlur={() => setTimeout(() => setOpen(false), 180)}
+              data-testid="storefront-search-input"
+            />
+            {q && (
+              <button type="button" onClick={() => { setQ(""); setSugg([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#999]" aria-label="Effacer"><X size={14}/></button>
+            )}
+            {open && sugg.length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-[#ececec] rounded-xl shadow-lg py-2 z-40 max-h-80 overflow-y-auto" data-testid="search-suggestions">
+                {sugg.slice(0, 8).map((s, i) => (
+                  <Link
+                    key={i}
+                    to={s.link}
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm"
+                    onMouseDown={(e) => e.preventDefault()}
+                    data-testid={`search-sugg-${i}`}
+                  >
+                    {s.image && <img src={s.image} alt="" className="w-7 h-7 rounded object-cover" />}
+                    <span className="flex-1 truncate">{s.name}</span>
+                    <span className="text-[10px] uppercase text-[#999]">{s.type}</span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </form>
+          <Link to="/boutique/account" className="w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-account"><User size={18}/></Link>
+          <Link to="/boutique/checkout" className="relative w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-cart">
             <ShoppingBag size={18}/>
             {count>0 && <span className="absolute -top-1 -right-1 bg-[#b02a2a] text-white text-[10px] font-bold rounded-full w-4 h-4 grid place-items-center">{count}</span>}
           </Link>
