@@ -61,6 +61,7 @@ import CustomerDetail from "@/pages/console/CustomerDetail";
 import Messagerie from "@/pages/console/Messagerie";
 import Segments from "@/pages/console/Segments";
 import Campagnes from "@/pages/console/Campagnes";
+import Statistiques from "@/pages/console/Statistiques";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
@@ -128,7 +129,7 @@ export default function App() {
               <Route path="alertes" element={<ErrorBoundary><AlertsAndCarts /></ErrorBoundary>} />
               <Route path="facturation" element={<ErrorBoundary><Invoicing /></ErrorBoundary>} />
               <Route path="depenses" element={<ErrorBoundary><Expenses /></ErrorBoundary>} />
-              <Route path="statistiques" element={<ErrorBoundary><Statistics /></ErrorBoundary>} />
+              <Route path="statistiques" element={<ErrorBoundary><Statistiques /></ErrorBoundary>} />
               <Route path="equipe" element={<ErrorBoundary><Team /></ErrorBoundary>} />
               <Route path="site" element={<ErrorBoundary><SiteSettings /></ErrorBoundary>} />
               <Route path="integrations" element={<ErrorBoundary><Integrations /></ErrorBoundary>} />
@@ -156,6 +157,7 @@ export default function App() {
               <Route path="accueil" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
               <Route path="apercu" element={<Navigate to="/boutique" replace/>} />
               <Route path="finances" element={<Navigate to="/console/resultat" replace/>} />
+              <Route path="statistiques" element={<ErrorBoundary><Statistiques/></ErrorBoundary>} />
               <Route path="segments" element={<ErrorBoundary><Segments/></ErrorBoundary>} />
               <Route path="campagnes" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
               <Route path="campagnes-whatsapp" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />

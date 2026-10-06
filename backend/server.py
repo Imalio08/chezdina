@@ -2109,6 +2109,286 @@ async def delete_hold(hid: str, user: dict = Depends(get_user)):
     await db.pos_holds.update_one({"id": hid}, {"$set": {"resumed": True, "resumed_at": now_iso()}})
     return {"ok": True}
 
+# ---------- Pack 7B: Statistiques (12 tabs) ----------
+
+async def _period_orders(period: str):
+    s, e, ps, pe = period_range(period)
+    curr = await db.orders.find({"created_at": {"$gte": s, "$lte": e}}).to_list(10000)
+    prev = await db.orders.find({"created_at": {"$gte": ps, "$lte": pe}}).to_list(10000)
+    return curr, prev, s, e, ps, pe
+
+def _split_by_status(orders):
+    return {
+        "orders": sum(o.get("total", 0) for o in orders),
+        "delivered": sum(o.get("total", 0) for o in orders if o.get("status") == "livree"),
+        "cancelled": sum(o.get("total", 0) for o in orders if o.get("status") == "annulee"),
+        "deferred": sum(o.get("total", 0) for o in orders if o.get("status") == "reportee"),
+    }
+
+@api.get("/stats/sales")
+async def stats_sales(user: dict = Depends(get_user), period: str = "30d"):
+    curr, prev, s, e, _, _ = await _period_orders(period)
+    split = _split_by_status(curr); split_prev = _split_by_status(prev)
+    cancel_rate = round(sum(1 for o in curr if o.get("status")=="annulee") * 100 / max(1,len(curr)), 1)
+    defer_rate = round(sum(1 for o in curr if o.get("status")=="reportee") * 100 / max(1,len(curr)), 1)
+    heatmap = [[0]*24 for _ in range(7)]; by_dow = [0]*7; by_hour = [0]*24
+    for o in curr:
+        try:
+            dt = datetime.fromisoformat(o["created_at"].replace("Z","+00:00"))
+            heatmap[dt.weekday()][dt.hour] += int(o.get("total",0))
+            by_dow[dt.weekday()] += int(o.get("total",0))
+            by_hour[dt.hour] += int(o.get("total",0))
+        except Exception: pass
+    channels: Dict[str,int] = {}; payments: Dict[str,int] = {}
+    for o in curr:
+        channels[o.get("channel","store")] = channels.get(o.get("channel","store"),0) + int(o.get("total",0))
+        payments[o.get("payment_method","cash")] = payments.get(o.get("payment_method","cash"),0) + int(o.get("total",0))
+    sellers: Dict[str,Dict] = {}
+    for o in curr:
+        n = o.get("vendeuse") or o.get("sold_by") or "—"
+        if n not in sellers: sellers[n] = {"name":n,"revenue":0,"orders":0}
+        sellers[n]["revenue"] += int(o.get("total",0)); sellers[n]["orders"] += 1
+    cancel_r: Dict[str,int] = {}; defer_r: Dict[str,int] = {}
+    for o in curr:
+        if o.get("status")=="annulee": cancel_r[o.get("cancel_reason") or "Non renseigné"] = cancel_r.get(o.get("cancel_reason") or "Non renseigné",0)+1
+        if o.get("status")=="reportee": defer_r[o.get("defer_reason") or "Non renseigné"] = defer_r.get(o.get("defer_reason") or "Non renseigné",0)+1
+    return {"split":split,"split_prev":split_prev,"cancel_rate":cancel_rate,"defer_rate":defer_rate,
+            "heatmap":heatmap,"by_dow":[{"day":d,"value":v} for d,v in zip(["Lun","Mar","Mer","Jeu","Ven","Sam","Dim"],by_dow)],
+            "by_hour":[{"hour":f"{h:02d}h","value":v} for h,v in enumerate(by_hour)],
+            "channels":[{"name":k,"value":v} for k,v in channels.items()],
+            "payments":[{"name":k,"value":v} for k,v in payments.items()],
+            "sellers":sorted(sellers.values(),key=lambda x:x["revenue"],reverse=True),
+            "cancel_reasons":[{"reason":k,"count":v} for k,v in cancel_r.items()],
+            "defer_reasons":[{"reason":k,"count":v} for k,v in defer_r.items()],
+            "discounts":sum(int(o.get("discount",0) or 0) for o in curr),
+            "avg_basket":int(split["orders"]/max(1,len(curr)))}
+
+@api.get("/stats/products")
+async def stats_products(user: dict = Depends(get_user), period: str = "30d", product_id: Optional[str] = None):
+    curr, _, _, _, _, _ = await _period_orders(period)
+    products = {p["id"]: p for p in await db.products.find({}).to_list(5000)}
+    agg: Dict[str,Dict] = {}; sold = set()
+    for o in curr:
+        for it in o.get("items",[]):
+            pid = it.get("product_id") or ""
+            if not pid: continue
+            sold.add(pid)
+            if pid not in agg:
+                p = products.get(pid, {})
+                agg[pid] = {"id":pid,"name":it.get("name"),"image":it.get("image"),"category":p.get("category",""),"brand":p.get("brand",""),"qty":0,"revenue":0,"margin":0}
+            agg[pid]["qty"] += int(it.get("qty",0))
+            agg[pid]["revenue"] += int(it.get("qty",0))*int(it.get("price",0))
+            cost = int((products.get(pid) or {}).get("cost",0))
+            agg[pid]["margin"] += (int(it.get("price",0))-cost)*int(it.get("qty",0))
+    never = [{"id":p["id"],"name":p["name"],"sku":p.get("sku"),"image":p.get("image"),"stock":p.get("stock",0)} for p in products.values() if p["id"] not in sold][:50]
+    variant = None
+    if product_id:
+        pdata = products.get(product_id)
+        if pdata:
+            ss: Dict[str,int] = {}; cs: Dict[str,int] = {}; matrix: Dict[str,Dict[str,int]] = {}
+            for o in curr:
+                for it in o.get("items",[]):
+                    if it.get("product_id") != product_id: continue
+                    s_ = it.get("size","—"); c_ = it.get("color","—"); q = int(it.get("qty",0))
+                    ss[s_] = ss.get(s_,0)+q; cs[c_] = cs.get(c_,0)+q
+                    matrix.setdefault(s_,{}).setdefault(c_,0); matrix[s_][c_] += q
+            variant = {"product":{"id":pdata["id"],"name":pdata.get("name"),"image":pdata.get("image")},
+                       "sizes":pdata.get("sizes",[]),"colors":pdata.get("colors",[]),
+                       "stock_by_size":pdata.get("stock_by_size",{}),
+                       "sales_by_size":ss,"sales_by_color":cs,"matrix":matrix}
+    return {"by_qty":sorted(agg.values(),key=lambda x:x["qty"],reverse=True)[:50],
+            "by_revenue":sorted(agg.values(),key=lambda x:x["revenue"],reverse=True)[:50],
+            "by_margin":sorted(agg.values(),key=lambda x:x["margin"],reverse=True)[:50],
+            "never_sold":never,"variant":variant}
+
+@api.get("/stats/categories")
+async def stats_categories(user: dict = Depends(get_user), period: str = "30d"):
+    curr, prev, _, _, _, _ = await _period_orders(period)
+    products = {p["id"]: p for p in await db.products.find({}).to_list(5000)}
+    def agg(orders):
+        d: Dict[str,Dict] = {}
+        for o in orders:
+            for it in o.get("items",[]):
+                p = products.get(it.get("product_id")) or {}
+                cat = p.get("category") or it.get("category") or "—"
+                if cat not in d: d[cat] = {"category":cat,"revenue":0,"orders":set(),"items":0,"margin":0,"top_sizes":{},"top_colors":{}}
+                rev = int(it.get("qty",0))*int(it.get("price",0)); cost = int(p.get("cost",0))*int(it.get("qty",0))
+                d[cat]["revenue"] += rev; d[cat]["orders"].add(o["id"]); d[cat]["items"] += int(it.get("qty",0)); d[cat]["margin"] += rev-cost
+                s_=it.get("size","—"); c_=it.get("color","—")
+                d[cat]["top_sizes"][s_] = d[cat]["top_sizes"].get(s_,0)+int(it.get("qty",0))
+                d[cat]["top_colors"][c_] = d[cat]["top_colors"].get(c_,0)+int(it.get("qty",0))
+        return d
+    curr_agg = agg(curr); prev_agg = agg(prev); rows = []
+    for cat, data in curr_agg.items():
+        prev_rev = (prev_agg.get(cat,{}) or {}).get("revenue",0)
+        rows.append({"category":cat,"revenue":data["revenue"],"orders":len(data["orders"]),"items":data["items"],
+                     "avg_basket":int(data["revenue"]/max(1,len(data["orders"]))),"margin":data["margin"],
+                     "margin_pct":round(data["margin"]*100/max(1,data["revenue"]),1),
+                     "delta_pct":delta_pct(data["revenue"],prev_rev),
+                     "top_sizes":sorted([{"size":k,"qty":v} for k,v in data["top_sizes"].items()],key=lambda x:x["qty"],reverse=True)[:5],
+                     "top_colors":sorted([{"color":k,"qty":v} for k,v in data["top_colors"].items()],key=lambda x:x["qty"],reverse=True)[:5]})
+    rows.sort(key=lambda x:x["revenue"],reverse=True)
+    return {"rows":rows}
+
+@api.get("/stats/stock-purchases")
+async def stats_stock_purchases(user: dict = Depends(get_user), period: str = "30d"):
+    products = await db.products.find({}).to_list(5000)
+    stock_value = sum((p.get("stock",0) or 0)*(p.get("cost",0) or 0) for p in products)
+    ruptures = sum(1 for p in products if (p.get("stock",0) or 0)==0)
+    low = sum(1 for p in products if 0 < (p.get("stock",0) or 0) < 5)
+    cutoff = (datetime.now(timezone.utc)-timedelta(days=60)).isoformat()
+    orders60 = await db.orders.find({"created_at":{"$gte":cutoff}}).to_list(10000)
+    sold = set()
+    for o in orders60:
+        for it in o.get("items",[]):
+            if it.get("product_id"): sold.add(it["product_id"])
+    dormant = [{"id":p["id"],"name":p["name"],"stock":p.get("stock",0)} for p in products if p["id"] not in sold and (p.get("stock",0) or 0)>0][:50]
+    rev_60 = 0
+    for o in orders60:
+        for it in o.get("items",[]):
+            pm = next((p for p in products if p["id"]==it.get("product_id")),None)
+            if pm: rev_60 += int(pm.get("cost",0))*int(it.get("qty",0))
+    rotation = round(rev_60/max(1,stock_value)*6,2) if stock_value else 0
+    pos = await db.purchase_orders.find({}).to_list(500)
+    sup_agg: Dict[str,Dict] = {}
+    for p in pos:
+        sid = p.get("supplier_id") or "—"; name = p.get("supplier_name") or "—"
+        if sid not in sup_agg: sup_agg[sid] = {"supplier_id":sid,"name":name,"purchased":0,"pos":0,"avg_lead":0}
+        sup_agg[sid]["purchased"] += int(p.get("total",0)); sup_agg[sid]["pos"] += 1
+    for s in await db.suppliers.find({}).to_list(500):
+        if s["id"] in sup_agg: sup_agg[s["id"]]["avg_lead"] = s.get("lead_time_days",0)
+    return {"stock_value":int(stock_value),"ruptures":ruptures,"low":low,"rotation":rotation,
+            "dormant":dormant,"suppliers":sorted(sup_agg.values(),key=lambda x:x["purchased"],reverse=True)}
+
+@api.get("/stats/orders-delivery")
+async def stats_orders_delivery(user: dict = Depends(get_user), period: str = "30d"):
+    curr, _, _, _, _, _ = await _period_orders(period)
+    by_status: Dict[str,int] = {}
+    for o in curr:
+        s_ = o.get("status","nouvelle"); by_status[s_] = by_status.get(s_,0)+1
+    rider: Dict[str,Dict] = {}; zones: Dict[str,Dict] = {}
+    for o in curr:
+        rid = o.get("rider_id")
+        if rid:
+            if rid not in rider: rider[rid] = {"rider_id":rid,"name":o.get("rider_name") or rid,"deliveries":0,"delivered":0,"cancelled":0,"revenue":0}
+            rider[rid]["deliveries"] += 1
+            if o.get("status")=="livree": rider[rid]["delivered"] += 1; rider[rid]["revenue"] += int(o.get("total",0))
+            if o.get("status")=="annulee": rider[rid]["cancelled"] += 1
+        z = o.get("delivery_zone") or "—"
+        if z not in zones: zones[z] = {"zone":z,"orders":0,"delivered":0,"cancelled":0,"revenue":0}
+        zones[z]["orders"] += 1
+        if o.get("status")=="livree": zones[z]["delivered"] += 1; zones[z]["revenue"] += int(o.get("total",0))
+        if o.get("status")=="annulee": zones[z]["cancelled"] += 1
+    cancel_r: Dict[str,int] = {}; defer_r: Dict[str,int] = {}
+    for o in curr:
+        if o.get("status")=="annulee": cancel_r[o.get("cancel_reason") or "Non renseigné"] = cancel_r.get(o.get("cancel_reason") or "Non renseigné",0)+1
+        if o.get("status")=="reportee": defer_r[o.get("defer_reason") or "Non renseigné"] = defer_r.get(o.get("defer_reason") or "Non renseigné",0)+1
+    return {"by_status":[{"status":k,"count":v} for k,v in by_status.items()],
+            "riders":sorted(rider.values(),key=lambda x:x["delivered"],reverse=True),
+            "zones":sorted(zones.values(),key=lambda x:x["revenue"],reverse=True),
+            "cancel_reasons":[{"reason":k,"count":v} for k,v in cancel_r.items()],
+            "defer_reasons":[{"reason":k,"count":v} for k,v in defer_r.items()],
+            "fees_collected":sum(int(o.get("delivery_fee",0) or 0) for o in curr if o.get("status")=="livree")}
+
+@api.get("/stats/customers")
+async def stats_customers(user: dict = Depends(get_user), period: str = "30d"):
+    s, e, _, _ = period_range(period)
+    orders = await db.orders.find({"created_at":{"$gte":s,"$lte":e}}).to_list(10000)
+    customers = await db.customers.find({"status":{"$ne":"blacklist"}},{"password_hash":0}).to_list(5000)
+    new = sum(1 for c in customers if (c.get("created_at") or "")>=s)
+    recurring = sum(1 for c in customers if (c.get("total_orders") or 0)>1)
+    ltv = int(sum(c.get("total_spent",0) for c in customers)/max(1,len(customers)))
+    freq = round(sum(c.get("total_orders",0) for c in customers)/max(1,len(customers)),2)
+    best = sorted(customers,key=lambda c:c.get("total_spent",0),reverse=True)[:20]
+    zones = {}; cats = {}; sizes = {}; channels = {}
+    for c in best:
+        z = (c.get("addresses",[]) or [{}])[0].get("zone") if c.get("addresses") else None
+        if z: zones[z] = zones.get(z,0)+1
+        if c.get("shoe_size"): sizes[c["shoe_size"]] = sizes.get(c["shoe_size"],0)+1
+    for o in orders:
+        cust = o.get("customer") or {}
+        if cust.get("id") in {b["id"] for b in best}:
+            ch = o.get("channel","store"); channels[ch] = channels.get(ch,0)+1
+            for it in o.get("items",[]):
+                cat = it.get("category") or "—"; cats[cat] = cats.get(cat,0)+1
+    bp = {"top_zones":sorted([{"zone":k,"count":v} for k,v in zones.items()],key=lambda x:x["count"],reverse=True)[:5],
+          "top_cats":sorted([{"cat":k,"count":v} for k,v in cats.items()],key=lambda x:x["count"],reverse=True)[:5],
+          "top_sizes":sorted([{"size":k,"count":v} for k,v in sizes.items()],key=lambda x:x["count"],reverse=True)[:5],
+          "top_channels":sorted([{"channel":k,"count":v} for k,v in channels.items()],key=lambda x:x["count"],reverse=True)[:5]}
+    return {"new":new,"recurring":recurring,"ltv":ltv,"frequency":freq,"best_profile":bp,
+            "best_customers":clean(best[:10]),
+            "segments":[{"name":seg["name"],"kind":seg["kind"]} for seg in await db.customer_segments_v2.find({}).to_list(100)]}
+
+@api.get("/stats/demand")
+async def stats_demand(user: dict = Depends(get_user), period: str = "30d"):
+    waitlist = await db.waitlist.find({}).to_list(500)
+    agg: Dict[str,Dict] = {}
+    for w in waitlist:
+        key = (w.get("product_id") or "")+"|"+(w.get("size") or "")+"|"+(w.get("color") or "")
+        if key not in agg: agg[key] = {"product_name":w.get("product_name"),"size":w.get("size"),"color":w.get("color"),"count":0}
+        agg[key]["count"] += 1
+    favs: Dict[str,int] = {}
+    async for c in db.customers.find({},{"favorites":1}):
+        for f in (c.get("favorites") or []): favs[f] = favs.get(f,0)+1
+    return {"waitlist":sorted(agg.values(),key=lambda x:x["count"],reverse=True),
+            "searches_no_result":[],
+            "top_favorites":sorted([{"product_id":k,"count":v} for k,v in favs.items()],key=lambda x:x["count"],reverse=True)[:20]}
+
+@api.get("/stats/marketing")
+async def stats_marketing(user: dict = Depends(get_user), period: str = "30d"):
+    s, e, _, _ = period_range(period)
+    customers = await db.customers.find({"created_at":{"$gte":s,"$lte":e}}).to_list(5000)
+    sources: Dict[str,int] = {}
+    for c in customers: sources[c.get("source") or "Direct"] = sources.get(c.get("source") or "Direct",0)+1
+    return {"promotions":[{"code":p.get("code"),"uses":p.get("uses",0),"type":p.get("type")} for p in await db.promotions.find({}).to_list(200)],
+            "campaigns":[{"name":c.get("name"),"stats":c.get("stats",{})} for c in await db.campaigns.find({}).to_list(200)],
+            "sources":sorted([{"source":k,"count":v} for k,v in sources.items()],key=lambda x:x["count"],reverse=True),
+            "loyalty_enabled":True}
+
+@api.get("/stats/site")
+async def stats_site(user: dict = Depends(get_user), period: str = "30d"):
+    s, e, _, _ = period_range(period)
+    orders_site = await db.orders.find({"created_at":{"$gte":s,"$lte":e},"channel":{"$in":["site","web","boutique_en_ligne"]}}).to_list(5000)
+    return {"orders":len(orders_site),"revenue":sum(int(o.get("total",0)) for o in orders_site),
+            "abandoned":await db.abandoned_carts.count_documents({"created_at":{"$gte":s,"$lte":e}}),
+            "note":"Les métriques visites/pages/durée nécessitent l'intégration d'un outil d'analytique."}
+
+@api.get("/stats/encaissements")
+async def stats_encaissements(user: dict = Depends(get_user), period: str = "30d"):
+    s, e, _, _ = period_range(period)
+    orders = await db.orders.find({"created_at":{"$gte":s,"$lte":e},"status":{"$ne":"annulee"}}).to_list(10000)
+    by_method: Dict[str,int] = {}; by_source: Dict[str,int] = {}; by_day: Dict[str,int] = {}
+    for o in orders:
+        by_method[o.get("payment_method","cash")] = by_method.get(o.get("payment_method","cash"),0)+int(o.get("total",0))
+        src = "Livraison" if o.get("status")=="livree" and o.get("delivery_fee") else ("Boutique" if o.get("channel")=="store" else "En ligne")
+        by_source[src] = by_source.get(src,0)+int(o.get("total",0))
+        day = (o.get("created_at") or "")[:10]
+        by_day[day] = by_day.get(day,0)+int(o.get("total",0))
+    return {"by_method":[{"name":k,"value":v} for k,v in by_method.items()],
+            "by_source":[{"name":k,"value":v} for k,v in by_source.items()],
+            "by_day":sorted([{"day":k,"value":v} for k,v in by_day.items()],key=lambda x:x["day"]),
+            "total":sum(by_method.values())}
+
+@api.get("/stats/team")
+async def stats_team(user: dict = Depends(get_user), period: str = "30d"):
+    s, e, _, _ = period_range(period)
+    orders = await db.orders.find({"created_at":{"$gte":s,"$lte":e}}).to_list(10000)
+    sellers: Dict[str,Dict] = {}
+    for o in orders:
+        n = o.get("vendeuse") or o.get("sold_by") or "—"
+        if n not in sellers: sellers[n] = {"name":n,"revenue":0,"orders":0}
+        sellers[n]["revenue"] += int(o.get("total",0)); sellers[n]["orders"] += 1
+    att_by_user: Dict[str,Dict] = {}
+    for a in await db.attendance.find({}).sort("date",-1).to_list(200):
+        uid = a.get("user_id")
+        if not uid: continue
+        if uid not in att_by_user: att_by_user[uid] = {"name":a.get("user_name") or uid,"present":0,"late":0,"absent":0}
+        if a.get("status")=="present": att_by_user[uid]["present"] += 1
+        elif a.get("status")=="late": att_by_user[uid]["late"] += 1
+        elif a.get("status")=="absent": att_by_user[uid]["absent"] += 1
+    return {"sellers":sorted(sellers.values(),key=lambda x:x["revenue"],reverse=True),
+            "attendance":list(att_by_user.values())}
+
 @api.get("/stats/zones")
 async def stats_zones(user: dict = Depends(get_user), period: str = "30d"):
     """Geographic breakdown by delivery zone."""

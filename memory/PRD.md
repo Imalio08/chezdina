@@ -5,38 +5,39 @@
 - Manager: `manager.cocody@dinastore.ci` / `Manager123!` · PIN 2222
 - Rider: `rider1@dinastore.ci` / `Rider123!` · PIN 5555
 
-## Fix pack 7 Vague A (Feb 2026) — Dashboard refonte
+## Fix pack 7 Vague B (Feb 2026) — Statistiques (12 onglets)
 
-### Backend
-- `/api/dashboard/kpis` enrichi :
-  - `generated_at` pour label "Chiffres au X (il y a Y min)"
-  - `cancel_rate` et `cancelled` séparés
-  - `deferred` (reportées)
-  - `margin` basé sur **CA - COGS** (coût marchandises) au lieu de CA - dépenses
-  - `by_category` : agrégation par catégorie {revenue, orders, items, avg_basket, margin, margin_pct, delta_pct} triée par CA
-  - `sales_series` enrichi avec `delivered`, `cancelled`, `deferred`, `margin` par jour
+### Backend : 11 nouveaux endpoints `/api/stats/*`
+- `/stats/sales` : CA split (commandé/livré/annulé/reporté), heatmap jour×heure, by_dow, by_hour, channels, payments, sellers, cancel/defer reasons
+- `/stats/products` : rankings qty/CA/marge + jamais vendus + **variant matrix** (ventes par taille × couleur, stock)
+- `/stats/categories` : CA/orders/items/panier/marge%/evolution + top tailles/couleurs par catégorie
+- `/stats/stock-purchases` : stock_value, rotation, ruptures, dormants, fournisseurs
+- `/stats/orders-delivery` : by_status, perf riders, zones, cancel/defer reasons, fees collected
+- `/stats/customers` : new/recurring/LTV/freq + **best_profile** (zones/cats/sizes/channels des TOP20)
+- `/stats/demand` : waitlist agrégée par produit×variante + favorites
+- `/stats/marketing` : promotions, campaigns, sources acquisition
+- `/stats/site` : commandes/CA/paniers abandonnés
+- `/stats/encaissements` : by_method, by_source, by_day
+- `/stats/team` : vendeuses + ponctualité
+- `/stats/zones` (existant) : map data
 
-### Frontend (Dashboard.jsx reconstruit)
-- Header avec dernière mise à jour "il y a X min" + bouton Actualiser animé + PeriodSelector
-- Row 1 : ActionItems (existant)
-- Row 2 Ventes : 6 KPIs (CA, Commandes, Articles, Panier moyen, **Marge brute**, Taux d'annulation) — l'espace vide à côté de Marge brute est maintenant comblé
-- Row 3 Par catégorie : tableau compact (catégorie, CA, commandes, articles, panier, marge FCFA+%, évolution %) + lien "Voir dans les statistiques →"
-- Charts : CA & marge quotidiens (AreaChart Recharts) + Statuts quotidiens (LineChart Recharts avec 4 lignes : passées/livrées/annulées/reportées)
-- Ventes par canal (PieChart) + Top 5 produits avec "Voir plus →" vers Statistiques
-- Accès rapides (drill-downs existants)
-- Toutes les comparaisons labelisées "vs X" dynamiquement
+### Frontend : `Statistiques.jsx` nouvelle page
+- 12 onglets avec icônes, PeriodSelector commun
+- Chaque onglet avec KPIs, charts Recharts, tableau détaillé, boutons **Export CSV + Export Excel**
+- Heatmap jour × heure (SVG grid rouge intensifié)
+- Matrice variant taille × couleur (vendu / stock, click sur produit top → charge variant)
+- Profil type des meilleures clientes (4 colonnes : zones/cats/sizes/channels)
+- Route `/console/statistiques` corrigée (anciens doublons supprimés)
 
 ### Testé
-- Backend : revenue 9.9M, cancel_rate 1.9%, margin 5M (CA-COGS), by_category 9 catégories, series avec statuts ✅
-- Frontend : Dashboard rendu avec 6 KPIs + table catégories + 2 charts avec données ✅
+- 12/12 endpoints retournent 200 avec données réelles ✅
+- Smoke test : Ventes split OK (9.9M commandé, 5.3M livré, 112k annulé), heatmap visible, 7 jours colorés ✅
 
-## Fix pack 6 (Vagues A + B) — Clients + Messagerie + Segments + Campagnes + Promotions renommables
-Toutes les features livrées.
+## Fix pack 7 Vague A — Dashboard refonte
+Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X min".
+
+## Fix pack 6 — Clients + Messagerie + Segments + Campagnes + Promotions renommables
 
 ## Backlog
-- **Pack 7 Vague B** : Statistiques (12 onglets)
 - **Pack 7 Vague C** : Finances (Dépenses enrichies + Encaissements + P&L complet)
 - Pack 8 Vitrine CMS, Pack 9 Finitions
-
-## Dépendances
-- xlsx@0.18.5 (Excel export) · jspdf · recharts · leaflet
