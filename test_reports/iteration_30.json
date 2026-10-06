@@ -1,0 +1,38 @@
+{
+  "summary": "Tested Visual Opening Hours Editor + Banner (iteration 30). Backend endpoints work correctly: PATCH /api/site persists {opening_hours} and GET /api/public/site returns the payload intact. The /boutique OpeningHoursBanner renders perfectly with correct countdown text 'Boutique fermée actuellement · rouvre demain à 09:00 · dans 11 h 2 min'. However, the OpeningHoursEditor UI is UNREACHABLE: /console/site routes to SiteVitrine.jsx (which does NOT mount the editor), while the newly-created SiteSettings.jsx (which does mount OpeningHoursEditor + site-save) is imported in App.js line 33 but never attached to any <Route>. All 13 regression console pages load clean.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "App.js routing / SiteSettings.jsx",
+        "issue": "CRITICAL: SiteSettings.jsx (the component that mounts <OpeningHoursEditor/> + site-save button + hero fields with hero-tagline/hero-title/hero-highlight/hero-subtitle/hero-image-N testids) is imported at App.js:33 but NO route uses it. The route path='site' at App.js:149 renders <SiteVitrine/> instead, which has tabs (Apparence/Accueil/Pages/SEO/Aperçu) but does NOT mount OpeningHoursEditor anywhere. Result: data-testid='hours-editor', 'hours-row-{mon..sun}', 'hours-open/close/closed/copy-{k}', 'hours-apply-weekdays', and 'site-save' are not present anywhere in the live UI. The admin cannot edit opening hours through the UI even though the backend and banner work.",
+        "selector": "[data-testid='hours-editor']",
+        "priority": "CRITICAL"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Mount <SiteSettings/> on a reachable route (e.g. /console/site-legacy) OR move the <OpeningHoursEditor/> block + opening_hours state/save into SiteVitrine.jsx (likely under the 'Accueil' or a new 'Horaires' tab). Ensure data-testids hours-editor, hours-row-{mon..sun}, hours-open/close/closed/copy-{k}, hours-apply-weekdays, and site-save are all present on /console/site after fix.",
+    "After mounting, re-verify the manual-save flow end-to-end from the UI (currently only backend-level save was verified via curl)."
+  ],
+  "critical_code_review_comments": [
+    "Dead import in /app/frontend/src/App.js:33 — `SiteSettings` imported but never used in any Route. This is the root cause of the reported bug.",
+    "OpeningHoursEditor.jsx itself is clean and correct (verified via code review): proper onChange patching, bulk apply covers tue..fri, copy-from-above disabled on index 0, 'Fermé' displays when row.closed is true.",
+    "OpeningHoursBanner.jsx logic is correct — closed detection + next-opening countdown handles both 'before open today' and 'after close / closed:true'. Session-storage dismiss works.",
+    "Backend PATCH /site accepts arbitrary Dict[str,Any] and merges opening_hours fine — GET /public/site returns the saved payload (confirmed)."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "50%"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! — login OK",
+  "seed_data_creation": "Persisted opening_hours via curl PATCH /api/site: mon-fri 09:00-18:30, sat 10:00-17:00, sun closed:true. Used to validate GET /public/site + /boutique banner.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Backend + banner are fully functional. The one blocker is purely a React routing issue: /console/site renders SiteVitrine (not SiteSettings). Once the main agent either (a) adds <Route path='site' element={<SiteSettings/>}/> or (b) ports the OpeningHoursEditor + opening_hours state into SiteVitrine.jsx, re-run the TEST 1-4 scenarios: 7 rows render, closed-sun toggle, apply-weekdays inheritance, site-save -> GET /public/site. TEST 5 (banner) already passes.",
+  "rca of the issue": "Reproduction: Login as admin → navigate to /console/site. Expected: hours-editor with 7 rows. Actual: SiteVitrine page with Apparence/Accueil/Pages/SEO/Aperçu tabs — no OpeningHoursEditor present on any tab. RCA: In /app/frontend/src/App.js, line 33 imports `SiteSettings from '@/pages/console/SiteSettings'` but line 149 `<Route path='site' element={<ErrorBoundary><SiteVitrine /></ErrorBoundary>}/>` routes to SiteVitrine instead. SiteSettings.jsx (which contains <OpeningHoursEditor/> and site-save button) has zero active route references. Mitigation: Either change line 149 to use <SiteSettings/>, or add a new route (e.g. 'site/horaires'), or merge the editor UI into SiteVitrine's AccueilTab."
+}

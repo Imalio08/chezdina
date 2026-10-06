@@ -1,5 +1,14 @@
 # Chez Dina — PRD
 
+## P4 Horaires éditeur (Feb 2026) ✅
+
+### Éditeur visuel
+- Nouveau composant `OpeningHoursEditor.jsx` (7 lignes jours lun→dim)
+- Pour chaque jour : input `time` ouverture + `time` fermeture + case "Fermé" + bouton copie "depuis au-dessus"
+- Bouton "Appliquer lundi à toute la semaine" pour cas simple
+- Monté dans `SiteSettings.jsx` sous "Hero mosaïque", persisté via `PATCH /site { opening_hours }`
+- Bannière storefront `OpeningHoursBanner` lit `/public/site` et affiche "Boutique fermée actuellement · ouvre à HH:MM · **dans X h Y min**" (compte à rebours automatique)
+
 ## P4 Finitions bis + Logo partout + P5 scaffold (Feb 2026) ✅
 
 ### Parrainage configurable
