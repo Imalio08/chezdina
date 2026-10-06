@@ -40,6 +40,12 @@ export default function POS() {
   const [receipt, setReceipt] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
   const [viewMobileCart, setViewMobileCart] = useState(false);
+  const [vListe, setVListe] = useState(() => localStorage.getItem("pos_view") !== "grid");
+  const [showTop, setShowTop] = useState(false);
+  const [sort, setSort] = useState("name");
+  const colorMap = { "Noir":"#111","Blanc":"#f5f5f5","Rouge":"#b02a2a","Beige":"#d7bfa6","Doré":"#d4af37","Marine":"#1b2b5c","Rose poudré":"#e8b7b3","Camel":"#b08b5a","Nude":"#dcc5b3","Vert émeraude":"#1f6b4a" };
+
+  useEffect(()=>{ localStorage.setItem("pos_view", vListe?"list":"grid"); }, [vListe]);
 
   useEffect(() => {
     api.get("/products").then(r=>setProducts(r.data)).catch(()=>{});
@@ -69,6 +75,18 @@ export default function POS() {
       return false;
     });
   }, [products, q, cat]);
+
+  const sortedFiltered = useMemo(() => {
+    let list = [...filtered];
+    if (showTop && shortcuts.length) {
+      const topIds = new Set(shortcuts.map(s => s.id));
+      list = list.filter(p => topIds.has(p.id));
+    }
+    if (sort === "price") list.sort((a,b) => a.price - b.price);
+    else if (sort === "stock") list.sort((a,b) => (b.stock||0) - (a.stock||0));
+    else list.sort((a,b) => (a.name||"").localeCompare(b.name||""));
+    return list;
+  }, [filtered, sort, showTop, shortcuts]);
 
   const subtotal = cart.reduce((s,x)=>s+x.qty*x.price,0);
   const zoneFee = zones.find(z=>z.name===zone)?.fee || 0;
@@ -179,8 +197,58 @@ export default function POS() {
           </div>
         )}
 
-        {/* Product grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 overflow-y-auto scrollbar-thin flex-1 pr-1" data-testid="pos-products-grid">
+        {/* Product list — table view by default (Fix pack 3) */}
+        <div className="flex items-center gap-2 mb-2">
+          <div className="flex gap-0.5 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-0.5 text-xs">
+            <button onClick={()=>setVListe(true)} className={`px-2.5 py-1 rounded-md ${vListe?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-view-list">Liste</button>
+            <button onClick={()=>setVListe(false)} className={`px-2.5 py-1 rounded-md ${!vListe?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-view-grid">Grille</button>
+          </div>
+          <button onClick={()=>setShowTop(!showTop)} className={`dina-chip text-[11px] ${showTop?"!bg-[#1c1c1c] !text-white":""}`} data-testid="pos-top8"><Flame size={11}/>Meilleures ventes</button>
+          <div className="ml-auto flex gap-0.5 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-0.5 text-[11px]">
+            {[["name","A-Z"],["price","Prix"],["stock","Stock"]].map(([k,l])=>(<button key={k} onClick={()=>setSort(k)} className={`px-2 py-1 rounded-md ${sort===k?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid={`pos-sort-${k}`}>{l}</button>))}
+          </div>
+        </div>
+
+        {vListe ? (
+          <div className="flex-1 overflow-y-auto scrollbar-thin border border-[#ececec] dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#141414]" data-testid="pos-products-table">
+            {sortedFiltered.length === 0 ? <div className="text-center text-sm text-[#666] py-10">Aucun produit</div> :
+            <table className="w-full text-sm">
+              <thead className="sticky top-0 bg-[#fafafa] dark:bg-[#141414] text-[10px] uppercase text-[#666] font-semibold border-b border-[#ececec] dark:border-[#2a2a2a]">
+                <tr><th className="px-2 py-2 text-left"></th><th className="px-2 py-2 text-left">Produit</th><th className="px-2 py-2 text-left">Tailles disponibles</th><th className="px-2 py-2 text-right">Stock</th><th className="px-2 py-2 text-right">Prix</th><th></th></tr>
+              </thead>
+              <tbody>
+                {sortedFiltered.map(p => {
+                  const waitlist = isWaitlist(p);
+                  const totalStk = Object.values(p.stock_by_size||{}).reduce((s,v)=>s+Number(v||0),0) || p.stock || 0;
+                  const promo = p.price_old && p.price_old > p.price;
+                  return (
+                    <tr key={p.id} className={`border-b border-[#f0f0f0] dark:border-[#2a2a2a] hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] ${waitlist?"opacity-50":""}`} data-testid={`pos-row-${p.id}`}>
+                      <td className="px-2 py-1.5"><div className="w-10 h-10 rounded bg-[#fff5f5] overflow-hidden"><img src={p.image || p.images?.[0]} alt="" className="w-full h-full object-cover" loading="lazy"/></div></td>
+                      <td className="px-2 py-1.5"><div className="font-medium leading-tight line-clamp-2">{p.name}</div><div className="text-[10px] text-[#999]">{p.brand} · {p.category} · <code>{p.sku}</code></div></td>
+                      <td className="px-2 py-1.5">
+                        <div className="flex flex-wrap gap-0.5">{(p.sizes||[]).slice(0,8).map(s => {
+                          const stk = Number(p.stock_by_size?.[s] ?? 0);
+                          return <span key={s} className={`text-[10px] px-1.5 py-0.5 rounded border ${stk===0?"border-[#ececec] text-[#999]":stk<3?"border-[#e4991e] text-[#e4991e]":"border-[#1f8a4c] text-[#1f8a4c]"}`}>{s}({stk})</span>;
+                        })}</div>
+                        <div className="flex gap-0.5 mt-0.5">{(p.colors||[]).slice(0,5).map(c => <span key={c} className="w-2.5 h-2.5 rounded-full border border-[#ececec]" style={{background: colorMap[c] || "#ccc"}} title={c}/>)}</div>
+                      </td>
+                      <td className="px-2 py-1.5 text-right tabular"><span className={totalStk===0?"text-[#c62828] font-semibold":totalStk<5?"text-[#e4991e] font-semibold":""}>{totalStk}</span></td>
+                      <td className="px-2 py-1.5 text-right tabular"><div className="font-bold text-[#b02a2a]">{fcfa(p.price)}</div>{promo && <div className="text-[9px] text-[#999] line-through">{fcfa(p.price_old)}</div>}</td>
+                      <td className="px-2 py-1.5 text-right">
+                        {waitlist ? <span className="text-[10px] text-[#e4991e]">Waitlist</span> :
+                        <button onClick={()=>{
+                          if ((p.sizes||[]).length===0 && (p.colors||[]).length<=1) addToCart(p, 1, "", p.colors?.[0]||"");
+                          else setSheetProduct(p);
+                        }} className="dina-btn-primary !min-h-[30px] !px-2.5 text-[11px]" data-testid={`pos-add-${p.id}`}><Plus size={11}/>Ajouter</button>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 overflow-y-auto scrollbar-thin flex-1 pr-1" data-testid="pos-products-grid">
           {filtered.length === 0 ? <div className="col-span-full text-center text-sm text-[#666] py-10">Aucun produit</div> :
           filtered.map(p=>{
             const waitlist = isWaitlist(p);
@@ -282,14 +350,19 @@ export default function POS() {
         {/* Items */}
         <div className="flex-1 overflow-y-auto scrollbar-thin -mx-2 px-2 min-h-[80px]">
           {cart.length===0 ? <div className="text-center text-sm text-[#666] py-10">Aucun article · Tapez un produit pour l'ajouter</div> :
-            cart.map(it=>(
-              <div key={it.key} className="flex items-center gap-2 py-2 border-b border-[#f0f0f0] dark:border-[#2a2a2a]">
-                <div className="w-11 h-11 rounded bg-[#fff5f5] dark:bg-[#2a1818] overflow-hidden shrink-0"><img src={it.image} alt="" className="w-full h-full object-cover"/></div>
-                <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{it.name}</div><div className="text-xs text-[#666] truncate">{[it.size,it.color].filter(Boolean).join(" · ")} · {fcfa(it.price)}</div></div>
-                <div className="flex items-center gap-1"><button onClick={()=>updateCartQty(it.key,it.qty-1)} className="w-6 h-6 border rounded"><Minus size={10} className="mx-auto"/></button><span className="w-6 text-center tabular text-sm">{it.qty}</span><button onClick={()=>updateCartQty(it.key,it.qty+1)} className="w-6 h-6 border rounded"><Plus size={10} className="mx-auto"/></button></div>
-                <button onClick={()=>removeFromCart(it.key)} className="text-[#c62828]"><Trash2 size={14}/></button>
-              </div>
-            ))}
+            cart.map(it=>{
+              const prod = products.find(p => p.id === it.product_id);
+              const stockLeft = prod ? ((it.size ? Number(prod.stock_by_size?.[it.size] ?? prod.stock ?? 0) : Number(prod.stock ?? 0)) - it.qty) : null;
+              const over = stockLeft !== null && stockLeft < 0;
+              return (
+                <div key={it.key} className={`flex items-center gap-2 py-2 border-b border-[#f0f0f0] dark:border-[#2a2a2a] ${over?"bg-[#fff5f5] dark:bg-[#2a1818]":""}`}>
+                  <div className="w-11 h-11 rounded bg-[#fff5f5] dark:bg-[#2a1818] overflow-hidden shrink-0"><img src={it.image} alt="" className="w-full h-full object-cover"/></div>
+                  <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{it.name}</div><div className="text-xs text-[#666] truncate">{[it.size,it.color].filter(Boolean).join(" · ")} · {fcfa(it.price)}</div><div className={`text-[10px] ${over?"text-[#c62828] font-bold":stockLeft<=2?"text-[#e4991e]":"text-[#1f8a4c]"}`}>{over ? `⚠ Dépasse le stock (${stockLeft})` : stockLeft !== null ? `Reste ${stockLeft} en stock` : ""}</div></div>
+                  <div className="flex items-center gap-1"><button onClick={()=>updateCartQty(it.key,it.qty-1)} className="w-6 h-6 border rounded"><Minus size={10} className="mx-auto"/></button><span className="w-6 text-center tabular text-sm">{it.qty}</span><button onClick={()=>updateCartQty(it.key,it.qty+1)} className="w-6 h-6 border rounded"><Plus size={10} className="mx-auto"/></button></div>
+                  <button onClick={()=>removeFromCart(it.key)} className="text-[#c62828]"><Trash2 size={14}/></button>
+                </div>
+              );
+            })}
         </div>
 
         {/* Totals */}

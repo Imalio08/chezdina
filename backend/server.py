@@ -3,7 +3,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-import os, logging, uuid, random, secrets
+import os, logging, uuid, random, secrets, time
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Any, Dict
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, Depends
@@ -3143,6 +3143,194 @@ async def stock_adjust(body: Dict[str,Any], user: dict = Depends(get_user)):
            "payload": {"product_id": pid, "delta": delta}, "reason": reason, "status":"pending", "created_at": now_iso()}
     await db.approval_requests.insert_one(doc)
     return {"ok": True, "applied": False, "approval_request_id": doc["id"]}
+
+# ---------- Fix pack 3 : Waitlist grouping, Out-of-catalog, Abandoned reminders, Invoices ----------
+
+@api.get("/waitlist/grouped")
+async def waitlist_grouped(user: dict = Depends(require_role("admin","manager"))):
+    """Group pending waitlist entries by product + size + color with customer list."""
+    rows = await db.waitlist.find({"notified_at": None}).to_list(1000)
+    pids = list({r.get("product_id") for r in rows})
+    prods = {p["id"]: p for p in await db.products.find({"id": {"$in": pids}}).to_list(500)}
+    groups: Dict[str, Any] = {}
+    for r in rows:
+        pid = r.get("product_id"); s = r.get("size") or ""; co = r.get("color") or ""
+        key = f"{pid}::{s}::{co}"
+        g = groups.setdefault(key, {"product_id": pid, "product": prods.get(pid), "size": s, "color": co, "customers": []})
+        g["customers"].append({"id": r.get("id"), "name": r.get("name"), "phone": r.get("phone"), "created_at": r.get("created_at")})
+    out = sorted(groups.values(), key=lambda g: -len(g["customers"]))
+    total_customers = sum(len(g["customers"]) for g in out)
+    conv = await db.waitlist.count_documents({"notified_at": {"$ne": None}, "converted": True})
+    notified = await db.waitlist.count_documents({"notified_at": {"$ne": None}})
+    return {"groups": clean(out), "pending": len(rows), "products_affected": len(pids), "customers_total": total_customers, "conversion_pct": round(conv/max(1,notified)*100,1) if notified else 0}
+
+@api.post("/waitlist/{wid}/notify")
+async def waitlist_notify(wid: str, user: dict = Depends(require_role("admin","manager"))):
+    w = await db.waitlist.find_one({"id": wid})
+    if not w: raise HTTPException(404)
+    await _notify_waitlist(w["product_id"], w.get("size"))
+    return {"ok": True}
+
+class OutOfCatalogIn(BaseModel):
+    keyword: str
+    customer_phone: Optional[str] = None
+    customer_name: Optional[str] = None
+    channel: str = "site"  # site | pos | search
+
+@api.post("/public/out-of-catalog")
+async def public_out_of_catalog(body: OutOfCatalogIn):
+    doc = {"id": new_id(), "keyword": body.keyword.strip().lower(), "customer_phone": body.customer_phone,
+           "customer_name": body.customer_name, "channel": body.channel, "created_at": now_iso()}
+    await db.out_of_catalog.insert_one(doc)
+    return {"ok": True}
+
+@api.get("/out-of-catalog")
+async def list_out_of_catalog(user: dict = Depends(require_role("admin","manager"))):
+    rows = await db.out_of_catalog.find({}).sort("created_at",-1).to_list(500)
+    buckets: Dict[str, Dict[str, Any]] = {}
+    for r in rows:
+        k = r["keyword"]
+        b = buckets.setdefault(k, {"keyword": k, "count": 0, "requests": []})
+        b["count"] += 1
+        if len(b["requests"]) < 20: b["requests"].append(clean(r))
+    out = sorted(buckets.values(), key=lambda b: -b["count"])
+    return {"keywords": out, "total": len(rows)}
+
+@api.get("/abandoned-carts/{aid}")
+async def abandoned_cart_detail(aid: str, user: dict = Depends(require_role("admin","manager"))):
+    a = await db.abandoned_carts.find_one({"id": aid})
+    if not a: raise HTTPException(404)
+    # Enrich with customer stats
+    cust_phone = (a.get("customer") or {}).get("phone") or a.get("customer_phone")
+    stats = {"orders_count": 0, "total_spent": 0, "tier": None}
+    if cust_phone:
+        c = await db.customers.find_one({"phone": cust_phone})
+        if c:
+            orders = await db.orders.find({"customer.phone": cust_phone}).to_list(500)
+            stats = {"orders_count": len(orders), "total_spent": sum(o.get("total",0) for o in orders),
+                     "tier": c.get("tier"), "loyalty_points": c.get("loyalty_points",0)}
+            a["customer_full"] = clean(c)
+    a["customer_stats"] = stats
+    # Previous reminders
+    reminders = await db.cart_reminders.find({"cart_id": aid}).sort("sent_at",-1).to_list(50)
+    a["reminders"] = clean(reminders)
+    return clean(a)
+
+class RelaunchOfferIn(BaseModel):
+    cart_ids: List[str] = []  # empty = all abandoned in period
+    offer_type: str = "none"  # none | pct | amount | special_price | free_delivery | gift
+    value: Optional[float] = 0
+    starts_at: Optional[str] = None
+    ends_at: Optional[str] = None
+    code: Optional[str] = None
+    channels: List[str] = ["whatsapp"]  # whatsapp | inapp | both
+    message: str = ""
+    period_from: Optional[str] = None
+    period_to: Optional[str] = None
+
+@api.post("/abandoned-carts/relaunch")
+async def abandoned_relaunch(body: RelaunchOfferIn, user: dict = Depends(require_role("admin","manager"))):
+    targets = []
+    if body.cart_ids:
+        targets = await db.abandoned_carts.find({"id": {"$in": body.cart_ids}}).to_list(500)
+    elif body.period_from and body.period_to:
+        targets = await db.abandoned_carts.find({"created_at": {"$gte": body.period_from, "$lte": body.period_to}, "recovered": {"$ne": True}}).to_list(1000)
+    else:
+        targets = await db.abandoned_carts.find({"recovered": {"$ne": True}}).to_list(500)
+    code = body.code or (f"RELANCE-{int(time.time())%100000}" if body.offer_type != "none" else None)
+    sent = 0
+    for a in targets:
+        phone = (a.get("customer") or {}).get("phone") or a.get("customer_phone") or ""
+        name = (a.get("customer") or {}).get("name") or a.get("customer_name") or "Cliente"
+        pd = "".join(c for c in phone if c.isdigit())
+        if not pd: continue
+        msg = (body.message
+               .replace("{prénom}", name.split()[0])
+               .replace("{produits}", ", ".join(it.get("name","") for it in a.get("items",[])))
+               .replace("{code}", code or "")
+               .replace("{date_fin}", (body.ends_at or "")[:10])
+               .replace("{lien_panier}", f"https://chezdina.ci/boutique/panier"))
+        if "whatsapp" in body.channels or "both" in body.channels:
+            await db.whatsapp_outbox.insert_one({"id":new_id(),"phone":phone,"phone_digits":pd,"message":msg,
+                "link":f"https://wa.me/{pd}?text={_url_quote(msg)}","kind":"cart_relaunch","cart_id":a["id"],
+                "sent":False,"created_at":now_iso()})
+        await db.cart_reminders.insert_one({"id":new_id(),"cart_id":a["id"],"channel":",".join(body.channels),
+            "offer_type":body.offer_type,"value":body.value,"code":code,"message":msg,
+            "sent_at":now_iso(),"sent_by":user.get("name")})
+        await db.abandoned_carts.update_one({"id": a["id"]}, {"$set": {"status":"relance","last_reminder_at":now_iso()}})
+        sent += 1
+    return {"ok": True, "sent": sent, "code": code}
+
+# Enforce order status transitions by role (Fix pack 3)
+TERMINAL_STATUSES = {"livree","annulee","reportee","echouee"}
+ROLE_ALLOWED_STATUSES = {
+    "admin": None,  # any
+    "manager": {"nouvelle","confirmee","en_preparation","prete","assignee"},
+    "rider": {"en_livraison","livree","annulee","reportee","echouee"},
+}
+
+@api.patch("/orders/{oid}/status-v3")
+async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Depends(get_user)):
+    """Fix pack 3: role-enforced status transitions with scan check + auto invoice on delivery."""
+    new_status = body.get("status")
+    reason = body.get("reason","")
+    o = await db.orders.find_one({"id": oid})
+    if not o: raise HTTPException(404)
+    role = user.get("role","")
+    allowed = ROLE_ALLOWED_STATUSES.get(role)
+    if allowed is not None and new_status not in allowed:
+        # Allow admin override with reason; otherwise reject
+        if role != "admin":
+            raise HTTPException(403, f"Rôle {role} ne peut pas passer la commande en « {new_status} »")
+        if new_status in TERMINAL_STATUSES and not reason:
+            raise HTTPException(400, "Raison obligatoire pour cette action (override)")
+    # Preparation control: 'prete' requires scanned items match
+    if new_status == "prete":
+        scanned = body.get("scanned_items") or []
+        if scanned and len(scanned) < len(o.get("items",[])):
+            raise HTTPException(400, f"Scan incomplet : {len(scanned)}/{len(o.get('items',[]))} articles")
+    patch = {"status": new_status, "updated_at": now_iso()}
+    if new_status == "livree": patch["delivered_at"] = now_iso(); patch["payment_status"] = "paye"
+    if new_status == "annulee": patch["cancellation_reason"] = reason
+    await db.orders.update_one({"id": oid}, {
+        "$set": patch,
+        "$push": {"timeline": {"status": new_status, "at": now_iso(), "by": user.get("name"), "reason": reason}}
+    })
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":f"order.status.{new_status}","entity_id":oid,"before":{"status":o.get("status")},"after":{"status":new_status,"reason":reason},"at":now_iso()})
+    # Auto-generate invoice when delivered
+    if new_status == "livree":
+        await db.invoices.update_one({"order_id": oid}, {"$setOnInsert": {
+            "id": new_id(), "number": f"INV-{int(time.time())%1000000}", "order_id": oid, "order_code": o.get("code"),
+            "customer": o.get("customer"), "items": o.get("items"), "subtotal": o.get("subtotal"),
+            "delivery_fee": o.get("delivery_fee",0), "discount": o.get("discount",0), "total": o.get("total"),
+            "status": "payee" if o.get("payment_status") == "paye" or True else "a_payer",
+            "created_at": now_iso(), "generated_by": "auto"
+        }}, upsert=True)
+    return {"ok": True}
+
+@api.get("/orders/{oid}/invoice")
+async def get_order_invoice(oid: str, user: dict = Depends(get_user)):
+    inv = await db.invoices.find_one({"order_id": oid})
+    if not inv:
+        o = await db.orders.find_one({"id": oid})
+        if not o: raise HTTPException(404)
+        return {"invoice": None, "order_code": o.get("code")}
+    return {"invoice": clean(inv)}
+
+@api.post("/orders/{oid}/generate-invoice")
+async def generate_invoice(oid: str, user: dict = Depends(require_role("admin","manager"))):
+    o = await db.orders.find_one({"id": oid})
+    if not o: raise HTTPException(404)
+    existing = await db.invoices.find_one({"order_id": oid})
+    if existing: return {"ok": True, "invoice": clean(existing), "already": True}
+    inv = {"id": new_id(), "number": f"INV-{int(time.time())%1000000}", "order_id": oid, "order_code": o.get("code"),
+           "customer": o.get("customer"), "items": o.get("items"), "subtotal": o.get("subtotal"),
+           "delivery_fee": o.get("delivery_fee",0), "discount": o.get("discount",0), "total": o.get("total"),
+           "status": "payee" if o.get("payment_status") == "paye" else "a_payer",
+           "created_at": now_iso(), "generated_by": user.get("name")}
+    await db.invoices.insert_one(inv)
+    return {"ok": True, "invoice": clean(inv)}
+
 
 async def _seed_demo_content_legacy():
     """Legacy seed block (orphaned by earlier insert) — kept for reference, not auto-called. Use /admin/seed-demo instead."""

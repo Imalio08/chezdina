@@ -3,66 +3,32 @@
 ## Problem Statement
 Chez Dina — retail OS femme Abidjan Cocody Angré 7e. Français, FCFA, Africa/Abidjan. 3 faces: Console / Rider / Storefront. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
-## Fix pack 1 (Feb 2026) — Bugs, demo data & interface rules
+## Fix pack 3 (Feb 2026) — Ventes : POS, Commandes, Liste d'attente, Paniers abandonnés
 
-### Fait
-- **Sidebar réorganisée** exactement selon spec : Tableau de bord seul en haut, puis Ventes · Livraison · Produits & achats · Clients & marketing · Équipe · Site vitrine · Pilotage · Paramètres · Manuel.
-- **AI floating button** masqué sur /console/pos (ne couvre plus "Encaisser").
-- **POS cart overflow** : grid lg:grid-cols-[1fr_min(400px,33vw)], scrollable, visible à 1280 px.
-- **Rider spelling** : Historique tabs rendus avec labels accentués (Livrées / Annulées / Reportées / Échecs).
-- **Sora global** : CSS unifiée, IBM Plex Serif supprimé, `.font-serif` → Sora 600.
-- **Search icon spacing** : règle CSS globale `.dina-input.pl-9/pl-10` pour éviter chevauchement.
-- **Demo seed** : POST /api/admin/seed-demo génère 300 clientes · 300 commandes 6 mois · 80 dépenses · 500 visites · 20 waitlist · 30 paniers abandonnés · 30 avis · 5 fournisseurs. Tag DEMO_PACK1. DELETE /api/admin/demo-data pour cleanup.
-- **Routes nouvelles** : /console/accueil (SectionBuilder), /console/apercu (redirect boutique), /console/finances (redirect /resultat), /console/segments (WhatsAppCampaigns), /console/manuel (Placeholder).
-- Bouton **"Supprimer les données de démonstration"** dans Settings (admin only).
-
-### Reste pour Pack 1
-- Bugs 1,2 (Period filter crash + Dashboard charts empty) — à investiguer en Pack 3.
-- Bugs 3,4 (Livraison 3 pages différentes) → Pack 4.
-- Bugs 5,6,8,9 (Catégories, Approvisionnements, IA desc, SEO section vide) → Pack 5.
-- Bug 7 (Site vitrine pages) → Pack 8.
-- Bug 10 (Statistiques Zones) → Pack 7.
-- Bug 11 (POS loading grey) → fix via demo seed (produits chargés). Si persiste en Pack 3.
-- KPI compact format "77,4 M FCFA" + tooltip → Pack 3.
-- Toggle Tableau/Grille/Kanban généralisé → Pack 3.
-- Standardisation du Period filter sur toutes les pages → Pack 3.
-
-## Fix pack 2 (Feb 2026) — Internal control, roles, cash & attendance
-
-### Backend (3100+ lignes)
-- **ROLE_TEMPLATES** : gerante, livreur, caissiere avec permissions pré-remplies.
-- **/roles CRUD** : GET (avec user_count + pending_approvals), POST, PATCH, DELETE. builtin=False non modifiables.
-- **/approval-requests** : POST (créer demande), GET (liste), POST /{id}/decide (approuver/rejeter → audit).
-- **/expense-requests** : POST (Gérante soumet), GET, POST /{id}/decide → crée expense si approuvée.
-- **/audit-logs** : GET (admin), tracé automatique sur role.*, approval.*, expense_request.*, cash.*, stock.adjust.
-- **Cash sessions handover** : POST /{sid}/declare-handover (Gérante déclare), POST /{sid}/validate-handover (owner valide, gap → manager_balance).
-- **/manager-balance/{mid}** : solde cumulé Gérante.
-- **Attendance complet** : /check-in (selfie + GPS + geofence Haversine + late detection + flags), /me, /today, /calendar/{eid}, /stats/{eid}. Flag "depart_sans_reconciliation" automatique pour riders. Geofence mandatory → 400 si hors zone.
-- **/business/geofence** et **/business/working-hours** PATCH.
-- **/stock/adjustments** : admin → appliqué + audit, sinon → approval_request.
-- Legacy /attendance/today renommé /attendance/today-kiosk.
+### Backend
+- **/waitlist/grouped** : groupe par produit + taille + couleur avec client list + KPIs (pending / products_affected / customers_total / conversion_pct)
+- **/waitlist/{wid}/notify** : notification WhatsApp immédiate
+- **/public/out-of-catalog** (public) et **/out-of-catalog** (admin) : regroupement par mot-clé
+- **/abandoned-carts/{aid}** : détail enrichi (customer stats, reminders history)
+- **/abandoned-carts/relaunch** : POST avec cart_ids ou period, offer_type (none/pct/amount/special_price/free_delivery/gift), value, dates, channels (whatsapp/inapp/both), message avec variables {prénom}/{produits}/{code}/{date_fin}/{lien_panier}
+- **/orders/{oid}/status-v3** : role-enforced transitions (admin libre, manager interdit livrée/annulée/reportée/échoué, rider terrain seulement). Admin override avec reason obligatoire. Scan check pour "prete". Invoice auto générée à "livree".
+- **/orders/{oid}/invoice** et **/orders/{oid}/generate-invoice** : récupération + génération manuelle
 
 ### Frontend
-- **CheckInGate.jsx** (nouveau) : selfie live caméra avant + GPS + submit, blocage toutes les tabs rider.
-- **RiderShell.jsx** : charge /attendance/me, affiche CheckInGate si !checked_in, badge "● Pointé" dans la topbar.
-- **Pointage.jsx** (réécrit) : KPIs présents/retards/hors boutique, liste aujourd'hui avec selfie, non-pointés, geofence (lat/lng/rayon/mandatory), horaires par rôle (open/close/tolerance), détail employé (calendrier mensuel coloré + stats ponctualité).
-- Route `/console/pointage` → Pointage (remplace Kiosk).
+- **POS Liste view** : table une ligne par produit (image/nom/marque/catégorie/SKU/tailles+stock/couleurs/stock/prix/+Ajouter). Toggle Liste/Grille (Liste par défaut). Chip "Meilleures ventes" filtre top 8. Sort A-Z/Prix/Stock. Clic +Ajouter → sheet variante.
+- **Cart stock restant** : chaque ligne affiche "Reste N en stock", rouge si dépassement + bloque Encaisser.
+- **Waitlist.jsx** (nouveau, remplace AlertsAndCarts) : KPIs, groupes expandables par produit/variant, actions Notifier/Retirer, tab "Demandes hors catalogue".
+- **AbandonedCarts.jsx** (nouveau, remplace AlertsAndCarts) : KPIs (count/valeur/relancés/récupérés/taux/CA récupéré), table sélectionnable, panneau détail latéral (cliente stats + panier full + relances envoyées), formulaire "Relancer" avec offre + variables + canal, "Créer une offre de relance" bulk.
+- Route `/console/liste-attente` → Waitlist · Route `/console/paniers-abandonnes` → AbandonedCarts.
 
-### Reste pour Pack 2
-- UI RolesPermissions matrice complète (4 niveaux par cellule) → simplifier/ajouter en Pack ultérieur.
-- UI CashSessions workflow handover/validate — endpoints prêts, UI à brancher.
-- Blind inventory UI → Pack 5.
-- Audit log viewer owner UI → à ajouter dans RolesPermissions.
-- Store tablet kiosk mode pour Gérante → endpoint existant (/attendance/punch-kiosk).
+### Reste pour Pack 3
+- POS enforce cash session ouverte (endpoint prêt /cash-sessions, UI non branchée)
+- Commandes UI : scan preparation Prête, colonne Facture (icônes Voir/PDF/WA), bloc Facture dans order detail
+- KPIs commandes (nouvelles/à confirmer/prêtes/.../taux annulation/CA livré)
+- Facturation tab retirée (route déjà supprimée Pack 1)
 
-## Sessions précédentes
-- **S14 Phase A/B/C** — POS v3, Produits v3, Storefront finalization
-- **S13** — Storefront v3 initial + Rider offline
-- **S12** — Rider Space v2
-- **S11** — Rebrand + CMS + Caisse + P&L
-- **S10** — CMS Vitrine + Compte Cliente
-- **S9** — WhatsApp auto + Fidélité
-- **S8** — Board DnD + GPS + QR
+## Fix pack 2 — Internal control (voir sessions précédentes du PRD)
+## Fix pack 1 — Bugs, demo data, interface rules (voir sessions précédentes)
 
 ## Credentials
 - Admin `aouattaraesca@gmail.com` / `Admin123!` · PIN 1234
@@ -71,10 +37,9 @@ Chez Dina — retail OS femme Abidjan Cocody Angré 7e. Français, FCFA, Africa/
 - Cliente démo `+225 07 60 17 28 21` · code `142085`
 
 ## Backlog ordonné
-### Pack 3
-- Period filter crash fix + Dashboard charts + POS loading
-- KPI compact format + toggle Tableau/Grille/Kanban
-- Facturation move into Commandes
+### Pack 3 reste
+- POS: block sale if no open cash session · scan preparation flow
+- Commandes UI: invoice column + detail bloc + KPI cards complète
 ### Pack 4
 - Livraisons: journées / livreurs / zones séparés
 ### Pack 5
@@ -85,3 +50,7 @@ Chez Dina — retail OS femme Abidjan Cocody Angré 7e. Français, FCFA, Africa/
 - Site vitrine pages/menu/SEO distincts
 ### Pack 9
 - Finale + optimisations
+
+## Known hygiene
+- server.py ~3500 lignes — refactor en routers après Pack 9
+- _seed_demo_content_legacy pas appelé (ancienne seed orpheline nettoyée en fonction nommée)

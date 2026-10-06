@@ -44,6 +44,8 @@ import CmsPages from "@/pages/console/CmsPages";
 import CashSessions from "@/pages/console/CashSessions";
 import Encaissements from "@/pages/console/Encaissements";
 import ProfitLoss from "@/pages/console/ProfitLoss";
+import Waitlist from "@/pages/console/Waitlist";
+import AbandonedCarts from "@/pages/console/AbandonedCarts";
 import Pointage from "@/pages/console/Pointage";
 import SiteAppearance from "@/pages/console/SiteAppearance";
 import BrandsCategories from "@/pages/console/BrandsCategories";
@@ -126,9 +128,9 @@ export default function App() {
               <Route path="zones" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
               <Route path="marques" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
               <Route path="categories" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
-              <Route path="liste-attente" element={<ErrorBoundary><AlertsAndCarts/></ErrorBoundary>} />
+              <Route path="liste-attente" element={<ErrorBoundary><Waitlist/></ErrorBoundary>} />
               <Route path="fournisseurs" element={<ErrorBoundary><Purchases/></ErrorBoundary>} />
-              <Route path="paniers-abandonnes" element={<ErrorBoundary><AlertsAndCarts/></ErrorBoundary>} />
+              <Route path="paniers-abandonnes" element={<ErrorBoundary><AbandonedCarts/></ErrorBoundary>} />
               <Route path="parrainage" element={<ErrorBoundary><Referrals/></ErrorBoundary>} />
               <Route path="campagnes-whatsapp" element={<ErrorBoundary><WhatsAppCampaigns/></ErrorBoundary>} />
               <Route path="encaissements" element={<ErrorBoundary><Encaissements/></ErrorBoundary>} />
