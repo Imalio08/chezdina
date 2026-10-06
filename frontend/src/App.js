@@ -44,6 +44,7 @@ import Referrals from "@/pages/console/Referrals";
 import RolesPermissions from "@/pages/console/RolesPermissions";
 import Approvals from "@/pages/console/Approvals";
 import Audit from "@/pages/console/Audit";
+import Preparation from "@/pages/console/Preparation";
 import Kiosk from "@/pages/console/Kiosk";
 import SectionBuilder from "@/pages/console/SectionBuilder";
 import CmsPages from "@/pages/console/CmsPages";
@@ -126,6 +127,7 @@ export default function App() {
               <Route index element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
               <Route path="pos" element={<ErrorBoundary><POS /></ErrorBoundary>} />
               <Route path="commandes" element={<ErrorBoundary><Orders /></ErrorBoundary>} />
+              <Route path="preparation" element={<ErrorBoundary><Preparation/></ErrorBoundary>} />
               <Route path="livraisons" element={<ErrorBoundary><DeliveryDays /></ErrorBoundary>} />
               <Route path="produits" element={<ErrorBoundary><Products /></ErrorBoundary>} />
               <Route path="stock" element={<ErrorBoundary><StockInventories /></ErrorBoundary>} />

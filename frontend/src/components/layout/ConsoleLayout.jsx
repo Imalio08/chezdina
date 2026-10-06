@@ -21,6 +21,7 @@ const SECTIONS = [
   { label: "Ventes", items: [
     { to: "/console/pos", icon: ShoppingCart, label: "Caisse" },
     { to: "/console/commandes", icon: Receipt, label: "Commandes" },
+    { to: "/console/preparation", icon: Package, label: "Préparation" },
     { to: "/console/sessions-caisse", icon: ClipboardList, label: "Sessions de caisse" },
     { to: "/console/liste-attente", icon: Hourglass, label: "Liste d'attente" },
     { to: "/console/paniers-abandonnes", icon: ShoppingCart, label: "Paniers abandonnés" },

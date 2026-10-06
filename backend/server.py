@@ -208,6 +208,7 @@ class RolesPermissionsIn(BaseModel):
 class AttendancePunchIn(BaseModel):
     code: str
     kind: str = "in"  # in | out
+    selfie: Optional[str] = None  # base64 data URL, captured on kiosk tablet
 class CustomerLoginCodeIn(BaseModel):
     phone: str
     code: str
@@ -3320,9 +3321,10 @@ async def attendance_punch_kiosk(body: AttendancePunchIn):
     doc = {
         "id": new_id(), "user_id": u.get("id"), "user_name": u.get("name"),
         "role": u.get("role"), "kind": body.kind, "at": now_iso(),
+        "selfie": body.selfie or None,
     }
     await db.attendance.insert_one(doc)
-    return {"ok": True, "name": u.get("name"), "role": u.get("role"), "kind": body.kind, "at": doc["at"]}
+    return {"ok": True, "name": u.get("name"), "role": u.get("role"), "kind": body.kind, "at": doc["at"], "has_selfie": bool(body.selfie)}
 
 @api.get("/notifications")
 async def notifications(user: dict = Depends(get_user)):
