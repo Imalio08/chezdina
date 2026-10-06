@@ -44,6 +44,9 @@ import CmsPages from "@/pages/console/CmsPages";
 import CashSessions from "@/pages/console/CashSessions";
 import Encaissements from "@/pages/console/Encaissements";
 import ProfitLoss from "@/pages/console/ProfitLoss";
+import DeliveryDays from "@/pages/console/DeliveryDays";
+import Riders from "@/pages/console/Riders";
+import Zones from "@/pages/console/Zones";
 import Waitlist from "@/pages/console/Waitlist";
 import AbandonedCarts from "@/pages/console/AbandonedCarts";
 import Pointage from "@/pages/console/Pointage";
@@ -104,7 +107,7 @@ export default function App() {
               <Route index element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
               <Route path="pos" element={<ErrorBoundary><POS /></ErrorBoundary>} />
               <Route path="commandes" element={<ErrorBoundary><Orders /></ErrorBoundary>} />
-              <Route path="livraisons" element={<ErrorBoundary><Deliveries /></ErrorBoundary>} />
+              <Route path="livraisons" element={<ErrorBoundary><DeliveryDays /></ErrorBoundary>} />
               <Route path="produits" element={<ErrorBoundary><Products /></ErrorBoundary>} />
               <Route path="stock" element={<ErrorBoundary><Stock /></ErrorBoundary>} />
               <Route path="achats" element={<ErrorBoundary><Purchases /></ErrorBoundary>} />
@@ -124,8 +127,8 @@ export default function App() {
               <Route path="factures" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="sessions-caisse" element={<ErrorBoundary><CashSessions/></ErrorBoundary>} />
               <Route path="journees-livraison" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
-              <Route path="livreurs" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
-              <Route path="zones" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
+              <Route path="livreurs" element={<ErrorBoundary><Riders/></ErrorBoundary>} />
+              <Route path="zones" element={<ErrorBoundary><Zones/></ErrorBoundary>} />
               <Route path="marques" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
               <Route path="categories" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
               <Route path="liste-attente" element={<ErrorBoundary><Waitlist/></ErrorBoundary>} />
