@@ -1,5 +1,29 @@
 # Chez Dina — PRD
 
+## Vague 1 bugs corrigés (Feb 2026) ✅
+
+### 1. Fiches colis & Feuille de route (DeliveryDays)
+- Avant : les 2 boutons appelaient `window.print()` directement → capture d'écran de la console
+- Après : « Imprimer les fiches colis » navigue vers `/console/fiches-colis?ids=...` avec préselection, « Feuille de route livreur » génère un vrai PDF via jsPDF (nom, téléphone, adresse, montant à encaisser par commande + signature)
+- Nouveau helper `printRouteSheetPDF(session, assigned)` dans `DeliveryDays.jsx`
+- `FichesColis.jsx` étendu avec `useSearchParams` pour lire `?ids=`
+
+### 2. Étiquettes QR appros (PurchaseOrders)
+- Avant : QR encode `SKU|size|color` (illisible) + `window.print()` capturait toute la console (position fixed cassée en impression) + modal non monté quand la vue détail PO est ouverte (early-return cache le JSX du modal)
+- Après : QR encode une URL `${origin}/scan?sku=&size=&color=&pid=` → nouveau composant `ScanRedirect.jsx` résout vers `/console/produits?highlight=` (staff) ou `/boutique/product/:id` (public)
+- Nouveau helper `buildScanUrl()` ; `LabelsPrintModal` ouvre une nouvelle fenêtre `window.open()` dédiée à l'impression (ne blank plus la console)
+- Fragment wrap du early-return `if (detail) return (<><PoDetail/>{labels && <LabelsPrintModal/>}</>)` → modal désormais accessible depuis la vue détail PO
+- Nouvelle route `/scan` publique dans `App.js`
+
+### 3. Code d'accès cliente (Customers)
+- Avant : `regenCode` faisait `setNewCode(r.data)` directement alors que le backend renvoie `{access_code, phone, name}` → la modale affichait `data.code = undefined`, les boutons Copier et WhatsApp étaient inactifs
+- Après : mapping explicite `{code: r.data.access_code, phone, name}` + dialog de confirmation avant régénération
+- Message WhatsApp pré-rempli contient maintenant le code à 6 chiffres
+
+### Testing
+- `/app/backend/tests/test_wave1_bugs.py` : 7/7 pytest green (regen-access-code + no-regression /customers /products /purchase-orders /orders /delivery-sessions)
+- Testing agent frontend : 100% success (iter 34)
+
 ## Manuel enrichi · captures annotées 05→16 (Feb 2026) ✅
 
 ### Extension du composant AnnotatedScreenshot
