@@ -96,6 +96,9 @@ const CHIPS_BY_PAGE = {
 export default function ConsoleLayout() {
   const { user, logout } = useAuth();
   const { theme, setTheme, online } = useApp();
+  const [site, setSite] = useState({});
+  useEffect(() => { api.get("/public/site").then(r => setSite(r.data || {})).catch(() => {}); }, []);
+  const logo = site.logo;
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState(null);
   const [showNotif, setShowNotif] = useState(false);
@@ -119,6 +122,9 @@ export default function ConsoleLayout() {
   useEffect(() => {
     const fetchNotifs = () => api.get("/notifications").then(r => setNotifs(r.data || [])).catch(()=>{});
     fetchNotifs(); const t = setInterval(fetchNotifs, 30000); return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    api.get("/public/site").then(r => setSite(r.data || {})).catch(() => setSite({}));
   }, []);
   useEffect(() => {
     const onKey = (e) => { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); document.querySelector('[data-testid="global-search"]')?.focus(); } };

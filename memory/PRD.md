@@ -1,5 +1,35 @@
 # Chez Dina — PRD
 
+## P4 Finitions (Feb 2026) ✅
+
+### Avis clientes
+- `/console/avis` enrichie : 4 KPI cards cliquables (pending/approved/rejected/note moyenne), bouton **Répondre** admin/manager → modal + réponse publique inline sous l'avis avec style "Chez Dina · {moderator}"
+- Backend `ReviewModerationIn` : accepte `reply` optionnel ; `moderate_review` persiste `reply`, `reply_by`, `reply_at`, `moderated_by`, `moderated_at`
+
+### Dina IA ↔ Manuel
+- `/api/ai/ask` : priorité **manuel** si question how-to (comment/créer/modifier/remboursement/remise/préparer/clôturer…)
+- `_search_manual` : fuzzy keyword match sur `manual_modules.sections.blocks` (text/content/items) filtré par rôle
+- Réponse structurée : étapes numérotées + lien profond `/console/manuel/{module}#{section}`
+- Questions non trouvées loggées dans `manual_gaps` (visible via `/manual-gaps` admin only)
+
+### Logo global
+- `ConsoleLayout` charge `/public/site` et propage `site.logo` + `site.name` dans sidebar + header (fallback pastille "CD")
+
+### Service Worker & Push
+- `/public/sw.js` : handler `push` + `notificationclick`
+- `/lib/sw.js` : `registerSW`, `subscribePush` (attend `REACT_APP_VAPID_PUBLIC_KEY`), `listenInstallPrompt`, `triggerInstall`
+- `registerSW()` au démarrage dans `App.js`
+
+### Analytics 1st-party
+- `POST /api/analytics/events` : stocke événement {name, visitor_id, session_id, page, utm_*, device, consent}
+- `GET /api/analytics/funnel?days=N` : agrégation visitors / page_views / product_views / add_to_cart / checkout_started / order_placed / conversion_rate
+- `/lib/analytics.js` : `track(name, extra)` + visitor_id persistant + consent gate
+
+### Testé (iteration_28)
+- Backend 6/6 pytest ✅ (reviews reply, ai manual, manual-gaps 403, analytics events + funnel)
+- Frontend reviews moderation+reply + 15/15 regression ✅
+- 2 bugs mineurs corrigés par le testing agent (dict items dans _search_manual, state site manquant dans ConsoleLayout — déduplication locale appliquée post-test)
+
 ## P3 Produits & achats (Feb 2026) ✅
 
 ### Backend
@@ -230,7 +260,16 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 
 ### P3 — Fix pack 5 (Produits & achats) ✅ TERMINÉ
 
-### P4 — Packs 6, 7, 8, 9
+### P4 — Packs 6, 7, 8, 9 (livré)
+- ✅ Avis modération inbox (approuver/rejeter/répondre + KPI cards)
+- ✅ Dina IA branchée sur le manuel (recherche manuel first, lien module/étape, filtrée par rôle, gaps loggés)
+- ✅ Service Worker + infra Web push (VAPID à configurer en production)
+- ✅ Analytics 1st-party (events + funnel)
+- ✅ Logo global (sidebar + header console propagent site.logo)
+- 🟡 **Reste P4 à faire plus tard** : Parrainage configurable UI, dark mode complet audit, horaires storefront bannière, police storefront only, WhatsApp outbox UI dédiée, logo sur reçus/factures/fiches colis/rider, "Installer l'application" bannière iOS
+
+### P5 — Dernière étape
+- Refactor `server.py` en modules par domaine
 - Avis modération inbox (approuver/rejeter/répondre)
 - Parrainage configurable (format code + validité)
 - Web push notifications (Service Worker + VAPID .env + bannière "Installer l'application" iOS)

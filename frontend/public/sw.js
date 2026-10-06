@@ -1,6 +1,7 @@
 /* Chez Dina Service Worker — push + install prompt infra
  * Push payload format: { title, body, url, badge, icon }
  */
+/* global clients */
 self.addEventListener("install", (e) => { self.skipWaiting(); });
 self.addEventListener("activate", (e) => { e.waitUntil(self.clients.claim()); });
 
@@ -21,8 +22,8 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = event.notification.data?.url || "/";
-  event.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
     for (const c of list) { if (c.url.includes(url) && "focus" in c) return c.focus(); }
-    if (clients.openWindow) return clients.openWindow(url);
+    if (self.clients.openWindow) return self.clients.openWindow(url);
   }));
 });

@@ -4727,8 +4727,16 @@ async def _search_manual(q: str, role: str) -> Optional[Dict[str, Any]]:
     best = None
     for m in modules:
         for sec in m.get("sections") or []:
+            def _items_text(it):
+                try:
+                    return " ".join(
+                        (x if isinstance(x, str) else (x.get("text") or x.get("content") or x.get("label") or ""))
+                        for x in (it or [])
+                    )
+                except Exception:
+                    return ""
             hay = (sec.get("heading","") + " " + " ".join(
-                (b.get("content","") or b.get("text","") or " ".join(b.get("items",[]) or []))
+                (b.get("content","") or b.get("text","") or _items_text(b.get("items",[])))
                 for b in sec.get("blocks") or []
             )).lower()
             score = sum(hay.count(t) for t in tokens)
@@ -4751,13 +4759,17 @@ async def ask_dina(body: AskIn, user: dict = Depends(get_user)):
             m = await db.manual_modules.find_one({"number": hit["module_number"]})
             sec = next((s for s in (m or {}).get("sections") or [] if s.get("id") == hit["section_id"]), None)
             lines = [f"**Module {hit['module_number']} · {hit['module_title']}** — section « {hit['section_heading']} »:\n"]
+            def _item_str(x):
+                if isinstance(x, str): return x
+                if isinstance(x, dict): return x.get("text") or x.get("content") or x.get("label") or ""
+                return str(x)
             for b in (sec or {}).get("blocks") or []:
                 if b.get("type") == "steps":
                     for i, s in enumerate(b.get("items") or [], 1):
-                        lines.append(f"{i}. {s}")
+                        lines.append(f"{i}. {_item_str(s)}")
                 elif b.get("type") == "list":
                     for s in b.get("items") or []:
-                        lines.append(f"• {s}")
+                        lines.append(f"• {_item_str(s)}")
                 elif b.get("content"):
                     lines.append(b["content"])
                 elif b.get("text"):
