@@ -27,7 +27,7 @@ export default function Login() {
     try {
       const u = mode === "password" ? await login(email, password) : await loginPin(pin);
       toast.success(`Bienvenue ${u.name}`);
-      nav(u.role === "rider" ? "/console/livreur" : "/console");
+      nav(u.role === "rider" ? "/rider" : "/console");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Connexion impossible");
     } finally { setLoading(false); }

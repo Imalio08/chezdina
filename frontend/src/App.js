@@ -28,6 +28,12 @@ import Settings from "@/pages/console/Settings";
 import SiteSettings from "@/pages/console/SiteSettings";
 import Placeholder from "@/pages/console/Placeholder";
 import FichesColis from "@/pages/console/FichesColis";
+import RiderShell from "@/pages/rider/RiderShell";
+import RiderCourses from "@/pages/rider/Courses";
+import RiderCarte from "@/pages/rider/Carte";
+import RiderHistorique from "@/pages/rider/Historique";
+import RiderPerformance from "@/pages/rider/Performance";
+import RiderProfil from "@/pages/rider/Profil";
 import WhatsAppCampaigns from "@/pages/console/WhatsAppCampaigns";
 import Referrals from "@/pages/console/Referrals";
 import RolesPermissions from "@/pages/console/RolesPermissions";
@@ -71,6 +77,13 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/suivi/:code" element={<Tracking />} />
+            <Route path="/rider" element={<Protected><RiderShell /></Protected>}>
+              <Route index element={<ErrorBoundary><RiderCourses /></ErrorBoundary>} />
+              <Route path="carte" element={<ErrorBoundary><RiderCarte /></ErrorBoundary>} />
+              <Route path="historique" element={<ErrorBoundary><RiderHistorique /></ErrorBoundary>} />
+              <Route path="performance" element={<ErrorBoundary><RiderPerformance /></ErrorBoundary>} />
+              <Route path="profil" element={<ErrorBoundary><RiderProfil /></ErrorBoundary>} />
+            </Route>
             <Route path="/boutique" element={<StorefrontLayout />}>
               <Route index element={<Home />} />
               <Route path="catalog" element={<Catalog />} />

@@ -1,0 +1,176 @@
+import React, { useEffect, useMemo, useState } from "react";
+import api from "@/lib/api";
+import { fcfa, statusLabel, statusColor } from "@/lib/format";
+import { toast } from "sonner";
+import { Phone, MessageCircle, Navigation, QrCode, ChevronRight, X, MapPin } from "lucide-react";
+import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
+
+const FILTERS = [
+  { v: "all", label: "Toutes", k: null },
+  { v: "a_livrer", label: "À livrer", k: "a_livrer" },
+  { v: "en_route", label: "En route", k: "en_route" },
+  { v: "livrees", label: "Livrées", k: "livrees" },
+  { v: "annulees", label: "Annulées", k: "annulees" },
+  { v: "reportees", label: "Reportées", k: "reportees" },
+  { v: "echecs", label: "Échecs", k: "echecs" },
+];
+
+export default function Courses() {
+  const [d, setD] = useState(null);
+  const [filter, setFilter] = useState("all");
+  const [open, setOpen] = useState(null); // order detail
+  const [proof, setProof] = useState(null);
+
+  const load = () => api.get("/riders/me/today").then(r => setD(r.data)).catch(() => toast.error("Erreur"));
+  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+
+  const match = (o) => {
+    if (filter === "all") return true;
+    const s = o.status;
+    if (filter === "a_livrer") return ["confirmee", "prete", "assignee"].includes(s);
+    if (filter === "en_route") return s === "en_livraison";
+    if (filter === "livrees") return s === "livree";
+    if (filter === "annulees") return s === "annulee";
+    if (filter === "reportees") return s === "reportee";
+    if (filter === "echecs") return s === "echouee";
+    return true;
+  };
+
+  const changeStatus = async (oid, status, reason) => {
+    try { await api.patch(`/orders/${oid}/status`, { status, reason }); toast.success("Mis à jour"); load(); setOpen(null); }
+    catch { toast.error("Erreur"); }
+  };
+  const confirmDeliver = (o) => setProof(o);
+
+  if (!d) return <div className="text-sm text-[#666] text-center py-10">Chargement…</div>;
+
+  const filtered = d.orders.filter(match);
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <KPI label="À livrer" v={d.counts.a_livrer} c="#e4991e" />
+        <KPI label="Livrées" v={d.counts.livrees} c="#1f8a4c" />
+        <KPI label="À encaisser" v={fcfa(d.to_collect)} c="#b02a2a" wide />
+        <KPI label="Encaissé" v={fcfa(d.collected)} c="#1f8a4c" wide />
+        <KPI label="À remettre" v={fcfa(d.balance_to_hand_over)} c="#b02a2a" wide />
+      </div>
+
+      <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1 -mx-3 px-3" data-testid="rider-filters">
+        {FILTERS.map(f => (
+          <button key={f.v} onClick={() => setFilter(f.v)} className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${filter === f.v ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec] dark:border-[#2a2a2a] text-[#666] dark:text-[#999]"}`} data-testid={`filter-${f.v}`}>
+            {f.label}{f.k ? ` · ${d.counts[f.k] || 0}` : ` · ${d.orders.length}`}
+          </button>
+        ))}
+      </div>
+
+      <button className="dina-btn-secondary w-full !min-h-[42px]" onClick={() => toast.message("Scan QR : fonctionnalité à venir — ouvrez l'ordre par la liste")} data-testid="rider-scan"><QrCode size={14} />Scanner une fiche</button>
+
+      <div className="space-y-2">
+        {filtered.length === 0 && <div className="text-center text-sm text-[#666] py-10">Aucune course</div>}
+        {filtered.map(o => <OrderCard key={o.id} order={o} onOpen={() => setOpen(o)} />)}
+      </div>
+
+      {open && <OrderDetail order={open} onClose={() => setOpen(null)} onStatus={changeStatus} onDeliver={confirmDeliver} />}
+      {proof && <DeliveryProofModal order={proof} onClose={() => setProof(null)} onDone={() => { setProof(null); load(); }} />}
+    </div>
+  );
+}
+
+function KPI({ label, v, c, wide }) {
+  return (
+    <div className={`dina-card-white p-3 ${wide ? "" : ""}`}>
+      <div className="text-[10px] uppercase text-[#999]">{label}</div>
+      <div className="font-serif text-xl tabular mt-0.5" style={{ color: c }}>{v}</div>
+    </div>
+  );
+}
+
+function OrderCard({ order, onOpen }) {
+  const isCod = order.payment_method === "cod";
+  return (
+    <button onClick={onOpen} className="w-full text-left dina-card-white p-3 flex items-center gap-3" data-testid={`course-${order.code}`}>
+      <div className="w-10 h-10 rounded-full bg-[#fff5f5] dark:bg-[#2a1818] text-[#b02a2a] grid place-items-center font-mono text-xs font-bold">{order.code.slice(-3)}</div>
+      <div className="flex-1 min-w-0">
+        <div className="font-semibold text-sm">{(order.customer?.name || "").split(" ")[0]} · {order.delivery_zone}</div>
+        <div className="text-[11px] text-[#666] dark:text-[#999] truncate">{order.customer?.quartier || order.note || ""}</div>
+        <div className="text-[11px] mt-0.5">{isCod ? <span className="text-[#c62828] font-semibold">COD {fcfa(order.total)}</span> : <span className="text-[#1f8a4c]">Déjà payé</span>}</div>
+      </div>
+      <div className="flex flex-col items-end gap-1">
+        <span className="dina-chip" style={{ color: statusColor[order.status] }}>{statusLabel[order.status]}</span>
+        <ChevronRight size={14} className="text-[#999]" />
+      </div>
+    </button>
+  );
+}
+
+function OrderDetail({ order, onClose, onStatus, onDeliver }) {
+  const [templates, setTemplates] = useState([]);
+  const [showWa, setShowWa] = useState(false);
+  useEffect(() => { api.get("/delivery-templates").then(r => setTemplates(r.data.wa_templates || [])).catch(() => { }); }, []);
+  const phone = order.customer?.phone?.replace(/\D/g, "") || "";
+  const callPhone = () => { api.post(`/orders/${order.id}/contact-log`, { kind: "call" }).catch(() => { }); window.location.href = `tel:${phone}`; };
+  const openWa = (tpl) => {
+    const prefill = (tpl.text || "")
+      .replace("{prenom_client}", (order.customer?.name || "").split(" ")[0])
+      .replace("{prenom_livreur}", "")
+      .replace("{numero_commande}", order.code)
+      .replace("{montant}", fcfa(order.total))
+      .replace("{lien_suivi}", `${window.location.origin}/suivi/${order.code}`);
+    api.post(`/orders/${order.id}/contact-log`, { kind: "whatsapp", template_key: tpl.key }).catch(() => { });
+    const pref = JSON.parse(localStorage.getItem("rider_prefs") || "{}");
+    const scheme = pref.wa === "business" ? "whatsapp" : "whatsapp"; // click-to-chat works for both
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(prefill)}`, "_blank");
+    setShowWa(false);
+  };
+  const itinerary = () => {
+    const q = encodeURIComponent(`${order.customer?.address || order.note || order.delivery_zone || "Abidjan"}`);
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${q}`, "_blank");
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-end" onClick={onClose}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="sticky top-0 bg-white dark:bg-[#1a1a1a] p-4 border-b flex justify-between items-center">
+          <div><div className="font-serif text-lg">{order.code}</div><div className="text-xs text-[#666]">{order.customer?.name} · {order.delivery_zone}</div></div>
+          <button onClick={onClose}><X size={18} /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            <button onClick={callPhone} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-call"><Phone size={14} /><span>Appeler</span></button>
+            <button onClick={() => setShowWa(true)} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-whatsapp"><MessageCircle size={14} /><span>WhatsApp</span></button>
+            <button onClick={itinerary} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-route"><Navigation size={14} /><span>Itinéraire</span></button>
+          </div>
+          <div className="p-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg text-sm">
+            <div className="font-semibold">{order.customer?.name}</div>
+            <div className="text-xs text-[#666] flex items-center gap-1"><MapPin size={10} />{order.customer?.address || order.delivery_zone}</div>
+            {order.note && <div className="text-xs italic mt-1">« {order.note} »</div>}
+          </div>
+          <div className="dina-card-white p-3">
+            <div className="font-semibold text-xs uppercase text-[#666] mb-2">Articles</div>
+            {(order.items || []).map((it, i) => <div key={i} className="flex justify-between text-sm py-0.5"><span>{it.qty}× {it.name} <span className="text-[11px] text-[#666]">{[it.size, it.color].filter(Boolean).join(" · ")}</span></span><span className="tabular">{fcfa(it.qty * it.price)}</span></div>)}
+          </div>
+          <div className="dina-card-white p-3 space-y-1 text-sm">
+            <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(order.subtotal || order.total)}</span></div>
+            {order.delivery_fee > 0 && <div className="flex justify-between"><span className="text-[#666]">Livraison</span><span className="tabular">{fcfa(order.delivery_fee)}</span></div>}
+            <div className="flex justify-between font-semibold text-base pt-1 border-t border-[#ececec]"><span>À encaisser</span><span className="tabular text-[#b02a2a]">{order.payment_method === "cod" ? fcfa(order.total) : "0 (prépayée)"}</span></div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {["confirmee", "prete", "assignee"].includes(order.status) && <button onClick={() => onStatus(order.id, "en_livraison")} className="dina-btn-primary !min-h-[44px]" data-testid="status-en-route">Je démarre</button>}
+            {order.status === "en_livraison" && <button onClick={() => onDeliver(order)} className="dina-btn-primary !min-h-[44px]" data-testid="rider-delivered">Livrée</button>}
+            {order.status !== "livree" && <button onClick={() => { const r = prompt("Raison ?") || ""; onStatus(order.id, "echouee", r); }} className="dina-btn-secondary !min-h-[44px] text-xs" style={{ color: "#c62828" }} data-testid="status-fail">Échec</button>}
+            {order.status !== "livree" && <button onClick={() => { const r = prompt("Reporté à (date) ?"); if (r) onStatus(order.id, "reportee", r); }} className="dina-btn-secondary !min-h-[44px] text-xs" data-testid="status-reschedule">Reporter</button>}
+          </div>
+        </div>
+        {showWa && (
+          <div className="fixed inset-0 bg-black/70 grid place-items-end z-[80]" onClick={() => setShowWa(false)}>
+            <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl w-full p-4" onClick={e => e.stopPropagation()}>
+              <div className="font-semibold mb-2">Choisir un message</div>
+              {templates.map(t => <button key={t.key} onClick={() => openWa(t)} className="w-full text-left p-3 border border-[#ececec] dark:border-[#2a2a2a] rounded-lg mb-2 text-sm hover:bg-[#fff5f5] dark:hover:bg-[#2a1818]" data-testid={`wa-tpl-${t.key}`}><div className="font-semibold text-xs text-[#b02a2a]">{t.label}</div><div className="text-xs text-[#666] line-clamp-2 mt-0.5">{t.text}</div></button>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

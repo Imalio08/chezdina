@@ -192,6 +192,33 @@ class IntegrationsIn(BaseModel):
     tiktok_pixel_id: Optional[str] = None
     wifi_printer_ip: Optional[str] = None
     wifi_printer_port: Optional[int] = 9100
+class ProofIn(BaseModel):
+    method: str  # code | photo | thirdparty
+    code: Optional[str] = None
+    photo: Optional[str] = None  # base64 data URL
+    signature: Optional[str] = None  # base64 data URL
+    thirdparty_name: Optional[str] = None
+    thirdparty_relation: Optional[str] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    amount_collected: Optional[float] = None
+    payment_method: Optional[str] = None
+    manager_pin: Optional[str] = None  # for high-value fallback
+class ContactLogIn(BaseModel):
+    kind: str  # call | whatsapp
+    template_key: Optional[str] = None
+class DeliveryTemplatesIn(BaseModel):
+    wa_templates: List[Dict[str, str]] = []  # [{key, label, text}]
+    proof_method: str = "code"  # code | photo | hybrid
+    proof_threshold: int = 50000
+    distance_warning_m: int = 300
+    code_sms_text: str = "Votre code de livraison Chez Dina : {code}. Donnez-le au livreur uniquement à la réception de votre colis."
+    score_weights: Dict[str, int] = {"delivery_rate": 35, "punctuality": 20, "rating": 25, "cash": 10, "proof": 10}
+class RiderPhotoIn(BaseModel):
+    photo: str  # base64 data URL
+class ReviewModerateIn(BaseModel):
+    hidden: bool
+    reason: Optional[str] = None
 
 # ---------- Auth ----------
 @api.post("/auth/login")
@@ -554,12 +581,220 @@ async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get
     upd = {"status": body.status, "timeline": tl}
     if body.reason: upd["last_reason"] = body.reason
     if body.next_date: upd["rescheduled_for"] = body.next_date
+    # When status becomes "en_livraison" (En route), generate delivery_code and enqueue WA
+    if body.status == "en_livraison" and prev != "en_livraison" and not o.get("delivery_code"):
+        code = str(secrets.randbelow(10000)).zfill(4)
+        upd["delivery_code"] = code
+        upd["delivery_code_attempts"] = 0
+        settings = await db.site_settings.find_one({"id":"main"}) or {}
+        tpl = (settings.get("delivery_templates") or {}).get("code_sms_text") or "Votre code de livraison Chez Dina : {code}."
+        text = tpl.replace("{code}", code)
+        phone = (o.get("customer") or {}).get("phone") or ""
+        pd = "".join(c for c in phone if c.isdigit())
+        if pd:
+            await db.whatsapp_outbox.insert_one({
+                "id": new_id(), "order_id": oid, "order_code": o.get("code"),
+                "customer_name": (o.get("customer") or {}).get("name"),
+                "phone": phone, "phone_digits": pd,
+                "message": text, "link": f"https://wa.me/{pd}?text={_url_quote(text)}",
+                "kind": "delivery_code", "status_trigger": "en_livraison",
+                "sent": False, "created_at": now_iso(), "created_by": user.get("name"),
+            })
     await db.orders.update_one({"id": oid}, {"$set": upd})
-    # Auto WhatsApp enqueue only on real status changes
     if prev != body.status:
         fresh = await db.orders.find_one({"id": oid})
         await _enqueue_wa(fresh, body.status, user.get("name"))
     return {"ok": True}
+
+# ---------- Rider upgrades ----------
+@api.post("/orders/{oid}/deliver")
+async def deliver_order(oid: str, body: ProofIn, user: dict = Depends(get_user)):
+    o = await db.orders.find_one({"id": oid})
+    if not o: raise HTTPException(404)
+    if o.get("status") == "livree":
+        raise HTTPException(400, "Déjà livrée")
+    settings = await db.site_settings.find_one({"id":"main"}) or {}
+    tpl = settings.get("delivery_templates") or {}
+    threshold = int(tpl.get("proof_threshold", 50000))
+    total = int(o.get("total", 0))
+    locked = o.get("delivery_locked")
+    if locked: raise HTTPException(423, "Commande verrouillée (3 codes erronés). Approbation gérante requise.")
+    proof = {"method": body.method, "at": now_iso(), "by": user.get("name"),
+             "lat": body.lat, "lng": body.lng,
+             "amount_collected": body.amount_collected, "payment_method": body.payment_method or o.get("payment_method")}
+    if body.method == "code":
+        if not body.code: raise HTTPException(400, "Code requis")
+        if (o.get("delivery_code") or "") != body.code.strip():
+            attempts = o.get("delivery_code_attempts", 0) + 1
+            upd = {"delivery_code_attempts": attempts}
+            if attempts >= 3:
+                upd["delivery_locked"] = True
+                await db.notifications.insert_one({"id": new_id(), "kind":"alert", "title": f"Commande {o.get('code')} verrouillée - 3 codes erronés", "created_at": now_iso(), "read": False})
+            await db.orders.update_one({"id": oid}, {"$set": upd})
+            raise HTTPException(401, f"Code invalide ({attempts}/3)")
+        proof["code_verified"] = True
+    elif body.method in ("photo", "thirdparty"):
+        # High-value rule: above threshold without code requires manager PIN
+        if total >= threshold:
+            if not body.manager_pin: raise HTTPException(403, f"Montant ≥ {threshold} FCFA : PIN gérante requis pour livrer sans code")
+            approver = await db.users.find_one({"attendance_code": body.manager_pin.strip(), "role": {"$in":["admin","manager"]}, "active": True})
+            if not approver: raise HTTPException(403, "PIN gérante invalide")
+            proof["approved_by"] = approver.get("name")
+        if not body.photo: raise HTTPException(400, "Photo requise")
+        if not body.signature: raise HTTPException(400, "Signature requise")
+        proof["photo"] = body.photo
+        proof["signature"] = body.signature
+        if body.method == "thirdparty":
+            if not body.thirdparty_name: raise HTTPException(400, "Nom du tiers requis")
+            proof["thirdparty_name"] = body.thirdparty_name
+            proof["thirdparty_relation"] = body.thirdparty_relation
+        proof["needs_review"] = True
+    else:
+        raise HTTPException(400, "Méthode inconnue")
+    tl = o.get("timeline", []); tl.append({"status":"livree","at":now_iso(),"by":user.get("name"),"proof_method":body.method})
+    await db.orders.update_one({"id": oid}, {"$set": {"status":"livree","timeline":tl,"proof": proof}})
+    await _enqueue_wa({**o, "status":"livree"}, "livree", user.get("name"))
+    return {"ok": True, "proof": proof}
+
+@api.post("/orders/{oid}/contact-log")
+async def contact_log(oid: str, body: ContactLogIn, user: dict = Depends(get_user)):
+    doc = {"kind": body.kind, "template_key": body.template_key, "at": now_iso(), "by": user.get("name"), "by_id": user.get("id")}
+    await db.orders.update_one({"id": oid}, {"$push": {"contact_log": doc}})
+    return {"ok": True}
+
+@api.get("/delivery-templates")
+async def get_delivery_templates(user: dict = Depends(get_user)):
+    s = await db.site_settings.find_one({"id":"main"}) or {}
+    t = s.get("delivery_templates") or {}
+    return {
+        "wa_templates": t.get("wa_templates") or [
+            {"key":"en_route","label":"En route","text":"Bonjour {prenom_client}, je suis {prenom_livreur}, livreur Chez Dina. Je suis en route avec votre commande {numero_commande}. J'arrive dans environ 15 minutes."},
+            {"key":"arrived","label":"Je suis arrivé","text":"Je suis arrivé. Pouvez-vous m'indiquer où vous trouver ?"},
+            {"key":"location","label":"Envoyer position","text":"Merci de m'envoyer votre position WhatsApp pour que je vous trouve plus facilement."},
+            {"key":"unreachable","label":"Rappel","text":"Je n'arrive pas à vous joindre. Merci de me rappeler pour la livraison de votre commande Chez Dina."},
+        ],
+        "proof_method": t.get("proof_method","code"),
+        "proof_threshold": t.get("proof_threshold", 50000),
+        "distance_warning_m": t.get("distance_warning_m", 300),
+        "code_sms_text": t.get("code_sms_text","Votre code de livraison Chez Dina : {code}. Donnez-le au livreur uniquement à la réception de votre colis."),
+        "score_weights": t.get("score_weights", {"delivery_rate":35,"punctuality":20,"rating":25,"cash":10,"proof":10}),
+    }
+
+@api.patch("/delivery-templates")
+async def set_delivery_templates(body: DeliveryTemplatesIn, user: dict = Depends(require_role("admin","manager"))):
+    data = body.model_dump()
+    await db.site_settings.update_one({"id":"main"}, {"$set":{"id":"main","delivery_templates":data,"updated_at":now_iso()}}, upsert=True)
+    return {"ok": True}
+
+@api.patch("/users/me/photo")
+async def upload_my_photo(body: RiderPhotoIn, user: dict = Depends(get_user)):
+    await db.users.update_one({"id": user["id"]}, {"$set": {"photo": body.photo, "updated_at": now_iso()}})
+    return {"ok": True, "photo": body.photo}
+
+@api.patch("/users/me/prefs")
+async def set_my_prefs(body: Dict[str, Any], user: dict = Depends(get_user)):
+    body.pop("role", None); body.pop("id", None); body.pop("_id", None); body.pop("password_hash", None)
+    await db.users.update_one({"id": user["id"]}, {"$set": {"prefs": body, "updated_at": now_iso()}})
+    return {"ok": True}
+
+@api.get("/riders/{rid}/score")
+async def rider_score(rid: str, user: dict = Depends(get_user)):
+    settings = await db.site_settings.find_one({"id":"main"}) or {}
+    weights = (settings.get("delivery_templates") or {}).get("score_weights") or {"delivery_rate":35,"punctuality":20,"rating":25,"cash":10,"proof":10}
+    orders = await db.orders.find({"rider_id": rid}).to_list(2000)
+    total = len(orders)
+    delivered = [o for o in orders if o.get("status") == "livree"]
+    failed = [o for o in orders if o.get("status") in ("echouee","annulee")]
+    delivery_rate = (len(delivered) / total * 100) if total else 100
+    # Punctuality: % delivered where delivered_at is within créneau (we don't track créneau precisely, approximate 90%)
+    punctuality = 90
+    # Rating
+    reviews = await db.reviews.find({"rider_id": rid, "hidden": {"$ne": True}}).to_list(500)
+    ratings = [r.get("rating",0) for r in reviews if r.get("rating")]
+    avg = (sum(ratings)/len(ratings)) if ratings else 5
+    rating_score = avg / 5 * 100
+    # Cash accuracy: % of delivered COD orders without ecart
+    cod_delivered = [o for o in delivered if o.get("payment_method") == "cod"]
+    sessions = await db.delivery_sessions.find({"rider_id": rid}).to_list(500)
+    recs = [v for s in sessions for v in (s.get("reconciliations") or {}).values() if isinstance(v, dict)]
+    with_gap = [r for r in recs if abs(r.get("ecart", 0)) > 100]
+    cash_score = max(0, 100 - (len(with_gap) * 10))
+    # Proof completeness: % of delivered using code (not fallback)
+    code_proofs = [o for o in delivered if (o.get("proof") or {}).get("method") == "code"]
+    proof_score = (len(code_proofs) / len(delivered) * 100) if delivered else 100
+    components = {
+        "delivery_rate": round(delivery_rate),
+        "punctuality": round(punctuality),
+        "rating": round(rating_score),
+        "cash": round(cash_score),
+        "proof": round(proof_score),
+    }
+    score = round(sum(components[k] * weights.get(k, 0) / 100 for k in components))
+    level = "Excellence" if score >= 90 else "Or" if score >= 75 else "Argent" if score >= 60 else "Bronze"
+    return {
+        "score": score, "level": level, "weights": weights, "components": components,
+        "stats": {"total": total, "delivered": len(delivered), "failed": len(failed),
+                  "rating_avg": round(avg,1), "reviews": len(reviews), "cash_gaps": len(with_gap)},
+    }
+
+@api.get("/riders/{rid}/reviews")
+async def rider_reviews(rid: str, user: dict = Depends(get_user)):
+    is_rider_self = user.get("role") == "rider" and user.get("id") == rid
+    f = {"rider_id": rid}
+    if is_rider_self: f["hidden"] = {"$ne": True}
+    rows = await db.reviews.find(f).sort("created_at", -1).to_list(300)
+    for r in rows:
+        # Mask customer phone, show first name + quartier only
+        cust = r.get("customer") or {}
+        r["customer"] = {"name": (cust.get("name") or "").split(" ")[0], "quartier": cust.get("quartier") or cust.get("zone")}
+    return clean(rows)
+
+@api.patch("/reviews/{rid}/moderate")
+async def moderate_review_hide(rid: str, body: ReviewModerateIn, user: dict = Depends(require_role("admin","manager"))):
+    await db.reviews.update_one({"id": rid}, {"$set": {"hidden": body.hidden, "moderation_reason": body.reason, "moderated_by": user.get("name"), "moderated_at": now_iso()}})
+    return {"ok": True}
+
+@api.get("/riders/me/today")
+async def rider_today(user: dict = Depends(get_user)):
+    """Rider dashboard summary for today."""
+    from datetime import datetime, timezone
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    orders = await db.orders.find({
+        "rider_id": user["id"],
+        "$or": [{"assigned_at": {"$gte": start}}, {"created_at": {"$gte": start}}],
+    }).to_list(500)
+    to_collect = sum(o.get("total",0) for o in orders if o.get("payment_method")=="cod" and o.get("status") not in ("livree","annulee"))
+    collected = 0
+    for o in orders:
+        p = o.get("proof") or {}
+        if o.get("status") == "livree" and o.get("payment_method") == "cod":
+            collected += p.get("amount_collected") or o.get("total", 0)
+    counts = {"a_livrer": 0, "en_route": 0, "livrees": 0, "annulees": 0, "reportees": 0, "echecs": 0}
+    for o in orders:
+        s = o.get("status")
+        if s in ("confirmee","prete","assignee"): counts["a_livrer"] += 1
+        elif s == "en_livraison": counts["en_route"] += 1
+        elif s == "livree": counts["livrees"] += 1
+        elif s == "annulee": counts["annulees"] += 1
+        elif s == "reportee": counts["reportees"] += 1
+        elif s == "echouee": counts["echecs"] += 1
+    return {"orders": clean(orders), "counts": counts, "to_collect": to_collect, "collected": collected, "balance_to_hand_over": collected}
+
+@api.get("/riders/me/history")
+async def rider_history(user: dict = Depends(get_user), days: int = 30):
+    from datetime import datetime, timezone, timedelta
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    sessions = await db.delivery_sessions.find({"rider_id": user["id"], "date": {"$gte": cutoff[:10]}}).sort("date", -1).to_list(100)
+    # Mask customer phone in history
+    for s in sessions:
+        for o in (s.get("orders_detail") or []):
+            cust = o.get("customer") or {}
+            ph = cust.get("phone","")
+            digits = "".join(c for c in ph if c.isdigit())
+            if len(digits) >= 4:
+                cust["phone_masked"] = f"{digits[:2]} •• •• •• {digits[-2:]}"
+                cust["phone"] = None
+    return clean(sessions)
 
 @api.get("/orders/track/{code}")
 async def track(code: str):
