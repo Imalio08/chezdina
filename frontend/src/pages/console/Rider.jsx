@@ -26,7 +26,7 @@ export default function Rider() {
   const [postponeOpen, setPostponeOpen] = useState(false);
 
   const load = () => api.get("/deliveries").then(r => setOrders(r.data));
-  useEffect(load, []);
+  useEffect(() => { load(); }, []);
 
   // Live GPS: push position every 30s if geolocation is granted
   useEffect(() => {
