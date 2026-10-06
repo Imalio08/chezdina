@@ -45,6 +45,7 @@ import CashSessions from "@/pages/console/CashSessions";
 import Encaissements from "@/pages/console/Encaissements";
 import ProfitLoss from "@/pages/console/ProfitLoss";
 import BrandsCategories from "@/pages/console/BrandsCategories";
+import Marques from "@/pages/console/Marques";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
@@ -121,8 +122,8 @@ export default function App() {
               <Route path="journees-livraison" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
               <Route path="livreurs" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
               <Route path="zones" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
-              <Route path="marques" element={<ErrorBoundary><BrandsCategories/></ErrorBoundary>} />
-              <Route path="categories" element={<ErrorBoundary><BrandsCategories/></ErrorBoundary>} />
+              <Route path="marques" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
+              <Route path="categories" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
               <Route path="liste-attente" element={<ErrorBoundary><AlertsAndCarts/></ErrorBoundary>} />
               <Route path="fournisseurs" element={<ErrorBoundary><Purchases/></ErrorBoundary>} />
               <Route path="paniers-abandonnes" element={<ErrorBoundary><AlertsAndCarts/></ErrorBoundary>} />

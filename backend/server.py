@@ -2129,6 +2129,81 @@ async def pos_pdf_data(oid: str, user: dict = Depends(get_user)):
     biz = await db.business.find_one({"id":"main"}) or {}
     return {"order": clean(o), "business": clean(biz)}
 
+@api.get("/products/kpis")
+async def product_kpis(user: dict = Depends(get_user)):
+    """Returns global KPIs for the Products tab."""
+    all_p = await db.products.find({}).to_list(2000)
+    def st(p):
+        if p.get("status"): return p["status"]
+        return "actif"
+    actifs = sum(1 for p in all_p if st(p) == "actif" and (p.get("stock",0) or 0) > 0)
+    inactifs = sum(1 for p in all_p if st(p) in ("inactif","archive"))
+    draft = sum(1 for p in all_p if st(p) == "brouillon")
+    waitlist = sum(1 for p in all_p if st(p) == "liste_attente")
+    rupture = sum(1 for p in all_p if (p.get("stock",0) or 0) <= 0 and st(p) not in ("inactif","archive","brouillon"))
+    low = sum(1 for p in all_p if 0 < (p.get("stock",0) or 0) < 5)
+    val_cost = sum((p.get("stock",0) or 0) * (p.get("cost",0) or 0) for p in all_p)
+    val_price = sum((p.get("stock",0) or 0) * (p.get("price",0) or 0) for p in all_p)
+    margins = [((p["price"]-p["cost"])/p["price"]*100) for p in all_p if p.get("price",0) > 0 and p.get("cost",0) > 0]
+    avg_margin = sum(margins)/len(margins) if margins else 0
+    return {"actifs":actifs,"inactifs":inactifs,"brouillon":draft,"liste_attente":waitlist,"rupture":rupture,"stock_bas":low,"valeur_cout":int(val_cost),"valeur_vente":int(val_price),"marge_moyenne":round(avg_margin,1),"total":len(all_p)}
+
+@api.get("/products/sales-30d")
+async def products_sales_30d(user: dict = Depends(get_user)):
+    """Return a dict {product_id: units_sold_last_30d}."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
+    sales: Dict[str,int] = {}
+    for o in orders:
+        for it in o.get("items",[]):
+            sales[it["product_id"]] = sales.get(it["product_id"],0) + int(it.get("qty",0))
+    return sales
+
+@api.post("/products/bulk-status")
+async def products_bulk_status(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
+    ids = body.get("ids") or []
+    status = body.get("status")
+    if not ids or not status: raise HTTPException(400, "ids et status requis")
+    await db.products.update_many({"id": {"$in": ids}}, {"$set": {"status": status, "updated_at": now_iso()}})
+    return {"ok": True, "count": len(ids)}
+
+@api.post("/products/bulk-promo")
+async def products_bulk_promo(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+    ids = body.get("ids") or []
+    pct = int(body.get("discount_pct", 0))
+    if not ids or pct <= 0 or pct > 90: raise HTTPException(400)
+    for pid in ids:
+        p = await db.products.find_one({"id": pid})
+        if p:
+            new_price = int(p.get("price",0) * (100-pct)/100)
+            await db.products.update_one({"id": pid}, {"$set": {"price_old": p.get("price"), "price": new_price, "promo_pct": pct, "updated_at": now_iso()}})
+    return {"ok": True, "count": len(ids)}
+
+@api.get("/products/{pid}/history")
+async def product_history(pid: str, user: dict = Depends(get_user)):
+    """Return a product's sales timeline + stock movements + waitlist entries."""
+    orders = await db.orders.find({"items.product_id": pid, "status":{"$ne":"annulee"}}).sort("created_at",-1).to_list(500)
+    sales = []
+    for o in orders:
+        for it in o.get("items",[]):
+            if it["product_id"] == pid:
+                sales.append({"date": o["created_at"], "qty": it["qty"], "price": it["price"], "size": it.get("size"), "color": it.get("color"), "order_code": o.get("code")})
+    waitlist = await db.waitlist.find({"product_id": pid}).sort("created_at",-1).to_list(100)
+    return {"sales": sales[:200], "sales_total": sum(s["qty"] for s in sales), "sales_revenue": sum(s["qty"]*s["price"] for s in sales), "waitlist": clean(waitlist)}
+
+@api.patch("/brands/{bid}")
+async def update_brand(bid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("_id",None); body.pop("id",None)
+    body["updated_at"] = now_iso()
+    # If name change, update products
+    if body.get("name"):
+        old = await db.brands.find_one({"id": bid})
+        if old and old.get("name") and old["name"] != body["name"]:
+            await db.products.update_many({"brand": old["name"]}, {"$set": {"brand": body["name"]}})
+    await db.brands.update_one({"id": bid}, {"$set": body}, upsert=True)
+    return {"ok": True}
+
+
 
 
 @api.get("/public/pages")

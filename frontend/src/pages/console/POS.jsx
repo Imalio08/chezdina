@@ -9,6 +9,7 @@ import PosProductSheet from "@/components/pos/PosProductSheet";
 import PosNewCustomer from "@/components/pos/PosNewCustomer";
 import PosPasteWA from "@/components/pos/PosPasteWA";
 import PosPayment from "@/components/pos/PosPayment";
+import PosScanner from "@/components/pos/PosScanner";
 import { downloadReceiptPDF } from "@/lib/pdfReceipt";
 
 export default function POS() {
@@ -27,6 +28,7 @@ export default function POS() {
   const [showNewCust, setShowNewCust] = useState(false);
   const [showPasteWA, setShowPasteWA] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [sheetProduct, setSheetProduct] = useState(null);
   const [mode, setMode] = useState("store");
   const [zone, setZone] = useState("Cocody");
@@ -149,7 +151,7 @@ export default function POS() {
       <div className="dina-card-white p-4 flex flex-col min-h-0">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
           <div className="relative flex-1 min-w-[200px]"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]"/><input className="dina-input pl-9" placeholder="Nom, marque, SKU, taille (ex: 39)…" value={q} onChange={e=>setQ(e.target.value)} data-testid="pos-search"/></div>
-          <button onClick={()=>toast.info("Scanner QR/code-barres bientôt (caméra tablette)")} className="dina-chip" title="Scanner" data-testid="pos-scan"><ScanLine size={13}/>Scanner</button>
+          <button onClick={()=>setShowScanner(true)} className="dina-chip" title="Scanner QR/code-barres" data-testid="pos-scan"><ScanLine size={13}/>Scanner</button>
           <button onClick={()=>setShowPasteWA(true)} className="dina-chip" title="Coller un message WhatsApp" data-testid="pos-paste-wa"><Sparkles size={13}/>Coller WA</button>
           <button onClick={()=>setShowHolds(true)} className="dina-chip" title="Commandes ouvertes" data-testid="pos-holds-open"><PauseCircle size={13}/>Ouvertes</button>
           <button onClick={()=>setShowCash(true)} className="dina-chip" title="Mouvements de caisse" data-testid="pos-cash-open"><Banknote size={13}/>Caisse</button>
@@ -322,6 +324,15 @@ export default function POS() {
 
       {/* Modals */}
       {sheetProduct && <PosProductSheet product={sheetProduct} customer={customer} onAdd={addToCart} onClose={()=>setSheetProduct(null)}/>}
+      {showScanner && <PosScanner onScan={(code)=>{
+        const match = products.find(p => p.sku === code || p.barcode === code || p.id === code);
+        if (match) {
+          addToCart(match, 1, match.sizes?.[0], match.colors?.[0]);
+          toast.success(`✓ ${match.name} ajouté`);
+        } else {
+          toast.error(`Code "${code}" inconnu`);
+        }
+      }} onClose={()=>setShowScanner(false)}/>}
       {showNewCust && <PosNewCustomer onClose={()=>setShowNewCust(false)} onCreated={(c)=>{setCustomer(c);setShowNewCust(false);}}/>}
       {showPasteWA && <PosPasteWA onApply={applyParsed} onClose={()=>setShowPasteWA(false)}/>}
       {showPayment && <PosPayment total={total} mode={mode} customer={customer} onPay={confirmPayment} onClose={()=>setShowPayment(false)}/>}
