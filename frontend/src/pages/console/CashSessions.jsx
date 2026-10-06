@@ -1,69 +1,151 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
+import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
-import { PlayCircle, StopCircle, Shield } from "lucide-react";
+import { PlayCircle, StopCircle, Shield, HandCoins, CheckCircle, AlertTriangle, Clock } from "lucide-react";
 
 export default function CashSessions() {
+  const { user } = useAuth();
+  const isOwner = user?.role === "admin";
   const [sessions, setSessions] = useState([]);
   const [opening, setOpening] = useState(false);
   const [closingFor, setClosingFor] = useState(null);
+  const [handoverFor, setHandoverFor] = useState(null);
+  const [validateFor, setValidateFor] = useState(null);
   const [openCash, setOpenCash] = useState(0);
-  const load = () => api.get("/cash-sessions").then(r => setSessions(r.data)).catch(() => { });
-  useEffect(() => { load(); }, []);
+
+  const load = () => api.get("/cash-sessions").then(r => setSessions(r.data || [])).catch(() => { });
+  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+
   const open = async () => {
     try { await api.post("/cash-sessions/open", { opening_cash: +openCash }); toast.success("Session ouverte"); setOpening(false); setOpenCash(0); load(); }
     catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
   };
+
   const current = sessions.find(s => !s.closed);
+  const pendingValidation = sessions.filter(s => s.status === "pending_validation");
+
+  const kpis = useMemo(() => ({
+    total_cash: sessions.filter(s => s.closed).reduce((a, s) => a + (s.cash_sales || 0), 0),
+    gap: sessions.reduce((a, s) => a + (s.ecart || 0) + (s.validation_gap || 0), 0),
+    pending: pendingValidation.length,
+    sessions_total: sessions.length,
+  }), [sessions, pendingValidation.length]);
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div><h1 className="font-serif text-3xl">Sessions de caisse</h1><p className="text-sm text-[#666]">Ouverture, mouvements et clôture avec PIN gérante</p></div>
-        {!current && <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[40px]" data-testid="cash-open"><PlayCircle size={14} />Ouvrir caisse</button>}
-        {current && <button onClick={() => setClosingFor(current)} className="dina-btn-primary !min-h-[40px]" style={{ background: "#c62828" }} data-testid="cash-close"><StopCircle size={14} />Clôturer</button>}
+        <div><h1 className="font-serif text-3xl">Sessions de caisse</h1><p className="text-sm text-[#666]">Ouverture · versement Gérante → validation Owner · écarts automatiquement comptabilisés</p></div>
+        <div className="flex gap-2 flex-wrap">
+          {!current && <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[40px]" data-testid="cash-open"><PlayCircle size={14} />Ouvrir caisse</button>}
+          {current && current.status !== "pending_validation" && <button onClick={() => setClosingFor(current)} className="dina-btn-primary !min-h-[40px]" style={{ background: "#c62828" }} data-testid="cash-close"><StopCircle size={14} />Clôturer</button>}
+        </div>
       </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KpiCard label="Sessions" value={kpis.sessions_total} color="#1c1c1c" testid="cash-kpi-total"/>
+        <KpiCard label="À valider (Owner)" value={kpis.pending} color="#e4991e" testid="cash-kpi-pending"/>
+        <KpiCard label="Encaissements espèces cumulés" value={fcfa(kpis.total_cash)} color="#1f8a4c" testid="cash-kpi-cash"/>
+        <KpiCard label="Écarts cumulés" value={fcfa(kpis.gap)} color={kpis.gap < 0 ? "#c62828" : kpis.gap > 0 ? "#1f8a4c" : "#666"} testid="cash-kpi-gap"/>
+      </div>
+
       {current && (
-        <div className="dina-card-white p-5">
-          <div className="font-serif text-xl mb-3">Session en cours · {current.opened_by}</div>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <KPI label="Fond initial" value={fcfa(current.opening_cash)} />
-            <KPI label="Ouverte depuis" value={dateTimeFmt(current.opened_at)} />
-            <KPI label="Statut" value="Ouverte" color="#1f8a4c" />
-            <KPI label="Note" value={current.note || "—"} />
+        <div className="dina-card-white p-5" data-testid="cash-current-session">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div>
+              <div className="font-serif text-xl flex items-center gap-2">Session en cours · {current.opened_by}
+                {current.status === "pending_validation" && <span className="dina-chip text-[10px] !text-[#e4991e] !border-[#e4991e]">En attente de validation Owner</span>}
+              </div>
+              <div className="text-xs text-[#666]">Ouverte {dateTimeFmt(current.opened_at)}</div>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {!current.handover_at && (
+                <button onClick={() => setHandoverFor(current)} className="dina-btn-secondary !min-h-[36px] !text-[#5867fd]" data-testid="cash-declare-handover"><HandCoins size={13}/>Déclarer versement</button>
+              )}
+              {current.status === "pending_validation" && isOwner && (
+                <button onClick={() => setValidateFor(current)} className="dina-btn-primary !min-h-[36px] !bg-[#1f8a4c]" data-testid="cash-validate-handover"><CheckCircle size={13}/>Valider versement</button>
+              )}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
+            <KPIsmall label="Fond initial" value={fcfa(current.opening_cash)} />
+            <KPIsmall label="Versement déclaré" value={current.handover_amount != null ? fcfa(current.handover_amount) : "—"} color={current.handover_amount != null ? "#5867fd" : "#999"} />
+            <KPIsmall label="Déclaré le" value={current.handover_at ? dateTimeFmt(current.handover_at) : "—"} />
+            <KPIsmall label="Note Gérante" value={current.handover_note || "—"} />
           </div>
         </div>
       )}
+
+      {isOwner && pendingValidation.length > 0 && (
+        <div className="dina-card-white p-4 border-l-4 border-[#e4991e]" data-testid="cash-owner-queue">
+          <div className="flex items-center gap-2 font-semibold mb-2 text-[#e4991e]"><AlertTriangle size={14}/>{pendingValidation.length} versement(s) à valider</div>
+          <div className="text-xs text-[#666]">Cliquez sur « Valider versement » dans la session en cours ci-dessus, ou dans la ligne concernée dans l'historique.</div>
+        </div>
+      )}
+
       <div className="dina-card-white overflow-hidden">
         <div className="font-semibold p-4">Historique ({sessions.length})</div>
-        <table className="dina-table">
-          <thead><tr><th>Ouverte</th><th>Fermée</th><th>Par</th><th>Approuvée</th><th className="text-right">Fond</th><th className="text-right">Ventes espèces</th><th className="text-right">Attendu</th><th className="text-right">Compté</th><th className="text-right">Écart</th></tr></thead>
-          <tbody>{sessions.map(s => (
-            <tr key={s.id} data-testid={`cash-row-${s.id}`}>
-              <td className="text-xs">{dateTimeFmt(s.opened_at)}</td>
-              <td className="text-xs">{s.closed_at ? dateTimeFmt(s.closed_at) : <span className="text-[#1f8a4c]">en cours</span>}</td>
-              <td>{s.opened_by}</td>
-              <td className="text-[#666]">{s.approved_by || "—"}</td>
-              <td className="text-right tabular">{fcfa(s.opening_cash)}</td>
-              <td className="text-right tabular">{fcfa(s.cash_sales || 0)}</td>
-              <td className="text-right tabular">{fcfa(s.expected || 0)}</td>
-              <td className="text-right tabular font-semibold">{s.closing_cash != null ? fcfa(s.closing_cash) : "—"}</td>
-              <td className={`text-right tabular font-semibold ${s.ecart > 0 ? "text-[#1f8a4c]" : s.ecart < 0 ? "text-[#c62828]" : ""}`}>{s.ecart != null ? (s.ecart > 0 ? "+" : "") + fcfa(s.ecart) : "—"}</td>
-            </tr>
-          ))}</tbody>
-        </table>
-      </div>
-      {opening && (
-        <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={() => setOpening(false)}>
-          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-            <div className="font-serif text-xl mb-4">Ouvrir une session</div>
-            <label className="text-xs uppercase text-[#666]">Fond de caisse (FCFA)</label>
-            <input type="number" className="dina-input mt-1 mb-4 tabular text-right" value={openCash} onChange={e => setOpenCash(e.target.value)} data-testid="cash-open-amount" />
-            <div className="flex gap-2"><button onClick={() => setOpening(false)} className="dina-btn-secondary flex-1">Annuler</button><button onClick={open} className="dina-btn-primary flex-1" data-testid="cash-open-confirm">Ouvrir</button></div>
-          </div>
+        <div className="overflow-x-auto">
+          <table className="dina-table">
+            <thead><tr>
+              <th>Ouverte</th><th>Fermée</th><th>Par</th><th>Statut</th>
+              <th className="text-right">Fond</th><th className="text-right">Ventes espèces</th><th className="text-right">Attendu</th>
+              <th className="text-right">Compté</th><th className="text-right">Versé</th><th className="text-right">Écart owner</th><th></th>
+            </tr></thead>
+            <tbody>{sessions.length === 0 ? <tr><td colSpan={11} className="text-sm text-[#666] text-center py-8">Aucune session</td></tr>
+            : sessions.map(s => (
+              <tr key={s.id} data-testid={`cash-row-${s.id}`}>
+                <td className="text-xs">{dateTimeFmt(s.opened_at)}</td>
+                <td className="text-xs">{s.closed_at ? dateTimeFmt(s.closed_at) : <span className="text-[#1f8a4c]">en cours</span>}</td>
+                <td>{s.opened_by}</td>
+                <td><StatusBadge s={s}/></td>
+                <td className="text-right tabular">{fcfa(s.opening_cash)}</td>
+                <td className="text-right tabular">{fcfa(s.cash_sales || 0)}</td>
+                <td className="text-right tabular">{fcfa(s.expected || 0)}</td>
+                <td className="text-right tabular font-semibold">{s.closing_cash != null ? fcfa(s.closing_cash) : "—"}</td>
+                <td className="text-right tabular">{s.handover_amount != null ? fcfa(s.handover_amount) : "—"}</td>
+                <td className={`text-right tabular font-semibold ${s.validation_gap > 0 ? "text-[#1f8a4c]" : s.validation_gap < 0 ? "text-[#c62828]" : ""}`}>{s.validation_gap != null ? ((s.validation_gap > 0 ? "+" : "") + fcfa(s.validation_gap)) : "—"}</td>
+                <td className="text-right">{s.status === "pending_validation" && isOwner && (
+                  <button onClick={() => setValidateFor(s)} className="text-[#1f8a4c] text-xs font-semibold hover:underline" data-testid={`cash-validate-${s.id}`}>Valider</button>
+                )}</td>
+              </tr>
+            ))}</tbody>
+          </table>
         </div>
-      )}
+      </div>
+
+      {opening && <OpenModal openCash={openCash} setOpenCash={setOpenCash} onCancel={() => setOpening(false)} onConfirm={open}/>}
       {closingFor && <CloseModal session={closingFor} onClose={() => setClosingFor(null)} onDone={() => { setClosingFor(null); load(); }} />}
+      {handoverFor && <HandoverModal session={handoverFor} onClose={() => setHandoverFor(null)} onDone={() => { setHandoverFor(null); load(); }} />}
+      {validateFor && <ValidateHandoverModal session={validateFor} onClose={() => setValidateFor(null)} onDone={() => { setValidateFor(null); load(); }} />}
+    </div>
+  );
+}
+
+function StatusBadge({ s }) {
+  if (s.status === "pending_validation") return <span className="dina-chip text-[10px] !text-[#e4991e] !border-[#e4991e]"><Clock size={9}/>À valider</span>;
+  if (s.status === "validated") return <span className="dina-chip text-[10px] !text-[#1f8a4c] !border-[#1f8a4c]"><CheckCircle size={9}/>Validée</span>;
+  if (s.status === "gap") return <span className="dina-chip text-[10px] !text-[#c62828] !border-[#c62828]"><AlertTriangle size={9}/>Écart</span>;
+  if (s.closed) return <span className="dina-chip text-[10px] !text-[#666]">Clôturée</span>;
+  return <span className="dina-chip text-[10px] !text-[#1f8a4c] !border-[#1f8a4c]">Ouverte</span>;
+}
+function KpiCard({ label, value, color, testid }) {
+  return <div className="dina-card-white p-3" data-testid={testid}><div className="text-[10px] uppercase text-[#666] font-semibold">{label}</div><div className="font-serif tabular text-xl mt-1" style={{ color }}>{value}</div></div>;
+}
+function KPIsmall({ label, value, color }) {
+  return <div className="p-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg"><div className="text-[10px] uppercase text-[#666]">{label}</div><div className="font-serif text-sm tabular mt-0.5 truncate" style={color ? { color } : {}}>{value}</div></div>;
+}
+
+function OpenModal({ openCash, setOpenCash, onCancel, onConfirm }) {
+  return (
+    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onCancel}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+        <div className="font-serif text-xl mb-4">Ouvrir une session</div>
+        <label className="text-xs uppercase text-[#666]">Fond de caisse (FCFA)</label>
+        <input type="number" className="dina-input mt-1 mb-4 tabular text-right" value={openCash} onChange={e => setOpenCash(e.target.value)} data-testid="cash-open-amount" autoFocus/>
+        <div className="flex gap-2"><button onClick={onCancel} className="dina-btn-secondary flex-1">Annuler</button><button onClick={onConfirm} className="dina-btn-primary flex-1" data-testid="cash-open-confirm">Ouvrir</button></div>
+      </div>
     </div>
   );
 }
@@ -92,6 +174,71 @@ function CloseModal({ session, onClose, onDone }) {
   );
 }
 
-function KPI({ label, value, color }) {
-  return <div className="p-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg"><div className="text-[10px] uppercase text-[#666]">{label}</div><div className="font-serif text-base tabular mt-0.5" style={color ? { color } : {}}>{value}</div></div>;
+function HandoverModal({ session, onClose, onDone }) {
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const expected = (session.opening_cash || 0) + (session.cash_sales || 0);
+  const submit = async () => {
+    const n = parseInt(amount || "0", 10);
+    if (Number.isNaN(n) || n < 0) return toast.error("Montant invalide");
+    setSubmitting(true);
+    try { await api.post(`/cash-sessions/${session.id}/declare-handover`, { amount: n, note }); toast.success("Versement déclaré · en attente du propriétaire"); onDone(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
+    finally { setSubmitting(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="handover-modal">
+        <div className="font-serif text-xl mb-3">Déclarer un versement au propriétaire</div>
+        <div className="p-3 rounded-lg bg-[#f5f5f5] dark:bg-[#141414] text-xs mb-3">
+          <div className="flex justify-between"><span className="text-[#666]">Fond initial</span><span className="tabular font-semibold">{fcfa(session.opening_cash || 0)}</span></div>
+          <div className="flex justify-between"><span className="text-[#666]">Ventes espèces (indicatif)</span><span className="tabular font-semibold">{fcfa(session.cash_sales || 0)}</span></div>
+          <div className="flex justify-between mt-1 pt-1 border-t border-[#ececec] dark:border-[#2a2a2a]"><span className="text-[#666]">Attendu</span><span className="tabular font-semibold text-[#b02a2a]">{fcfa(expected)}</span></div>
+        </div>
+        <label className="text-xs uppercase text-[#666] font-semibold">Montant versé réellement (FCFA)</label>
+        <input type="number" min="0" inputMode="numeric" className="dina-input mt-1 mb-3 tabular text-right text-lg" value={amount} onChange={e => setAmount(e.target.value)} data-testid="handover-amount" autoFocus/>
+        <label className="text-xs uppercase text-[#666] font-semibold">Note (facultatif)</label>
+        <textarea className="dina-input mt-1 mb-4" rows={2} placeholder="Ex. une partie du fond gardée pour le change" value={note} onChange={e => setNote(e.target.value)} data-testid="handover-note"/>
+        <div className="flex gap-2"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={submit} disabled={submitting} className="dina-btn-primary flex-1" data-testid="handover-confirm"><HandCoins size={13}/>Déclarer</button></div>
+      </div>
+    </div>
+  );
+}
+
+function ValidateHandoverModal({ session, onClose, onDone }) {
+  const expected = session.handover_amount || 0;
+  const [actual, setActual] = useState(expected);
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const gap = (+actual || 0) - expected;
+  const submit = async () => {
+    setSubmitting(true);
+    try {
+      const r = await api.post(`/cash-sessions/${session.id}/validate-handover`, { expected, actual: +actual || 0, note });
+      toast.success(r.data.gap === 0 ? "Versement validé sans écart" : `Validé · écart ${fcfa(r.data.gap)} appliqué au solde Gérante`);
+      onDone();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
+    finally { setSubmitting(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="validate-handover-modal">
+        <div className="font-serif text-xl mb-3">Valider le versement</div>
+        <div className="p-3 rounded-lg bg-[#fff5f5] dark:bg-[#2a1818] text-xs mb-3">
+          <div className="flex justify-between"><span className="text-[#666]">Déclaré par {session.handover_by}</span><span className="tabular font-semibold text-[#5867fd]">{fcfa(expected)}</span></div>
+          <div className="flex justify-between text-[#666]"><span>Le</span><span>{dateTimeFmt(session.handover_at)}</span></div>
+          {session.handover_note && <div className="mt-2 italic">"{session.handover_note}"</div>}
+        </div>
+        <label className="text-xs uppercase text-[#666] font-semibold">Montant effectivement reçu (FCFA)</label>
+        <input type="number" min="0" inputMode="numeric" className="dina-input mt-1 mb-2 tabular text-right text-lg" value={actual} onChange={e => setActual(e.target.value)} data-testid="validate-actual" autoFocus/>
+        <div className={`text-xs mb-3 font-semibold ${gap === 0 ? "text-[#1f8a4c]" : gap > 0 ? "text-[#1f8a4c]" : "text-[#c62828]"}`}>
+          Écart : {gap > 0 ? "+" : ""}{fcfa(gap)} {gap !== 0 && "— ajouté au solde Gérante"}
+        </div>
+        <label className="text-xs uppercase text-[#666] font-semibold">Note (facultatif)</label>
+        <textarea className="dina-input mt-1 mb-4" rows={2} placeholder="Ex. écart lié au change" value={note} onChange={e => setNote(e.target.value)} data-testid="validate-note"/>
+        <div className="flex gap-2"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={submit} disabled={submitting} className="dina-btn-primary flex-1" data-testid="validate-confirm"><CheckCircle size={13}/>Valider</button></div>
+      </div>
+    </div>
+  );
 }

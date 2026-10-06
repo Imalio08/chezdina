@@ -1,87 +1,247 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { Save, Shield, Check, X } from "lucide-react";
+import { Save, Shield, Plus, Trash2 } from "lucide-react";
 
-const PERMISSIONS = [
-  { key: "pos", label: "Caisse POS" },
-  { key: "orders", label: "Commandes" },
-  { key: "deliveries", label: "Livraisons" },
-  { key: "products", label: "Produits" },
-  { key: "stock", label: "Stock & inventaire" },
-  { key: "customers", label: "Clientes" },
-  { key: "expenses", label: "Dépenses" },
-  { key: "team", label: "Équipe & paies" },
-  { key: "settings", label: "Paramètres" },
+/* 4 niveaux par cellule : none / read / write / full
+   Compat descendante : true → "full", false/absent → "none". */
+
+const LEVELS = [
+  { k: "none",  label: "Aucun",       color: "#999",    bg: "#f5f5f5" },
+  { k: "read",  label: "Lecture",     color: "#5867fd", bg: "#eceefe" },
+  { k: "write", label: "Modif.",      color: "#e4991e", bg: "#fdf2e0" },
+  { k: "full",  label: "Complet",     color: "#1f8a4c", bg: "#e8f5ee" },
 ];
 
-const ROLES = [
-  { key: "admin", label: "Admin" },
-  { key: "manager", label: "Gérante" },
-  { key: "sales", label: "Vendeuse" },
-  { key: "stock_keeper", label: "Stock" },
-  { key: "rider", label: "Livreur" },
+const SECTIONS = [
+  {
+    label: "Ventes & commandes",
+    modules: [
+      { key: "pos", label: "Caisse POS", sensitive: false },
+      { key: "orders", label: "Commandes", sensitive: false },
+      { key: "deliveries", label: "Livraisons", sensitive: false },
+    ],
+  },
+  {
+    label: "Catalogue & stock",
+    modules: [
+      { key: "products", label: "Produits", sensitive: false },
+      { key: "stock", label: "Stock & inventaire", sensitive: true },
+      { key: "purchases", label: "Approvisionnements", sensitive: false },
+    ],
+  },
+  {
+    label: "Clients & marketing",
+    modules: [
+      { key: "customers", label: "Clientes", sensitive: false },
+      { key: "campaigns", label: "Campagnes", sensitive: false },
+    ],
+  },
+  {
+    label: "Finances",
+    modules: [
+      { key: "expenses", label: "Dépenses", sensitive: true },
+      { key: "cash", label: "Sessions de caisse", sensitive: true },
+      { key: "stats", label: "Statistiques & finances", sensitive: true },
+    ],
+  },
+  {
+    label: "Administration",
+    modules: [
+      { key: "team", label: "Équipe & paies", sensitive: true },
+      { key: "settings", label: "Paramètres", sensitive: true },
+      { key: "audit", label: "Journal d'audit", sensitive: true },
+    ],
+  },
 ];
+const ALL_KEYS = SECTIONS.flatMap(s => s.modules.map(m => m.key));
+
+const normalize = (v) => {
+  if (v === true) return "full";
+  if (v === false || v == null) return "none";
+  if (["none","read","write","full"].includes(v)) return v;
+  return "none";
+};
+const asMap = (r) => {
+  if (!r) return {};
+  if (r.all === true || r.all === "full") {
+    return Object.fromEntries(ALL_KEYS.map(k => [k, "full"]));
+  }
+  return Object.fromEntries(ALL_KEYS.map(k => [k, normalize(r[k])]));
+};
 
 export default function RolesPermissions() {
   const [matrix, setMatrix] = useState({});
+  const [roles, setRoles] = useState([
+    { key: "admin", label: "Admin", builtin: true },
+    { key: "manager", label: "Gérante", builtin: true },
+    { key: "sales", label: "Vendeuse", builtin: true },
+    { key: "stock_keeper", label: "Stock", builtin: true },
+    { key: "rider", label: "Livreur", builtin: true },
+  ]);
   const [saving, setSaving] = useState(false);
+  const [showNewRole, setShowNewRole] = useState(false);
+  const [newRoleName, setNewRoleName] = useState("");
 
   const load = async () => {
-    try { const r = await api.get("/roles-permissions"); setMatrix(r.data.matrix || {}); }
-    catch { toast.error("Erreur"); }
+    try {
+      const r = await api.get("/roles-permissions");
+      const raw = r.data.matrix || {};
+      const normalized = {};
+      Object.entries(raw).forEach(([role, perms]) => { normalized[role] = asMap(perms); });
+      setMatrix(normalized);
+      // Pull custom roles that may be defined server-side
+      const custom = Object.keys(raw).filter(k => !roles.find(r => r.key === k));
+      if (custom.length) setRoles(rs => [...rs, ...custom.map(k => ({ key: k, label: k, builtin: false }))]);
+    } catch { toast.error("Erreur de chargement"); }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, []); // eslint-disable-line
 
-  const toggle = (role, perm) => {
-    if (role === "admin") return; // admin has all
-    setMatrix({ ...matrix, [role]: { ...(matrix[role] || {}), [perm]: !matrix[role]?.[perm] } });
+  const setCell = (role, perm, level) => {
+    if (role === "admin") return;
+    setMatrix(m => ({ ...m, [role]: { ...(m[role] || {}), [perm]: level } }));
+  };
+  const applyToSection = (role, modules, level) => {
+    if (role === "admin") return;
+    setMatrix(m => {
+      const next = { ...(m[role] || {}) };
+      modules.forEach(mod => { next[mod.key] = level; });
+      return { ...m, [role]: next };
+    });
   };
   const save = async () => {
     setSaving(true);
-    try { await api.patch("/roles-permissions", { matrix }); toast.success("Matrice enregistrée"); }
-    catch { toast.error("Erreur · droits admin requis"); } finally { setSaving(false); }
+    try {
+      await api.patch("/roles-permissions", { matrix });
+      toast.success("Matrice enregistrée");
+    } catch { toast.error("Droits admin requis"); }
+    finally { setSaving(false); }
+  };
+
+  const addRole = () => {
+    if (!newRoleName.trim()) return;
+    const key = newRoleName.toLowerCase().replace(/\s+/g, "_").replace(/[^\w-]/g,"");
+    if (roles.find(r => r.key === key)) { toast.error("Clé déjà utilisée"); return; }
+    setRoles(rs => [...rs, { key, label: newRoleName, builtin: false }]);
+    setMatrix(m => ({ ...m, [key]: Object.fromEntries(ALL_KEYS.map(k => [k, "none"])) }));
+    setNewRoleName(""); setShowNewRole(false);
+    toast.success("Nouveau rôle · n'oubliez pas d'enregistrer");
+  };
+  const removeRole = (key) => {
+    if (!confirm(`Supprimer le rôle "${key}" ?`)) return;
+    setRoles(rs => rs.filter(r => r.key !== key));
+    setMatrix(m => { const n = {...m}; delete n[key]; return n; });
+  };
+
+  const Cell = ({ role, perm, sensitive }) => {
+    const level = normalize(matrix[role]?.[perm]);
+    if (role === "admin") {
+      return <div className="w-full h-10 rounded-lg bg-[#1f8a4c] text-white grid place-items-center text-xs font-semibold">Complet</div>;
+    }
+    return (
+      <select
+        value={level}
+        onChange={(e) => setCell(role, perm, e.target.value)}
+        className="w-full h-10 rounded-lg border text-xs font-semibold text-center cursor-pointer transition"
+        style={{
+          background: LEVELS.find(l => l.k === level)?.bg,
+          color: LEVELS.find(l => l.k === level)?.color,
+          borderColor: sensitive && level === "full" ? "#c62828" : "transparent",
+          borderWidth: sensitive && level === "full" ? 2 : 1,
+        }}
+        data-testid={`perm-${role}-${perm}`}
+        title={sensitive && level === "full" ? "⚠️ Droit sensible" : LEVELS.find(l => l.k === level)?.label}
+      >
+        {LEVELS.map(l => <option key={l.k} value={l.k}>{l.label}</option>)}
+      </select>
+    );
   };
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-5" data-testid="roles-permissions-page">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div><h1 className="font-serif text-3xl">Rôles & permissions</h1><p className="text-sm text-[#666]">Matrice des droits d'accès par rôle · admin a tous les droits</p></div>
-        <button onClick={save} disabled={saving} className="dina-btn-primary !min-h-[40px]" data-testid="roles-save"><Save size={14} />{saving ? "Enregistrement…" : "Enregistrer"}</button>
+        <div>
+          <h1 className="font-serif text-3xl">Rôles & permissions</h1>
+          <p className="text-sm text-[#666]">4 niveaux par module · <span className="text-[#c62828] font-semibold">bordure rouge</span> = droit sensible · Admin a tout.</p>
+        </div>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => setShowNewRole(true)} className="dina-btn-secondary !min-h-[40px]" data-testid="roles-add"><Plus size={14}/>Nouveau rôle</button>
+          <button onClick={save} disabled={saving} className="dina-btn-primary !min-h-[40px]" data-testid="roles-save"><Save size={14}/>{saving ? "…" : "Enregistrer"}</button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2 text-[11px]">
+        {LEVELS.map(l => (
+          <div key={l.k} className="flex items-center gap-1.5 px-2 py-1 rounded-full" style={{background: l.bg, color: l.color}}>
+            <span className="w-2 h-2 rounded-full" style={{background: l.color}}/>{l.label}
+          </div>
+        ))}
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full border-2 border-[#c62828] text-[#c62828]">⚠ Droit sensible</div>
       </div>
 
       <div className="dina-card-white p-5 overflow-x-auto">
         <table className="w-full text-sm" data-testid="roles-matrix">
           <thead>
             <tr>
-              <th className="text-left pb-3 pr-4"><Shield size={14} className="inline mr-1" />Module</th>
-              {ROLES.map(r => <th key={r.key} className="pb-3 px-3 text-center font-semibold text-[#666] uppercase text-xs">{r.label}</th>)}
+              <th className="text-left pb-3 pr-4 min-w-[220px]"><Shield size={14} className="inline mr-1"/>Module</th>
+              {roles.map(r => (
+                <th key={r.key} className="pb-3 px-2 min-w-[140px]">
+                  <div className="text-center font-semibold text-xs uppercase text-[#666]">{r.label}</div>
+                  {!r.builtin && <button onClick={() => removeRole(r.key)} className="text-[10px] text-[#c62828] mt-1" title="Supprimer rôle"><Trash2 size={10} className="inline"/></button>}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {PERMISSIONS.map(p => (
-              <tr key={p.key} className="border-t border-[#ececec] dark:border-[#2a2a2a]">
-                <td className="py-3 pr-4 font-medium">{p.label}</td>
-                {ROLES.map(r => {
-                  const on = r.key === "admin" || !!matrix[r.key]?.[p.key] || !!matrix[r.key]?.all;
-                  return (
-                    <td key={r.key} className="text-center py-3 px-3">
-                      <button
-                        onClick={() => toggle(r.key, p.key)}
-                        disabled={r.key === "admin"}
-                        className={`w-10 h-10 rounded-lg grid place-items-center transition ${on ? "bg-[#1f8a4c] text-white" : "bg-[#f5f5f5] dark:bg-[#2a2a2a] text-[#999]"} ${r.key === "admin" ? "opacity-70 cursor-not-allowed" : "hover:scale-105"}`}
-                        data-testid={`perm-${r.key}-${p.key}`}
-                      >
-                        {on ? <Check size={16} /> : <X size={16} />}
-                      </button>
+            {SECTIONS.map(sec => (
+              <React.Fragment key={sec.label}>
+                <tr className="bg-[#fafafa] dark:bg-[#141414]">
+                  <td className="pt-4 pb-2 pr-4 font-serif text-sm font-semibold" colSpan={roles.length + 1}>
+                    <div className="flex items-center justify-between">
+                      <span>{sec.label}</span>
+                      <div className="flex gap-1 flex-wrap">
+                        {roles.filter(r => r.key !== "admin").map(r => (
+                          <select key={r.key} onChange={(e) => { if (e.target.value) applyToSection(r.key, sec.modules, e.target.value); e.target.value = ""; }}
+                            className="text-[10px] px-1.5 py-0.5 rounded border border-[#ddd] bg-white dark:bg-[#1a1a1a]"
+                            data-testid={`section-bulk-${sec.label}-${r.key}`} defaultValue="">
+                            <option value="">{r.label} · bulk</option>
+                            {LEVELS.map(l => <option key={l.k} value={l.k}>Tout · {l.label}</option>)}
+                          </select>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+                {sec.modules.map(m => (
+                  <tr key={m.key} className="border-t border-[#ececec] dark:border-[#2a2a2a]">
+                    <td className="py-2 pr-4 font-medium">
+                      {m.label}
+                      {m.sensitive && <span className="ml-1.5 text-[9px] text-[#c62828] font-bold">SENSIBLE</span>}
                     </td>
-                  );
-                })}
-              </tr>
+                    {roles.map(r => (
+                      <td key={r.key} className="py-1.5 px-1.5"><Cell role={r.key} perm={m.key} sensitive={m.sensitive}/></td>
+                    ))}
+                  </tr>
+                ))}
+              </React.Fragment>
             ))}
           </tbody>
         </table>
       </div>
+
+      {showNewRole && (
+        <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={() => setShowNewRole(false)}>
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()} data-testid="new-role-modal">
+            <div className="font-serif text-xl mb-4">Nouveau rôle (vierge)</div>
+            <label className="text-xs uppercase text-[#666]">Nom du rôle</label>
+            <input className="dina-input mt-1 mb-4" value={newRoleName} onChange={e => setNewRoleName(e.target.value)} placeholder="ex. Caissière senior" data-testid="new-role-name" autoFocus/>
+            <div className="flex gap-2">
+              <button onClick={() => { setShowNewRole(false); setNewRoleName(""); }} className="dina-btn-secondary flex-1">Annuler</button>
+              <button onClick={addRole} className="dina-btn-primary flex-1" data-testid="new-role-create">Créer</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

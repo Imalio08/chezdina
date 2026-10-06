@@ -42,6 +42,8 @@ import BonsPlans from "@/pages/storefront/BonsPlans";
 import WhatsAppCampaigns from "@/pages/console/WhatsAppCampaigns";
 import Referrals from "@/pages/console/Referrals";
 import RolesPermissions from "@/pages/console/RolesPermissions";
+import Approvals from "@/pages/console/Approvals";
+import Audit from "@/pages/console/Audit";
 import Kiosk from "@/pages/console/Kiosk";
 import SectionBuilder from "@/pages/console/SectionBuilder";
 import CmsPages from "@/pages/console/CmsPages";
@@ -162,6 +164,8 @@ export default function App() {
               <Route path="resultat" element={<ErrorBoundary><ProfitLoss/></ErrorBoundary>} />
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
+              <Route path="approbations" element={<ErrorBoundary><Approvals/></ErrorBoundary>} />
+              <Route path="audit" element={<ErrorBoundary><Audit/></ErrorBoundary>} />
               <Route path="pointage" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
               <Route path="apparence" element={<Navigate to="/console/site?tab=apparence" replace/>} />
               <Route path="accueil" element={<Navigate to="/console/site?tab=accueil" replace/>} />

@@ -8,7 +8,7 @@ import {
   Sparkles, Plug, Settings as Cog, Bell, Moon, Sun, LogOut, Store, Wifi, WifiOff, Search, Receipt, Gift, Star,
   X, ShoppingBag, Globe, MessageSquare, Send, ChevronDown, ChevronRight, Plus, Minimize2, Maximize2, Target,
   TrendingUp, Palette, FileCode, Menu, Shield, Database, ClipboardList, MapPin, Tag, Layers, Hourglass, Heart,
-  Building2, UserCheck, BookOpen, Calendar, GraduationCap, HelpCircle
+  Building2, UserCheck, BookOpen, Calendar, GraduationCap, HelpCircle, CheckCircle2
 } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import HelpButton from "@/components/console/HelpButton";
@@ -50,6 +50,8 @@ const SECTIONS = [
   { label: "Équipe", items: [
     { to: "/console/equipe", icon: UserCog, label: "Employés" },
     { to: "/console/roles", icon: Shield, label: "Rôles & permissions", adminOnly: true },
+    { to: "/console/approbations", icon: CheckCircle2, label: "À approuver", adminOnly: true },
+    { to: "/console/audit", icon: ClipboardList, label: "Journal d'audit", adminOnly: true },
     { to: "/console/pointage", icon: Calendar, label: "Pointage" },
   ]},
   { label: "Site vitrine", items: [

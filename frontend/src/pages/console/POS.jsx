@@ -10,9 +10,10 @@ import PosNewCustomer from "@/components/pos/PosNewCustomer";
 import PosPasteWA from "@/components/pos/PosPasteWA";
 import PosPayment from "@/components/pos/PosPayment";
 import PosScanner from "@/components/pos/PosScanner";
+import POSSessionGuard from "@/components/pos/POSSessionGuard";
 import { downloadReceiptPDF } from "@/lib/pdfReceipt";
 
-export default function POS() {
+function POSInner() {
   const { cart, addToCart, updateCartQty, removeFromCart, clearCart } = useApp();
   const [products, setProducts] = useState([]);
   const [shortcuts, setShortcuts] = useState([]);
@@ -472,4 +473,8 @@ function Receipt({ data, onClose }) {
       </div>
     </div>
   );
+}
+
+export default function POS() {
+  return <POSSessionGuard><POSInner/></POSSessionGuard>;
 }
