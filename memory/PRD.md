@@ -1,36 +1,79 @@
 # Chez Dina — PRD
 
-## Fix pack 4 (Feb 2026) — Livraison : 3 pages distinctes + score détaillé
-
-### Backend
-- Endpoints existants réutilisés : `/zones` CRUD, `/delivery-sessions` POST/GET/add-order/reconcile/close, `/riders/{rid}/score` avec weights + components (delivery_rate 35, punctuality 20, rating 25, cash 10, proof 10).
-
-### Frontend — 3 pages distinctes
-- **Zones.jsx** (nouveau) : KPIs (actives, tarif moyen, top zone, frais 30j), table CRUD (nom/communes/tarif/seuil offert/délai/couleur/statut/cmd 30j), formulaire modal.
-- **Riders.jsx** (nouveau) : grid/table toggle, KPIs (actifs, livraisons jour, score moyen, soldes), cartes livreur avec photo + stats + score ⭐, page profil avec breakdown score pondéré (barres de progression) + explication textuelle.
-- **DeliveryDays.jsx** (nouveau) : KPIs (ouvertes/clôturées/à encaisser/écarts), table journées, bouton "+ Créer une journée" avec date picker. Page détail avec 4 tabs : Affectation (checkbox selection + bouton "Affecter à…" vers un livreur, pas de drag), Suivi (statuts live), Réconciliation (par commande : articles/livraison/déjà payé/à encaisser/déclaré/écart), Fiches & feuilles de route (imprimer).
-- Routes `/console/livraisons` → DeliveryDays · `/console/livreurs` → Riders · `/console/zones` → Zones.
-- Rider space : scanner déjà retiré (préparation = Gérante côté console).
-
-### Reste Pack 4 (à itérer)
-- Carte Suivi avec Leaflet (actuellement liste simple)
-- Suggestion automatique d'affectation par zone
-- Clôture auto reportées → journée suivante
-- Rider : écran "Confirmer la remise" avec code 4 chiffres déjà présent, calendar filter Historique à ajouter
-
-## Fix pack 3 — Ventes POS/Commandes/Waitlist/Carts (voir précédent)
-## Fix pack 2 — Internal control
-## Fix pack 1 — Bugs, demo data
+## Original Problem Statement
+Women's fashion boutique retail OS in Abidjan: POS, Deliveries (Rider App), E-commerce Storefront, Catalog, Customers, Finances. Language FR only. Amounts FCFA.
 
 ## Credentials
-- Admin `aouattaraesca@gmail.com` / `Admin123!` · PIN 1234
-- Manager `manager.cocody@dinastore.ci` / `Manager123!` · PIN 2222
-- Rider `rider1@dinastore.ci` / `Rider123!` · PIN 5555
-- Cliente démo `+225 07 60 17 28 21` · code `142085`
+- Admin: `aouattaraesca@gmail.com` / `Admin123!` · PIN 1234
+- Manager: `manager.cocody@dinastore.ci` / `Manager123!` · PIN 2222
+- Rider: `rider1@dinastore.ci` / `Rider123!` · PIN 5555
+
+## Fix pack 5 (Feb 2026, Wave A + Wave B) — Products & Purchasing
+
+### Wave A — Products / Brands / Categories & Collections
+**Backend** (added endpoints):
+- `POST /api/ai/product-description` — Claude Sonnet, FR description with tone (elegant/chic/casual/luxe/playful) and length (short/medium/long). Never commercial data. Fallback template.
+- `POST /api/ai/product-seo` — JSON {seo_title ≤60, seo_description ≤160, slug}. Fallback included.
+- `GET /api/brands/kpis` — total, actives, avg products/brand, top_brand, top_brand_ca, avg_margin
+- `GET /api/brands/full` — list with ca_30d + avg_margin per brand
+- `GET /api/brands/{bid}` — detail with products + stats
+- `GET /api/categories/tree` — hierarchical with parent_id, image, order, visible, product_count
+- `GET /api/categories/kpis`
+- `PATCH /api/categories/{cid}` — upsert (supports derived cats from products)
+- `GET /api/collections` + CRUD — manual (product_ids) or auto (rules: cat/brand/price_max) + banner + dates + visible
+- `GET /api/collections/kpis`
+
+**Frontend**:
+- `ProductFormV3`: new `AiDescribeModal` with tone+length+regenerate+insert; new `SeoSection` with char counters (60/160), slug auto/edit, OG image, Google + WhatsApp preview cards; `Générer avec l'IA` button for SEO.
+- `Products.jsx` KPIs: refactored to 8 compact `KpiMini` cards (actifs/inactifs/en attente/rupture/stock bas/val coût/val vente/marge moy.) — no overflow.
+- `MarquesV2.jsx` (replaces Marques route): KPIs + grid/table view + brand detail page with CA 30j, marge, stock value, products.
+- `CategoriesCollections.jsx` (new, replaces Marques on /categories route): 2 tabs — Catégories tree (indent, ↑↓ order, visible toggle, add sub-category) + Collections (manual/auto, banner, dates, visibility, product picker/rules).
+
+### Wave B — Suppliers / Purchase Orders / Stock & Inventories
+**Backend** (added endpoints):
+- `SupplierIn` extended: trade_name, city, address, whatsapp, website, logo, manager_{name,role,phone,whatsapp}, payment_terms, lead_time_days, categories, documents, status.
+- `GET /api/suppliers` — hides sensitive fields for non-admin (only owner sees phone/email/manager/etc.)
+- `GET /api/suppliers/kpis` — total, actives, purchased_30d, balance, avg_lead_days
+- `GET /api/suppliers/{sid}` — owner-only, with products, POs, stats
+- `GET /api/purchase-orders/kpis` — this_month, total_month, pending, partial, due, avg_expected_margin
+- `GET /api/purchase-orders/{pid}` — detail
+- `PATCH /api/purchase-orders/{pid}/edit-guard` — enforces read-only after reception
+- `POST /api/purchase-orders/{pid}/blind-receive` — receiver enters counted qty without seeing ordered; gaps logged; if no gaps, stock auto-increments
+- `POST /api/purchase-orders/{pid}/validate-gaps` — owner validates, stock increments w/ counted qty
+- `GET /api/stock/kpis` — value, items, ruptures, low, dormant (60d no sales), ecarts_month
+- `GET /api/stock/movements` — journal from `stock_adjustments`
+- `GET /api/stock/adjustment-requests` + `POST` + `POST /{aid}/decide` — manager proposes, owner approves/rejects
+- `GET /api/stock/inventories` — list; non-admin don't see `qty_expected` on open inventories (blind count)
+- `POST /api/stock/inventories` — create (all or picked products)
+- `POST /api/stock/inventories/{iid}/count` — record counts
+- `POST /api/stock/inventories/{iid}/close` — owner closes, applies gaps as stock_adjustments
+
+**Frontend**:
+- `Suppliers.jsx`: KPIs + grid/table view + supplier detail page (owner only) + full supplier form (logo, trade_name, address, phone+WA, email, website, manager+contact, payment_terms, lead_time_days, categories, notes). Non-admins see only name/country.
+- `PurchaseOrders.jsx`: KPIs + Kanban (5 columns) / table toggle, create+edit form (locked after reception), detail page with export PDF (bon de commande + bon de réception) via jspdf, Excel via xlsx, QR labels print (A4 planche 3×8), **blind reception modal** (no qty_ordered shown, photos+signature+note), **validate-gaps panel** for owner.
+- `StockInventories.jsx`: KPIs + 4 tabs (Stock par variante / Mouvements / Demandes d'ajustement / Inventaires). Adjust modal creates `adjustment-request` — auto-approved for owner, pending for manager. Owner approves/rejects. Blind inventory count modal; close applies gaps.
+
+### Routing
+- `/console/produits` → Products (updated KPIs)
+- `/console/marques` → MarquesV2
+- `/console/categories` → CategoriesCollections (new, no longer alias of Marques)
+- `/console/fournisseurs` → Suppliers (own page)
+- `/console/achats` → PurchaseOrders (own page)
+- `/console/stock` → StockInventories
+
+### Dependencies added
+- `xlsx@0.18.5` (Excel export)
+
+## Fix pack 4 — Delivery (3 pages: Zones/Riders/Days) + rider score detail
+- Scanner retiré de l'espace Rider.
+- Performance : encart « Comment est calculé votre score ? » + barres pondérées.
+- DeliveryProofModal : code 4 chiffres OU photo+signature (+PIN gérante pour cmd ≥ 50 000).
+
+## Earlier packs (1-3)
+Pack 1 : nav, UI, demo. Pack 2 : roles, cash sessions, attendance geofencing. Pack 3 : POS liste, waitlist, abandoned carts, invoices PDF.
 
 ## Backlog
-- Pack 5 : Catégories, Approvisionnements, AI desc fix, SEO
 - Pack 6/7 : Statistiques, Marketing
 - Pack 8 : Site vitrine pages/menu/SEO
 - Pack 9 : Finale + optimisations
-- Refactor server.py (3500 lignes) après Pack 9
+- Refactor server.py (~3900 lignes)

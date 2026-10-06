@@ -52,7 +52,11 @@ import AbandonedCarts from "@/pages/console/AbandonedCarts";
 import Pointage from "@/pages/console/Pointage";
 import SiteAppearance from "@/pages/console/SiteAppearance";
 import BrandsCategories from "@/pages/console/BrandsCategories";
-import Marques from "@/pages/console/Marques";
+import Marques from "@/pages/console/MarquesV2";
+import CategoriesCollections from "@/pages/console/CategoriesCollections";
+import Suppliers from "@/pages/console/Suppliers";
+import PurchaseOrders from "@/pages/console/PurchaseOrders";
+import StockInventories from "@/pages/console/StockInventories";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
@@ -109,8 +113,8 @@ export default function App() {
               <Route path="commandes" element={<ErrorBoundary><Orders /></ErrorBoundary>} />
               <Route path="livraisons" element={<ErrorBoundary><DeliveryDays /></ErrorBoundary>} />
               <Route path="produits" element={<ErrorBoundary><Products /></ErrorBoundary>} />
-              <Route path="stock" element={<ErrorBoundary><Stock /></ErrorBoundary>} />
-              <Route path="achats" element={<ErrorBoundary><Purchases /></ErrorBoundary>} />
+              <Route path="stock" element={<ErrorBoundary><StockInventories /></ErrorBoundary>} />
+              <Route path="achats" element={<ErrorBoundary><PurchaseOrders /></ErrorBoundary>} />
               <Route path="avis" element={<ErrorBoundary><Reviews /></ErrorBoundary>} />
               <Route path="clients" element={<ErrorBoundary><Customers /></ErrorBoundary>} />
               <Route path="fidelite" element={<ErrorBoundary><Loyalty /></ErrorBoundary>} />
@@ -130,9 +134,9 @@ export default function App() {
               <Route path="livreurs" element={<ErrorBoundary><Riders/></ErrorBoundary>} />
               <Route path="zones" element={<ErrorBoundary><Zones/></ErrorBoundary>} />
               <Route path="marques" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
-              <Route path="categories" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
+              <Route path="categories" element={<ErrorBoundary><CategoriesCollections/></ErrorBoundary>} />
               <Route path="liste-attente" element={<ErrorBoundary><Waitlist/></ErrorBoundary>} />
-              <Route path="fournisseurs" element={<ErrorBoundary><Purchases/></ErrorBoundary>} />
+              <Route path="fournisseurs" element={<ErrorBoundary><Suppliers/></ErrorBoundary>} />
               <Route path="paniers-abandonnes" element={<ErrorBoundary><AbandonedCarts/></ErrorBoundary>} />
               <Route path="parrainage" element={<ErrorBoundary><Referrals/></ErrorBoundary>} />
               <Route path="campagnes-whatsapp" element={<ErrorBoundary><WhatsAppCampaigns/></ErrorBoundary>} />

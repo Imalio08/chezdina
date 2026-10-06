@@ -115,14 +115,15 @@ export default function Products() {
 
       {/* KPIs */}
       {kpis && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <KPICard testid="kpi-actifs" label="Actifs" value={kpis.actifs} icon={CheckCircle} color="#1f8a4c"/>
-          <KPICard testid="kpi-inactifs" label="Inactifs" value={kpis.inactifs} icon={XCircle} color="#999"/>
-          <KPICard testid="kpi-waitlist" label="Liste d'attente" value={kpis.liste_attente} icon={Clock} color="#e4991e"/>
-          <KPICard testid="kpi-rupture" label="Rupture" value={kpis.rupture} icon={AlertTriangle} color="#c62828"/>
-          <KPICard testid="kpi-stock-bas" label="Stock bas" value={kpis.stock_bas} icon={AlertTriangle} color="#e4991e"/>
-          <KPICard testid="kpi-valeur" label="Valeur stock" value={fcfa(kpis.valeur_vente)} icon={DollarSign} color="#b02a2a" info={`Coût: ${fcfa(kpis.valeur_cout)}`}/>
-          <KPICard testid="kpi-marge" label="Marge moy." value={`${kpis.marge_moyenne}%`} icon={Percent} color="#5867fd"/>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8 gap-2">
+          <KpiMini label="Actifs" v={kpis.actifs} c="#1f8a4c"/>
+          <KpiMini label="Inactifs" v={kpis.inactifs} c="#999"/>
+          <KpiMini label="En attente" v={kpis.liste_attente} c="#e4991e"/>
+          <KpiMini label="Rupture" v={kpis.rupture} c="#c62828"/>
+          <KpiMini label="Stock bas" v={kpis.stock_bas} c="#e4991e"/>
+          <KpiMini label="Val. coût" v={fcfa(kpis.valeur_cout)} c="#5867fd" small/>
+          <KpiMini label="Val. vente" v={fcfa(kpis.valeur_vente)} c="#b02a2a" small/>
+          <KpiMini label="Marge moy." v={`${kpis.marge_moyenne}%`} c="#1f8a4c"/>
         </div>
       )}
 
@@ -228,6 +229,15 @@ function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap }) {
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
         <button onClick={onEdit} className="w-7 h-7 rounded-lg bg-white dark:bg-[#2a2a2a] shadow grid place-items-center" title="Modifier"><Pencil size={11}/></button>
       </div>
+    </div>
+  );
+}
+
+function KpiMini({ label, v, c, small }) {
+  return (
+    <div className="dina-card-white p-3 min-w-0" data-testid={`kpi-${label.toLowerCase().replace(/\s/g,'-').replace(/\./g,'')}`}>
+      <div className="text-[10px] uppercase tracking-wide text-[#666] font-semibold truncate">{label}</div>
+      <div className={`font-serif tabular leading-none mt-1.5 truncate ${small ? "text-lg" : "text-2xl"}`} style={{ color: c }}>{v}</div>
     </div>
   );
 }

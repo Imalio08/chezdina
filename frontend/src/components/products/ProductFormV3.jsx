@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { ChevronLeft, Save, Wand2, Sparkles, Image as ImageIcon, Grid, DollarSign, Package, Eye, Globe } from "lucide-react";
 import ImageUpload from "@/components/shared/ImageUpload";
 import CreateOnFlySelect from "@/components/shared/CreateOnFlySelect";
+import AiDescribeModal from "./AiDescribeModal";
+import SeoSection from "./SeoSection";
 
 const SHOE_SIZES = ["36","37","38","39","40","41","42"];
 const CLOTH_SIZES = ["XS","S","M","L","XL","XXL"];
@@ -25,6 +27,7 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
   const [brands, setBrands] = useState(brandsProp || []);
   const [cats, setCats] = useState(catsProp || []);
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -51,14 +54,9 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
     upd("stock_by_size", matrix);
   };
 
-  const aiDescribe = async () => {
+  const aiDescribe = () => {
     if (!f.name) return toast.error("Entrez d'abord un nom");
-    setAiLoading(true);
-    try {
-      const { data } = await api.post("/ai/ask", { question: `Rédige une description de produit en français pour une boutique de mode féminine à Abidjan : nom "${f.name}", catégorie "${f.category||'—'}", marque "${f.brand||'Dina Signature'}", matière "${f.material||'—'}", occasion "${f.occasion||'—'}", prix ${f.price} FCFA. 3 phrases vendeuses + 4 bullet points (matière, confort, occasion, conseil de taille).` });
-      upd("description", data.answer || f.description);
-      toast.success("Description générée");
-    } catch { toast.error("IA indisponible"); } finally { setAiLoading(false); }
+    setAiOpen(true);
   };
 
   const save = async (keepOpen=false) => {
@@ -126,7 +124,7 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
           </Section>
 
           {/* 2. Description */}
-          <Section title="2. Description" icon={Sparkles} action={<button onClick={aiDescribe} disabled={aiLoading||!f.name} className="text-xs text-[#b02a2a] hover:underline flex items-center gap-1 disabled:opacity-50" data-testid="pfv-ai"><Wand2 size={11}/>{aiLoading?"Génération…":"Rédiger avec l'IA"}</button>}>
+          <Section title="2. Description" icon={Sparkles} action={<button onClick={aiDescribe} disabled={!f.name} className="text-xs text-[#b02a2a] hover:underline flex items-center gap-1 disabled:opacity-50" data-testid="pfv-ai"><Wand2 size={11}/>Rédiger avec l'IA</button>}>
             <textarea className="dina-input" rows={5} placeholder="Description vendeuse en français…" value={f.description} onChange={e=>upd("description",e.target.value)} data-testid="pfv-desc"/>
           </Section>
 
@@ -229,8 +227,7 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
 
           {/* 8. SEO */}
           <Section title="8. SEO" icon={Globe} collapsed>
-            <input className="dina-input" placeholder="Titre SEO" value={f.seo_title||""} onChange={e=>upd("seo_title",e.target.value)} data-testid="pfv-seo-title"/>
-            <textarea className="dina-input mt-3" rows={2} placeholder="Description SEO" value={f.seo_description||""} onChange={e=>upd("seo_description",e.target.value)} data-testid="pfv-seo-desc"/>
+            <SeoSection f={f} upd={upd}/>
           </Section>
         </div>
 
@@ -254,6 +251,7 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
           </div>
         </aside>
       </div>
+      {aiOpen && <AiDescribeModal product={f} onInsert={(t)=>upd("description", t)} onClose={()=>setAiOpen(false)}/>}
     </div>
   );
 }

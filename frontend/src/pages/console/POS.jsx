@@ -277,6 +277,7 @@ export default function POS() {
             );
           })}
         </div>
+        )}
       </div>
 
       {/* RIGHT: Cart (desktop) + mobile bottom sheet */}

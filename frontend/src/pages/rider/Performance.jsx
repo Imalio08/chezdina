@@ -36,7 +36,12 @@ export default function Performance() {
       </div>
 
       <div className="dina-card-white p-4">
-        <div className="font-semibold text-sm mb-3">Détail du score</div>
+        <div className="font-semibold text-sm mb-1">Comment est calculé votre score ?</div>
+        <div className="text-[11px] text-[#666] dark:text-[#999] mb-3 leading-relaxed">
+          Votre score est noté sur <b>100 points</b>, cumul pondéré de 5 critères :
+          taux de livraison, ponctualité, satisfaction cliente, exactitude de la caisse et preuves de remise.
+          Niveaux : Bronze &lt; 60 · Argent 60-74 · Or 75-89 · Excellence ≥ 90.
+        </div>
         {componentsArr.map(c => (
           <div key={c.k} className="mb-2" data-testid={`perf-${c.k}`}>
             <div className="flex justify-between text-xs mb-1"><span>{c.label} <span className="text-[#999]">({data.weights[c.k]}%)</span></span><span className="tabular font-semibold">{data.components[c.k]}{c.unit}</span></div>

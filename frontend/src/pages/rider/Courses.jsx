@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import { fcfa, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
-import { Phone, MessageCircle, Navigation, QrCode, ChevronRight, X, MapPin } from "lucide-react";
+import { Phone, MessageCircle, Navigation, ChevronRight, X, MapPin } from "lucide-react";
 import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
 
 const FILTERS = [
@@ -63,8 +63,6 @@ export default function Courses() {
           </button>
         ))}
       </div>
-
-      <button className="dina-btn-secondary w-full !min-h-[42px]" onClick={() => toast.message("Scan QR : fonctionnalité à venir — ouvrez l'ordre par la liste")} data-testid="rider-scan"><QrCode size={14} />Scanner une fiche</button>
 
       <div className="space-y-2">
         {filtered.length === 0 && <div className="text-center text-sm text-[#666] py-10">Aucune course</div>}

@@ -104,7 +104,27 @@ class CustomerLoginIn(BaseModel): identifier: str; password: str
 class ExpenseIn(BaseModel):
     category: str; amount: int; note: str = ""; payment_method: str = "cash"
 class SupplierIn(BaseModel):
-    name: str; country: str = "CI"; phone: str = ""; email: Optional[str] = None; balance: int = 0; notes: str = ""
+    name: str
+    trade_name: Optional[str] = None
+    country: str = "CI"
+    city: Optional[str] = None
+    address: Optional[str] = None
+    phone: str = ""
+    whatsapp: Optional[str] = None
+    email: Optional[str] = None
+    website: Optional[str] = None
+    logo: Optional[str] = None
+    manager_name: Optional[str] = None
+    manager_role: Optional[str] = None
+    manager_phone: Optional[str] = None
+    manager_whatsapp: Optional[str] = None
+    payment_terms: Optional[str] = None
+    lead_time_days: int = 0
+    categories: Optional[List[str]] = None
+    documents: Optional[List[Dict[str, Any]]] = None
+    balance: int = 0
+    notes: str = ""
+    status: str = "active"
 class PurchaseOrderIn(BaseModel):
     supplier_id: str
     supplier_name: str
@@ -998,7 +1018,50 @@ async def delete_expense(eid: str, user: dict = Depends(require_role("admin","ma
 
 @api.get("/suppliers")
 async def suppliers(user: dict = Depends(get_user)):
-    return clean(await db.suppliers.find({}).to_list(200))
+    rows = await db.suppliers.find({}).to_list(500)
+    # Owner-only fields are hidden for non-admin
+    if user.get("role") != "admin":
+        for r in rows:
+            for k in ("phone","whatsapp","email","website","address","manager_name","manager_role","manager_phone","manager_whatsapp","payment_terms","documents","notes"):
+                r.pop(k, None)
+    return clean(rows)
+
+@api.get("/suppliers/kpis")
+async def suppliers_kpis(user: dict = Depends(get_user)):
+    rows = await db.suppliers.find({}).to_list(500)
+    actives = sum(1 for r in rows if r.get("status", "active") == "active")
+    balance = sum(int(r.get("balance", 0) or 0) for r in rows)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    pos = await db.purchase_orders.find({"created_at": {"$gte": cutoff}}).to_list(500)
+    purchased_30 = sum(int(p.get("total", 0) or 0) for p in pos)
+    leads = [int(r.get("lead_time_days", 0) or 0) for r in rows if r.get("lead_time_days")]
+    avg_lead = round(sum(leads) / len(leads), 1) if leads else 0
+    return {"total": len(rows), "actives": actives, "purchased_30d": purchased_30, "balance": balance, "avg_lead_days": avg_lead}
+
+@api.get("/suppliers/{sid}")
+async def supplier_detail(sid: str, user: dict = Depends(get_user)):
+    if user.get("role") != "admin":
+        raise HTTPException(403, "Accès réservé au propriétaire")
+    s = await db.suppliers.find_one({"id": sid})
+    if not s: raise HTTPException(404)
+    # Products from this supplier
+    products = await db.products.find({"supplier": s.get("name")}).to_list(500)
+    # POs
+    pos = await db.purchase_orders.find({"supplier_id": sid}).sort("created_at", -1).to_list(200)
+    purchased_total = sum(int(p.get("total", 0) or 0) for p in pos)
+    margins = [((p["price"] - p["cost"]) / p["price"] * 100) for p in products if p.get("price", 0) > 0 and p.get("cost", 0) > 0]
+    return clean({
+        **s,
+        "products": products,
+        "purchase_orders": pos,
+        "stats": {
+            "purchased_total": purchased_total,
+            "balance": int(s.get("balance", 0) or 0),
+            "avg_margin": round(sum(margins) / len(margins), 1) if margins else 0,
+            "product_count": len(products),
+            "po_count": len(pos),
+        }
+    })
 
 @api.post("/suppliers")
 async def create_supplier(body: SupplierIn, user: dict = Depends(require_role("admin","manager","stock_keeper"))):
@@ -1036,8 +1099,240 @@ async def update_po(pid: str, body: Dict[str, Any], user: dict = Depends(require
 
 @api.delete("/purchase-orders/{pid}")
 async def delete_po(pid: str, user: dict = Depends(require_role("admin","manager"))):
+    po = await db.purchase_orders.find_one({"id": pid})
+    if po and po.get("status") in ("recu", "receptionne", "cloture"): raise HTTPException(400, "Un bon reçu/clôturé ne peut être supprimé")
     await db.purchase_orders.delete_one({"id": pid})
     return {"ok": True}
+
+@api.get("/purchase-orders/kpis")
+async def po_kpis(user: dict = Depends(get_user)):
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    all_po = await db.purchase_orders.find({}).to_list(500)
+    this_month = [p for p in all_po if (p.get("created_at") or "") >= cutoff]
+    total_this_month = sum(int(p.get("total", 0) or 0) for p in this_month)
+    pending = sum(1 for p in all_po if p.get("status") in ("en_attente", "brouillon", "commande"))
+    partial = sum(1 for p in all_po if p.get("status") == "recu_partiel")
+    due = sum(int(p.get("balance_due", 0) or 0) for p in all_po)
+    margins = []
+    for p in all_po:
+        for it in p.get("items", []):
+            cost = float(it.get("unit_cost", 0) or 0)
+            sell = float(it.get("sell_price", 0) or 0)
+            if cost > 0 and sell > 0: margins.append((sell - cost) / sell * 100)
+    avg_m = round(sum(margins) / len(margins), 1) if margins else 0
+    return {"this_month": len(this_month), "total_month": total_this_month, "pending": pending, "partial": partial, "due": due, "avg_expected_margin": avg_m}
+
+@api.get("/purchase-orders/{pid}")
+async def po_detail(pid: str, user: dict = Depends(get_user)):
+    po = await db.purchase_orders.find_one({"id": pid})
+    if not po: raise HTTPException(404)
+    return clean(po)
+
+@api.patch("/purchase-orders/{pid}/edit-guard")
+async def po_edit(pid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
+    po = await db.purchase_orders.find_one({"id": pid})
+    if not po: raise HTTPException(404)
+    if po.get("status") in ("recu", "receptionne", "cloture"):
+        raise HTTPException(400, "Bon reçu — lecture seule")
+    body.pop("id", None); body.pop("_id", None)
+    body["updated_at"] = now_iso()
+    await db.purchase_orders.update_one({"id": pid}, {"$set": body})
+    return {"ok": True}
+
+@api.post("/purchase-orders/{pid}/blind-receive")
+async def po_blind_receive(pid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
+    """Blind reception: receiver enters counted qty WITHOUT seeing ordered qty.
+    Gaps are flagged, awaiting owner validation before stock is actually incremented."""
+    po = await db.purchase_orders.find_one({"id": pid})
+    if not po: raise HTTPException(404)
+    if po.get("status") in ("recu", "cloture"):
+        raise HTTPException(400, "Déjà réceptionné")
+    counts = body.get("counts") or []  # [{line_id, qty_counted, photo?}]
+    photos = body.get("photos") or []
+    signature = body.get("signature")
+    items = po.get("items", []) or []
+    gaps = []
+    for i, it in enumerate(items):
+        count_rec = next((c for c in counts if c.get("line_id") == i or c.get("product_id") == it.get("product_id")), {})
+        qty_counted = int(count_rec.get("qty_counted", 0))
+        qty_ordered = int(it.get("qty", 0))
+        it["qty_counted"] = qty_counted
+        it["qty_ordered"] = qty_ordered
+        if qty_counted != qty_ordered:
+            gaps.append({"product_name": it.get("product_name"), "size": it.get("size"), "ordered": qty_ordered, "counted": qty_counted, "gap": qty_counted - qty_ordered})
+    has_gaps = len(gaps) > 0
+    status = "recu_partiel" if has_gaps else "recu"
+    await db.purchase_orders.update_one({"id": pid}, {"$set": {
+        "status": status,
+        "items": items,
+        "reception": {
+            "received_by": user.get("name"), "received_by_id": user.get("id"),
+            "at": now_iso(), "photos": photos, "signature": signature,
+            "gaps": gaps, "validated": not has_gaps,
+        },
+        "received_at": now_iso(),
+    }})
+    # If no gaps, directly increment stock
+    if not has_gaps:
+        for it in items:
+            if it.get("product_id") and it.get("size"):
+                await db.products.update_one({"id": it["product_id"]},
+                    {"$inc": {f"stock_by_size.{it['size']}": int(it.get("qty_counted", 0)), "stock": int(it.get("qty_counted", 0))}})
+    return {"ok": True, "status": status, "gaps": gaps}
+
+@api.post("/purchase-orders/{pid}/validate-gaps")
+async def po_validate_gaps(pid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin"))):
+    """Owner reviews gaps and validates. Stock is incremented using the counted quantities."""
+    po = await db.purchase_orders.find_one({"id": pid})
+    if not po: raise HTTPException(404)
+    rec = po.get("reception") or {}
+    if rec.get("validated"): raise HTTPException(400, "Déjà validé")
+    for it in po.get("items", []):
+        if it.get("product_id") and it.get("size"):
+            qty = int(it.get("qty_counted", it.get("qty", 0)))
+            await db.products.update_one({"id": it["product_id"]},
+                {"$inc": {f"stock_by_size.{it['size']}": qty, "stock": qty}})
+    note = body.get("note") or ""
+    await db.purchase_orders.update_one({"id": pid}, {"$set": {
+        "status": "recu", "reception.validated": True,
+        "reception.validated_by": user.get("name"), "reception.validated_at": now_iso(),
+        "reception.validation_note": note,
+    }})
+    return {"ok": True}
+
+# ---------- Pack 5: Stock & inventories ----------
+@api.get("/stock/kpis")
+async def stock_kpis(user: dict = Depends(get_user)):
+    products = await db.products.find({}).to_list(2000)
+    total_stock_value = sum((p.get("stock",0) or 0) * (p.get("cost",0) or 0) for p in products)
+    items_in_stock = sum((p.get("stock",0) or 0) for p in products)
+    ruptures = sum(1 for p in products if (p.get("stock",0) or 0) <= 0)
+    low = sum(1 for p in products if 0 < (p.get("stock",0) or 0) < 5)
+    # Dormant: no sales in 60d
+    cutoff60 = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff60}, "status":{"$ne":"annulee"}}).to_list(5000)
+    sold_pids = set()
+    for o in orders:
+        for it in o.get("items", []):
+            if it.get("product_id"): sold_pids.add(it["product_id"])
+    dormant = sum(1 for p in products if p["id"] not in sold_pids and (p.get("stock",0) or 0) > 0)
+    # Écarts du mois
+    cutoff30 = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    adj = await db.stock_adjustments.find({"created_at": {"$gte": cutoff30}}).to_list(500)
+    ecarts = sum(abs(int(a.get("qty_delta", 0) or 0)) for a in adj)
+    return {"value": int(total_stock_value), "items": int(items_in_stock), "ruptures": ruptures, "low": low, "dormant": dormant, "ecarts_month": ecarts}
+
+@api.get("/stock/movements")
+async def stock_movements(user: dict = Depends(get_user)):
+    rows = await db.stock_adjustments.find({}).sort("created_at", -1).to_list(200)
+    return clean(rows)
+
+@api.get("/stock/adjustment-requests")
+async def stock_adj_requests(user: dict = Depends(get_user)):
+    rows = await db.stock_adjustment_requests.find({}).sort("created_at", -1).to_list(100)
+    return clean(rows)
+
+@api.post("/stock/adjustment-requests")
+async def stock_adj_request(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
+    doc = {"id": new_id(), "created_at": now_iso(), "status": "pending",
+           "requested_by": user.get("name"), "requested_by_id": user.get("id"),
+           "product_id": body.get("product_id"),
+           "product_name": body.get("product_name"),
+           "size": body.get("size"),
+           "qty_delta": int(body.get("qty_delta", 0)),
+           "reason": body.get("reason", ""),
+    }
+    # Admin requests are auto-approved
+    if user.get("role") == "admin":
+        doc["status"] = "approved"
+        doc["approved_by"] = user.get("name")
+        doc["approved_at"] = now_iso()
+        if doc.get("product_id") and doc.get("size"):
+            await db.products.update_one({"id": doc["product_id"]},
+                {"$inc": {f"stock_by_size.{doc['size']}": doc["qty_delta"], "stock": doc["qty_delta"]}})
+    await db.stock_adjustment_requests.insert_one(doc)
+    return clean(doc)
+
+@api.post("/stock/adjustment-requests/{aid}/decide")
+async def stock_adj_decide(aid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    doc = await db.stock_adjustment_requests.find_one({"id": aid})
+    if not doc: raise HTTPException(404)
+    if doc.get("status") != "pending": raise HTTPException(400, "Déjà traité")
+    decision = body.get("decision")  # "approve" | "reject"
+    note = body.get("note", "")
+    if decision == "approve":
+        if doc.get("product_id") and doc.get("size"):
+            await db.products.update_one({"id": doc["product_id"]},
+                {"$inc": {f"stock_by_size.{doc['size']}": int(doc.get("qty_delta",0)), "stock": int(doc.get("qty_delta",0))}})
+        await db.stock_adjustment_requests.update_one({"id": aid}, {"$set": {"status":"approved", "approved_by": user.get("name"), "approved_at": now_iso(), "decision_note": note}})
+    else:
+        await db.stock_adjustment_requests.update_one({"id": aid}, {"$set": {"status":"rejected", "rejected_by": user.get("name"), "rejected_at": now_iso(), "decision_note": note}})
+    return {"ok": True}
+
+@api.get("/stock/inventories")
+async def inventories_list(user: dict = Depends(get_user)):
+    rows = await db.inventories.find({}).sort("created_at", -1).to_list(50)
+    # Hide ordered qty from non-admin on open inventories (blind count)
+    if user.get("role") != "admin":
+        for r in rows:
+            if r.get("status") == "open":
+                for ln in r.get("lines", []):
+                    ln.pop("qty_expected", None)
+    return clean(rows)
+
+@api.post("/stock/inventories")
+async def inventory_create(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+    pids = body.get("product_ids") or []
+    products = await db.products.find({"id":{"$in": pids}} if pids else {}).to_list(500)
+    lines = []
+    for p in products:
+        for size, qty in (p.get("stock_by_size") or {"":p.get("stock",0)}).items():
+            lines.append({"product_id": p["id"], "product_name": p["name"], "sku": p.get("sku",""), "size": size, "qty_expected": int(qty or 0), "qty_counted": None})
+    doc = {"id": new_id(), "created_at": now_iso(), "created_by": user.get("name"),
+           "status": "open", "name": body.get("name", f"Inventaire {datetime.now().strftime('%d/%m/%Y')}"),
+           "lines": lines}
+    await db.inventories.insert_one(doc)
+    return clean(doc)
+
+@api.post("/stock/inventories/{iid}/count")
+async def inventory_count(iid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
+    inv = await db.inventories.find_one({"id": iid})
+    if not inv: raise HTTPException(404)
+    if inv.get("status") != "open": raise HTTPException(400, "Clôturé")
+    counts = body.get("counts") or []  # [{line_index, qty_counted}]
+    lines = inv.get("lines", [])
+    for c in counts:
+        i = int(c.get("line_index", -1))
+        if 0 <= i < len(lines):
+            lines[i]["qty_counted"] = int(c.get("qty_counted", 0))
+            lines[i]["counted_by"] = user.get("name")
+    await db.inventories.update_one({"id": iid}, {"$set": {"lines": lines, "updated_at": now_iso()}})
+    return {"ok": True}
+
+@api.post("/stock/inventories/{iid}/close")
+async def inventory_close(iid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    inv = await db.inventories.find_one({"id": iid})
+    if not inv: raise HTTPException(404)
+    gaps = []
+    for ln in inv.get("lines", []):
+        if ln.get("qty_counted") is None: continue
+        gap = int(ln["qty_counted"]) - int(ln.get("qty_expected", 0))
+        if gap != 0:
+            gaps.append({**ln, "gap": gap})
+            # Apply as stock adjustment
+            await db.stock_adjustments.insert_one({
+                "id": new_id(), "created_at": now_iso(), "created_by": user.get("name"),
+                "product_id": ln.get("product_id"), "size": ln.get("size"),
+                "qty_delta": gap, "reason": f"Inventaire {inv.get('name','')}",
+                "source": "inventory", "inventory_id": iid,
+            })
+            if ln.get("product_id") and ln.get("size"):
+                await db.products.update_one({"id": ln["product_id"]},
+                    {"$inc": {f"stock_by_size.{ln['size']}": gap, "stock": gap}})
+    await db.inventories.update_one({"id": iid}, {"$set": {"status":"closed","closed_at": now_iso(), "closed_by": user.get("name"), "gaps": gaps, "note": body.get("note","")}})
+    return {"ok": True, "gaps": gaps}
+
+# ---------- Promotions ----------
 
 @api.post("/purchase-orders/{pid}/receive")
 async def receive_po(pid: str, body: POReceiveIn, user: dict = Depends(require_role("admin","manager","stock_keeper"))):
@@ -2486,6 +2781,320 @@ async def create_category(body: SimpleNameIn, user: dict = Depends(require_role(
 async def delete_category(cid: str, user: dict = Depends(require_role("admin","manager"))):
     await db.categories.delete_one({"id": cid})
     return {"ok": True}
+
+# ---------- Pack 5: AI Product description & SEO ----------
+class ProductDescIn(BaseModel):
+    name: str
+    brand: Optional[str] = ""
+    category: Optional[str] = ""
+    attributes: Optional[Dict[str, Any]] = None  # {material, occasion, heel_type, care, etc.}
+    colors: Optional[List[str]] = None
+    sizes: Optional[List[str]] = None
+    photos: Optional[List[str]] = None
+    tone: Optional[str] = "elegant"  # elegant | chic | casual | luxe | playful
+    length: Optional[str] = "medium"  # short | medium | long
+
+class ProductSeoIn(BaseModel):
+    name: str
+    brand: Optional[str] = ""
+    category: Optional[str] = ""
+    description: Optional[str] = ""
+    price: Optional[int] = 0
+
+def _slug(s: str) -> str:
+    import re, unicodedata
+    s = (s or "").strip().lower()
+    s = unicodedata.normalize("NFKD", s).encode("ascii","ignore").decode("ascii")
+    s = re.sub(r"[^a-z0-9]+","-", s).strip("-")
+    return s[:80]
+
+@api.post("/ai/product-description")
+async def ai_product_description(body: ProductDescIn, user: dict = Depends(get_user)):
+    if not body.name: raise HTTPException(400, "Nom requis")
+    attrs = body.attributes or {}
+    attrs_s = ", ".join(f"{k}: {v}" for k, v in attrs.items() if v)
+    tone_map = {
+        "elegant": "élégant et vendeur, un peu luxueux",
+        "chic": "chic parisien, intemporel",
+        "casual": "simple, décontracté, chaleureux",
+        "luxe": "très premium, mots raffinés",
+        "playful": "fun, enjoué, émojis parcimonieux",
+    }
+    tone_desc = tone_map.get(body.tone or "elegant", tone_map["elegant"])
+    length_map = {"short": "3 phrases + 4 bullet points", "medium": "4 phrases + 5 bullet points", "long": "5 phrases + 6 bullet points"}
+    len_desc = length_map.get(body.length or "medium", length_map["medium"])
+    system = ("Tu es rédacteur produit pour 'Chez Dina', boutique de mode féminine à Abidjan. "
+              "Tu écris UNIQUEMENT en français, pour une cliente ivoirienne. "
+              "Ne JAMAIS inventer de données commerciales (ventes, popularité, nombre de clientes). "
+              "Interdit : prix, promotions, chiffres de vente, 'best-seller', 'populaire'. "
+              f"Ton : {tone_desc}. Format : {len_desc}. "
+              "Structure : d'abord un paragraphe descriptif, puis une liste de bullet points '- '.")
+    user_msg = (f"Produit : {body.name}\n"
+                f"Marque : {body.brand or '—'}\n"
+                f"Catégorie : {body.category or '—'}\n"
+                f"Attributs : {attrs_s or '—'}\n"
+                f"Couleurs : {', '.join(body.colors or []) or '—'}\n"
+                f"Tailles : {', '.join(body.sizes or []) or '—'}\n"
+                f"Rédige la description.")
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-desc-{user['id']}-{new_id()[:6]}", system_message=system).with_model("anthropic","claude-sonnet-4-5-20250929")
+        reply = await chat.send_message(UserMessage(text=user_msg))
+        return {"description": str(reply).strip()}
+    except Exception:
+        logger.exception("AI product desc")
+        # Fallback template
+        bullets = ["Matière confortable et tendance", "Taille conforme — voir guide des tailles", "Idéal pour une tenue de soirée ou cérémonie", "Entretien facile — lavage à la main recommandé"]
+        fb = f"Découvrez {body.name}, une pièce signée {body.brand or 'Chez Dina'} qui incarne l'élégance moderne. Pensée pour la femme ivoirienne active, elle se porte aussi bien en journée qu'en soirée. Son coupe soignée met en valeur votre silhouette avec allure.\n\n" + "\n".join(f"- {b}" for b in bullets)
+        return {"description": fb, "fallback": True}
+
+@api.post("/ai/product-seo")
+async def ai_product_seo(body: ProductSeoIn, user: dict = Depends(get_user)):
+    if not body.name: raise HTTPException(400, "Nom requis")
+    slug = _slug(f"{body.name}-{body.brand}" if body.brand else body.name)
+    system = ("Tu es expert SEO pour boutique mode féminine Abidjan. Réponds UNIQUEMENT en JSON valide. "
+              "Interdit : chiffres de vente, superlatifs comme 'meilleur'. En français, cliente ivoirienne.")
+    user_msg = (f"Produit: {body.name} | Marque: {body.brand} | Catégorie: {body.category} | Prix: {body.price} FCFA.\n"
+                f"Génère :\n"
+                f"- seo_title (max 60 caractères, inclut nom + marque)\n"
+                f"- seo_description (max 160 caractères, incitatif, inclut Abidjan ou Côte d'Ivoire)\n"
+                f"Réponds strictement : {{\"seo_title\":\"...\",\"seo_description\":\"...\"}}")
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-seo-{user['id']}-{new_id()[:6]}", system_message=system).with_model("anthropic","claude-sonnet-4-5-20250929")
+        reply = await chat.send_message(UserMessage(text=user_msg))
+        import json as _json, re as _re
+        txt = str(reply)
+        m = _re.search(r"\{.*?\}", txt, _re.DOTALL)
+        obj = _json.loads(m.group(0)) if m else {}
+        return {
+            "seo_title": (obj.get("seo_title") or f"{body.name} - {body.brand or 'Chez Dina'}")[:60],
+            "seo_description": (obj.get("seo_description") or f"Découvrez {body.name} chez Dina Abidjan. Livraison rapide, paiement à la livraison.")[:160],
+            "slug": slug,
+        }
+    except Exception:
+        logger.exception("AI SEO")
+        return {
+            "seo_title": f"{body.name} - {body.brand or 'Chez Dina'}"[:60],
+            "seo_description": f"Découvrez {body.name} chez Dina à Abidjan. Livraison rapide dans toute la Côte d'Ivoire."[:160],
+            "slug": slug,
+            "fallback": True,
+        }
+
+# ---------- Pack 5: Brands enrichment ----------
+@api.get("/brands/kpis")
+async def brands_kpis(user: dict = Depends(get_user)):
+    stored = await db.brands.find({}).to_list(500)
+    distinct = await db.products.distinct("brand")
+    names = sorted(set(distinct) | {b["name"] for b in stored if b.get("name")})
+    active_names = {b["name"] for b in stored if b.get("status") != "inactive"} | set(distinct)
+    total_products = await db.products.count_documents({})
+    # CA 30d par marque
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
+    ca_by_brand: Dict[str, int] = {}
+    for o in orders:
+        for it in o.get("items", []):
+            b = it.get("brand") or ""
+            if not b and it.get("product_id"):
+                p = await db.products.find_one({"id": it["product_id"]})
+                b = (p or {}).get("brand", "")
+            if b: ca_by_brand[b] = ca_by_brand.get(b, 0) + int(it.get("qty",0)) * int(it.get("price",0))
+    top_brand = max(ca_by_brand.items(), key=lambda x:x[1])[0] if ca_by_brand else ""
+    # Marge moyenne par marque
+    all_p = await db.products.find({}).to_list(2000)
+    margins = []
+    for p in all_p:
+        if p.get("price",0) > 0 and p.get("cost",0) > 0:
+            margins.append((p["price"] - p["cost"]) / p["price"] * 100)
+    avg_m = round(sum(margins)/len(margins),1) if margins else 0
+    return {
+        "total": len(names),
+        "actives": len(active_names),
+        "avg_products": round(total_products / len(names), 1) if names else 0,
+        "top_brand": top_brand,
+        "top_brand_ca": ca_by_brand.get(top_brand, 0),
+        "avg_margin": avg_m,
+    }
+
+# Enrich /brands with ca_30d + margin per brand
+@api.get("/brands/full")
+async def list_brands_full(user: dict = Depends(get_user)):
+    distinct = await db.products.distinct("brand")
+    stored = {b["name"]: b for b in await db.brands.find({}).to_list(500)}
+    names = sorted(set(distinct) | set(stored.keys()))
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
+    ca_by_brand: Dict[str, int] = {}
+    for o in orders:
+        for it in o.get("items", []):
+            b = it.get("brand") or ""
+            if not b and it.get("product_id"):
+                p = await db.products.find_one({"id": it["product_id"]})
+                b = (p or {}).get("brand", "")
+            if b: ca_by_brand[b] = ca_by_brand.get(b, 0) + int(it.get("qty",0)) * int(it.get("price",0))
+    out = []
+    for name in names:
+        s = stored.get(name, {})
+        products = await db.products.find({"brand": name}).to_list(500)
+        margins = [((p["price"]-p["cost"])/p["price"]*100) for p in products if p.get("price",0) > 0 and p.get("cost",0) > 0]
+        out.append({
+            "id": s.get("id") or new_id(),
+            "name": name,
+            "logo": s.get("logo",""),
+            "note": s.get("note",""),
+            "status": s.get("status","active"),
+            "product_count": len(products),
+            "ca_30d": ca_by_brand.get(name, 0),
+            "avg_margin": round(sum(margins)/len(margins),1) if margins else 0,
+        })
+    return out
+
+@api.get("/brands/{bid}")
+async def brand_detail(bid: str, user: dict = Depends(get_user)):
+    b = await db.brands.find_one({"id": bid})
+    if not b:
+        # fallback: find by name among products (derived brand)
+        b = {"id": bid, "name": bid, "note": "", "logo": "", "status":"active"}
+    name = b.get("name")
+    products = await db.products.find({"brand": name}).to_list(500)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
+    ca_30 = 0
+    for o in orders:
+        for it in o.get("items", []):
+            if it.get("brand") == name or any(p for p in products if p["id"] == it.get("product_id")):
+                ca_30 += int(it.get("qty",0)) * int(it.get("price",0))
+    margins = [((p["price"]-p["cost"])/p["price"]*100) for p in products if p.get("price",0) > 0 and p.get("cost",0) > 0]
+    stock_value = sum((p.get("stock",0) or 0) * (p.get("price",0) or 0) for p in products)
+    return clean({**b, "products": products, "stats": {
+        "product_count": len(products),
+        "ca_30d": ca_30,
+        "avg_margin": round(sum(margins)/len(margins),1) if margins else 0,
+        "stock_value": stock_value,
+    }})
+
+# ---------- Pack 5: Categories tree (parent_id + visible + image + order) ----------
+class CategoryIn(BaseModel):
+    name: str
+    parent_id: Optional[str] = None
+    image: Optional[str] = None
+    order: int = 0
+    visible: bool = True
+    note: Optional[str] = None
+
+@api.get("/categories/tree")
+async def categories_tree(user: dict = Depends(get_user)):
+    stored = await db.categories.find({}).to_list(500)
+    distinct = await db.products.distinct("category")
+    # Ensure a doc exists for every product-derived category (for counts)
+    stored_names = {c["name"] for c in stored}
+    extras = [{"id": new_id(), "name": n, "parent_id": None, "image":"","order":999,"visible":True,"note":""} for n in distinct if n and n not in stored_names]
+    all_cats = stored + extras
+    # product_count
+    for c in all_cats:
+        c["product_count"] = await db.products.count_documents({"category": c["name"]})
+    # Build tree
+    by_id = {c["id"]: {**c, "children": []} for c in all_cats}
+    roots = []
+    for c in all_cats:
+        pid = c.get("parent_id")
+        if pid and pid in by_id:
+            by_id[pid]["children"].append(by_id[c["id"]])
+        else:
+            roots.append(by_id[c["id"]])
+    roots.sort(key=lambda x: (x.get("order", 999), x["name"]))
+    for r in roots:
+        r["children"].sort(key=lambda x: (x.get("order", 999), x["name"]))
+    return clean(roots)
+
+@api.get("/categories/kpis")
+async def categories_kpis(user: dict = Depends(get_user)):
+    stored = await db.categories.find({}).to_list(500)
+    distinct = await db.products.distinct("category")
+    names = set([c["name"] for c in stored]) | set([n for n in distinct if n])
+    with_parent = sum(1 for c in stored if c.get("parent_id"))
+    # top category by sales 30d
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
+    sales: Dict[str,int] = {}
+    for o in orders:
+        for it in o.get("items", []):
+            cat = it.get("category") or ""
+            if not cat and it.get("product_id"):
+                p = await db.products.find_one({"id": it["product_id"]})
+                cat = (p or {}).get("category","")
+            if cat: sales[cat] = sales.get(cat, 0) + int(it.get("qty",0)) * int(it.get("price",0))
+    top = max(sales.items(), key=lambda x:x[1])[0] if sales else ""
+    return {"total": len(names), "sub": with_parent, "top": top, "top_ca": sales.get(top, 0)}
+
+@api.patch("/categories/{cid}")
+async def update_category(cid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("_id",None); body.pop("id",None)
+    body["updated_at"] = now_iso()
+    old = await db.categories.find_one({"id": cid})
+    if not old:
+        # upsert new record for a derived category
+        body["id"] = cid
+        await db.categories.insert_one(body)
+    else:
+        if body.get("name") and old.get("name") and old["name"] != body["name"]:
+            await db.products.update_many({"category": old["name"]}, {"$set": {"category": body["name"]}})
+        await db.categories.update_one({"id": cid}, {"$set": body})
+    return {"ok": True}
+
+# ---------- Pack 5: Collections ----------
+class CollectionIn(BaseModel):
+    name: str
+    kind: str = "manual"  # manual | auto
+    rules: Optional[Dict[str, Any]] = None  # for auto: {category, brand, price_max, tags}
+    product_ids: Optional[List[str]] = None  # for manual
+    banner: Optional[str] = None
+    description: Optional[str] = None
+    starts_at: Optional[str] = None
+    ends_at: Optional[str] = None
+    visible: bool = True
+
+@api.get("/collections")
+async def list_collections(user: dict = Depends(get_user)):
+    cols = await db.collections.find({}).to_list(200)
+    # Resolve products for each
+    for c in cols:
+        if c.get("kind") == "auto":
+            rules = c.get("rules") or {}
+            flt: Dict[str, Any] = {}
+            if rules.get("category"): flt["category"] = rules["category"]
+            if rules.get("brand"): flt["brand"] = rules["brand"]
+            if rules.get("price_max"): flt["price"] = {"$lte": int(rules["price_max"])}
+            c["product_count"] = await db.products.count_documents(flt) if flt else 0
+        else:
+            c["product_count"] = len(c.get("product_ids") or [])
+    return clean(cols)
+
+@api.post("/collections")
+async def create_collection(body: CollectionIn, user: dict = Depends(require_role("admin","manager"))):
+    doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso()})
+    await db.collections.insert_one(doc)
+    return clean(doc)
+
+@api.patch("/collections/{cid}")
+async def update_collection(cid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("_id",None); body.pop("id",None)
+    body["updated_at"] = now_iso()
+    await db.collections.update_one({"id": cid}, {"$set": body})
+    return {"ok": True}
+
+@api.delete("/collections/{cid}")
+async def delete_collection(cid: str, user: dict = Depends(require_role("admin","manager"))):
+    await db.collections.delete_one({"id": cid})
+    return {"ok": True}
+
+@api.get("/collections/kpis")
+async def collections_kpis(user: dict = Depends(get_user)):
+    all_c = await db.collections.find({}).to_list(500)
+    actives = sum(1 for c in all_c if c.get("visible", True))
+    manual_products = sum(len(c.get("product_ids") or []) for c in all_c)
+    return {"total": len(all_c), "actives": actives, "products": manual_products}
 
 # ---------- Cash sessions (open/close) ----------
 @api.get("/cash-sessions")
