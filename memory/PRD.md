@@ -5,33 +5,32 @@
 - Manager: `manager.cocody@dinastore.ci` / `Manager123!` · PIN 2222
 - Rider: `rider1@dinastore.ci` / `Rider123!` · PIN 5555
 
-## Fix pack 7 Vague B (Feb 2026) — Statistiques (12 onglets)
+## Fix pack 7 Vague C (Feb 2026) — Finances ✅
 
-### Backend : 11 nouveaux endpoints `/api/stats/*`
-- `/stats/sales` : CA split (commandé/livré/annulé/reporté), heatmap jour×heure, by_dow, by_hour, channels, payments, sellers, cancel/defer reasons
-- `/stats/products` : rankings qty/CA/marge + jamais vendus + **variant matrix** (ventes par taille × couleur, stock)
-- `/stats/categories` : CA/orders/items/panier/marge%/evolution + top tailles/couleurs par catégorie
-- `/stats/stock-purchases` : stock_value, rotation, ruptures, dormants, fournisseurs
-- `/stats/orders-delivery` : by_status, perf riders, zones, cancel/defer reasons, fees collected
-- `/stats/customers` : new/recurring/LTV/freq + **best_profile** (zones/cats/sizes/channels des TOP20)
-- `/stats/demand` : waitlist agrégée par produit×variante + favorites
-- `/stats/marketing` : promotions, campaigns, sources acquisition
-- `/stats/site` : commandes/CA/paniers abandonnés
-- `/stats/encaissements` : by_method, by_source, by_day
-- `/stats/team` : vendeuses + ponctualité
-- `/stats/zones` (existant) : map data
+### Backend
+- Modèle `ExpenseIn` enrichi : `label`, `type` (fixe/variable), `paid_at`, `receipt` (base64), `supplier`
+- Modèle `ExpenseCategoryIn` + collection `expense_categories` seed de 12 catégories (Loyer, Électricité, Eau, Salaires, Transport, Marketing, Internet, Fournitures, Taxes, Emballage, Carburant livreurs, Autre)
+- `GET /api/expenses` avec filtres `category`, `type`, `days` (sur paid_at), `q`
+- `PATCH /api/expenses/{id}` (admin/manager)
+- `POST /api/expenses/{id}/receipt` upload base64
+- CRUD complet `/api/expense-categories` (list, create, patch, delete)
+- Les endpoints existants `/encaissements`, `/profit-loss` sont intégrés dans la nouvelle page
 
-### Frontend : `Statistiques.jsx` nouvelle page
-- 12 onglets avec icônes, PeriodSelector commun
-- Chaque onglet avec KPIs, charts Recharts, tableau détaillé, boutons **Export CSV + Export Excel**
-- Heatmap jour × heure (SVG grid rouge intensifié)
-- Matrice variant taille × couleur (vendu / stock, click sur produit top → charge variant)
-- Profil type des meilleures clientes (4 colonnes : zones/cats/sizes/channels)
-- Route `/console/statistiques` corrigée (anciens doublons supprimés)
+### Frontend : `Finances.jsx` (route `/console/finances`)
+- 4 onglets :
+  1. **Dépenses** — KPIs (total, fixe, variable, #), filtres (type/catégorie/période/recherche), CRUD complet avec upload reçu (viewer modal)
+  2. **Encaissements** — KPIs, pie répartition par mode, bar par jour, détail
+  3. **Compte de résultat** — Breakdown P&L + waterfall + pie dépenses par cat (résultat d'exploitation, pas de taxes)
+  4. **Catégories** — Ajouter / toggler fixe-variable / supprimer
 
-### Testé
-- 12/12 endpoints retournent 200 avec données réelles ✅
-- Smoke test : Ventes split OK (9.9M commandé, 5.3M livré, 112k annulé), heatmap visible, 7 jours colorés ✅
+### Testé (iteration_16)
+- Backend 13/13 pytest green ✅
+- Frontend E2E : 4 onglets + CRUD dépense + catégorie round-trip ✅
+- Regression 6 routes précédentes ✅
+
+## Fix pack 7 Vague B — Statistiques (12 onglets)
+- 11 endpoints `/api/stats/*` : sales (split commandé/livré/annulé/reporté, heatmap), products (variant matrix), categories, stock-purchases, orders-delivery, customers (best_profile), demand (waitlist), marketing, site, encaissements, team, zones
+- `Statistiques.jsx` : 12 onglets, PeriodSelector, Recharts, Leaflet, Export CSV/Excel, heatmap SVG, matrice variant
 
 ## Fix pack 7 Vague A — Dashboard refonte
 Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X min".
@@ -39,5 +38,6 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 ## Fix pack 6 — Clients + Messagerie + Segments + Campagnes + Promotions renommables
 
 ## Backlog
-- **Pack 7 Vague C** : Finances (Dépenses enrichies + Encaissements + P&L complet)
-- Pack 8 Vitrine CMS, Pack 9 Finitions
+- Pack 8 Vitrine CMS
+- Pack 9 Finitions
+- Refactor `server.py` monolith (4879 lignes)

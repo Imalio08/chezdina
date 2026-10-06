@@ -269,7 +269,7 @@ function ExpenseForm({ expense, cats, onSave, onClose }) {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-[#666] mb-1 block">Mode de paiement</label>
-              <select className="dina-input" value={f.payment_method} onChange={e => setF({ ...f, payment_method: e.target.value })}>
+              <select className="dina-input" value={f.payment_method} onChange={e => setF({ ...f, payment_method: e.target.value })} data-testid="expense-payment-method">
                 <option value="cash">Espèces</option>
                 <option value="wave">Wave</option>
                 <option value="orange_money">Orange Money</option>

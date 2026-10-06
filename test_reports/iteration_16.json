@@ -1,0 +1,42 @@
+{
+  "summary": "Fix Pack 7 Wave C (Finances) fully validated end-to-end. Backend: 13/13 pytest cases green covering expense-categories (seeded 12 defaults present, create + duplicate 400 + PATCH type toggle + DELETE), expenses CRUD (create with all new fields label/type/paid_at/supplier/receipt, filter by type/category/days/q, PATCH update, POST /receipt base64 upload, DELETE), /encaissements for days=7/30/90 returning {by_method, daily, total, count}, /profit-loss shape with revenue/cogs/gross_margin/gross_margin_pct/expenses_total/expenses_by_cat/net/net_margin_pct and math identities (gross_margin == revenue-cogs, net == gross_margin - expenses_total). Frontend: /console/finances loads with all 4 tabs (Dépenses, Encaissements, Compte de résultat, Catégories); Dépenses KPIs (kpi-total/fixe/variable/count) + filter chips (type/category/days/q) + Nouvelle dépense modal round-trip (label/category/type/amount/paid_at + save -> appears in table -> delete) OK; Encaissements KPIs (enc-total/count/avg/modes) + period chips 7/30/90 + Pie+Bar charts + mode table OK; P&L KPIs (pl-ca/mb/dep/net) + period chips 7/30/90/365 + waterfall + category pie OK; Catégories create -> toggle (Fixe<->Variable round-tripped) -> delete OK. Regression: /console, /console/statistiques, /console/clients, /console/depenses, /console/encaissements, /console/resultat all return 200.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/expenses?days=N", "issue": "Filter uses created_at timestamp instead of paid_at. The UI column displays paid_at, so a late-entered expense (paid_at=2 months ago, created_at=today) will match the 'last 30 days' filter yet show an old date. Consider switching the filter to paid_at (or whichever field P&L uses) for consistency."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Finances > Dépenses modal", "issues": ["Mode de paiement <select> lacks a data-testid (manifest lists it as present but file shows none). Not blocking since the modal saves correctly."]},
+      {"screen": "All console pages with PeriodSelector/CreateOnFlySelect", "issues": ["Pre-existing hydration warning '<span> cannot be a child of <option>' from visual-editor instrumentation (dev-only noise, flagged in iteration_15 as well)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack7_wavec.py",
+    "/app/test_reports/pytest/fixpack7_wavec.xml"
+  ],
+  "action_items": [
+    "(Optional) Switch /api/expenses days filter from created_at to paid_at for consistency with how the UI displays and groups expenses.",
+    "(Optional) Add data-testid='expense-payment-method' to the Mode de paiement select in the ExpenseForm modal."
+  ],
+  "critical_code_review_comments": [
+    "Finances.jsx (556 lines) keeps all 4 tabs in one file — reasonable size, but ExpenseForm could be extracted.",
+    "Backend P&L and Encaissements endpoints respond with clean serialized docs — no ObjectId leakage observed.",
+    "ExpenseIn Pydantic model correctly includes new fields (label, type, paid_at, receipt, supplier) with defaults.",
+    "POST /expense-categories correctly 400s on duplicate name and requires admin/manager role.",
+    "server.py now 4879 lines — monolith concern persists (previously flagged)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixpack7_wavec.py (new, 13 tests, reusable regression)"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% E2E for the 4 Finances tabs + regression on 6 previous routes"},
+  "test_credentials": "admin aouattaraesca@gmail.com / Admin123! verified OK",
+  "seed_data_creation": "All test entities prefixed TEST_FP7 and cleaned up: TEST_FP7_CatA expense category (create+patch+delete), TEST_FP7 Loyer mars expense (create+patch+receipt+delete), TEST_FP7 UI Loyer expense (UI create+delete), TEST_FP7 UICat category (UI create+toggle+delete). Idempotent: category deletion is explicit in the test setup if a stale row exists.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Finances page (Wave C) is production-ready. Reusable regression suite at /app/backend/tests/test_fixpack7_wavec.py. Only minor backend nit is the days filter using created_at vs paid_at. Previously known: login inputs still lack data-testid (use nth(0)/nth(1)); PeriodSelector hydration warning from visual-editor; server.py monolith at 4879 lines.",
+  "rca of the issue": "No blockers. All stated acceptance criteria for Fix Pack 7 Wave C verified at API and UI level."
+}

@@ -1136,7 +1136,8 @@ async def expenses(user: dict = Depends(get_user),
     if type: f["type"] = type
     if days:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        f["created_at"] = {"$gte": cutoff}
+        # Filter by paid_at (actual expense date) with fallback to created_at for legacy rows
+        f["$or"] = [{"paid_at": {"$gte": cutoff}}, {"paid_at": None, "created_at": {"$gte": cutoff}}]
     rows = await db.expenses.find(f).sort("created_at", -1).to_list(2000)
     if q:
         ql = q.lower()
