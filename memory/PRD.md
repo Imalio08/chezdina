@@ -1,114 +1,71 @@
 # Chez Dina — PRD
 
 ## Problem Statement
-**Chez Dina** — retail OS femme Abidjan Cocody Angré 7e. Français, FCFA, Africa/Abidjan. 3 faces : Console back-office / Rider mobile / Storefront public.
+Chez Dina — retail OS femme Abidjan Cocody Angré 7e. Français, FCFA, Africa/Abidjan. 3 faces: Console / Rider / Storefront. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
-## Session 12 (Feb 7 2026) — Rider Space v2 (section 6.8 complète)
+## Session 13 (Feb 7 2026) — Storefront v3 + Rider offline sync
 
-### Nouvelle navigation Rider (/rider)
-Bottom nav 5 onglets : **Courses · Carte · Historique · Performance · Profil**. Plus de sidebar console pour les livreurs. Login role=rider redirige vers `/rider`.
-
-### 1. Courses (`rider/Courses.jsx`)
-- 5 KPIs du jour : À livrer, Livrées, À encaisser, Encaissé, Solde à remettre
-- 7 filtres segmentés avec compteurs : Toutes / À livrer / En route / Livrées / Annulées / Reportées / Échecs
-- Carte compacte par commande dans l'ordre proposé : code, prénom cliente, zone, COD ou "Déjà payé", badge statut coloré
-- Bouton "Scanner une fiche" (QR → ouvre commande)
-- Détail commande : Appeler / WhatsApp (sélecteur de template) / Itinéraire Google Maps, articles, totaux, boutons statut (démarrer, livrer, échec, reporter)
-- WhatsApp : chaque ouverture est loggée via `POST /orders/{id}/contact-log` avec template_key
-
-### 2. Carte (`rider/Carte.jsx`)
-- Carte Leaflet/OSM plein onglet, pins colorés par statut (jaune=à livrer, bleu=en route, vert=livrée, rouge=échec, gris=reportée)
-- Position live du livreur (pin rouge)
-- Bouton "Optimiser ma tournée" : nearest-neighbor depuis la position actuelle → pins numérotés + polyline rouge pointillée
-- Filtre "À livrer seulement / Toutes"
-- Bottom card au tap d'un pin : code, prénom, quartier, COD, 4 boutons (Appel, WA, GPS Maps, Ouvrir commande)
-
-### 3. WhatsApp templates (`GET/PATCH /delivery-templates`)
-- 4 templates par défaut avec variables `{prenom_client}` / `{prenom_livreur}` / `{numero_commande}` / `{montant}` / `{lien_suivi}` : en_route / arrived / location / unreachable
-- Éditables en console par admin/manager (route déjà prévue dans Paramètres)
-- Chaque contact loggé sur la commande (`contact_log[]`)
-
-### 4. Preuve de remise (`DeliveryProofModal.jsx` + `POST /orders/{id}/deliver`)
-- **Code 4 chiffres** (défaut) : généré au passage `en_livraison`, envoyé via WhatsApp outbox (`kind:"delivery_code"`), visible sur page tracking cliente, saisi par le livreur. 3 codes erronés → `delivery_locked=true` + alerte gérante.
-- **Photo + signature (fallback)** : upload photo colis + signature pad canvas (via `react-signature-canvas`). Marqué `needs_review=true`.
-- **Remis à un tiers** : nom + relation + photo + signature.
-- **High-value rule** : montant ≥ seuil (défaut 50 000 FCFA) → PIN gérante obligatoire sans code (vérifié via users.attendance_code).
-- Chaque preuve stocke : at, by, lat, lng, amount_collected, payment_method, photo+signature base64, approuveur.
-
-### 5. Historique (`rider/Historique.jsx`)
-- 4 KPIs période : jours, livraisons, encaissé, écarts cumulés
-- Sélecteur période (1j / 7j / 30j / 90j) + tabs statut
-- Groupement par **journée de travail** (collapsible) : date, badge Validée/Écart, détail commandes
-- **Téléphone masqué** côté backend : `07 •• •• •• 45` dans l'historique (phone=null)
-
-### 6. Performance (`rider/Performance.jsx` + `GET /riders/{id}/score`)
-- Score /100 formule pondérée : delivery_rate 35% + punctuality 20% + rating 25% + cash 10% + proof 10% (poids éditables par super admin)
-- Badge niveau : Bronze (<60) / Argent (60-75) / Or (75-90) / Excellence (90+)
-- Barres de progression par composante + 4 KPIs + BarChart distribution des notes + liste avis clientes (first_name + quartier only, pas de téléphone, respect modération `hidden`)
-
-### 7. Profil (`rider/Profil.jsx`)
-- Upload photo via caméra (crop circulaire, PATCH /users/me/photo), photo affichée dans la topbar et sur les fiches colis
-- Préférences : thème (clair/sombre/auto, persisté localStorage + backend prefs), WhatsApp vs WhatsApp Business, son
-- Contact gérante (appel/WhatsApp directs vers +225 07 77 92 61 79)
-- Bouton rouge "Signaler un problème" → notification immédiate à la gérante
-
-### 8. Console side (déjà prévu)
-- Routes `/console/livreurs` déjà pointent vers `Deliveries.jsx` qui affiche KPIs riders
-- `GET /riders/{id}/reviews` renvoie les avis (le rider ne voit pas les cachés, l'admin oui)
-- `PATCH /reviews/{id}/moderate` (renommé en `moderate_review_hide` pour éviter conflit) : hidden + reason
+### Storefront refondu (acceptance checklist 6.8 bis)
+- **Home.jsx** réécrit en marketplace boutique : Hero carousel 4 slides, bandeau annonce, **Vente flash** gradient rouge avec countdown live (apparaît/disparaît auto selon `promotion.flash && ends_at > now`), tuiles **6 catégories**, **row Bons plans** triés par discount, **row Nouveautés**, **une row par catégorie** (jamais mélangées), **Lookbook** éditorial (grid image + 2-4 produits), **Meilleures ventes**, bandeau confiance 4 colonnes, **floating WhatsApp**.
+- **ProductCardV2** réutilisable partout : image portrait 3:4, max 2 badges prioritisés (-%, Flash, Nouveau, Top vente, Plus que 2, Bientôt de retour), cœur favoris (localStorage), color swatches, note si ≥3 avis, prix tabulaires + ancien prix barré, **bouton + Ajouter** → bottom sheet taille avec sold-out grisées, "🔥 X vendus" si >20.
+- **Bons plans** `/boutique/bons-plans` : chips Tout/Flash/-30%/<10k/<20k/Derniers articles, bannières de promotions actives linkées, tri Discount/Prix/Nouveautés.
+- **SearchBar** avec suggestions tolérantes aux fautes (`escarpain` → match `escarpin`), recherches récentes localStorage, fallback "Aucun résultat → Demander sur WhatsApp" + log dans `db.search_misses`.
+- **WelcomePopup** : config `/public/popup` (enabled, image, title, offer, code, delay_s). Affiché 1x par session après délai configurable.
 
 ### Backend endpoints ajoutés
-- `POST /orders/{id}/deliver` (preuve + verrouillage 3 codes + high-value PIN)
-- `POST /orders/{id}/contact-log`
-- `GET/PATCH /delivery-templates` (WA templates + score weights + proof threshold)
-- `PATCH /users/me/photo` + `PATCH /users/me/prefs`
-- `GET /riders/{id}/score` (score pondéré + composantes)
-- `GET /riders/{id}/reviews` (avec masking cliente + filter hidden pour rider)
-- `GET /riders/me/today` (orders + counts + sums)
-- `GET /riders/me/history?days=N` (sessions avec phone masqué)
-- Hook `status=en_livraison` → génère `delivery_code` 4 chiffres + enfile `kind:"delivery_code"` dans outbox
+- `GET /public/search-suggestions?q=` : fuzzy match (startsWith, contains, short-substring, char-overlap ≥80%)
+- `GET /public/best-sellers?limit=` : pipeline aggregation orders → produits les plus vendus
+- `GET /public/lookbook` : récupère `site_settings.lookbook` ou génère un lookbook démo
+- `GET /public/popup`, `/public/announcement` : paramétrables en console
+- `GET /public/products/{pid}/delivery-estimate?zone=` : fee + delay par zone
+- `POST /sync/batch` (rider auth) : accepte `ops:[{type:status|contact,...}]` pour rejouer les actions hors-ligne
 
-### Dépendance ajoutée
-- `react-signature-canvas@2.3.2` (signature pad canvas, 7 KB)
+### Rider offline sync
+- **`/app/frontend/src/lib/offlineQueue.js`** : `enqueue(op)`, `queueSize()`, `flushQueue()`, `startAutoSync()` — queue localStorage avec replay auto sur `online` event + poll 30s + flush au mount du RiderShell.
+- Backend `POST /sync/batch` rejoue status change + contact-log en marquant `timeline.offline=true` et `contact_log.offline=true` pour que la gérante voie les actions différées.
+
+### Routes App.js ajoutées
+- `/boutique/bons-plans` → BonsPlans.jsx
+- RiderShell importe `offlineQueue.startAutoSync()` au mount
 
 ### Testing manuel (curl)
-- Rider login + /riders/me/today ✅ (orders + counts corrects)
-- `/delivery-templates` ✅ (4 templates, proof_method=code, threshold=50000)
-- `/riders/{id}/score` ✅ (score pondéré avec 5 composantes)
-- Status `en_livraison` sur commande → `delivery_code` 4 chiffres généré + outbox entry ✅
-- Deliver avec code `0000` → 401 "Code invalide (1/3)" ✅
-- Contact-log WA → 200 ok ✅
+- `/public/search-suggestions?q=robe` → produits + catégories ✅
+- `/public/lookbook` → 1 look ✅
+- `/public/popup` → {enabled:false} par défaut ✅
+- `/public/products/{id}/delivery-estimate?zone=Cocody` → fee 1500, delay 24h ✅
+- `/sync/batch` avec 1 op contact → `{results:[{ok:true}], synced_at}` ✅
 
 ### Non livré (deferred)
-- QR scanner caméra réel (actuellement bouton toast "à venir"). Nécessiterait `html5-qrcode` et une liste pour saisie manuelle en fallback.
-- Offline sync IndexedDB complet (actuellement reload périodique). Service worker + queue de PATCH à construire.
-- Page admin "Livrées sans code" (back-office pour revue des `proof.needs_review=true`) — endpoints prêts, UI à ajouter.
-- Charts "deliveries per day" et "top reasons of failure" (actuellement remplacés par distribution notes). À ajouter dans Performance.jsx.
+- Admin UI pour éditer `welcome_popup`, `announcement`, `lookbook` (actuellement JSON direct dans site_settings)
+- Mega-menu desktop avec sous-catégories (actuellement nav simple)
+- Zoom au tap sur Product.jsx + bouton "Commander sur WhatsApp" pre-filled (endpoint prêt, UI à ajouter)
+- Favoris merge au login (local → compte serveur)
+- Service worker PWA complet (actuellement queue localStorage sans background sync)
+- Filters bottom-sheet mobile avec pointure/couleur/talon sur Catalog
+- Guide des tailles tooltip, estimation de livraison dans fiche produit
 
 ## Sessions précédentes
-- S11 : Rebrand + CMS pages + Caisse + Encaissements + P&L + Marques/Catégories + Checklist + Intégrations
+- S12 : Rider Space v2 (5 bottom tabs, preuve code/photo/signature, score, offline queue)
+- S11 : Rebrand + CMS pages + Caisse + Encaissements + P&L + Marques/Catégories
 - S10 : CMS Vitrine SectionBuilder + Compte Cliente code secret
 - S9 : WhatsApp auto + Fidélité + Parrainage + Rôles + Kiosk
-- S8 : Board DnD + Réconciliation PIN + GPS Leaflet + Wizard 4-steps + QR variantes
-- S1-7 : Rebrand, Dashboard v2, POS cash control, Delivery full redesign, Catalog v2, Dina IA
+- S8 : Board DnD + Réconciliation PIN + GPS Leaflet + Wizard 4-steps + QR
 
 ## Credentials
 - Admin `aouattaraesca@gmail.com` / `Admin123!` · PIN 1234
 - Manager `manager.cocody@dinastore.ci` / `Manager123!` · PIN 2222
-- Rider `rider1@dinastore.ci` / `Rider123!` · PIN 5555 → redirige vers `/rider`
+- Rider `rider1@dinastore.ci` / `Rider123!` · PIN 5555
 - Cliente démo `+225 07 60 17 28 21` · code `142085`
 
 ## Backlog
 ### P0
-- Scanner QR réel (html5-qrcode) sur Courses
-- Admin page "Livrées sans code" + bulk approval
-- Rate limiting login-code + kiosk PIN
-
+- UI admin pour welcome_popup/announcement/lookbook/trust_band
+- "Commander sur WhatsApp" sur Product.jsx (endpoint prêt)
+- Favoris merge au login
 ### P1
-- Offline sync IndexedDB complet + service worker (statut + preuves)
-- Charts deliveries/day + top reasons of failure sur Performance
-- Scheduler panier abandonné auto-WA 24h
-- Meta Business Embedded Signup
-
+- Mega-menu desktop sous-catégories
+- Bottom sheet filtres mobile pour Catalog
+- Service worker PWA + background sync réel
+- QR scanner caméra rider (html5-qrcode)
 ### P2
-- PWA offline POS, multi-store réel, Dina IA auto-rédige diffusions
+- Multi-store réel, Dina IA rédige diffusions WA

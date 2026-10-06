@@ -1863,6 +1863,111 @@ DEFAULT_PAGES = [
     {"slug":"faq","title":"FAQ","content":"Comment commander ? Via le site ou WhatsApp 0777 92 61 79.","enabled":True},
 ]
 
+@api.get("/public/best-sellers")
+async def public_best_sellers(limit: int = 12):
+    pipeline = [
+        {"$match": {"status": {"$ne": "annulee"}}},
+        {"$unwind": "$items"},
+        {"$group": {"_id": "$items.product_id", "sold": {"$sum": "$items.qty"}}},
+        {"$sort": {"sold": -1}}, {"$limit": limit}
+    ]
+    rows = await db.orders.aggregate(pipeline).to_list(limit)
+    ids = [r["_id"] for r in rows if r.get("_id")]
+    products = await db.products.find({"id": {"$in": ids}, "active": True}).to_list(limit)
+    pmap = {p["id"]: p for p in products}
+    sold_map = {r["_id"]: r["sold"] for r in rows}
+    out = []
+    for pid in ids:
+        if pid in pmap:
+            p = pmap[pid]; p["sold_count"] = sold_map.get(pid, 0); out.append(p)
+    return clean(out)
+
+@api.get("/public/search-suggestions")
+async def public_search_suggestions(q: str = ""):
+    q = (q or "").strip().lower()
+    if len(q) < 2: return {"products": [], "categories": [], "brands": []}
+    import unicodedata
+    def norm(s): return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").lower()
+    nq = norm(q)
+    products = await db.products.find({"active": True}).to_list(1500)
+    scored = []
+    for p in products:
+        hay = f"{norm(p.get('name',''))} {norm(p.get('brand',''))} {norm(p.get('category',''))} {norm(p.get('sku',''))}"
+        if nq in hay:
+            scored.append((0 if hay.startswith(nq) else 1, p))
+        else:
+            # tolerant: handle typos — check if trimmed version appears, or char overlap >= 60%
+            short = nq[:max(4, len(nq)-2)]
+            if short in hay:
+                scored.append((2, p))
+            else:
+                common = sum(1 for c in set(nq) if c in hay) / max(len(set(nq)), 1)
+                if common >= 0.80: scored.append((3, p))
+    scored.sort(key=lambda x: x[0])
+    found = [s[1] for s in scored[:8]]
+    cats = sorted(set(p["category"] for p in products if nq in norm(p.get("category",""))))[:5]
+    brands = sorted(set(p["brand"] for p in products if p.get("brand") and nq in norm(p.get("brand",""))))[:5]
+    if not found:
+        await db.search_misses.insert_one({"id": new_id(), "q": q, "at": now_iso()})
+    return {"products": clean(found), "categories": cats, "brands": brands}
+
+@api.get("/public/lookbook")
+async def public_lookbook():
+    s = await db.site_settings.find_one({"id":"main"}) or {}
+    lb = s.get("lookbook") or []
+    if not lb:
+        prods = await db.products.find({"active": True}).limit(4).to_list(4)
+        lb = [{"image": "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200", "title": "Look rentrée", "product_ids": [p["id"] for p in prods]}]
+    return clean(lb)
+
+@api.get("/public/popup")
+async def public_popup():
+    s = await db.site_settings.find_one({"id":"main"}) or {}
+    p = s.get("welcome_popup") or {}
+    if not p.get("enabled"): return {"enabled": False}
+    return {
+        "enabled": True,
+        "image": p.get("image","https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=800"),
+        "title": p.get("title","Bienvenue chez Dina ✨"),
+        "offer": p.get("offer","-10% sur votre première commande"),
+        "code": p.get("code","BIENVENUE"),
+        "delay_s": p.get("delay_s", 8),
+    }
+
+@api.get("/public/announcement")
+async def public_announcement():
+    s = await db.site_settings.find_one({"id":"main"}) or {}
+    return s.get("announcement") or {"enabled": False, "text": ""}
+
+@api.get("/public/products/{pid}/delivery-estimate")
+async def delivery_estimate(pid: str, zone: str = "Cocody"):
+    z = await db.zones.find_one({"name": zone})
+    fee = (z or {}).get("fee", 1500)
+    return {"zone": zone, "fee": fee, "delay": "24h (demain)"}
+
+# Offline sync queue for rider
+@api.post("/sync/batch")
+async def sync_batch(body: Dict[str, Any], user: dict = Depends(get_user)):
+    """Accept a batch of queued offline operations from the rider."""
+    ops = body.get("ops") or []
+    results = []
+    for op in ops:
+        try:
+            if op.get("type") == "status":
+                o = await db.orders.find_one({"id": op["order_id"]})
+                if o and o.get("status") != op["status"]:
+                    tl = o.get("timeline", []); tl.append({"status": op["status"], "at": op.get("at", now_iso()), "by": user.get("name"), "offline": True})
+                    await db.orders.update_one({"id": op["order_id"]}, {"$set": {"status": op["status"], "timeline": tl}})
+                results.append({"id": op.get("id"), "ok": True})
+            elif op.get("type") == "contact":
+                await db.orders.update_one({"id": op["order_id"]}, {"$push": {"contact_log": {"kind": op.get("kind","call"), "at": op.get("at"), "by": user.get("name"), "offline": True}}})
+                results.append({"id": op.get("id"), "ok": True})
+            else:
+                results.append({"id": op.get("id"), "ok": False, "err": "unknown"})
+        except Exception as e:
+            results.append({"id": op.get("id"), "ok": False, "err": str(e)})
+    return {"results": results, "synced_at": now_iso()}
+
 @api.get("/public/pages")
 async def public_pages():
     rows = await db.cms_pages.find({"enabled": True}).to_list(50)

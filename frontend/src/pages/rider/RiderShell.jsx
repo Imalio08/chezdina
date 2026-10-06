@@ -29,6 +29,9 @@ export default function RiderShell() {
     const wid = navigator.geolocation.watchPosition(push, () => { }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
     return () => navigator.geolocation.clearWatch(wid);
   }, []);
+  useEffect(() => {
+    import("@/lib/offlineQueue").then(m => { const stop = m.startAutoSync(); return () => stop && stop(); });
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#fff5f5] dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-white pb-20 font-sora">

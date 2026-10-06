@@ -34,6 +34,7 @@ import RiderCarte from "@/pages/rider/Carte";
 import RiderHistorique from "@/pages/rider/Historique";
 import RiderPerformance from "@/pages/rider/Performance";
 import RiderProfil from "@/pages/rider/Profil";
+import BonsPlans from "@/pages/storefront/BonsPlans";
 import WhatsAppCampaigns from "@/pages/console/WhatsAppCampaigns";
 import Referrals from "@/pages/console/Referrals";
 import RolesPermissions from "@/pages/console/RolesPermissions";
@@ -90,6 +91,7 @@ export default function App() {
               <Route path="product/:id" element={<ProductPage />} />
               <Route path="checkout" element={<Checkout />} />
               <Route path="account" element={<Account />} />
+              <Route path="bons-plans" element={<BonsPlans />} />
             </Route>
             <Route path="/console" element={<Protected><ConsoleLayout /></Protected>}>
               <Route index element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />
