@@ -1,6 +1,15 @@
 # Chez Dina — PRD
 
+## Correctif urgent (Feb 2026) — Crash "Cannot read properties of undefined (reading 'length')" ✅
+
+Bulk-patch défensif sur tous les points qui crashaient lorsqu'un endpoint renvoyait un payload partiel :
+- `Statistiques.jsx` : tous les `d.FIELD.(map|slice|length|filter)` → `(d.FIELD || []).XXX`, plus `v.sales_by_size[x]` → `(v.sales_by_size || {})[x]`, `d.best_profile.top_X` → `(d.best_profile?.top_X || [])`
+- `Dashboard.jsx` : même patch sur `d.FIELD` et `k.FIELD` (notamment `k.channels.map` qui crashait)
+- `Deliveries.jsx`, `MarquesV2.jsx`, `Suppliers.jsx`, `Rider.jsx`, `Statistics.jsx`, `Waitlist.jsx` : guards sur `s.orders`, `b.products`, `s.products`, `o.items`, `zones.zones`, `g.customers`
+- Tests iteration_22 : frontend 100% — ZÉRO TypeError confirmé sur Dashboard, 12 onglets Statistiques, Livraisons, Marques, Fournisseurs, Liste d'attente, Rider
+
 ## Fix pack 9/9 (Feb 2026) — Manuel d'utilisation ✅
+
 
 ### Backend
 - Collection `manual_modules` seedée au démarrage avec 16 modules complets (Prise en main → Espace livreur)
