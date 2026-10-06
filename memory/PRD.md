@@ -3,7 +3,28 @@
 ## Problem Statement
 **Chez Dina** — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). Single codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. **Français uniquement**, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
-## Session 1 (Feb 6 2026) — Globals intro + 10 bugs P0
+## Session 2 (Feb 6 2026) — Section 2 Fondations UX
+### Composants partagés créés dans `/app/frontend/src/components/shared/`
+- **`PeriodSelector.jsx`** : 14 presets (Aujourd'hui, Hier, Cette semaine, Semaine dernière, 7j, 30j, Ce mois, Mois dernier, Ce trimestre, Trimestre dernier, Cette année, Année dernière, Depuis le début, Personnalisée). Dropdown avec date pickers Du/Au pour custom. Sélecteur comparaison intégré (Période précédente / Même période l'an dernier / Aucune). Helpers `resolvePeriod()` + `previousPeriod()` exportés pour calculer les bornes dates côté caller.
+- **`KPICard.jsx`** : Carte avec icône dans un carré coloré, label uppercase, value très large tabular, delta auto-calculé depuis `previousValue` (sens up/down/flat avec `inverse` pour KPI où monter = mauvais comme dépenses/annulations), couleurs vert #1f8a4c / rouge #c62828 / gris, info-tooltip (hover ou tap), lien **Rapport ›** vers détail, **sparkline** area chart si tableau de points fourni, variante `hero` double-colonne pour KPI principal.
+- **`ViewToggle.jsx`** : toggle Tableau/Grille/Graphique/Kanban avec icônes lucide. Hook `useStoredView(tabKey)` qui persiste le choix par onglet dans `localStorage` (`dina_view_<tab>`).
+- **`FiltersPanel.jsx`** : chip "Filtres" avec badge nb actif, side-sheet qui glisse de la droite avec champs typés (select, text, number, range min/max, multi tags), chips supprimables sous la barre + "Tout effacer", **Vues enregistrées** (sauvegarde par tabKey dans `localStorage`, charger/supprimer).
+- **`CreateOnFlySelect.jsx`** : select avec option `+ Ajouter …` en bas qui bascule en mode input + Enter pour créer + Escape pour annuler. Callback `onCreate(value)` pour que le parent persiste et sélectionne immédiatement sans quitter le formulaire.
+- **`ImageUpload.jsx`** : drag & drop + bouton parcourir + bouton appareil photo (mobile), compression Canvas → WebP (resize 1200px, qualité adaptative pour tenir sous `maxKB`, défaut 500 Ko), grid preview avec badge "Principale" sur la première image, boutons "Principale"/supprimer au hover, mode `single` pour avatars/logos. Retourne data URLs → stockage DB simple pour le MVP, pas de backend upload.
+- **`EmptyState.jsx`** : état vide standard (icône, titre, description, action), évite les 0 et messages d'erreur quand il n'y a pas de données.
+
+### Dashboard refondu (démo d'intégration des composants)
+- Utilise **PeriodSelector** + **KPICard** (hero sur CA, sparkline sur CA et commandes).
+- Header reformulé : "Chiffres au {date}, {heure} · comparaison vs les 30 jours précédents".
+- Section titrée "Chiffres clés" + sous-ligne descriptive avant la grille KPI.
+- Carte "Accès rapides" en bas avec chips cliquables vers les drill-downs (commandes, clientes, livrées, en cours, stock faible, dépenses).
+- Modal drill-down déjà dark-mode compatible.
+
+### Validé via Playwright
+- 10 KPI cards nouvelles détectées, PeriodSelector cliquable, light + dark mode OK.
+- Backend `/dashboard/kpis?period=30d` renvoie bien `revenue/prev/delta/description` + `sales_series` + `channels` + `top_products` + `payments`.
+
+## Session 1 (Feb 6 2026)
 ### Rebrand & langue
 - Rebrand complet "Chez Dina" partout (API title, business doc, storefront footer, login footer, invoicing header + PDF export, POS receipt, rider header). "Dina Store"/"Chez Dina Boutique" → **Chez Dina**.
 - `index.html` title → "Chez Dina — Console".
