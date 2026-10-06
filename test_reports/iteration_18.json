@@ -1,0 +1,48 @@
+{
+  "summary": "Fix Pack 8 Wave B (Compte client) tested end-to-end. Backend: 16/16 pytest green on /app/backend/tests/test_fixpack8_waveb.py covering customer login, photo upload+persistence, profile update, addresses CRUD + default toggle (with cleanup), orders-split buckets+counts, order detail with rider populated, rider live position (POST /rider/position stores -> GET simulated=false within 60s, 403 for non-rider), position inactive when status!=en_livraison, recently-viewed track/list, reviews-pending + review submission updating product rating_count, change-code (wrong old, simple pattern, length, success and revert round-trip), POST thread/rider idempotent. Frontend: LoginGate -> login works; 14-item side menu visible with correct data-testid='account-side-menu'; 'Bonjour, {firstName} 👋' greeting rendered; storefront header shows user dropdown (storefront-user-menu->user-dropdown) with menu-account/orders/messages/favorites/vouchers. 4 overview cards (card-info/address/wallet/prefs) each with Pencil edit. Photo-file-input present. Mes commandes shows 2 tabs with counts (tab-current/tab-cancelled). Order detail for Awa en_livraison order (DN-260920-1032) renders timeline + items (×4) + Paiement + Livraison + download-invoice + LiveDelivery component with rider name 'Kouamé', btn-call, btn-whatsapp, btn-chat. Sécurité form has 3 PIN inputs + change-pin button. Empty states present on favoris/vus-recemment/bons-achat with empty-continue link.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/public/order/{code}/rider-position", "issue": "Simulator returns position=null when the order timeline has no 'en_livraison' entry (checked DN-260920-1032: timeline only has 'nouvelle' yet status=en_livraison). Spec requires a plausible position regardless. _simulated_rider_position should fallback to order.created_at or order.updated_at when the en_livraison timeline event is missing."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "LiveDelivery", "issue": "Leaflet map area renders empty grey block for Awa en_livraison order because API returned {active:true, position:null}. The component only initializes the map inside useEffect([pos]) when pos is non-null — correct guard, but UX shows an unexplained empty box with no fallback skeleton/message. Suggest: when pos is null, render 'Localisation du livreur en cours…' placeholder.", "selector": "[data-testid=\"rider-map\"]", "priority": "MEDIUM"},
+      {"component": "StorefrontLayout dropdown logout", "issue": "Spec lists data-testid 'logout-header' for the dropdown logout item but implementation uses 'menu-logout-header'. Align either spec or code.", "selector": "[data-testid=\"menu-logout-header\"]", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Live rider tracking", "issue": "Simulator returns null -> map empty + 'En route vers vous' with no ETA. Not an API 500 but UX dead-end for seeded en_livraison orders missing timeline event.", "affected_selectors": ["[data-testid=\"rider-map\"]", "[data-testid=\"live-delivery\"]"]}
+    ],
+    "design_issues": [
+      {"screen": "Order detail — Livraison box", "issues": ["Adresse shows '—' (empty) for the test en_livraison order; verify order has structured delivery_address or improve fallback text."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack8_waveb.py",
+    "/app/test_reports/pytest/fixpack8_waveb.xml"
+  ],
+  "action_items": [
+    "Backend: make _simulated_rider_position fallback to order.created_at (or updated_at) when timeline en_livraison entry is missing, so the live tracking feature works out of the box for seeded orders.",
+    "Frontend: add placeholder/skeleton in LiveDelivery when pos is still null after first fetch (e.g., 'En attente de la position du livreur…').",
+    "Frontend: rename dropdown logout testid from 'menu-logout-header' to 'logout-header' to match the Wave B spec (or update spec)."
+  ],
+  "critical_code_review_comments": [
+    "AccountShell.jsx (796 lines) is approaching the >700 line threshold; recommend splitting into one file per sub-view (Overview, OrdersPage, OrderDetail, LiveDelivery, MessagesPage, ReviewsPending, Addresses, Security, EmptyState).",
+    "LiveDelivery useEffect dependencies: both the init and the pan effects depend on [pos]; the init effect returns a cleanup that removes the leaflet instance every time pos changes, which will destroy/recreate the map on every poll even though an existing leaflet instance is kept via leafletRef. Guard with `if (leafletRef.current) return` is present but the cleanup still fires. Use empty deps for init and only [pos] for pan.",
+    "Server /public/account/addresses POST silently ignores invalid payloads (no Pydantic schema). Consider validating required fields (label/street/zone).",
+    "Server /public/account/reviews can be submitted multiple times for the same product by the same customer — order_ratings insert duplicates. Deduplicate or enforce unique index on (customer_id, product_id).",
+    "Simulator ETA formula `(100 - progress) * 0.15` returns minutes but when progress=50 that's ~7 min, independent of actual distance; fine for demo but could be improved via haversine between pos and end.",
+    "/rider/position lacks heading/speed validation (accepts None); minor since body is a free dict."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixpack8_waveb.py (new, 16 tests)"
+  ],
+  "success_rate": {"backend": "100% (16/16)", "frontend": "~90% — all required data-testids present and functional; 1 UX gap (empty rider-map) + 1 testid name mismatch"},
+  "test_credentials": "Customer TestPack6 +225 07 00 00 11 22 / 368567, Awa +225 07 85 55 58 88 / 386436, rider1@dinastore.ci / Rider123! — all verified OK.",
+  "seed_data_creation": "No persistent seed created. Tests clean up TEST_ addresses. One review (comment 'TEST_WAVEB') was added to the first pending product for Awa — low impact. Rider1 position row left in rider_positions (expected).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend tests at /app/backend/tests/test_fixpack8_waveb.py are a reusable regression (16 cases, ~7s). Key seed order for live tracking: DN-260920-1032 (customer Awa, rider Kouamé, status en_livraison) but its timeline has no 'en_livraison' event -> simulator returns null. Either (a) patch simulator to fallback to updated_at/created_at OR (b) seed/write an 'en_livraison' timeline event for that order. Note the dropdown logout testid is 'menu-logout-header' not 'logout-header' per current code. The '/boutique/compte' tree has both desktop and mobile DOM mounted simultaneously (two copies of each testid) — Playwright strict selectors should use .first or scope by visibility.",
+  "rca of the issue": "LiveDelivery map empty root cause: GET /api/public/order/DN-260920-1032/rider-position returns {active:true, position:null} because _simulated_rider_position() in server.py line 708-709 bails out early when it cannot find a timeline entry with status='en_livraison' (`enl = next((t for t in reversed(tl) if t.get('status') == 'en_livraison'), None); if not enl: return None`). The order was seeded in en_livraison status without appending the matching timeline entry. Mitigation: either (1) write a defensive fallback in the simulator (use order.updated_at or now_iso-15min if timeline entry missing), or (2) re-seed en_livraison orders through the proper transition path that appends the timeline entry."
+}

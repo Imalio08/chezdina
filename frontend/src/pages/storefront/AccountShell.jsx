@@ -445,6 +445,7 @@ function Timeline({ tl }) {
 function LiveDelivery({ order, rider }) {
   const [pos, setPos] = useState(null);
   const [eta, setEta] = useState(null);
+  const [checked, setChecked] = useState(false);
   const nav = useNavigate();
   const mapRef = useRef(null);
   const markerRef = useRef(null);
@@ -455,35 +456,46 @@ function LiveDelivery({ order, rider }) {
       const r = await api.get(`/public/order/${order.code}/rider-position`);
       if (r.data.position) { setPos(r.data.position); setEta(r.data.eta_minutes); }
     } catch {}
+    finally { setChecked(true); }
   };
 
   useEffect(() => {
     fetchPos();
     const t = setInterval(fetchPos, 30000);
     return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order.code]);
 
+  // Init map once when we have a first position
   useEffect(() => {
     if (!pos || !mapRef.current || leafletRef.current) return;
-    const run = async () => {
+    let cancelled = false;
+    (async () => {
       const L = (await import("leaflet")).default;
       await import("leaflet/dist/leaflet.css");
+      if (cancelled || !mapRef.current || leafletRef.current) return;
       const map = L.map(mapRef.current, { zoomControl: false }).setView([pos.lat, pos.lng], 14);
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { attribution: "© OSM", maxZoom: 19 }).addTo(map);
       const icon = L.divIcon({ className: "", html: `<div style="background:#b02a2a;color:#fff;border-radius:9999px;width:34px;height:34px;display:grid;place-items:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.3)">🏍️</div>` });
       markerRef.current = L.marker([pos.lat, pos.lng], { icon }).addTo(map);
       leafletRef.current = map;
-    };
-    run();
-    return () => { if (leafletRef.current) { leafletRef.current.remove(); leafletRef.current = null; } };
-  }, [pos]);
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pos ? "ready" : "pending"]);
 
+  // Pan the marker on each position update
   useEffect(() => {
     if (pos && markerRef.current && leafletRef.current) {
       markerRef.current.setLatLng([pos.lat, pos.lng]);
       leafletRef.current.panTo([pos.lat, pos.lng]);
     }
   }, [pos]);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => { if (leafletRef.current) { leafletRef.current.remove(); leafletRef.current = null; } };
+  }, []);
 
   const openChat = async () => {
     try {
@@ -504,7 +516,17 @@ function LiveDelivery({ order, rider }) {
           </div>
         </div>
       </div>
-      <div ref={mapRef} className="w-full h-64 rounded-lg bg-[#f5f5f5] overflow-hidden" data-testid="rider-map"></div>
+      <div className="relative w-full h-64 rounded-lg bg-[#f5f5f5] overflow-hidden" data-testid="rider-map-wrap">
+        <div ref={mapRef} className="w-full h-full" data-testid="rider-map"></div>
+        {!pos && (
+          <div className="absolute inset-0 grid place-items-center bg-[#fafafa]/90 text-sm text-[#666]" data-testid="rider-map-placeholder">
+            <div className="flex flex-col items-center gap-2">
+              <Clock size={28} className="text-[#b02a2a]"/>
+              <span>{checked ? "En attente de la position du livreur…" : "Chargement de la carte…"}</span>
+            </div>
+          </div>
+        )}
+      </div>
       <div className="flex gap-2 mt-3">
         {rider?.phone && <a href={`tel:${rider.phone}`} className="dina-btn-secondary flex-1" data-testid="btn-call"><Phone size={14}/> Appeler</a>}
         {rider?.phone && <a href={`https://wa.me/${rider.phone.replace(/\D/g,"")}`} target="_blank" rel="noreferrer" className="dina-btn-secondary flex-1" data-testid="btn-whatsapp"><MessageCircle size={14}/> WhatsApp</a>}

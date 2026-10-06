@@ -703,16 +703,18 @@ async def _simulated_rider_position(order: Dict[str,Any]) -> Optional[Dict[str,A
         if k.lower() in z.lower(): end = v; break
     if not end:
         end = (start[0] + 0.012, start[1] - 0.008)
-    # Progress: based on time since en_livraison, 0..1 over ~15 minutes
+    # Progress: based on time since en_livraison, 0..1 over ~15 minutes.
+    # Fallback: use order.updated_at or created_at if the timeline event is missing.
     tl = order.get("timeline") or []
     enl = next((t for t in reversed(tl) if t.get("status") == "en_livraison"), None)
-    if not enl: return None
+    start_iso = (enl or {}).get("at") or order.get("updated_at") or order.get("created_at")
+    if not start_iso: return None
     try:
-        start_at = datetime.fromisoformat(enl["at"].replace("Z","+00:00"))
+        start_at = datetime.fromisoformat(start_iso.replace("Z","+00:00"))
     except Exception:
         return None
     elapsed = (datetime.now(timezone.utc) - start_at).total_seconds()
-    t = min(0.95, elapsed / (15 * 60))
+    t = max(0.05, min(0.95, elapsed / (15 * 60)))
     return {"lat": _interp(start[0], end[0], t), "lng": _interp(start[1], end[1], t),
             "simulated": True, "progress": round(t * 100), "at": now_iso()}
 

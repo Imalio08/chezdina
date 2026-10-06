@@ -1,5 +1,40 @@
 # Chez Dina — PRD
 
+## Fix pack 8 Vague A (Feb 2026) — Storefront ✅
+- Marque "Chez Dina" nettoyée partout (plus de sous-titre "boutique")
+- Barre de recherche permanente dans le header avec autosuggest (produits/catégories/marques, debounce 200ms)
+- Nouvelle section `MosaicSection` (masonry 3-4 cols desktop / 2 mobile, défilement vertical continu à vitesses alternées, pause au hover, prefers-reduced-motion respecté, lien optionnel par image)
+- Console `SectionBuilder` : type "mosaic" avec drag-drop upload multi-images
+- Tests iteration_17 : 22/22 ✅
+
+## Fix pack 8 Vague B (Feb 2026) — Compte client ✅
+### Backend
+- `/public/account/photo` upload base64
+- `/public/account/update` patch (nom, email, tailles, prefs com)
+- `/public/account/addresses` CRUD + default
+- `/public/account/orders-split` buckets en_cours/livrees/annulees
+- `/public/account/order/{code}` détail + rider info
+- `/public/account/recently-viewed` GET+track
+- `/public/account/reviews-pending` + `POST /reviews`
+- `/public/account/vouchers`
+- `/public/account/change-code` avec vérif old
+- `/public/account/threads` + `thread/rider/{code}`
+- `/rider/position` POST (rider only)
+- `/public/order/{code}/rider-position` avec simulateur (interpolation Cocody→zone sur 15 min)
+
+### Frontend
+- `CustomerContext` + `AccountShell` sur `/boutique/compte/*`
+- 14 items dans le menu gauche (desktop) / liste (mobile)
+- Overview : 4 cartes (Infos + photo upload, Adresse défaut, Porte-monnaie+points, Préférences)
+- `OrdersPage` 2 onglets avec compteurs
+- `OrderDetail` : timeline + items + Paiement + Livraison + facture
+- `LiveDelivery` : carte Leaflet, polling 30s, Appeler/WhatsApp/Message in-app, placeholder si position vide
+- `MessagesPage` : threads + chat polling 5s
+- `ReviewsPending`, `Security` (changer code 6 chiffres), `Addresses` CRUD, `Preferences`, empty states partout
+- Header storefront : greeting "Bonjour, {prénom}" + dropdown
+- Tests iteration_18 : backend 16/16, frontend 90%+ (après fix simulateur+placeholder)
+
+
 ## Credentials
 - Admin: `aouattaraesca@gmail.com` / `Admin123!` · PIN 1234
 - Manager: `manager.cocody@dinastore.ci` / `Manager123!` · PIN 2222
