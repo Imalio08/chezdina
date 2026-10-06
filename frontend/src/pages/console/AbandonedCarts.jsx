@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { fcfa } from "@/lib/format";
-import { ShoppingBag, DollarSign, MessageSquare, CheckCircle, X, Send, Target } from "lucide-react";
+import { ShoppingBag, DollarSign, MessageSquare, CheckCircle, X, Send, Target, Upload, Trash2 } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
+import ImageUpload from "@/components/shared/ImageUpload";
 
 const OFFER_TYPES = [
   { v:"none", label:"Aucune (simple rappel)" },
@@ -12,6 +13,13 @@ const OFFER_TYPES = [
   { v:"special_price", label:"Prix spécial sur un article" },
   { v:"free_delivery", label:"Livraison offerte" },
   { v:"gift", label:"Cadeau" },
+  { v:"custom", label:"Offre personnalisée" },
+];
+
+const CHANNELS = [
+  { v:"whatsapp", label:"WhatsApp" },
+  { v:"inapp", label:"Message in-app" },
+  { v:"popup", label:"Pop-up espace cliente" },
 ];
 
 const STATUS_LABEL = { nouveau: "Nouveau", relance: "Relancé", recupere: "Récupéré", expire: "Expiré" };
@@ -145,69 +153,148 @@ function DetailPanel({ data, onClose, onRelaunch }) {
 }
 
 function RelaunchForm({ targets, carts, onClose }) {
-  const [f, setF] = useState({ offer_type:"none", value:0, duration:"3j", channels:["whatsapp"],
-    message: "Bonjour {prénom}, nous avons remarqué que vous n'avez pas finalisé votre panier chez Chez Dina ({produits}). Profitez de {code} valable jusqu'au {date_fin} : {lien_panier} 💕" });
+  // Initial target mode: single/multiple preselect from targets prop; "all" if string
+  const initialSingle = Array.isArray(targets) && targets.length === 1;
+  const initialAll = targets === "all";
+  const [mode, setMode] = useState(initialAll ? "all" : initialSingle ? "single" : "selected");
+  const [selectedIds, setSelectedIds] = useState(Array.isArray(targets) ? targets : []);
+  const [attachImage, setAttachImage] = useState(false);
+  const [image, setImage] = useState("");
+  const now = new Date();
+  const defaultEnd = new Date(Date.now() + 3 * 24 * 3600 * 1000);
+  const [f, setF] = useState({
+    offer_type: "none", value: 0,
+    custom_name: "", custom_desc: "", custom_value: "",
+    starts_at: new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+    ends_at: new Date(defaultEnd.getTime() - defaultEnd.getTimezoneOffset() * 60000).toISOString().slice(0, 16),
+    channels: ["whatsapp"],
+    message: "Bonjour {prénom}, nous avons remarqué que vous n'avez pas finalisé votre panier chez Chez Dina ({produits}). Profitez de {code} valable jusqu'au {date_fin} : {lien_panier} 💕",
+  });
   const [sending, setSending] = useState(false);
 
-  const durations = { "24h": 1, "3j": 3, "1sem": 7 };
+  const toggleChannel = (v) => setF(s => ({ ...s, channels: s.channels.includes(v) ? s.channels.filter(x => x !== v) : [...s.channels, v] }));
+  const toggleId = (id) => setSelectedIds(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
+
+  const effectiveTargetIds = mode === "all" ? carts.map(c => c.id) : mode === "single" ? selectedIds.slice(0, 1) : selectedIds;
+
   const submit = async () => {
+    if (!f.channels.length) return toast.error("Sélectionnez au moins un canal");
+    if (!effectiveTargetIds.length) return toast.error("Sélectionnez au moins une cliente");
+    if (new Date(f.ends_at) <= new Date(f.starts_at)) return toast.error("La fin doit être après le début");
+    if (f.offer_type === "custom" && !f.custom_name.trim()) return toast.error("Nommez votre offre personnalisée");
     setSending(true);
     try {
-      const starts = new Date(); const ends = new Date(Date.now() + durations[f.duration]*24*3600*1000);
       const body = {
-        cart_ids: Array.isArray(targets) ? targets : [],
-        offer_type: f.offer_type, value: Number(f.value||0),
-        starts_at: starts.toISOString(), ends_at: ends.toISOString(),
+        cart_ids: effectiveTargetIds,
+        offer_type: f.offer_type,
+        value: f.offer_type === "custom" ? Number(f.custom_value || 0) : Number(f.value || 0),
+        offer_custom: f.offer_type === "custom" ? { name: f.custom_name, description: f.custom_desc, value: Number(f.custom_value || 0) } : null,
+        starts_at: new Date(f.starts_at).toISOString(),
+        ends_at: new Date(f.ends_at).toISOString(),
         channels: f.channels, message: f.message,
+        image: attachImage ? image : null,
       };
       const { data } = await api.post("/abandoned-carts/relaunch", body);
-      toast.success(`${data.sent} relance(s) envoyée(s) · code ${data.code||"—"}`);
+      toast.success(`${data.sent || effectiveTargetIds.length} relance(s) envoyée(s) · code ${data.code || "—"}`);
       onClose(true);
-    } catch { toast.error("Erreur relance"); } finally { setSending(false); }
+    } catch { toast.error("Erreur relance"); }
+    finally { setSending(false); }
   };
 
-  const nTargets = Array.isArray(targets) ? targets.length : carts.length;
-
   return (
-    <div className="fixed inset-0 bg-black/50 grid place-items-center z-[60] p-4" onClick={()=>onClose(false)} data-testid="relaunch-form">
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-5 w-full max-w-lg max-h-[92vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/50 grid place-items-center z-[60] p-4" onClick={() => onClose(false)} data-testid="relaunch-form">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-5 w-full max-w-2xl max-h-[92vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
-          <div><div className="font-serif text-xl">Créer une offre de relance</div><div className="text-xs text-[#666]">Cible : <b>{nTargets}</b> panier{nTargets>1?"s":""}</div></div>
-          <button onClick={()=>onClose(false)}><X size={18}/></button>
+          <div><div className="font-serif text-xl">Créer une offre de relance</div><div className="text-xs text-[#666]">Formulaire 100% personnalisable</div></div>
+          <button onClick={() => onClose(false)}><X size={18}/></button>
         </div>
-        <div className="space-y-3">
+
+        <div className="space-y-4">
+          {/* Cible */}
+          <div>
+            <label className="text-[10px] uppercase text-[#666] font-semibold">Cible</label>
+            <div className="flex gap-1 mt-1">
+              {[["single", "1 cliente"], ["selected", "Plusieurs"], ["all", "Toutes"]].map(([v, l]) => (
+                <button key={v} onClick={() => setMode(v)} className={`dina-chip text-[11px] ${mode === v ? "!bg-[#b02a2a] !text-white" : ""}`} data-testid={`rf-mode-${v}`}>{l}</button>
+              ))}
+            </div>
+            {mode !== "all" && (
+              <div className="mt-2 max-h-40 overflow-y-auto border border-[#ececec] dark:border-[#2a2a2a] rounded-lg p-2 space-y-1">
+                {carts.map(c => (
+                  <label key={c.id} className="flex items-center gap-2 text-xs cursor-pointer hover:bg-[#fafafa] dark:hover:bg-[#141414] p-1 rounded">
+                    <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => toggleId(c.id)} disabled={mode === "single" && selectedIds.length >= 1 && !selectedIds.includes(c.id)} className="accent-[#b02a2a]" data-testid={`rf-pick-${c.id}`}/>
+                    <span className="flex-1 truncate">{c.customer?.name || c.customer_name || "—"} · {c.customer?.phone || c.customer_phone || "—"}</span>
+                    <span className="tabular text-[#666]">{fcfa(c.total || c.value || 0)}</span>
+                  </label>
+                ))}
+                {carts.length === 0 && <div className="text-xs text-[#666] text-center py-2">Aucun panier</div>}
+              </div>
+            )}
+            <div className="text-[11px] text-[#666] mt-1">{effectiveTargetIds.length} cliente(s) ciblée(s)</div>
+          </div>
+
+          {/* Type d'offre */}
           <div>
             <label className="text-[10px] uppercase text-[#666] font-semibold">Type d'offre</label>
-            <select className="dina-input" value={f.offer_type} onChange={e=>setF({...f, offer_type:e.target.value})} data-testid="rf-type">
-              {OFFER_TYPES.map(o=><option key={o.v} value={o.v}>{o.label}</option>)}
+            <select className="dina-input" value={f.offer_type} onChange={e => setF({...f, offer_type: e.target.value})} data-testid="rf-type">
+              {OFFER_TYPES.map(o => <option key={o.v} value={o.v}>{o.label}</option>)}
             </select>
           </div>
-          {["pct","amount","special_price"].includes(f.offer_type) && (
-            <div><label className="text-[10px] uppercase text-[#666] font-semibold">Valeur {f.offer_type==="pct"?"(%)":""}</label>
-              <input type="number" className="dina-input tabular" value={f.value||""} onChange={e=>setF({...f, value:+e.target.value||0})} data-testid="rf-value"/></div>
+          {["pct", "amount", "special_price"].includes(f.offer_type) && (
+            <div><label className="text-[10px] uppercase text-[#666] font-semibold">Valeur {f.offer_type === "pct" ? "(%)" : "(FCFA)"}</label>
+              <input type="number" className="dina-input tabular" value={f.value || ""} onChange={e => setF({...f, value: +e.target.value || 0})} data-testid="rf-value"/></div>
           )}
-          <div>
-            <label className="text-[10px] uppercase text-[#666] font-semibold">Validité</label>
-            <div className="flex gap-1 mt-1">{Object.keys(durations).map(d => (
-              <button key={d} onClick={()=>setF({...f, duration:d})} className={`dina-chip text-[11px] ${f.duration===d?"!bg-[#1c1c1c] !text-white":""}`} data-testid={`rf-dur-${d}`}>{d}</button>
-            ))}</div>
+          {f.offer_type === "custom" && (
+            <div className="grid gap-2 bg-[#fff5f5] dark:bg-[#2a1818] p-3 rounded-lg" data-testid="rf-custom-box">
+              <input className="dina-input" placeholder="Nom de l'offre (ex: Pack Dina trio)" value={f.custom_name} onChange={e => setF({...f, custom_name: e.target.value})} data-testid="rf-custom-name"/>
+              <textarea className="dina-input" rows={2} placeholder="Description détaillée (ex: 3 articles au prix de 2 + sac offert)" value={f.custom_desc} onChange={e => setF({...f, custom_desc: e.target.value})} data-testid="rf-custom-desc"/>
+              <input type="number" className="dina-input tabular" placeholder="Valeur approximative FCFA (facultatif)" value={f.custom_value} onChange={e => setF({...f, custom_value: e.target.value})} data-testid="rf-custom-value"/>
+            </div>
+          )}
+
+          {/* Validité */}
+          <div className="grid grid-cols-2 gap-2">
+            <div><label className="text-[10px] uppercase text-[#666] font-semibold">Début</label>
+              <input type="datetime-local" className="dina-input" value={f.starts_at} onChange={e => setF({...f, starts_at: e.target.value})} data-testid="rf-starts"/></div>
+            <div><label className="text-[10px] uppercase text-[#666] font-semibold">Fin</label>
+              <input type="datetime-local" className="dina-input" value={f.ends_at} onChange={e => setF({...f, ends_at: e.target.value})} data-testid="rf-ends"/></div>
           </div>
+
+          {/* Canaux */}
           <div>
-            <label className="text-[10px] uppercase text-[#666] font-semibold">Canal</label>
-            <div className="flex gap-1 mt-1">
-              {[["whatsapp","WhatsApp"],["inapp","In-app"],["both","Les deux"]].map(([v,l]) => (
-                <button key={v} onClick={()=>setF({...f, channels:[v]})} className={`dina-chip text-[11px] ${f.channels[0]===v?"!bg-[#b02a2a] !text-white":""}`} data-testid={`rf-ch-${v}`}>{l}</button>
+            <label className="text-[10px] uppercase text-[#666] font-semibold">Canaux (plusieurs possibles)</label>
+            <div className="flex gap-1 mt-1 flex-wrap">
+              {CHANNELS.map(c => (
+                <button key={c.v} onClick={() => toggleChannel(c.v)} className={`dina-chip text-[11px] ${f.channels.includes(c.v) ? "!bg-[#b02a2a] !text-white" : ""}`} data-testid={`rf-ch-${c.v}`}>{c.label}</button>
               ))}
             </div>
           </div>
+
+          {/* Image */}
+          <div>
+            <label className="text-[10px] uppercase text-[#666] font-semibold flex items-center gap-2">Joindre une image
+              <div className="flex gap-1">
+                <button onClick={() => setAttachImage(true)} className={`dina-chip text-[11px] ${attachImage ? "!bg-[#1f8a4c] !text-white" : ""}`} data-testid="rf-img-yes">Oui</button>
+                <button onClick={() => { setAttachImage(false); setImage(""); }} className={`dina-chip text-[11px] ${!attachImage ? "!bg-[#666] !text-white" : ""}`} data-testid="rf-img-no">Non</button>
+              </div>
+            </label>
+            {attachImage && (
+              <div className="mt-2">
+                <ImageUpload value={image ? [image] : []} onChange={imgs => setImage(imgs[0] || "")} single max={1} maxKB={500} testid="rf-img-upload"/>
+              </div>
+            )}
+          </div>
+
+          {/* Message */}
           <div>
             <label className="text-[10px] uppercase text-[#666] font-semibold">Message · variables {`{prénom} {produits} {code} {date_fin} {lien_panier}`}</label>
-            <textarea rows={5} className="dina-input" value={f.message} onChange={e=>setF({...f, message:e.target.value})} data-testid="rf-message"/>
+            <textarea rows={5} className="dina-input" value={f.message} onChange={e => setF({...f, message: e.target.value})} data-testid="rf-message"/>
           </div>
         </div>
+
         <div className="flex gap-2 mt-5">
-          <button onClick={()=>onClose(false)} className="dina-btn-secondary flex-1">Annuler</button>
-          <button onClick={submit} disabled={sending} className="dina-btn-primary flex-1" data-testid="rf-send"><Send size={13}/>{sending?"Envoi…":"Envoyer la relance"}</button>
+          <button onClick={() => onClose(false)} className="dina-btn-secondary flex-1">Annuler</button>
+          <button onClick={submit} disabled={sending} className="dina-btn-primary flex-1" data-testid="rf-send"><Send size={13}/>{sending ? "Envoi…" : `Envoyer à ${effectiveTargetIds.length}`}</button>
         </div>
       </div>
     </div>

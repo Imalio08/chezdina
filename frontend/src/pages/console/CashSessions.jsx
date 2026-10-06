@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
-import { PlayCircle, StopCircle, Shield, HandCoins, CheckCircle, AlertTriangle, Clock } from "lucide-react";
+import { PlayCircle, StopCircle, Shield, HandCoins, CheckCircle, AlertTriangle, Clock, XCircle, X } from "lucide-react";
 
 export default function CashSessions() {
   const { user } = useAuth();
@@ -13,6 +13,7 @@ export default function CashSessions() {
   const [closingFor, setClosingFor] = useState(null);
   const [handoverFor, setHandoverFor] = useState(null);
   const [validateFor, setValidateFor] = useState(null);
+  const [rejectFor, setRejectFor] = useState(null);
   const [openCash, setOpenCash] = useState(0);
 
   const load = () => api.get("/cash-sessions").then(r => setSessions(r.data || [])).catch(() => { });
@@ -64,7 +65,10 @@ export default function CashSessions() {
                 <button onClick={() => setHandoverFor(current)} className="dina-btn-secondary !min-h-[36px] !text-[#5867fd]" data-testid="cash-declare-handover"><HandCoins size={13}/>Déclarer versement</button>
               )}
               {current.status === "pending_validation" && isOwner && (
-                <button onClick={() => setValidateFor(current)} className="dina-btn-primary !min-h-[36px] !bg-[#1f8a4c]" data-testid="cash-validate-handover"><CheckCircle size={13}/>Valider versement</button>
+                <>
+                  <button onClick={() => setValidateFor(current)} className="dina-btn-primary !min-h-[36px] !bg-[#1f8a4c]" data-testid="cash-validate-handover"><CheckCircle size={13}/>Valider versement</button>
+                  <button onClick={() => setRejectFor(current)} className="dina-btn-secondary !min-h-[36px] !text-[#c62828] !border-[#c62828]" data-testid="cash-reject-handover"><XCircle size={13}/>Rejeter</button>
+                </>
               )}
             </div>
           </div>
@@ -115,15 +119,64 @@ export default function CashSessions() {
         </div>
       </div>
 
+      {current && current.status === "rejected" && current.rejection_reason && (
+        <div className="dina-card-white p-4 border-l-4 border-[#c62828]" data-testid="handover-rejected-banner">
+          <div className="flex items-center gap-2 font-semibold mb-1 text-[#c62828]"><XCircle size={14}/>Versement rejeté par le propriétaire</div>
+          <div className="text-sm text-[#1c1c1c] dark:text-white italic">« {current.rejection_reason} »</div>
+          <div className="text-xs text-[#666] mt-1">Rejeté par {current.rejected_by} le {dateTimeFmt(current.rejected_at)} — recomptez les espèces et déclarez un nouveau versement.</div>
+        </div>
+      )}
+
       {opening && <OpenModal openCash={openCash} setOpenCash={setOpenCash} onCancel={() => setOpening(false)} onConfirm={open}/>}
       {closingFor && <CloseModal session={closingFor} onClose={() => setClosingFor(null)} onDone={() => { setClosingFor(null); load(); }} />}
       {handoverFor && <HandoverModal session={handoverFor} onClose={() => setHandoverFor(null)} onDone={() => { setHandoverFor(null); load(); }} />}
       {validateFor && <ValidateHandoverModal session={validateFor} onClose={() => setValidateFor(null)} onDone={() => { setValidateFor(null); load(); }} />}
+      {rejectFor && <RejectHandoverModal session={rejectFor} onClose={() => setRejectFor(null)} onDone={() => { setRejectFor(null); load(); }} />}
+    </div>
+  );
+}
+
+function RejectHandoverModal({ session, onClose, onDone }) {
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const submit = async () => {
+    const r = reason.trim();
+    if (r.length < 5) return toast.error("Un motif clair est obligatoire (min. 5 caractères)");
+    if (!window.confirm(`Rejeter le versement de ${session.handover_by || "la Gérante"} ?\n\nMotif : ${r}`)) return;
+    setSubmitting(true);
+    try {
+      await api.post(`/cash-sessions/${session.id}/reject-handover`, { reason: r });
+      toast.success("Versement rejeté · la Gérante en est informée");
+      onDone();
+    } catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
+    finally { setSubmitting(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="reject-handover-modal">
+        <div className="flex items-center justify-between mb-3">
+          <div className="font-serif text-xl text-[#c62828]">Rejeter le versement</div>
+          <button onClick={onClose}><X size={18}/></button>
+        </div>
+        <div className="p-3 rounded-lg bg-[#fff5f5] dark:bg-[#2a1818] text-xs mb-3">
+          <div className="flex justify-between"><span className="text-[#666]">Déclaré par {session.handover_by}</span><span className="tabular font-semibold text-[#5867fd]">{fcfa(session.handover_amount || 0)}</span></div>
+          <div className="flex justify-between text-[#666]"><span>Le</span><span>{dateTimeFmt(session.handover_at)}</span></div>
+          {session.handover_note && <div className="mt-2 italic">« {session.handover_note} »</div>}
+        </div>
+        <label className="text-xs uppercase text-[#666] font-semibold">Motif du rejet (obligatoire) *</label>
+        <textarea className="dina-input mt-1 mb-2" rows={3} placeholder="Ex. le montant déposé ne correspond pas aux espèces reçues, 5 000 FCFA en moins" value={reason} onChange={e => setReason(e.target.value)} data-testid="reject-reason" autoFocus/>
+        <div className="text-xs text-[#666] mb-4">La Gérante verra ce motif et pourra re-déclarer un versement corrigé.</div>
+        <div className="flex gap-2">
+          <button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button>
+          <button onClick={submit} disabled={submitting} className="dina-btn-primary flex-1 !bg-[#c62828]" data-testid="reject-confirm"><XCircle size={13}/>{submitting ? "Rejet…" : "Rejeter avec motif"}</button>
+        </div>
+      </div>
     </div>
   );
 }
 
 function StatusBadge({ s }) {
+  if (s.status === "rejected") return <span className="dina-chip text-[10px] !text-[#c62828] !border-[#c62828]"><XCircle size={9}/>Rejeté</span>;
   if (s.status === "pending_validation") return <span className="dina-chip text-[10px] !text-[#e4991e] !border-[#e4991e]"><Clock size={9}/>À valider</span>;
   if (s.status === "validated") return <span className="dina-chip text-[10px] !text-[#1f8a4c] !border-[#1f8a4c]"><CheckCircle size={9}/>Validée</span>;
   if (s.status === "gap") return <span className="dina-chip text-[10px] !text-[#c62828] !border-[#c62828]"><AlertTriangle size={9}/>Écart</span>;

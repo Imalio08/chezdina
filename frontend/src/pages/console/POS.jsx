@@ -249,7 +249,7 @@ function POSInner() {
             </table>}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 overflow-y-auto scrollbar-thin flex-1 pr-1" data-testid="pos-products-grid">
+          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5 overflow-y-auto scrollbar-thin flex-1 pr-1" data-testid="pos-products-grid">
           {filtered.length === 0 ? <div className="col-span-full text-center text-sm text-[#666] py-10">Aucun produit</div> :
           filtered.map(p=>{
             const waitlist = isWaitlist(p);

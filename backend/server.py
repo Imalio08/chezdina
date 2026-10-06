@@ -3705,11 +3705,13 @@ class WaitlistIn(BaseModel):
     size: Optional[str] = None
     phone: str
     name: Optional[str] = None
+    source: Optional[str] = "console"  # console | site | pos | search
 
 @api.post("/waitlist")
 async def waitlist_add(body: WaitlistIn, user: dict = Depends(get_user)):
     doc = {"id": new_id(), "product_id": body.product_id, "size": body.size,
            "phone": body.phone, "name": body.name or "Cliente",
+           "source": body.source or "console",
            "created_at": now_iso(), "notified_at": None, "created_by": user.get("name")}
     await db.waitlist.insert_one(doc)
     return clean(doc)
@@ -3718,6 +3720,7 @@ async def waitlist_add(body: WaitlistIn, user: dict = Depends(get_user)):
 async def public_waitlist_add(body: WaitlistIn):
     doc = {"id": new_id(), "product_id": body.product_id, "size": body.size,
            "phone": body.phone, "name": body.name or "Cliente",
+           "source": body.source or "site",
            "created_at": now_iso(), "notified_at": None, "created_by": "boutique"}
     await db.waitlist.insert_one(doc)
     return {"ok": True}
@@ -5854,6 +5857,32 @@ async def validate_handover(sid: str, body: Dict[str,Any], user: dict = Depends(
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.validate_handover","entity_id":sid,"after":{"gap":gap,"status":status},"at":now_iso()})
     return {"ok": True, "gap": gap, "status": status}
 
+@api.post("/cash-sessions/{sid}/reject-handover")
+async def reject_handover(sid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    """Owner rejects the handover with a mandatory reason. Session reverts to open so the Gérante can re-declare."""
+    s = await db.cash_sessions.find_one({"id": sid})
+    if not s: raise HTTPException(404)
+    reason = (body.get("reason") or "").strip()
+    if not reason: raise HTTPException(400, "Motif de rejet obligatoire")
+    await db.cash_sessions.update_one({"id": sid}, {"$set": {
+        "status": "rejected",
+        "rejected_at": now_iso(), "rejected_by": user.get("name"),
+        "rejection_reason": reason,
+        # Clear handover so the Gérante can submit again
+        "handover_amount": None, "handover_at": None, "handover_by": None, "handover_note": None,
+    }})
+    # Notify Gérante
+    await db.notifications.insert_one({
+        "id": new_id(), "type": "handover_rejected",
+        "title": "Versement rejeté",
+        "msg": f"{user.get('name')} a rejeté votre versement : {reason}",
+        "color": "#c62828", "at": now_iso(),
+        "link": "/console/sessions-caisse",
+        "target_user_id": s.get("opened_by_id"),
+    })
+    await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.reject_handover","entity_id":sid,"after":{"reason":reason},"at":now_iso()})
+    return {"ok": True, "reason": reason}
+
 @api.get("/manager-balance/{mid}")
 async def manager_balance(mid: str, user: dict = Depends(require_role("admin","manager"))):
     rows = await db.manager_balance.find({"manager_id": mid}).sort("at",-1).to_list(500)
@@ -6011,7 +6040,27 @@ async def waitlist_grouped(user: dict = Depends(require_role("admin","manager"))
     return {"groups": clean(out), "pending": len(rows), "products_affected": len(pids), "customers_total": total_customers, "conversion_pct": round(conv/max(1,notified)*100,1) if notified else 0}
 
 @api.post("/waitlist/{wid}/notify")
-async def waitlist_notify(wid: str, user: dict = Depends(require_role("admin","manager"))):
+async def waitlist_notify(wid: str, body: Dict[str, Any] = None, user: dict = Depends(require_role("admin","manager"))):
+    w = await db.waitlist.find_one({"id": wid})
+    if not w: raise HTTPException(404)
+    body = body or {}
+    # Log the outbound notification with its channel/message/offer details for traceability
+    log = {
+        "id": new_id(), "waitlist_id": wid, "product_id": w.get("product_id"),
+        "customer_name": w.get("name"), "customer_phone": w.get("phone"),
+        "channels": body.get("channels") or ["whatsapp"],
+        "message": body.get("message") or "",
+        "offer_type": body.get("offer_type") or "none",
+        "offer_value": body.get("offer_value") or 0,
+        "offer_custom": body.get("offer_custom"),
+        "image": body.get("image"),
+        "starts_at": body.get("starts_at") or now_iso(),
+        "ends_at": body.get("ends_at"),
+        "sent_at": now_iso(), "sent_by": user.get("name"),
+    }
+    await db.waitlist_notifications.insert_one(log)
+    await db.waitlist.update_one({"id": wid}, {"$set": {"notified_at": now_iso(), "notified_by": user.get("name")}})
+    return {"ok": True, "notification_id": log["id"]}
     w = await db.waitlist.find_one({"id": wid})
     if not w: raise HTTPException(404)
     await _notify_waitlist(w["product_id"], w.get("size"))

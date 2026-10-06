@@ -2,7 +2,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
-import { SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X, Search as SearchIcon, Send } from "lucide-react";
+import { toast } from "sonner";
 import FiltersSheet from "@/components/storefront/FiltersSheet";
 import ProductCardV2 from "@/components/storefront/ProductCardV2";
 
@@ -14,9 +15,12 @@ export default function Catalog() {
   const [sort, setSort] = useState("new");
   const [filters, setFilters] = useState({});
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [oocPhone, setOocPhone] = useState("");
+  const [oocSent, setOocSent] = useState(false);
+  const [oocSending, setOocSending] = useState(false);
   const cat = sp.get("category") || "all";
 
-  useEffect(() => { setQ(sp.get("q") || ""); }, [sp]);
+  useEffect(() => { setQ(sp.get("q") || ""); setOocSent(false); }, [sp]);
   useEffect(() => {
     api.get(`/public/products?category=${cat}`).then(r => setProducts(r.data));
     api.get("/brands").then(r => setBrands(r.data || [])).catch(() => {});
@@ -82,6 +86,28 @@ export default function Catalog() {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         {filtered.map(p => <ProductCardV2 key={p.id} product={p}/>)}
       </div>
+
+      {filtered.length === 0 && q.trim().length >= 2 && (
+        <div className="mt-6 border-2 border-dashed border-[#ececec] dark:border-[#2a2a2a] rounded-xl p-6 text-center bg-[#fafafa] dark:bg-[#141414]" data-testid="catalog-no-results">
+          <div className="w-14 h-14 mx-auto rounded-full bg-[#fff5f5] grid place-items-center text-[#b02a2a] mb-3"><SearchIcon size={22}/></div>
+          <div className="font-serif text-xl mb-1">« {q} » n'est pas dans notre catalogue</div>
+          <div className="text-sm text-[#666] mb-4">Dites-nous ce que vous cherchez : si beaucoup de clientes le demandent, nous le proposerons bientôt.</div>
+          {oocSent ? (
+            <div className="text-sm text-[#1f8a4c] font-semibold">✓ Merci, votre demande a été transmise à l'équipe Chez Dina !</div>
+          ) : (
+            <div className="flex flex-col sm:flex-row gap-2 max-w-md mx-auto">
+              <input className="dina-input flex-1" placeholder="Votre numéro (facultatif pour être prévenue)" value={oocPhone} onChange={e=>setOocPhone(e.target.value)} data-testid="catalog-ooc-phone"/>
+              <button disabled={oocSending} onClick={async () => {
+                setOocSending(true);
+                try {
+                  await api.post("/public/out-of-catalog", { keyword: q.trim(), customer_phone: oocPhone || null, channel: "search" });
+                  setOocSent(true); toast.success("Demande envoyée");
+                } catch { toast.error("Erreur, réessayez"); } finally { setOocSending(false); }
+              }} className="dina-btn-primary" data-testid="catalog-ooc-send"><Send size={14}/>{oocSending ? "Envoi…" : "Envoyer ma demande"}</button>
+            </div>
+          )}
+        </div>
+      )}
 
       <FiltersSheet open={sheetOpen} onClose={()=>setSheetOpen(false)} value={filters} onChange={setFilters} brands={brands}/>
     </div>
