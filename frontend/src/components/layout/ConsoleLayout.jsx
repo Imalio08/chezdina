@@ -38,7 +38,7 @@ const SECTIONS = [
   ]},
   { label: "Clients & marketing", items: [
     { to: "/console/clients", icon: Users, label: "Clients" },
-    { to: "/console/campagnes-whatsapp", icon: MessageSquare, label: "Messagerie" },
+    { to: "/console/messagerie", icon: MessageSquare, label: "Messagerie" },
     { to: "/console/segments", icon: Target, label: "Segments & campagnes" },
     { to: "/console/promotions", icon: Megaphone, label: "Promotions" },
     { to: "/console/fidelite", icon: Gift, label: "Fidélité" },

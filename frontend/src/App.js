@@ -57,6 +57,8 @@ import CategoriesCollections from "@/pages/console/CategoriesCollections";
 import Suppliers from "@/pages/console/Suppliers";
 import PurchaseOrders from "@/pages/console/PurchaseOrders";
 import StockInventories from "@/pages/console/StockInventories";
+import CustomerDetail from "@/pages/console/CustomerDetail";
+import Messagerie from "@/pages/console/Messagerie";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
@@ -117,6 +119,8 @@ export default function App() {
               <Route path="achats" element={<ErrorBoundary><PurchaseOrders /></ErrorBoundary>} />
               <Route path="avis" element={<ErrorBoundary><Reviews /></ErrorBoundary>} />
               <Route path="clients" element={<ErrorBoundary><Customers /></ErrorBoundary>} />
+              <Route path="clients/:id" element={<ErrorBoundary><CustomerDetail /></ErrorBoundary>} />
+              <Route path="messagerie" element={<ErrorBoundary><Messagerie /></ErrorBoundary>} />
               <Route path="fidelite" element={<ErrorBoundary><Loyalty /></ErrorBoundary>} />
               <Route path="promotions" element={<ErrorBoundary><Promotions /></ErrorBoundary>} />
               <Route path="alertes" element={<ErrorBoundary><AlertsAndCarts /></ErrorBoundary>} />

@@ -501,6 +501,124 @@ async def bulk_customers(body: List[CustomerIn], user: dict = Depends(require_ro
     if docs: await db.customers.insert_many(docs)
     return {"inserted": len(docs)}
 
+# ---------- Pack 6: Customer access-code regeneration + first-login change ----------
+@api.post("/customers/{cid}/regen-access-code")
+async def regen_access_code(cid: str, user: dict = Depends(require_role("admin","manager"))):
+    code = gen_access_code()
+    await db.customers.update_one({"id": cid}, {"$set": {"access_code": code, "access_code_must_change": True, "access_code_generated_at": now_iso()}})
+    c = await db.customers.find_one({"id": cid}, {"password_hash": 0})
+    return {"ok": True, "access_code": code, "phone": c.get("phone"), "name": c.get("name")}
+
+@api.post("/public/account/change-code")
+async def change_code(body: Dict[str, Any], c: dict = Depends(get_customer)):
+    new = (body.get("new_code") or "").strip()
+    if len(new) != 6 or not new.isdigit(): raise HTTPException(400, "Code à 6 chiffres requis")
+    if new in ("123456","000000","111111","222222","333333","444444","555555","666666","777777","888888","999999","121212"):
+        raise HTTPException(400, "Code trop simple")
+    await db.customers.update_one({"id": c["id"]}, {"$set": {"access_code": new, "access_code_must_change": False, "access_code_changed_at": now_iso()}})
+    return {"ok": True}
+
+# ---------- Pack 6: In-app messaging ----------
+async def _conv_key(parts: List[str]) -> str:
+    return "|".join(sorted(parts))
+
+@api.get("/messages/conversations")
+async def list_conversations(user: dict = Depends(get_user)):
+    """List conversations where staff is a participant (store side)."""
+    rows = await db.conversations.find({"participants.kind": {"$in": ["store", "rider"]}}).sort("updated_at", -1).to_list(200)
+    for r in rows:
+        unread_me = sum(1 for m in (r.get("messages") or []) if not (m.get("read_by") or []) or user["id"] not in (m.get("read_by") or []))
+        r["unread"] = unread_me
+        r["last_message"] = (r.get("messages") or [{}])[-1] if r.get("messages") else None
+    return clean(rows)
+
+@api.get("/messages/conversations/{conv_id}")
+async def get_conversation(conv_id: str, user: dict = Depends(get_user)):
+    c = await db.conversations.find_one({"id": conv_id})
+    if not c: raise HTTPException(404)
+    # mark read
+    msgs = c.get("messages") or []
+    changed = False
+    for m in msgs:
+        if user["id"] not in (m.get("read_by") or []):
+            m.setdefault("read_by", []).append(user["id"])
+            changed = True
+    if changed: await db.conversations.update_one({"id": conv_id}, {"$set": {"messages": msgs}})
+    return clean(c)
+
+@api.post("/messages/send")
+async def send_message(body: Dict[str, Any], user: dict = Depends(get_user)):
+    """Create or append to a conversation. Body: {customer_id?, rider_id?, order_id?, text, image?, kind?}"""
+    cust_id = body.get("customer_id")
+    rider_id = body.get("rider_id")
+    order_id = body.get("order_id")
+    kind = body.get("kind", "boutique_cliente")  # boutique_cliente | boutique_livreur | cliente_livreur
+    parts = []
+    if cust_id: parts.append(f"c:{cust_id}")
+    if rider_id: parts.append(f"r:{rider_id}")
+    if not cust_id and not rider_id: raise HTTPException(400, "customer_id ou rider_id requis")
+    parts.append(f"s:{user['id']}")
+    key = await _conv_key(parts)
+    conv = await db.conversations.find_one({"key": key})
+    msg = {"id": new_id(), "at": now_iso(), "from_id": user["id"], "from_name": user.get("name"),
+           "from_kind": "store", "text": body.get("text",""), "image": body.get("image"), "read_by": [user["id"]]}
+    if not conv:
+        participants = [{"kind": "store", "id": user["id"], "name": user.get("name")}]
+        if cust_id:
+            cust = await db.customers.find_one({"id": cust_id})
+            if cust: participants.append({"kind": "customer", "id": cust_id, "name": cust.get("name")})
+        if rider_id:
+            r = await db.users.find_one({"id": rider_id})
+            if r: participants.append({"kind": "rider", "id": rider_id, "name": r.get("name")})
+        conv = {"id": new_id(), "key": key, "kind": kind, "order_id": order_id, "closed": False,
+                "participants": participants, "messages": [msg], "created_at": now_iso(), "updated_at": now_iso()}
+        await db.conversations.insert_one(conv)
+    else:
+        if conv.get("closed"): raise HTTPException(400, "Conversation fermée")
+        await db.conversations.update_one({"id": conv["id"]}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso()}})
+    return {"ok": True, "conversation_id": conv["id"], "message": msg}
+
+@api.get("/public/account/messages")
+async def customer_messages(c: dict = Depends(get_customer)):
+    rows = await db.conversations.find({"participants.id": c["id"]}).sort("updated_at", -1).to_list(100)
+    return clean(rows)
+
+@api.post("/public/account/messages/send")
+async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
+    conv_id = body.get("conversation_id")
+    conv = await db.conversations.find_one({"id": conv_id, "participants.id": c["id"]})
+    if not conv: raise HTTPException(404)
+    if conv.get("closed"): raise HTTPException(400, "Conversation fermée")
+    msg = {"id": new_id(), "at": now_iso(), "from_id": c["id"], "from_name": c.get("name"), "from_kind": "customer",
+           "text": body.get("text",""), "image": body.get("image"), "read_by": [c["id"]]}
+    await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso()}})
+    return {"ok": True, "message": msg}
+
+@api.post("/messages/broadcast")
+async def broadcast(body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    """Broadcast to customers (segment or list) or riders. Creates one conversation per target."""
+    target = body.get("target", "all")  # all | segment:ID | ids
+    text = body.get("text", "")
+    image = body.get("image")
+    valid_until = body.get("valid_until")
+    ids: List[str] = []
+    if target == "all":
+        async for c in db.customers.find({"status": "active"}, {"id": 1}): ids.append(c["id"])
+    elif isinstance(target, list):
+        ids = target
+    elif isinstance(target, str) and target.startswith("segment:"):
+        seg = await db.customer_segments.find_one({"id": target.split(":",1)[1]})
+        ids = (seg or {}).get("customer_ids") or []
+    count = 0
+    for cid in ids:
+        await send_message({"customer_id": cid, "text": text, "image": image, "kind": "boutique_cliente"}, user)
+        count += 1
+    return {"ok": True, "count": count, "valid_until": valid_until}
+
+# Auto-close customer↔rider convos when order status becomes "livree"
+async def _close_rider_customer_convs(order_id: str):
+    await db.conversations.update_many({"order_id": order_id, "kind": "cliente_livreur"}, {"$set": {"closed": True, "closed_at": now_iso()}})
+
 # ---------- Orders ----------
 def gen_code():
     return f"DN-{datetime.now().strftime('%y%m%d')}-{random.randint(1000,9999)}"
