@@ -168,7 +168,8 @@ export default function App() {
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
               <Route path="approbations" element={<ErrorBoundary><Approvals/></ErrorBoundary>} />
               <Route path="audit" element={<ErrorBoundary><Audit/></ErrorBoundary>} />
-              <Route path="pointage" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
+              <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
+              <Route path="presence" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
               <Route path="apparence" element={<Navigate to="/console/site?tab=apparence" replace/>} />
               <Route path="accueil" element={<Navigate to="/console/site?tab=accueil" replace/>} />
               <Route path="apercu" element={<Navigate to="/boutique" replace/>} />

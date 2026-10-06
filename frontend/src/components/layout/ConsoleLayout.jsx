@@ -53,7 +53,8 @@ const SECTIONS = [
     { to: "/console/roles", icon: Shield, label: "Rôles & permissions", adminOnly: true },
     { to: "/console/approbations", icon: CheckCircle2, label: "À approuver", adminOnly: true },
     { to: "/console/audit", icon: ClipboardList, label: "Journal d'audit", adminOnly: true },
-    { to: "/console/pointage", icon: Calendar, label: "Pointage" },
+    { to: "/console/pointage", icon: Calendar, label: "Pointage (kiosk)" },
+    { to: "/console/presence", icon: UserCheck, label: "Présence & géofence", adminOnly: true },
   ]},
   { label: "Site vitrine", items: [
     { to: "/console/site?tab=apparence", icon: Palette, label: "Apparence" },

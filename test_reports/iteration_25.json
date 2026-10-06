@@ -1,0 +1,34 @@
+{
+  "summary": "Sprint-2 P1 testing. Backend 6/6 pytest green: punch-kiosk with selfie (has_selfie=true + persisted in attendance doc), punch-kiosk without selfie (has_selfie=false), invalid PIN -> 403, scan-incomplete on /orders/{id}/status-v3 -> 400, full scanned_items submit -> 200 + status transitions to 'prete'. Frontend Preparation page fully functional: /console/preparation renders preparation-page + 3 KPI testids (nouvelle/confirmee/prep), 27 prep-card-{code} tiles visible after seeding one order back to en_preparation via admin status-v3 override. PrepRunner opens, prep-scan-input focused, prep-mark-ready DISABLED initially, bogus SKU scan toasts 'Article non trouvé dans cette commande', prep-manual-{idx} opens prep-manual-modal with prep-manual-reason select (5 preset + 'Autre'), choosing 'Autre' reveals prep-manual-custom input, prep-manual-confirm closes modal, line turns amber with reason; after ALL lines manually overridden prep-mark-ready becomes ENABLED and PATCH /orders/{id}/status-v3 succeeds returning to list. Regression (/console/commandes, approbations, audit, roles, sessions-caisse, pos, dashboard, statistiques): all 200, no crash. HOWEVER /console/pointage still renders the OLD legacy admin Pointage (presence/geofence/non-pointés) because the new Kiosk component is imported in App.js line 48 but has NO <Route> entry; it is unreachable, so webcam/selfie flow cannot be tested in UI. Backend selfie persistence is proven via API tests.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Routing / Kiosk", "issue": "Kiosk component imported but never mounted. /console/pointage still routes to legacy Pointage. The new webcam/selfie kiosk is dead code and unreachable from the sidebar.", "selector": "App.js line 171 route 'pointage' -> <Pointage/> instead of <Kiosk/>", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Guided tour", "issues": ["Still auto-opens as overlay (data-testid='guided-tour') and intercepts clicks on first visit of each page — pre-existing from iter24, blocks tests until localStorage dina_tour_* flags are pre-seeded."]},
+      {"screen": "Hydration (console warning)", "issues": ["Pre-existing: '<span> cannot be a child of <option>' hydration warnings still logged by PeriodSelector, Audit user filter, RolesPermissions bulk selects — tracked but non-blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter25_prep_kiosk.py",
+    "/app/test_reports/pytest/iter25.xml"
+  ],
+  "action_items": [
+    "Add a Route for Kiosk at /console/pointage (and move legacy Pointage to a new path such as /console/presence) OR introduce /console/kiosk route and update sidebar label. Currently the new webcam+selfie kiosk UI is unreachable even though the Kiosk.jsx component itself compiles cleanly."
+  ],
+  "critical_code_review_comments": [
+    "App.js: `import Kiosk from '@/pages/console/Kiosk'` is unused — ESLint should have flagged it. Route for Kiosk missing entirely.",
+    "Preparation.jsx matches() function uses `s.includes(sku) && sku.length > 2` which can produce false positives for very similar SKUs; consider stricter exact-equality on tokens.",
+    "Preparation.jsx submits status-v3 then falls back to legacy status endpoint on error — the legacy path skips scan verification entirely; consider surfacing the backend error instead of silently downgrading enforcement."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter25_prep_kiosk.py"],
+  "success_rate": {"backend": "100% (6/6)", "frontend": "Preparation 100% · Kiosk UI 0% (route missing) · Regression 8/8 pages load"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! (PIN 1234) used successfully.",
+  "seed_data_creation": "Reverted one order DN-261006-3625 from 'prete' back to 'en_preparation' via admin PATCH /orders/{id}/status-v3 override, then marked it 'prete' again via the PrepRunner UI (all items manually overridden).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Guided tour overlay (data-testid='guided-tour') blocks clicks on first visit — pre-seed localStorage keys dina_tour_<page>='1' before login. Kiosk is reachable only AFTER main agent wires Route path='pointage' element={<Kiosk/>} in App.js (or similar). Backend selfie storage and status-v3 scan enforcement are already proven green by /app/backend/tests/test_iter25_prep_kiosk.py.",
+  "rca of the issue": "In App.js the new Kiosk import was added (line 48) but the matching <Route path='pointage' element={<Kiosk/>}/> replacement was never applied; legacy Pointage still occupies that path. Fix: swap line 171 to use <Kiosk/> and relocate legacy Pointage to '/console/presence' if still needed."
+}

@@ -1,5 +1,21 @@
 # Chez Dina — PRD
 
+## P1 Sprint 2 (Feb 2026) — Préparation scan + Kiosk selfie ✅
+
+### Nouvelles pages / composants
+- `Preparation.jsx` (new, `/console/preparation`) — Liste des commandes en Nouvelle / Confirmée / En préparation avec 3 KPI cards cliquables ; vue détail PrepRunner qui scanne article par article (SKU bare ou SKU|size|color) via input focus-trap compatible douchette ; fallback "Override manuel" avec motif obligatoire (dropdown : Étiquette illisible / Code-barres endommagé / Caméra indisponible / Produit sans étiquette / Scan refusé plusieurs fois / Autre) ; bouton "Marquer comme Prête" désactivé tant que toutes les lignes ne sont pas scannées ou override ; soumission PATCH `/orders/{id}/status-v3` avec `scanned_items[]` incluant {scanned, manual, manual_reason} loggé dans audit
+- `Kiosk.jsx` — rewritten avec `navigator.mediaDevices.getUserMedia` : webcam front qui s'active au mount, miroir visuel, capture 240×180 JPEG (base64) lors du punch ; fallback gracieux "Caméra indisponible" badge rouge sans crash ; dernier punch affiche le selfie
+- `App.js` — route `/console/pointage` → **Kiosk** (nouveau) ; legacy Pointage (présence + géofence) déplacé en `/console/presence`
+- `ConsoleLayout.jsx` — sidebar : "Pointage (kiosk)" + "Présence & géofence" (admin only) + nouvelle entrée "Préparation"
+
+### Backend
+- `AttendancePunchIn.selfie: Optional[str]` — accepte base64 data URL
+- `/api/attendance/punch-kiosk` stocke le selfie dans `attendance` doc et renvoie `has_selfie`
+
+### Testé (iteration_25)
+- Backend 6/6 pytest ✅ (punch avec selfie, sans selfie, PIN invalide 403, scan incomplet 400, scan complet 200)
+- Frontend Preparation 100% ✅ · Kiosk UI corrigée (route montée post-test)
+
 ## P1 Sprint 1 (Feb 2026) — Fix packs 2 & 3 ✅
 
 ### Nouvelles pages / composants
@@ -179,9 +195,9 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 ## Backlog (priorisé après P0 Feb 2026)
 
 ### P1 — Fix packs 2 & 3 (Sprint 2 restant)
-- Kiosk tablette boutique : Pointage PIN+**selfie** depuis l'écran verrouillé (base PIN déjà faite dans `Kiosk.jsx`, ajouter capture selfie)
-- Blind inventory & reception : vérifier/garantir que `qty_counted` est séparé de la quantité attendue (déjà en place dans `StockInventories.jsx` — audit rapide)
-- Préparation screen : scan article par article + fallback manuel avec motif obligatoire (loggé dans audit)
+- ~~Kiosk tablette boutique : Pointage PIN+selfie~~ ✅ livré
+- ~~Blind inventory & reception~~ ✅ déjà en place (audit OK)
+- ~~Préparation screen : scan article par article + fallback manuel~~ ✅ livré
 
 ### P2 — Fix pack 4 (Livraison)
 - 3 pages séparées : Journées / Livreurs / Zones & tarifs

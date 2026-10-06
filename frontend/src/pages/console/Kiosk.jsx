@@ -18,7 +18,7 @@ export default function Kiosk() {
   const canvasRef = useRef(null);
   const timerRef = useRef(null);
 
-  const load = () => api.get("/attendance/today").then(r => setPunches(r.data || [])).catch(() => { });
+  const load = () => api.get("/attendance/today-kiosk").then(r => setPunches(Array.isArray(r.data) ? r.data : (r.data?.punches || []))).catch(() => { });
   useEffect(() => { load(); const t = setInterval(load, 15000); return () => clearInterval(t); }, []);
 
   // Start webcam when entering the page; stop on unmount.
