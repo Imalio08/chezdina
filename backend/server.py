@@ -106,6 +106,20 @@ class ReconcileIn(BaseModel): order_id: str; collected: bool
 class StockAlertIn(BaseModel): product_id: str; size: Optional[str] = None; phone: str
 class UserIn(BaseModel):
     name: str; email: str; password: str; role: str; phone: str = ""; pin: str = ""
+class PinAuthIn(BaseModel):
+    pin: str
+    action: str  # "discount_over_limit", "void", "refund"
+    amount: Optional[float] = None
+class CashMovementIn(BaseModel):
+    type: str  # "in" or "out"
+    amount: float
+    reason: str
+    note: Optional[str] = ""
+class HoldIn(BaseModel):
+    items: List[Dict[str, Any]]
+    customer: Optional[Dict[str, Any]] = None
+    note: Optional[str] = ""
+    expires_in_hours: Optional[int] = 24
 
 # ---------- Auth ----------
 @api.post("/auth/login")
@@ -748,6 +762,76 @@ async def dashboard_actions(user: dict = Depends(get_user)):
         "paniers_abandonnes": {"count": paniers, "link":"/console/alertes"},
         "avis_a_valider": {"count": reviews_pending, "link":"/console/avis"},
     }
+
+# ---------- POS cash control: PIN auth, movements, holds ----------
+@api.post("/pos/pin-authorize")
+async def pin_authorize(body: PinAuthIn, user: dict = Depends(get_user)):
+    """Verify a manager/admin PIN to authorize a sensitive POS action. Logs approval."""
+    approver = await db.users.find_one({"attendance_code": body.pin.strip(), "role": {"$in": ["admin","manager"]}, "active": True})
+    if not approver:
+        raise HTTPException(403, "PIN invalide ou droits insuffisants")
+    log = {
+        "id": new_id(), "action": body.action, "amount": body.amount,
+        "requested_by": user.get("id"), "requested_by_name": user.get("name"),
+        "approved_by": approver.get("id"), "approved_by_name": approver.get("name"),
+        "created_at": now_iso(),
+    }
+    await db.pos_authorizations.insert_one(log)
+    return {"ok": True, "approver": approver.get("name"), "approval_id": log["id"]}
+
+@api.post("/cash-movements")
+async def create_cash_movement(body: CashMovementIn, user: dict = Depends(get_user)):
+    if body.type not in ("in", "out"): raise HTTPException(400, "Type invalide")
+    doc = {
+        "id": new_id(), "type": body.type, "amount": float(body.amount),
+        "reason": body.reason, "note": body.note or "",
+        "user_id": user.get("id"), "user_name": user.get("name"),
+        "created_at": now_iso(),
+    }
+    await db.cash_movements.insert_one(doc)
+    return clean(doc)
+
+@api.get("/cash-movements")
+async def list_cash_movements(user: dict = Depends(get_user), date: Optional[str] = None):
+    """List today's movements by default. date='YYYY-MM-DD' for a specific day."""
+    from datetime import datetime, timezone, timedelta
+    if date:
+        try: d = datetime.fromisoformat(date).replace(tzinfo=timezone.utc)
+        except Exception: d = datetime.now(timezone.utc)
+    else: d = datetime.now(timezone.utc)
+    s = d.replace(hour=0,minute=0,second=0,microsecond=0).isoformat()
+    e = (d.replace(hour=0,minute=0,second=0,microsecond=0) + timedelta(days=1)).isoformat()
+    rows = await db.cash_movements.find({"created_at": {"$gte": s, "$lt": e}}).sort("created_at", -1).to_list(500)
+    # Compute expected cash: + cash sales + ins − outs − cash refunds
+    orders = await db.orders.find({"created_at": {"$gte": s, "$lt": e}, "payment_method": "cash", "status": {"$ne": "annulee"}}).to_list(1000)
+    cash_sales = sum(o.get("total",0) for o in orders)
+    ins = sum(r["amount"] for r in rows if r["type"]=="in")
+    outs = sum(r["amount"] for r in rows if r["type"]=="out")
+    return {"movements": clean(rows), "cash_sales": cash_sales, "ins": ins, "outs": outs, "expected": cash_sales + ins - outs}
+
+@api.post("/pos/holds")
+async def create_hold(body: HoldIn, user: dict = Depends(get_user)):
+    from datetime import datetime, timezone, timedelta
+    exp = (datetime.now(timezone.utc) + timedelta(hours=body.expires_in_hours or 24)).isoformat()
+    doc = {
+        "id": new_id(), "items": body.items, "customer": body.customer,
+        "note": body.note or "", "user_name": user.get("name"),
+        "created_at": now_iso(), "expires_at": exp, "resumed": False,
+    }
+    await db.pos_holds.insert_one(doc)
+    return clean(doc)
+
+@api.get("/pos/holds")
+async def list_holds(user: dict = Depends(get_user)):
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc).isoformat()
+    rows = await db.pos_holds.find({"resumed": False, "expires_at": {"$gte": now}}).sort("created_at", -1).to_list(100)
+    return clean(rows)
+
+@api.delete("/pos/holds/{hid}")
+async def delete_hold(hid: str, user: dict = Depends(get_user)):
+    await db.pos_holds.update_one({"id": hid}, {"$set": {"resumed": True, "resumed_at": now_iso()}})
+    return {"ok": True}
 
 @api.get("/stats/zones")
 async def stats_zones(user: dict = Depends(get_user), period: str = "30d"):

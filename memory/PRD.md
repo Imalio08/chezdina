@@ -3,6 +3,30 @@
 ## Problem Statement
 **Chez Dina** — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). Single codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. **Français uniquement**, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
+## Session 5 (Feb 6 2026) — Section 5 POS cash control
+### Nouveaux endpoints backend (contrôle caisse)
+- **`POST /api/pos/pin-authorize`** → vérifie le PIN d'un admin/gérante actif (`attendance_code` + role in admin/manager) et logge l'approbation dans `pos_authorizations` (requested_by/approved_by/action/amount). Retourne 403 si PIN invalide.
+- **`POST /api/cash-movements`** + **`GET /api/cash-movements?date=YYYY-MM-DD`** → entrées/sorties d'espèces. Le GET renvoie aussi `cash_sales` (ventes espèces du jour), `ins`, `outs` et **`expected`** = cash_sales + ins − outs, qui est le montant attendu en caisse au closing.
+- **`POST /api/pos/holds`** + **`GET /api/pos/holds`** + **`DELETE /api/pos/holds/{id}`** → commandes ouvertes (hold cart). Expiration automatique après N heures (défaut 24h).
+
+### Nouveau composant `/app/frontend/src/components/pos/POSExtensions.jsx`
+- **`PinAuthModal`** : modal centré avec input PIN à 4-6 chiffres (tracking large façon code sécurisé), affiche l'action demandée + montant, erreur en FR si PIN invalide, toast de succès avec nom de l'approbateur.
+- **`CashDrawer`** : panel qui glisse du bas (mobile) ou centré (desktop) avec 4 KPI (Ventes espèces, Entrées, Sorties, **Attendu en caisse** en rouge), formulaire Nouveau mouvement (toggle Entrée/Sortie, montant, motif dropdown avec 4-5 presets, note), historique du jour avec icônes vertes/rouges.
+- **`HoldsPanel`** : liste des commandes ouvertes avec cliente/montant/items/note/user/date, boutons Reprendre (restore cart + customer) et Supprimer.
+
+### POS.jsx mis à jour
+- Deux nouveaux chips header **"Ouvertes" (PauseCircle)** et **"Caisse" (Banknote)** à côté de la search bar.
+- Nouveau bouton **"Mettre en attente" (PauseCircle)** sur le panier (quand items > 0) qui prompt une note puis POST `/pos/holds` et clear le cart.
+- **Garde-fou remise > 20%** : si l'utilisatrice tape une remise supérieure à 20% du sous-total, la modal PIN s'ouvre automatiquement et bloque jusqu'à validation par le PIN d'une gérante. Après validation, l'icône Shield verte apparaît à côté du champ pour montrer que c'est autorisé.
+- `onResume` reconstruit le cart item par item + attache la cliente d'origine.
+
+### Testé en curl
+- PIN 1234 (admin) → `ok=True, approver=Aïcha Ouattara` ✅
+- PIN 9999 → 403 "PIN invalide ou droits insuffisants" ✅
+- Cash entrée 50 000 FCFA fond de caisse → stocké ✅
+- Cash summary → M:1, cash_sales:0, ins:50000, outs:0, expected:50000 ✅
+- Hold create → ID retourné · Hold list → 1 ouverte avec cliente Fatou · Delete → ok ✅
+
 ## Session 4 (Feb 6 2026) — Section 4 Dashboard & Statistiques v2
 ### Dashboard "À traiter maintenant"
 - Nouveau composant `/app/frontend/src/components/dashboard/ActionItems.jsx` au-dessus des KPI, mis à jour chaque minute.

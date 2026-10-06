@@ -3,7 +3,8 @@ import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
-import { Search, Trash2, Plus, Minus, UserPlus, Printer, CreditCard, Smartphone, Wallet, X, Store, Truck, Home as HomeIcon, Share2, MessageCircle } from "lucide-react";
+import { Search, Trash2, Plus, Minus, UserPlus, Printer, CreditCard, Smartphone, Wallet, X, Store, Truck, Home as HomeIcon, Share2, MessageCircle, PauseCircle, Banknote, Shield } from "lucide-react";
+import { PinAuthModal, CashDrawer, HoldsPanel } from "@/components/pos/POSExtensions";
 
 const ZONES_DEFAULT = {"Cocody":1500,"Riviera":2000,"Angré":2000,"Plateau":1000,"Marcory":1500,"Zone 4":1500,"Treichville":1500,"Koumassi":2000,"Yopougon":2500,"Abobo":3000,"Adjamé":1500,"Port-Bouët":2500,"Bingerville":3000,"Songon":3500,"Grand-Bassam":5000};
 
@@ -13,6 +14,10 @@ export default function POS() {
   const [zones, setZones] = useState([]);
   const [q, setQ] = useState("");
   const [cat, setCat] = useState("Tous");
+  const [showCash, setShowCash] = useState(false);
+  const [showHolds, setShowHolds] = useState(false);
+  const [pinAuth, setPinAuth] = useState(null); // {action, actionLabel, amount, onApprove}
+  const [holdNote, setHoldNote] = useState("");
   const [customer, setCustomer] = useState(null);
   const [custQ, setCustQ] = useState("");
   const [custResults, setCustResults] = useState([]);
@@ -73,6 +78,8 @@ export default function POS() {
       <div className="dina-card-white p-4 flex flex-col min-h-0">
         <div className="flex items-center gap-2 mb-3">
           <div className="relative flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]"/><input className="dina-input pl-9" placeholder="Rechercher ou scanner un code-barres…" value={q} onChange={e=>setQ(e.target.value)} data-testid="pos-search"/></div>
+          <button onClick={()=>setShowHolds(true)} className="dina-chip" title="Commandes ouvertes" data-testid="pos-holds-open"><PauseCircle size={13}/>Ouvertes</button>
+          <button onClick={()=>setShowCash(true)} className="dina-chip" title="Mouvements de caisse" data-testid="pos-cash-open"><Banknote size={13}/>Caisse</button>
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-2 mb-3">
           {cats.map(c=><button key={c} onClick={()=>setCat(c)} className={`px-3 py-1.5 text-xs rounded-full border whitespace-nowrap ${cat===c?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec] text-[#666]"}`} data-testid={`pos-cat-${c}`}>{c}</button>)}
@@ -101,6 +108,11 @@ export default function POS() {
           <div className="font-semibold">Panier · <span className="text-[#666] text-xs">{cart.length} article{cart.length>1?"s":""}</span></div>
           <div className="flex items-center gap-1">
             {cart.length>0 && customer && <button onClick={shareCart} className="text-xs text-[#1f8a4c] flex items-center gap-1" data-testid="pos-share"><Share2 size={11}/>Partager</button>}
+            {cart.length>0 && <button onClick={async()=>{
+              const note = prompt("Note pour cette commande ouverte ? (optionnel)") || "";
+              try { await api.post("/pos/holds", { items: cart, customer, note, expires_in_hours: 24 }); toast.success("Panier mis en attente"); clearCart(); }
+              catch { toast.error("Erreur"); }
+            }} className="text-xs text-[#5867fd] flex items-center gap-1" data-testid="pos-hold"><PauseCircle size={11}/>Mettre en attente</button>}
             {cart.length>0 && <button onClick={clearCart} className="text-xs text-[#c62828]" data-testid="pos-clear">Vider</button>}
           </div>
         </div>
@@ -151,7 +163,26 @@ export default function POS() {
         <div className="border-t border-[#ececec] pt-3 space-y-1.5 text-sm">
           <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(subtotal)}</span></div>
           {mode==="delivery" && <div className="flex justify-between"><span className="text-[#666]">Livraison · {zone}</span><span className="tabular">{fcfa(fee)}</span></div>}
-          <div className="flex justify-between items-center"><span className="text-[#666]">Remise</span><input type="number" className="dina-input w-24 text-right tabular !py-1" value={discount} onChange={e=>setDiscount(e.target.value)} data-testid="pos-discount"/></div>
+          <div className="flex justify-between items-center">
+            <span className="text-[#666]">Remise</span>
+            <div className="flex items-center gap-1">
+              <input type="number" className="dina-input w-24 text-right tabular !py-1" value={discount} onChange={e=>{
+                const v = Number(e.target.value||0);
+                // Over-limit protection: 20% of subtotal threshold triggers PIN auth
+                const limit = subtotal * 0.20;
+                if (v > limit && v > Number(discount||0)) {
+                  setPinAuth({
+                    action: "discount_over_limit", actionLabel: `Remise > 20% (limite ${fcfa(limit)})`,
+                    amount: v,
+                    onApprove: () => { setDiscount(v); setPinAuth(null); },
+                  });
+                  return;
+                }
+                setDiscount(e.target.value);
+              }} data-testid="pos-discount"/>
+              {Number(discount||0) > subtotal * 0.20 && <Shield size={12} className="text-[#1f8a4c]" title="Autorisé par PIN"/>}
+            </div>
+          </div>
           <div className="flex justify-between font-semibold text-base"><span>Total</span><span className="tabular text-[#b02a2a]">{fcfa(total)}</span></div>
         </div>
 
@@ -166,6 +197,15 @@ export default function POS() {
 
       {showNewCust && <NewCustomerModal onClose={()=>setShowNewCust(false)} onCreated={(c)=>{setCustomer(c);setShowNewCust(false);}}/>}
       {receipt && <Receipt data={receipt} onClose={()=>setReceipt(null)}/>}
+      {showCash && <CashDrawer onClose={()=>setShowCash(false)}/>}
+      {showHolds && <HoldsPanel onClose={()=>setShowHolds(false)} onResume={(h)=>{
+        clearCart();
+        (h.items||[]).forEach(it => addToCart({id:it.product_id,name:it.name,image:it.image,price:it.price,sizes:[it.size],colors:[it.color]}, it.qty, it.size, it.color));
+        if (h.customer) setCustomer(h.customer);
+        setShowHolds(false);
+        toast.success(`Panier repris · ${h.customer?.name||"sans cliente"}`);
+      }}/>}
+      {pinAuth && <PinAuthModal {...pinAuth} onCancel={()=>setPinAuth(null)}/>}
     </div>
   );
 }
