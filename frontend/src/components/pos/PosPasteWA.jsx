@@ -1,0 +1,73 @@
+import React, { useState } from "react";
+import api from "@/lib/api";
+import { toast } from "sonner";
+import { X, Sparkles } from "lucide-react";
+import { fcfa } from "@/lib/format";
+
+/** Paste a WhatsApp order message, Dina IA parses it into cart items + customer hints. */
+export default function PosPasteWA({ onApply, onClose }) {
+  const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [parsed, setParsed] = useState(null);
+
+  const parse = async () => {
+    if (!text.trim()) return toast.error("Collez un message WhatsApp");
+    setLoading(true);
+    try {
+      const { data } = await api.post("/ai/parse-order", { text });
+      if (data.error) toast.error(data.error);
+      setParsed(data);
+    } catch { toast.error("IA indisponible"); } finally { setLoading(false); }
+  };
+
+  const apply = () => {
+    if (!parsed) return;
+    const items = (parsed.items||[]).filter(it => it.product_id).map(it => ({
+      product_id: it.product_id, name: it.name, size: it.size || null, color: it.color || null,
+      qty: Number(it.qty||1), price: Number(it.price||0), image: it.image,
+    }));
+    if (!items.length) return toast.error("Aucun article identifié avec certitude");
+    onApply({ items, customer_hint: parsed.customer_hint || {} });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 grid place-items-end sm:place-items-center z-50 p-0 sm:p-4" onClick={onClose} data-testid="pos-paste-wa">
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-xl max-h-[92vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
+        <div className="flex items-center justify-between p-5 border-b border-[#ececec] dark:border-[#2a2a2a]">
+          <div className="flex items-center gap-2"><div className="w-9 h-9 rounded-lg bg-[#fff5f5] text-[#b02a2a] grid place-items-center"><Sparkles size={16}/></div><div><div className="font-serif text-lg">Coller une commande WhatsApp</div><div className="text-xs text-[#666]">Dina IA remplit le panier automatiquement</div></div></div>
+          <button onClick={onClose}><X size={18}/></button>
+        </div>
+        <div className="p-5 space-y-3">
+          <textarea className="dina-input" rows={6} placeholder={`Collez le message de la cliente ici. Ex.:\n\n« Bonjour, je veux la mule Nora noire en 39 et le sac Awa, livré à Angré »`} value={text} onChange={e=>setText(e.target.value)} data-testid="paste-wa-text"/>
+          <button onClick={parse} disabled={loading||!text.trim()} className="dina-btn-primary w-full" data-testid="paste-wa-parse"><Sparkles size={14}/>{loading?"Analyse en cours…":"Analyser avec Dina IA"}</button>
+
+          {parsed && (
+            <div className="mt-3 border border-[#ececec] dark:border-[#2a2a2a] rounded-xl p-3">
+              <div className="text-[10px] uppercase font-semibold text-[#666] mb-2">Articles identifiés · confiance {(parsed.confidence*100||0).toFixed(0)}%</div>
+              {(parsed.items||[]).length === 0 ? <div className="text-sm text-[#c62828]">Aucun article trouvé — vérifiez l'orthographe ou ajoutez-les manuellement.</div> :
+                (parsed.items||[]).map((it, i) => (
+                  <div key={i} className={`flex items-center gap-2 py-1.5 ${!it.product_id?"opacity-50":""}`}>
+                    <div className="w-10 h-10 rounded bg-[#fff5f5] overflow-hidden shrink-0">{it.image && <img src={it.image} alt="" className="w-full h-full object-cover"/>}</div>
+                    <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{it.qty}× {it.name || "Produit inconnu"}</div><div className="text-xs text-[#666]">{[it.size,it.color].filter(Boolean).join(" · ") || "sans variante"}{!it.product_id?" · ⚠ non identifié":""}</div></div>
+                    {it.price>0 && <div className="tabular text-sm font-semibold">{fcfa(it.qty*it.price)}</div>}
+                  </div>
+                ))
+              }
+              {parsed.customer_hint && (parsed.customer_hint.name || parsed.customer_hint.phone || parsed.customer_hint.zone) && (
+                <div className="mt-2 pt-2 border-t border-[#ececec] dark:border-[#2a2a2a] text-xs text-[#666]">
+                  <b>Cliente :</b> {parsed.customer_hint.name || "?"}{parsed.customer_hint.phone?` · ${parsed.customer_hint.phone}`:""}{parsed.customer_hint.zone?` · ${parsed.customer_hint.zone}`:""}
+                  {parsed.customer_hint.address && <div className="mt-0.5"><b>Adresse :</b> {parsed.customer_hint.address}</div>}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="sticky bottom-0 bg-white dark:bg-[#1a1a1a] border-t border-[#ececec] dark:border-[#2a2a2a] p-4 flex gap-2">
+          <button onClick={onClose} className="dina-btn-secondary flex-1">Fermer</button>
+          <button onClick={apply} disabled={!parsed || !(parsed.items||[]).filter(i=>i.product_id).length} className="dina-btn-primary flex-1" data-testid="paste-wa-apply">Remplir le panier</button>
+        </div>
+      </div>
+    </div>
+  );
+}

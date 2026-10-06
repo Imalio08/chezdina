@@ -1873,7 +1873,7 @@ async def public_best_sellers(limit: int = 12):
     ]
     rows = await db.orders.aggregate(pipeline).to_list(limit)
     ids = [r["_id"] for r in rows if r.get("_id")]
-    products = await db.products.find({"id": {"$in": ids}, "active": True}).to_list(limit)
+    products = await db.products.find({"id": {"$in": ids}, "$or": [{"active": True}, {"active": {"$exists": False}}], "status": {"$nin": ["inactif","archive","brouillon"]}}).to_list(limit)
     pmap = {p["id"]: p for p in products}
     sold_map = {r["_id"]: r["sold"] for r in rows}
     out = []
@@ -1889,7 +1889,7 @@ async def public_search_suggestions(q: str = ""):
     import unicodedata
     def norm(s): return "".join(c for c in unicodedata.normalize("NFD", s or "") if unicodedata.category(c) != "Mn").lower()
     nq = norm(q)
-    products = await db.products.find({"active": True}).to_list(1500)
+    products = await db.products.find({"$or": [{"active": True}, {"active": {"$exists": False}}], "status": {"$nin": ["inactif","archive","brouillon"]}}).to_list(1500)
     scored = []
     for p in products:
         hay = f"{norm(p.get('name',''))} {norm(p.get('brand',''))} {norm(p.get('category',''))} {norm(p.get('sku',''))}"
@@ -1916,7 +1916,7 @@ async def public_lookbook():
     s = await db.site_settings.find_one({"id":"main"}) or {}
     lb = s.get("lookbook") or []
     if not lb:
-        prods = await db.products.find({"active": True}).limit(4).to_list(4)
+        prods = await db.products.find({"$or": [{"active": True}, {"active": {"$exists": False}}]}).limit(4).to_list(4)
         lb = [{"image": "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200", "title": "Look rentrée", "product_ids": [p["id"] for p in prods]}]
     return clean(lb)
 
@@ -1967,6 +1967,169 @@ async def sync_batch(body: Dict[str, Any], user: dict = Depends(get_user)):
         except Exception as e:
             results.append({"id": op.get("id"), "ok": False, "err": str(e)})
     return {"results": results, "synced_at": now_iso()}
+
+# ---------- POS v3: shortcuts, shared-cart, waitlist, parse-order ----------
+@api.get("/pos/shortcuts")
+async def pos_shortcuts(user: dict = Depends(get_user), limit: int = 8):
+    """Top best-selling products of last 7 days for quick POS access."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    pipeline = [
+        {"$match": {"created_at": {"$gte": cutoff}, "status": {"$ne": "annulee"}}},
+        {"$unwind": "$items"},
+        {"$group": {"_id": "$items.product_id", "sold": {"$sum": "$items.qty"}}},
+        {"$sort": {"sold": -1}}, {"$limit": limit}
+    ]
+    rows = await db.orders.aggregate(pipeline).to_list(limit)
+    ids = [r["_id"] for r in rows if r.get("_id")]
+    products = await db.products.find({"id": {"$in": ids}}).to_list(limit)
+    pmap = {p["id"]: p for p in products}
+    sold_map = {r["_id"]: r["sold"] for r in rows}
+    out = []
+    for pid in ids:
+        if pid in pmap:
+            p = pmap[pid]; p["sold_count"] = sold_map.get(pid, 0); out.append(p)
+    return clean(out)
+
+@api.post("/pos/shared-cart")
+async def pos_create_shared_cart(body: Dict[str, Any], user: dict = Depends(get_user)):
+    """Create a shareable cart link for a customer to review & confirm via WhatsApp."""
+    exp_h = int(body.get("expires_in_hours", 48))
+    doc = {
+        "id": new_id(), "items": body.get("items", []), "customer": body.get("customer"),
+        "mode": body.get("mode", "store"), "zone": body.get("zone"),
+        "delivery_fee": int(body.get("delivery_fee", 0)), "discount": int(body.get("discount", 0)),
+        "note": body.get("note", ""), "address": body.get("address"),
+        "created_at": now_iso(), "created_by_id": user.get("id"), "created_by_name": user.get("name"),
+        "expires_at": (datetime.now(timezone.utc) + timedelta(hours=exp_h)).isoformat(),
+        "confirmed": False, "confirmed_at": None, "order_id": None,
+    }
+    await db.shared_carts.insert_one(doc)
+    return {"id": doc["id"], "link": f"/boutique/panier-partage/{doc['id']}", "expires_at": doc["expires_at"]}
+
+@api.get("/public/shared-cart/{sid}")
+async def public_shared_cart(sid: str):
+    sc = await db.shared_carts.find_one({"id": sid})
+    if not sc: raise HTTPException(404, "Panier introuvable")
+    if sc.get("confirmed"): return {"error": "already_confirmed", "order_code": (await db.orders.find_one({"id": sc.get("order_id")}) or {}).get("code")}
+    if sc.get("expires_at") and sc["expires_at"] < now_iso(): return {"error": "expired"}
+    return clean(sc)
+
+@api.post("/public/shared-cart/{sid}/confirm")
+async def confirm_shared_cart(sid: str, body: Dict[str, Any]):
+    sc = await db.shared_carts.find_one({"id": sid})
+    if not sc: raise HTTPException(404)
+    if sc.get("confirmed"): raise HTTPException(400, "Déjà confirmé")
+    if sc.get("expires_at") and sc["expires_at"] < now_iso(): raise HTTPException(400, "Expiré")
+    items = body.get("items") or sc.get("items", [])
+    sub = sum(int(it.get("qty",1))*int(it.get("price",0)) for it in items)
+    fee = int(sc.get("delivery_fee",0)); disc = int(sc.get("discount",0))
+    total = sub + fee - disc
+    code = gen_code()
+    doc = {
+        "id": new_id(), "code": code, "items": items, "customer": sc.get("customer"),
+        "channel": "shared_cart", "payment_method": body.get("payment_method","cod"),
+        "delivery_zone": sc.get("zone"), "delivery_fee": fee, "discount": disc,
+        "note": sc.get("note",""), "mode": sc.get("mode","delivery"), "store_id":"store-cocody",
+        "subtotal": sub, "total": total, "status":"confirmee" if sc.get("mode")=="delivery" else "livree",
+        "payment_status":"en_attente", "created_at": now_iso(),
+        "created_by": sc.get("created_by_name"), "placed_by_agent": sc.get("created_by_name"),
+        "timeline":[{"status":"confirmee","at":now_iso(),"by":f"Cliente ({sc.get('customer',{}).get('name','?')})"}],
+    }
+    await db.orders.insert_one(doc)
+    for it in items:
+        await db.products.update_one({"id": it["product_id"]}, {"$inc": {"stock": -int(it.get("qty",1))}})
+        if it.get("size"):
+            await db.products.update_one({"id": it["product_id"]}, {"$inc": {f"stock_by_size.{it['size']}": -int(it.get("qty",1))}})
+    await db.shared_carts.update_one({"id": sid}, {"$set": {"confirmed": True, "confirmed_at": now_iso(), "order_id": doc["id"]}})
+    return {"ok": True, "code": code, "order_id": doc["id"]}
+
+class WaitlistIn(BaseModel):
+    product_id: str
+    size: Optional[str] = None
+    phone: str
+    name: Optional[str] = None
+
+@api.post("/waitlist")
+async def waitlist_add(body: WaitlistIn, user: dict = Depends(get_user)):
+    doc = {"id": new_id(), "product_id": body.product_id, "size": body.size,
+           "phone": body.phone, "name": body.name or "Cliente",
+           "created_at": now_iso(), "notified_at": None, "created_by": user.get("name")}
+    await db.waitlist.insert_one(doc)
+    return clean(doc)
+
+@api.post("/public/waitlist")
+async def public_waitlist_add(body: WaitlistIn):
+    doc = {"id": new_id(), "product_id": body.product_id, "size": body.size,
+           "phone": body.phone, "name": body.name or "Cliente",
+           "created_at": now_iso(), "notified_at": None, "created_by": "boutique"}
+    await db.waitlist.insert_one(doc)
+    return {"ok": True}
+
+@api.get("/waitlist")
+async def waitlist_list(user: dict = Depends(get_user), product_id: Optional[str] = None):
+    f = {"notified_at": None}
+    if product_id: f["product_id"] = product_id
+    rows = await db.waitlist.find(f).sort("created_at", -1).to_list(500)
+    # Enrich with product info
+    pids = list({r.get("product_id") for r in rows})
+    prods = {p["id"]: p for p in await db.products.find({"id": {"$in": pids}}).to_list(500)}
+    for r in rows:
+        p = prods.get(r.get("product_id"))
+        if p: r["product_name"] = p.get("name"); r["product_image"] = p.get("image")
+    return clean(rows)
+
+@api.delete("/waitlist/{wid}")
+async def waitlist_remove(wid: str, user: dict = Depends(get_user)):
+    await db.waitlist.update_one({"id": wid}, {"$set": {"notified_at": now_iso(), "notified_by": user.get("name")}})
+    return {"ok": True}
+
+@api.post("/ai/parse-order")
+async def ai_parse_order(body: Dict[str, Any], user: dict = Depends(get_user)):
+    """Parse a pasted WhatsApp order message into structured cart items + customer hints."""
+    text = (body.get("text") or "").strip()
+    if not text: raise HTTPException(400, "Texte requis")
+    # Load available products catalog (name + sizes + colors + id)
+    all_prods = await db.products.find({}).to_list(1000)
+    cat_lines = [f"- id={p['id']} | {p['name']} | marque={p.get('brand','')} | cat={p.get('category','')} | couleurs={','.join(p.get('colors',[]))} | tailles={','.join(p.get('sizes',[]))} | prix={p.get('price',0)}" for p in all_prods[:200]]
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        system = ("Tu es un parseur de commandes WhatsApp pour la boutique 'Chez Dina' (Abidjan). "
+                  "Depuis le message client, tu extrais STRICTEMENT en JSON : "
+                  "{\"items\":[{\"product_id\":\"...\",\"name\":\"...\",\"size\":\"...\",\"color\":\"...\",\"qty\":1}], "
+                  "\"customer_hint\":{\"name\":\"...\",\"phone\":\"...\",\"zone\":\"...\",\"address\":\"...\"}, \"confidence\":0.0}. "
+                  "Fais correspondre chaque article à un product_id du catalogue ci-dessous. Si pas sûr, laisse product_id vide. "
+                  f"Catalogue:\n" + "\n".join(cat_lines[:150]))
+        chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-parse-{user['id']}", system_message=system).with_model("anthropic","claude-sonnet-4-5-20250929")
+        reply = await chat.send_message(UserMessage(text=f"Message cliente :\n{text}\n\nRéponds UNIQUEMENT par le JSON, sans texte avant/après."))
+        import json, re
+        raw = str(reply).strip()
+        # Extract JSON block
+        m = re.search(r'\{[\s\S]*\}', raw)
+        if m: raw = m.group(0)
+        data = json.loads(raw)
+        # Enrich items with price/image from catalog
+        pmap = {p["id"]: p for p in all_prods}
+        for it in data.get("items", []):
+            pid = it.get("product_id")
+            if pid and pid in pmap:
+                p = pmap[pid]
+                it["price"] = p.get("price", 0)
+                it["image"] = p.get("image")
+                if not it.get("name"): it["name"] = p.get("name")
+        return data
+    except Exception as e:
+        logger.exception("parse_order")
+        return {"items": [], "customer_hint": {}, "confidence": 0.0, "error": "AI indisponible"}
+
+@api.get("/pos/pdf-receipt/{oid}")
+async def pos_pdf_data(oid: str, user: dict = Depends(get_user)):
+    """Return receipt data for client-side PDF generation."""
+    o = await db.orders.find_one({"id": oid})
+    if not o: raise HTTPException(404)
+    biz = await db.business.find_one({"id":"main"}) or {}
+    return {"order": clean(o), "business": clean(biz)}
+
+
 
 @api.get("/public/pages")
 async def public_pages():

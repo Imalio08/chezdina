@@ -54,6 +54,7 @@ import ProductPage from "@/pages/storefront/Product";
 import Checkout from "@/pages/storefront/Checkout";
 import Tracking from "@/pages/storefront/Tracking";
 import Account from "@/pages/storefront/Account";
+import SharedCart from "@/pages/storefront/SharedCart";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -78,6 +79,7 @@ export default function App() {
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/suivi/:code" element={<Tracking />} />
+            <Route path="/boutique/panier-partage/:id" element={<SharedCart />} />
             <Route path="/rider" element={<ProtectedRider><RiderShell /></ProtectedRider>}>
               <Route index element={<ErrorBoundary><RiderCourses /></ErrorBoundary>} />
               <Route path="carte" element={<ErrorBoundary><RiderCarte /></ErrorBoundary>} />
