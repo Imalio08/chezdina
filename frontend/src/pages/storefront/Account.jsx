@@ -53,6 +53,14 @@ function LoginForm({ onDone }) {
     try {
       const r = await api.post("/public/customer-login-code", { phone, code });
       toast.success(`Bonjour ${r.data.customer.name.split(" ")[0]} 👋`);
+      // Merge guest favorites into the account
+      try {
+        const localFavs = JSON.parse(localStorage.getItem("dina_favorites") || "[]");
+        if (Array.isArray(localFavs) && localFavs.length) {
+          await api.post("/public/account/favorites/merge", { product_ids: localFavs }, { headers: { Authorization: `Bearer ${r.data.token}` }});
+          toast.info(`${localFavs.length} favoris synchronisés`);
+        }
+      } catch {}
       onDone({ token: r.data.token, customer: r.data.customer });
     } catch (e) {
       toast.error(e.response?.data?.detail || "Connexion échouée");

@@ -44,6 +44,7 @@ import CmsPages from "@/pages/console/CmsPages";
 import CashSessions from "@/pages/console/CashSessions";
 import Encaissements from "@/pages/console/Encaissements";
 import ProfitLoss from "@/pages/console/ProfitLoss";
+import SiteAppearance from "@/pages/console/SiteAppearance";
 import BrandsCategories from "@/pages/console/BrandsCategories";
 import Marques from "@/pages/console/Marques";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
@@ -134,7 +135,7 @@ export default function App() {
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
               <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
-              <Route path="apparence" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
+              <Route path="apparence" element={<ErrorBoundary><SiteAppearance/></ErrorBoundary>} />
               <Route path="pages" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
               <Route path="menus" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
               <Route path="seo" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />

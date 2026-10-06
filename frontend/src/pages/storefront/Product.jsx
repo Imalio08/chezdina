@@ -27,6 +27,8 @@ export default function ProductPage() {
   const [imgIdx, setImgIdx] = useState(0);
   const [showReview, setShowReview] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
+  const [deliveryEst, setDeliveryEst] = useState(null);
+  const [deliveryZone, setDeliveryZone] = useState("Cocody");
   const { addToCart } = useApp();
 
   useEffect(() => {
@@ -40,6 +42,11 @@ export default function ProductPage() {
     api.get(`/public/reviews/${id}`).then(r=>setReviews(r.data));
   }, [id]);
 
+  useEffect(() => {
+    if (!id) return;
+    api.get(`/public/products/${id}/delivery-estimate?zone=${encodeURIComponent(deliveryZone)}`).then(r=>setDeliveryEst(r.data)).catch(()=>{});
+  }, [id, deliveryZone]);
+
   if (!p) return <div className="p-10 text-sm text-[#666]">Chargement…</div>;
   const gallery = (p.images && p.images.length ? p.images : [p.image]).filter(Boolean);
   const current = gallery[imgIdx] || p.image;
@@ -47,7 +54,10 @@ export default function ProductPage() {
   const canAdd = stockForSize > 0;
 
   const add = () => { if(!canAdd) return toast.error("Rupture pour cette taille"); addToCart(p,1,size,color); toast.success("Ajouté au panier"); };
-  const wa = () => window.open(`https://wa.me/2250777926179?text=${encodeURIComponent(`Bonjour, je veux commander: ${p.name} (${size}, ${color}) ${fcfa(p.price)}`)}`,"_blank");
+  const wa = () => {
+    const msg = `Bonjour Chez Dina 💕 Je souhaite commander :\n• ${p.name}\n• Taille : ${size||"à préciser"}\n• Couleur : ${color||"à préciser"}\n• Prix : ${fcfa(p.price)}\n\nMerci de me confirmer la disponibilité et les frais de livraison vers ${deliveryZone}.`;
+    window.open(`https://wa.me/2250777926179?text=${encodeURIComponent(msg)}`,"_blank");
+  };
   const prev = () => setImgIdx((imgIdx-1+gallery.length)%gallery.length);
   const next = () => setImgIdx((imgIdx+1)%gallery.length);
 
@@ -116,6 +126,16 @@ export default function ProductPage() {
             <button onClick={wa} className="dina-btn-secondary flex-1" style={{background:"#1f8a4c",color:"white",borderColor:"#1f8a4c"}} data-testid="product-whatsapp"><MessageCircle size={16}/>WhatsApp</button>
           </div>
           <div className="text-xs text-[#666] mt-4 flex items-center gap-2"><Check size={12} className="text-[#1f8a4c]"/>Livraison 24h à Abidjan · Paiement à la livraison accepté</div>
+
+          <div className="mt-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg p-3" data-testid="delivery-estimate-block">
+            <div className="text-[10px] uppercase text-[#666] font-semibold mb-1.5">Estimation de livraison</div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <select className="dina-input !py-1.5 max-w-[150px] text-xs" value={deliveryZone} onChange={e=>setDeliveryZone(e.target.value)} data-testid="delivery-zone-select">
+                {["Cocody","Riviera","Angré","Plateau","Marcory","Zone 4","Treichville","Koumassi","Yopougon","Abobo","Adjamé","Port-Bouët","Bingerville","Songon","Grand-Bassam"].map(z=><option key={z}>{z}</option>)}
+              </select>
+              {deliveryEst && <span className="text-sm">→ <b className="tabular text-[#b02a2a]">{fcfa(deliveryEst.fee)}</b> · <span className="text-[#666]">{deliveryEst.delay}</span></span>}
+            </div>
+          </div>
         </div>
       </div>
 

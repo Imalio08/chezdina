@@ -455,7 +455,7 @@ async def delete_customer(cid: str, user: dict = Depends(require_role("admin","m
     return {"ok": True}
 
 @api.get("/customers/{cid}")
-async def get_customer(cid: str, user: dict = Depends(get_user)):
+async def get_customer_detail(cid: str, user: dict = Depends(get_user)):
     c = await db.customers.find_one({"id": cid}, {"password_hash":0})
     if not c: raise HTTPException(404)
     orders = await db.orders.find({"customer.id": cid}).sort("created_at", -1).to_list(100)
@@ -511,6 +511,12 @@ async def create_order(body: OrderIn, user: dict = Depends(get_user)):
         await db.products.update_one({"id": it.product_id}, {"$inc": {"stock": -it.qty}})
         if it.size:
             await db.products.update_one({"id": it.product_id}, {"$inc": {f"stock_by_size.{it.size}": -it.qty}})
+        # Auto-flip to liste_attente when all stock exhausted
+        fresh = await db.products.find_one({"id": it.product_id})
+        if fresh:
+            total_stk = sum((fresh.get("stock_by_size") or {}).values()) if fresh.get("stock_by_size") else fresh.get("stock", 0)
+            if total_stk <= 0 and fresh.get("status") not in ("liste_attente", "archive", "inactif"):
+                await db.products.update_one({"id": it.product_id}, {"$set": {"status": "liste_attente", "auto_waitlist_at": now_iso()}})
     if body.customer and body.customer.get("id"):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set": {"last_order_at": now_iso()}, "$inc": {"loyalty_points": int(total/500)}})
     await db.orders.insert_one(doc)
@@ -2198,6 +2204,58 @@ async def products_bulk_promo(body: Dict[str,Any], user: dict = Depends(require_
     return {"ok": True, "count": len(ids)}
 
 @api.get("/products/{pid}/history")
+
+# ---------- Favorites (per customer) ----------
+@api.get("/public/account/favorites")
+async def account_favorites(c: dict = Depends(get_customer)):
+    cust = await db.customers.find_one({"id": c["id"]})
+    ids = (cust or {}).get("favorites") or []
+    products = await db.products.find({"id": {"$in": ids}}).to_list(500)
+    return clean(products)
+
+@api.post("/public/account/favorites/toggle")
+async def account_fav_toggle(body: Dict[str, Any], c: dict = Depends(get_customer)):
+    pid = body.get("product_id")
+    if not pid: raise HTTPException(400, "product_id requis")
+    cust = await db.customers.find_one({"id": c["id"]})
+    favs = set((cust or {}).get("favorites") or [])
+    if pid in favs: favs.remove(pid); state = "removed"
+    else: favs.add(pid); state = "added"
+    await db.customers.update_one({"id": c["id"]}, {"$set": {"favorites": list(favs)}})
+    return {"ok": True, "state": state, "favorites": list(favs)}
+
+@api.post("/public/account/favorites/merge")
+async def account_fav_merge(body: Dict[str, Any], c: dict = Depends(get_customer)):
+    """Merge guest favorites (from localStorage) into the account on login."""
+    guest_ids = body.get("product_ids") or []
+    cust = await db.customers.find_one({"id": c["id"]})
+    existing = set((cust or {}).get("favorites") or [])
+    merged = list(existing | set(guest_ids))
+    await db.customers.update_one({"id": c["id"]}, {"$set": {"favorites": merged}})
+    return {"ok": True, "count": len(merged), "favorites": merged}
+
+# ---------- Waitlist notify helper (auto on restock) ----------
+async def _notify_waitlist(product_id: str, size: Optional[str] = None):
+    f = {"product_id": product_id, "notified_at": None}
+    if size: f["size"] = size
+    rows = await db.waitlist.find(f).to_list(200)
+    p = await db.products.find_one({"id": product_id})
+    if not p: return
+    link = f"https://chezdina.ci/boutique/product/{product_id}"
+    for w in rows:
+        phone = w.get("phone") or ""
+        pd = "".join(c for c in phone if c.isdigit())
+        if not pd: continue
+        msg = f"Bonjour {w.get('name','')} 💕\nBonne nouvelle, le produit {p.get('name')} est de retour en stock{' (taille '+w['size']+')' if w.get('size') else ''} ! Commandez vite : {link}"
+        await db.whatsapp_outbox.insert_one({
+            "id": new_id(), "phone": phone, "phone_digits": pd,
+            "message": msg, "link": f"https://wa.me/{pd}?text={_url_quote(msg)}",
+            "kind": "waitlist_restock", "product_id": product_id,
+            "sent": False, "created_at": now_iso(),
+        })
+        await db.waitlist.update_one({"id": w["id"]}, {"$set": {"notified_at": now_iso(), "notified_by": "auto-restock"}})
+    return len(rows)
+
 async def product_history(pid: str, user: dict = Depends(get_user)):
     """Return a product's sales timeline + stock movements + waitlist entries."""
     orders = await db.orders.find({"items.product_id": pid, "status":{"$ne":"annulee"}}).sort("created_at",-1).to_list(500)
