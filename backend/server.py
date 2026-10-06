@@ -1379,7 +1379,276 @@ async def delete_zone(zid: str, user: dict = Depends(require_role("admin","manag
     await db.zones.delete_one({"id": zid})
     return {"ok": True}
 
-# ---------- Expenses / Suppliers / Purchases ----------
+# ---------- Pack 9: Manuel d'utilisation ----------
+MANUAL_MODULES_SEED = [
+    {"number": 1, "title": "Prise en main", "icon": "LogIn", "description": "Connexion, pointage, interface, recherche et thème",
+     "roles": ["admin","manager","sales","rider","stock"], "path_hints": ["/console","/login"],
+     "sections": [
+         {"id":"s1","heading":"Se connecter","blocks":[
+             {"type":"text","content":"Chaque employée dispose de son propre compte avec email et mot de passe. En plus, un code PIN à 4 chiffres sert à valider les actions sensibles (remises, remboursements)."},
+             {"type":"steps","items":["Allez sur /login","Saisissez votre email professionnel","Tapez votre mot de passe","Cliquez sur Se connecter"]},
+             {"type":"callout","variant":"info","text":"Si vous oubliez votre mot de passe, demandez à la gérante de le réinitialiser depuis Équipe > Employés."},
+         ]},
+         {"id":"s2","heading":"Pointer son arrivée","blocks":[
+             {"type":"text","content":"Chaque vendeuse pointe son arrivée et son départ depuis la page Pointage. Un geofencing vérifie que vous êtes bien à la boutique."},
+             {"type":"steps","items":["Ouvrez Équipe > Pointage","Autorisez la géolocalisation","Cliquez sur Pointer l'arrivée","À la fin, cliquez sur Pointer la sortie"]},
+             {"type":"callout","variant":"tip","text":"Vous pouvez consulter votre historique de pointages dans l'onglet Mes présences."},
+         ]},
+         {"id":"s3","heading":"Comprendre l'interface","blocks":[
+             {"type":"text","content":"Le menu latéral regroupe toutes vos pages par thème. En haut à droite : notifications, mode sombre, création rapide, et une barre de recherche globale."},
+             {"type":"list","items":["Clic sur le logo = retour Tableau de bord","Icône cloche = notifications non lues","Soleil/lune = basculer thème clair/sombre","Barre de recherche = clientes, produits, commandes"]},
+         ]},
+         {"id":"s4","heading":"Rechercher partout","blocks":[
+             {"type":"text","content":"La barre de recherche en haut de chaque page cherche à travers clientes, produits et commandes en même temps. Tapez simplement un nom, un numéro ou un code."},
+             {"type":"callout","variant":"tip","text":"Astuce : commencez par 3 lettres et laissez les suggestions apparaître."},
+         ]},
+     ]},
+    {"number": 2, "title": "Comprendre Chez Dina", "icon": "BookOpen", "description": "Vocabulaire : produit, variante, statuts, session de caisse, réconciliation",
+     "roles": ["admin","manager","sales","rider","stock"], "path_hints": [],
+     "sections": [
+         {"id":"s1","heading":"Vocabulaire essentiel","blocks":[
+             {"type":"statuses","items":[
+                 {"name":"Produit","desc":"Un article (ex. Robe wax rouge)"},
+                 {"name":"Variante","desc":"Une déclinaison du produit (taille M, couleur rouge, SKU unique)"},
+                 {"name":"Commande","desc":"Un panier validé par une cliente, qui va suivre un parcours"},
+                 {"name":"Session de caisse","desc":"Une période de travail d'une vendeuse avec fond de caisse"},
+                 {"name":"Journée de livraison","desc":"Lot de commandes attribuées à un livreur pour une journée"},
+                 {"name":"Réconciliation","desc":"Rapprochement entre encaissé et versé à la banque en fin de journée"},
+             ]},
+         ]},
+         {"id":"s2","heading":"Les statuts d'une commande","blocks":[
+             {"type":"statuses","items":[
+                 {"name":"Nouvelle","desc":"Reçue sur le site, non confirmée"},
+                 {"name":"Confirmée","desc":"Validée par la gérante, stock réservé"},
+                 {"name":"Assignée","desc":"Attribuée à un livreur"},
+                 {"name":"En préparation","desc":"Articles emballés"},
+                 {"name":"En livraison","desc":"Chez le livreur, en route"},
+                 {"name":"Livrée","desc":"Remise à la cliente, payée"},
+                 {"name":"Reportée","desc":"Cliente injoignable, à relivrer"},
+                 {"name":"Annulée / Retournée","desc":"Vente ratée ou produit retourné"},
+             ]},
+         ]},
+     ]},
+    {"number": 3, "title": "Caisse et ventes en boutique", "icon": "ShoppingCart", "description": "Encaisser une vente, appliquer une remise, imprimer un reçu",
+     "roles": ["admin","manager","sales"], "path_hints": ["/console/pos"],
+     "sections": [
+         {"id":"s1","heading":"Encaisser une vente","blocks":[
+             {"type":"text","content":"La Caisse (POS) est l'écran principal des vendeuses. On y scanne ou cherche des produits, on choisit la cliente, et on encaisse."},
+             {"type":"steps","items":["Ouvrez Caisse","Scannez le code-barres ou tapez le nom du produit","Choisissez la variante (taille, couleur)","Sélectionnez la cliente ou créez-la","Cliquez sur Encaisser","Choisissez le mode de paiement et validez"]},
+             {"type":"callout","variant":"warning","text":"Une remise supérieure à la limite (défaut 20%) demande le PIN de la gérante."},
+         ]},
+         {"id":"s2","heading":"Ouvrir et clôturer la caisse","blocks":[
+             {"type":"text","content":"Chaque vendeuse ouvre sa session de caisse en arrivant, et la clôture en partant."},
+             {"type":"steps","items":["Caisse > Ouvrir ma session","Saisissez le fond de caisse (ex. 10 000 FCFA)","Faites vos ventes de la journée","À la fin, cliquez sur Clôturer","Comptez les espèces et saisissez le montant","Validez — l'écart est calculé automatiquement"]},
+         ]},
+     ]},
+    {"number": 4, "title": "Commandes et préparation", "icon": "Receipt", "description": "Confirmer, scanner, imprimer fiches colis",
+     "roles": ["admin","manager","sales","stock"], "path_hints": ["/console/commandes"],
+     "sections": [
+         {"id":"s1","heading":"Confirmer une commande web","blocks":[
+             {"type":"steps","items":["Ouvrez Commandes","Filtrez par 'Nouvelle'","Vérifiez la disponibilité des articles","Appelez la cliente pour confirmer","Cliquez sur Confirmer"]},
+         ]},
+         {"id":"s2","heading":"Préparer un colis","blocks":[
+             {"type":"text","content":"Après confirmation, scannez chaque article pour éviter les erreurs."},
+             {"type":"steps","items":["Ouvrez la commande","Scannez chaque article (ou cochez)","Emballez et collez la fiche colis","Marquez En préparation"]},
+         ]},
+     ]},
+    {"number": 5, "title": "Livraison", "icon": "Truck", "description": "Journées, affectation aux livreurs, preuve, réconciliation",
+     "roles": ["admin","manager","rider"], "path_hints": ["/console/livraisons","/rider"],
+     "sections": [
+         {"id":"s1","heading":"Créer une journée de livraison","blocks":[
+             {"type":"steps","items":["Livraisons > Nouvelle journée","Choisissez la date et le livreur","Glissez les commandes à livrer","Validez la tournée"]},
+         ]},
+         {"id":"s2","heading":"Preuve de livraison","blocks":[
+             {"type":"text","content":"À la remise, le livreur prend une photo (ou signature) et saisit un code à 4 chiffres communiqué à la cliente."},
+             {"type":"callout","variant":"warning","text":"Au-dessus du seuil configuré (défaut 50 000 FCFA), le PIN de la gérante est aussi requis."},
+         ]},
+     ]},
+    {"number": 6, "title": "Produits, marques et catégories", "icon": "Package", "description": "Créer un produit, gérer les variantes et le stock initial",
+     "roles": ["admin","manager","stock"], "path_hints": ["/console/produits","/console/marques","/console/categories"],
+     "sections":[
+         {"id":"s1","heading":"Créer un produit","blocks":[
+             {"type":"steps","items":["Produits > Nouveau produit","Remplissez nom, catégorie, prix","Ajoutez les variantes (taille × couleur)","Téléversez les photos","Enregistrez"]},
+             {"type":"callout","variant":"tip","text":"Utilisez l'IA (bouton magique) pour générer la description à partir du nom et de quelques détails."},
+         ]},
+     ]},
+    {"number": 7, "title": "Fournisseurs et approvisionnements", "icon": "Building2", "description": "Commande fournisseur en Kanban, réception",
+     "roles": ["admin","manager","stock"], "path_hints": ["/console/fournisseurs","/console/achats"],
+     "sections":[
+         {"id":"s1","heading":"Passer une commande d'approvisionnement","blocks":[
+             {"type":"steps","items":["Approvisionnements > Nouvelle commande","Choisissez le fournisseur","Ajoutez les articles et quantités","Validez — passe en 'Commandée'"]},
+         ]},
+         {"id":"s2","heading":"Réceptionner la marchandise","blocks":[
+             {"type":"text","content":"Déplacez la commande en 'Reçue' dans le Kanban. Les quantités sont ajoutées au stock automatiquement."},
+         ]},
+     ]},
+    {"number": 8, "title": "Stock et inventaires", "icon": "Boxes", "description": "Suivre, ajuster, inventorier",
+     "roles": ["admin","manager","stock"], "path_hints":["/console/stock"],
+     "sections":[
+         {"id":"s1","heading":"Faire un inventaire","blocks":[
+             {"type":"steps","items":["Stock > Nouvel inventaire","Imprimez la feuille de comptage","Comptez article par article","Saisissez les écarts","Validez — les ajustements sont enregistrés"]},
+         ]},
+     ]},
+    {"number": 9, "title": "Clientes, messagerie, campagnes", "icon": "Users", "description": "Fiches clientes 360°, messages, segments",
+     "roles": ["admin","manager","sales"], "path_hints":["/console/clients","/console/messagerie","/console/segments"],
+     "sections":[
+         {"id":"s1","heading":"La fiche cliente 360°","blocks":[
+             {"type":"text","content":"Chaque fiche cliente regroupe 14 onglets : commandes, favoris, messages, avis, fidélité, parrainage, porte-monnaie, adresses, préférences, notes, etc."},
+         ]},
+         {"id":"s2","heading":"Lancer une campagne WhatsApp","blocks":[
+             {"type":"steps","items":["Segments > Nouveau segment","Définissez les critères (ex. inactives 30j)","Prévisualisez les destinataires","Créez une campagne liée","Rédigez le message et envoyez"]},
+         ]},
+     ]},
+    {"number": 10, "title": "Promotions, fidélité, parrainage", "icon": "Megaphone", "description": "Codes promo, points, bons d'achat",
+     "roles": ["admin","manager","sales"], "path_hints":["/console/promotions","/console/fidelite","/console/parrainage"],
+     "sections":[
+         {"id":"s1","heading":"Créer un code promo","blocks":[
+             {"type":"steps","items":["Promotions > Nouveau","Choisissez type (% ou fixe)","Définissez la période","Limitez par produits/catégories (optionnel)","Activez"]},
+         ]},
+     ]},
+    {"number": 11, "title": "Sessions de caisse et versements", "icon": "ClipboardList", "description": "Ouvrir, fermer, verser à la banque",
+     "roles": ["admin","manager"], "path_hints":["/console/sessions-caisse"],
+     "sections":[
+         {"id":"s1","heading":"Verser à la banque","blocks":[
+             {"type":"steps","items":["Sessions de caisse > Session clôturée","Cliquez sur Nouveau versement","Saisissez le montant et le mode (banque/mobile money)","Téléversez le reçu","Validez"]},
+         ]},
+     ]},
+    {"number": 12, "title": "Statistiques et finances", "icon": "BarChart3", "description": "12 onglets stats, dépenses, compte de résultat",
+     "roles": ["admin","manager"], "path_hints":["/console/statistiques","/console/finances"],
+     "sections":[
+         {"id":"s1","heading":"Lire son compte de résultat","blocks":[
+             {"type":"text","content":"Le compte de résultat affiche : CA − coût des marchandises = marge brute, moins les dépenses = résultat d'exploitation."},
+             {"type":"callout","variant":"tip","text":"Comparez chaque mois à N-1 pour voir vos progrès."},
+         ]},
+     ]},
+    {"number": 13, "title": "Site vitrine", "icon": "Globe", "description": "Apparence, accueil, pages, SEO, aperçu",
+     "roles": ["admin","manager"], "path_hints":["/console/site"],
+     "sections":[
+         {"id":"s1","heading":"Changer l'apparence du site","blocks":[
+             {"type":"steps","items":["Site vitrine > Apparence","Choisissez vos couleurs (ou un preset)","Sélectionnez la police","Enregistrez — rechargez /boutique pour voir"]},
+         ]},
+         {"id":"s2","heading":"Éditer l'accueil","blocks":[
+             {"type":"text","content":"L'accueil est composé de sections modulaires : hero mosaïque, bons plans, catégories, ventes flash. Ajoutez vos images (upload uniquement)."},
+         ]},
+     ]},
+    {"number": 14, "title": "Équipe, rôles et pointage", "icon": "UserCog", "description": "Employés, droits, horaires, présences",
+     "roles": ["admin","manager"], "path_hints":["/console/equipe","/console/roles","/console/pointage"],
+     "sections":[
+         {"id":"s1","heading":"Créer une employée","blocks":[
+             {"type":"steps","items":["Équipe > Nouvel employé","Nom, email, téléphone, rôle","Générez un mot de passe temporaire","L'employée changera son PIN à la 1re connexion"]},
+         ]},
+     ]},
+    {"number": 15, "title": "Paramètres et intégrations", "icon": "Settings", "description": "Identité, coordonnées, paiements, notifications",
+     "roles": ["admin","manager"], "path_hints":["/console/parametres"],
+     "sections":[
+         {"id":"s1","heading":"Mettre à jour le logo partout","blocks":[
+             {"type":"text","content":"Le logo chargé dans Paramètres > Identité se propage automatiquement : console, site, espace livreur, reçus, factures et fiches colis."},
+         ]},
+     ]},
+    {"number": 16, "title": "Espace livreur (téléphone)", "icon": "Smartphone", "description": "App livreur : journée, remise, preuve, score",
+     "roles": ["admin","manager","rider"], "path_hints":["/rider"],
+     "sections":[
+         {"id":"s1","heading":"Démarrer ma journée","blocks":[
+             {"type":"steps","items":["Ouvrez /rider sur votre téléphone","Connectez-vous avec votre PIN à 4 chiffres","Autorisez la géolocalisation","Consultez vos commandes du jour"]},
+         ]},
+         {"id":"s2","heading":"Livrer et marquer livré","blocks":[
+             {"type":"steps","items":["Cliquez sur une commande","Appelez la cliente avant d'arriver","Sur place, prenez une photo de preuve","Demandez le code à 4 chiffres à la cliente","Validez — la commande passe Livrée"]},
+             {"type":"callout","variant":"info","text":"Votre score dépend de la ponctualité, du zéro annulation, de la note cliente et de la preuve de livraison."},
+         ]},
+     ]},
+]
+
+async def seed_manual_modules():
+    if await db.manual_modules.count_documents({}) >= len(MANUAL_MODULES_SEED): return
+    for m in MANUAL_MODULES_SEED:
+        existing = await db.manual_modules.find_one({"number": m["number"]})
+        if not existing:
+            doc = {**m, "id": new_id(), "created_at": now_iso()}
+            await db.manual_modules.insert_one(doc)
+
+@api.get("/manual/modules")
+async def manual_modules(user: dict = Depends(get_user), role: Optional[str] = None):
+    f: Dict[str, Any] = {}
+    if role: f["roles"] = role
+    rows = await db.manual_modules.find(f).sort("number", 1).to_list(100)
+    # Attach user progress
+    prog = await db.manual_progress.find_one({"user_id": user["id"]}) or {}
+    read_set = set(prog.get("read_sections", []))
+    for m in rows:
+        total = sum(1 for _ in m.get("sections") or [])
+        done = sum(1 for s in m.get("sections") or [] if f"{m['number']}:{s['id']}" in read_set)
+        m["progress"] = {"total": total, "done": done}
+    return clean(rows)
+
+@api.get("/manual/modules/{number}")
+async def manual_module(number: int, user: dict = Depends(get_user)):
+    m = await db.manual_modules.find_one({"number": number})
+    if not m: raise HTTPException(404)
+    prog = await db.manual_progress.find_one({"user_id": user["id"]}) or {}
+    read_set = set(prog.get("read_sections", []))
+    for s in m.get("sections") or []:
+        s["read"] = f"{number}:{s['id']}" in read_set
+    return clean(m)
+
+@api.patch("/manual/modules/{number}")
+async def update_manual_module(number: int, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("id", None); body.pop("_id", None); body.pop("number", None)
+    body["updated_at"] = now_iso()
+    r = await db.manual_modules.update_one({"number": number}, {"$set": body})
+    if r.matched_count == 0: raise HTTPException(404)
+    return {"ok": True}
+
+@api.post("/manual/progress")
+async def manual_mark_read(body: Dict[str,Any], user: dict = Depends(get_user)):
+    key = f"{body.get('module_number')}:{body.get('section_id')}"
+    if not body.get("section_id") or not body.get("module_number"): raise HTTPException(400)
+    await db.manual_progress.update_one(
+        {"user_id": user["id"]},
+        {"$addToSet": {"read_sections": key}, "$set": {"updated_at": now_iso()}},
+        upsert=True,
+    )
+    return {"ok": True}
+
+@api.get("/manual/progress")
+async def manual_progress_me(user: dict = Depends(get_user)):
+    prog = await db.manual_progress.find_one({"user_id": user["id"]}) or {}
+    return {"read_sections": prog.get("read_sections", [])}
+
+@api.get("/manual/search")
+async def manual_search(q: str, user: dict = Depends(get_user)):
+    ql = (q or "").strip().lower()
+    if len(ql) < 2: return []
+    rows = await db.manual_modules.find({}).sort("number", 1).to_list(100)
+    hits = []
+    for m in rows:
+        if ql in (m.get("title","") + " " + m.get("description","")).lower():
+            hits.append({"module_number": m["number"], "title": m["title"], "match": "titre"})
+        for s in m.get("sections") or []:
+            parts = [s.get("heading","")]
+            for b in (s.get("blocks") or []):
+                if not isinstance(b, dict): continue
+                parts.append(b.get("content","") or "")
+                parts.append(b.get("text","") or "")
+                parts.append(b.get("caption","") or "")
+                for it in (b.get("items") or []):
+                    if isinstance(it, str): parts.append(it)
+                    elif isinstance(it, dict): parts.extend([it.get("name",""), it.get("desc","")])
+            text = " ".join(parts).lower()
+            if ql in text:
+                hits.append({"module_number": m["number"], "title": m["title"], "section_id": s["id"], "heading": s.get("heading"), "match": "contenu"})
+    return hits[:30]
+
+@api.get("/manual/module-for-path")
+async def manual_module_for_path(path: str, user: dict = Depends(get_user)):
+    """Return the first module whose path_hints matches the given path (longest prefix wins)."""
+    rows = await db.manual_modules.find({}).to_list(100)
+    best = None; best_len = 0
+    for m in rows:
+        for h in (m.get("path_hints") or []):
+            if path.startswith(h) and len(h) > best_len:
+                best = m; best_len = len(h)
+    return clean(best) if best else {}
+
 @api.get("/expenses")
 async def expenses(user: dict = Depends(get_user),
                    category: Optional[str] = None, type: Optional[str] = None,
@@ -4470,6 +4739,8 @@ async def seed_if_empty():
     # Zones
     if await db.zones.count_documents({}) == 0:
         await db.zones.insert_many([{"id": new_id(), "name": n, "fee": f, "created_at": now_iso()} for n,f in ZONES])
+    # Manual modules
+    await seed_manual_modules()
     # Expense Categories (default list for Finances page)
     if await db.expense_categories.count_documents({}) == 0:
         DEFAULT_EXP_CATS = [

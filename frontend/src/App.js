@@ -26,6 +26,8 @@ import Reviews from "@/pages/console/Reviews";
 import AlertsAndCarts from "@/pages/console/AlertsAndCarts";
 import Integrations from "@/pages/console/Integrations";
 import Settings from "@/pages/console/Settings";
+import Manuel from "@/pages/console/Manuel";
+import ManuelModule from "@/pages/console/ManuelModule";
 import SiteSettings from "@/pages/console/SiteSettings";
 import SiteVitrine from "@/pages/console/SiteVitrine";
 import Placeholder from "@/pages/console/Placeholder";
@@ -140,6 +142,8 @@ export default function App() {
               <Route path="site" element={<ErrorBoundary><SiteVitrine /></ErrorBoundary>} />
               <Route path="integrations" element={<ErrorBoundary><Integrations /></ErrorBoundary>} />
               <Route path="parametres" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+              <Route path="manuel" element={<ErrorBoundary><Manuel /></ErrorBoundary>} />
+              <Route path="manuel/:number" element={<ErrorBoundary><ManuelModule /></ErrorBoundary>} />
               {/* Placeholder routes for upcoming modules (keep sidebar functional) */}
               <Route path="factures" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
               <Route path="sessions-caisse" element={<ErrorBoundary><CashSessions/></ErrorBoundary>} />

@@ -8,9 +8,11 @@ import {
   Sparkles, Plug, Settings as Cog, Bell, Moon, Sun, LogOut, Store, Wifi, WifiOff, Search, Receipt, Gift, Star,
   X, ShoppingBag, Globe, MessageSquare, Send, ChevronDown, ChevronRight, Plus, Minimize2, Maximize2, Target,
   TrendingUp, Palette, FileCode, Menu, Shield, Database, ClipboardList, MapPin, Tag, Layers, Hourglass, Heart,
-  Building2, UserCheck, BookOpen, Calendar
+  Building2, UserCheck, BookOpen, Calendar, GraduationCap, HelpCircle
 } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import HelpButton from "@/components/console/HelpButton";
+import GuidedTour from "@/components/console/GuidedTour";
 
 const SECTIONS = [
   { label: "", items: [
@@ -61,9 +63,9 @@ const SECTIONS = [
     { to: "/console/statistiques", icon: BarChart3, label: "Statistiques" },
     { to: "/console/finances", icon: Wallet, label: "Finances" },
   ]},
-  { label: "", adminOnly: true, items: [
-    { to: "/console/parametres", icon: Cog, label: "Paramètres" },
-    { to: "/console/manuel", icon: BookOpen, label: "Manuel d'utilisation" },
+  { label: "", adminOnly: false, items: [
+    { to: "/console/parametres", icon: Cog, label: "Paramètres", adminOnly: true },
+    { to: "/console/manuel", icon: GraduationCap, label: "Manuel d'utilisation" },
   ]},
 ];
 
@@ -217,6 +219,7 @@ export default function ConsoleLayout() {
           <div className={`dina-chip ${online?"":"!border-[#c62828] !text-[#c62828]"}`} data-testid="sync-indicator">
             {online ? <><Wifi size={12}/>En ligne</> : <><WifiOff size={12}/>Hors ligne</>}
           </div>
+          <HelpButton/>
           <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
           <div className="relative">
             <button onClick={()=>setShowNotif(!showNotif)} className="dina-chip relative" data-testid="notifications-button">
@@ -243,6 +246,7 @@ export default function ConsoleLayout() {
         </header>
         <div className="p-6 flex-1"><ErrorBoundary><Outlet /></ErrorBoundary></div>
       </main>
+      <GuidedTour/>
 
       {/* Floating AI assistant — hidden on POS (would cover "Encaisser") */}
       {!showAi && pathname !== "/console/pos" && (
