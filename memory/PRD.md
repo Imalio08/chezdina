@@ -1,5 +1,21 @@
 # Chez Dina — PRD
 
+## P0 Stabilité (Feb 2026) — Fix pack 1 remnants ✅
+
+### Backend
+- `POST /api/pages` enforce slug uniqueness → 409 "Slug déjà utilisé" (confirmed by pytest)
+
+### Frontend
+- `/app/frontend/src/lib/format.js` : nouveau `fcfaCompact(n)` (ex. "77,4 M FCFA", "12,5 k FCFA", "2,1 Md FCFA") + `numCompact(n)`
+- `KPICard.jsx` : fix NaN delta — parse `previousValue` string ou number ; handle 0/0 → flat ; prev=0 non-zero current → affiche delta absolu (plus de `+NaN%`) ; nouveau prop `valueFull` → attribut HTML `title` pour tooltip exacte sur la version compacte
+- `Dashboard.jsx` : KPIs CA période, Panier moyen, Marge brute en `fcfaCompact` + `valueFull=fcfa(...)` ; empty states "Aucune donnée pour cette période" sur CA & marge, Commandes par statut, Ventes par canal, Top 5 produits
+- `Statistiques.jsx` : `HeatmapCard` guard matrix undefined ; `SalesTab` défauts sur `d.split/d.by_dow/d.by_hour` ; `RankTable` empty state ; `ZonesTab` empty state et defensive loader catch
+- `Orders.jsx` : data-testid `orders-view-table`, `orders-view-kanban`
+
+### Testé (iteration_23)
+- Backend 3/3 pytest (slug uniqueness) ✅
+- Frontend 13/13 period presets, 12/12 stats tabs, 7/7 regression pages, ZERO TypeError, ZERO NaN ✅
+
 ## Correctif urgent (Feb 2026) — Crash "Cannot read properties of undefined (reading 'length')" ✅
 
 Bulk-patch défensif sur tous les points qui crashaient lorsqu'un endpoint renvoyait un payload partiel :
@@ -143,7 +159,50 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 
 ## Fix pack 6 — Clients + Messagerie + Segments + Campagnes + Promotions renommables
 
-## Backlog
-- Pack 8 Vitrine CMS
-- Pack 9 Finitions
-- Refactor `server.py` monolith (4879 lignes)
+## Backlog (priorisé après P0 Feb 2026)
+
+### P1 — Fix packs 2 & 3 (brancher l'UI, backend déjà prêt)
+- Rôles & permissions UI 4 niveaux par cellule, toggles sensibles, "Appliquer à toute la section", créer rôle vierge
+- Page "À approuver" (owner only) : remises, remboursements, ajustements stock, prix, dépenses
+- Journal d'audit viewer (filtres user/action/date, before/after, export, trace ajustements directs owner)
+- Sessions de caisse UI : Gérante déclare → Owner valide/écart → ajout au solde Gérante
+- POS session guard : pas de vente sans session ouverte ("Ouvrez votre session de caisse")
+- Kiosk tablette boutique : Pointage PIN+selfie depuis l'écran verrouillé
+- Inventaire & réception à l'aveugle : `qty_counted` séparé de la quantité attendue
+- Commandes UI : colonne Facture (Voir, PDF, WhatsApp), KPI cards (nouvelles/à confirmer/en préparation/prêtes/en livraison/livrées/annulées/reportées/taux annulation/CA livré)
+- Préparation screen : scan article par article + fallback manuel avec motif obligatoire (loggé)
+
+### P2 — Fix pack 4 (Livraison)
+- 3 pages séparées : Journées / Livreurs / Zones & tarifs
+- Fix création journée
+- Affectation checkboxes (DnD desktop bonus seulement)
+- "Suggérer une répartition" par zone + charge livreur
+- Suivi Leaflet temps réel + pins colorés par statut
+- Historique livreur avec filtre calendrier
+
+### P3 — Fix pack 5 (Produits & achats)
+- Séparer Catégories & collections de Marques ; Approvisionnements vs Fournisseurs
+- Fix "Rédiger avec l'IA" + SEO
+- **Variantes taille × couleur** : grille Existe/N'existe pas, POS et storefront filtrent les combinaisons réelles
+- **Vidéos produit** : jusqu'à 2 par produit (MP4/MOV ≤ 60s ≤ 50 MB), no autoplay mobile
+
+### P4 — Packs 6, 7, 8, 9
+- Avis modération inbox (approuver/rejeter/répondre)
+- Parrainage configurable (format code + validité)
+- Web push notifications (Service Worker + VAPID .env + bannière "Installer l'application" iOS)
+- Dark mode complet partout
+- Logo centralisé (sidebar, rider, storefront, reçus, factures, fiches colis)
+- Horaires sur contact + footer + bannière "Fermé actuellement"
+- Police storefront only (console reste en Sora)
+- WhatsApp outbox (préparé pour API future)
+- Analytics 1st-party (events table + funnel : page_view, product_view, add_to_cart, checkout_started, order_placed, search)
+- Manuel richement illustré (captures annotées SVG, GIFs placeholders, FAQ 30 Q/R, mémo A4 par rôle, glossaire)
+- **Dina IA branchée sur le manuel** (recherche manuel first, réponse par étapes + lien module/étape, filtrée par rôle, questions non répondues listées pour owner)
+
+### P5 — Dernière étape
+- Refactor `server.py` en modules par domaine (auth, catalog, stock, purchases, orders, POS, cash, delivery, customers, marketing, stats, settings, storefront)
+
+### Décisions
+- ❌ Pas de badge "Déjà vu X fois" — remplacé par signaux réels (prix en baisse, plus que X en stock, retour en stock)
+- ✅ WhatsApp outbox + wa.me (API Business branché plus tard)
+- ✅ Analytics first-party (pas d'outil externe)
