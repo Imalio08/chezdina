@@ -1,5 +1,21 @@
 # Chez Dina — PRD
 
+## P3 Produits & achats (Feb 2026) ✅
+
+### Backend
+- `ProductIn` : nouveaux champs `variants: List[Dict]` (size, color, stock, enabled, price?), `videos: List[str]` (max 2, base64 data URL ou URL externe), `video_posters: List[str]`
+
+### Frontend
+- `VariantsGrid.jsx` (new) : grille taille × couleur Existe/N'existe pas avec input stock par cellule, bulk par ligne (tout +), par colonne (tout +), globaux (Tout activer / Désactiver tout)
+- `VideoUpload.jsx` (new) : max 2 vidéos MP4/MOV, validation durée (≤ 60 s mesurée via `video.loadedmetadata`) + taille (≤ 50 MB) + MIME ; preview avec `controls muted playsInline` ; stockage base64 in-memory
+- `ProductFormV3.jsx` : sections `3b. Vidéos` et sous-section `5b. Combinaisons réelles taille × couleur`
+- `lib/variants.js` (new) : helpers `hasRealVariants`, `availableColorsForSize`, `availableSizesForColor`, `stockFor`, `comboExists` avec fallback descendant vers `stock_by_size`
+- `storefront/Product.jsx` : filtre `visibleSizes` et `visibleColors` par variantes réelles ; sélection size filtre colors et vice-versa ; combos n'existant pas sont CACHÉES ; combos existantes OOS → "M'alerter" ligne barrée ; vidéos affichées en grille 2 colonnes sous la galerie, `controls muted playsInline` (jamais d'autoplay mobile)
+
+### Déjà en place avant P3 ✅
+- Pages séparées : Catégories & collections / Marques / Fournisseurs / Approvisionnements
+- `AiDescribeModal` + `SeoSection` fonctionnels (fallback texte si LLM key absente)
+
 ## P2 Livraison (Feb 2026) ✅
 
 ### Nouvelles pages / composants
@@ -212,11 +228,7 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 
 ### P2 — Fix pack 4 (Livraison) ✅ TERMINÉ
 
-### P3 — Fix pack 5 (Produits & achats)
-- Séparer Catégories & collections de Marques ; Approvisionnements vs Fournisseurs
-- Fix "Rédiger avec l'IA" + SEO
-- **Variantes taille × couleur** : grille Existe/N'existe pas, POS et storefront filtrent les combinaisons réelles
-- **Vidéos produit** : jusqu'à 2 par produit (MP4/MOV ≤ 60s ≤ 50 MB), no autoplay mobile
+### P3 — Fix pack 5 (Produits & achats) ✅ TERMINÉ
 
 ### P4 — Packs 6, 7, 8, 9
 - Avis modération inbox (approuver/rejeter/répondre)

@@ -1,0 +1,35 @@
+{
+  "summary": "Iter27 P3 Produits & achats testing complete. Backend 3/3 pytest green (test_iter27_variants_videos.py): POST /api/products accepts variants=[{size,color,enabled,stock}] + videos=['data:video/mp4;base64,...'] + video_posters; GET /api/products persists all three fields correctly; legacy products without variants/videos default to []; /api/ai/product-description returns 200 (fallback or Claude). Frontend: Login → /console/produits → products-new opens ProductFormV3 (data-testid=product-form-v3). Section 3b 'Vidéos (facultatif, 2 max)' renders video-upload + video-add with '0/2 vidéos' indicator. Setting Catégorie='Chaussures' switches sizeOptions to shoe sizes; clicking pfv-size-39/40 + pfv-color-Noir/Rouge renders variants-grid. VariantsGrid: var-on-39-Noir activates cell → var-cell-39-Noir, var-stock-39-Noir input, var-off-39-Noir off-btn all present. Bulk: var-row-all-Rouge activates both 39-Rouge+40-Rouge; var-col-all-40 activates 40-Noir; var-disable-all clears all cells (0); var-enable-all brings back 4 cells (2×2). pfv-ai opens ai-describe-modal with 11 controls (Ton/Longueur chips + Générer/Insérer). Storefront /boutique/product/{id} on a seeded product with variants=[{39,Noir,3},{40,Rouge,2}]: initial preselect (size=39, color=Noir) correctly hides size-40 and color-Rouge via visibleSizes/visibleColors filters; after selecting size 39, color-Rouge stays HIDDEN as expected (return null for non-existing combo). product-videos container + product-video-0 both render with controls/muted/playsInline. Regression: 18 console pages (dashboard, statistiques, commandes, preparation, approbations, audit, roles, sessions-caisse, pos, livraisons, livreurs, zones, pointage, clients, categories, marques, fournisseurs, approvisionnements) all load with 0 pageerrors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Guided tour", "issues": ["Still gated on dina_tour_done_${user.id} — automated tests must GET /api/auth/me first to seed. Pre-existing from iter24+."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter27_variants_videos.py",
+    "/app/test_reports/pytest/iter27.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "ProductFormV3 size options are hard-coded to isShoe check on category name (keywords 'chaussure/mule/sandale'). If a new category 'Bottines' is added, the sizes revert to CLOTH_SIZES. Consider explicit 'size_system' per category (shoe/cloth/one-size) stored in the Category model.",
+    "VariantsGrid emit() keeps only enabled variants in the output array — this is correct for storage but means toggling off a cell loses its stock value. UX-wise, consider preserving disabled rows for easy re-enable (currently user must re-input stock on re-enable). Non-blocking.",
+    "VideoUpload.probeDuration() does not timeout — if a corrupt file never fires loadedmetadata or error, the upload hangs with loading=true. Add a setTimeout fallback (e.g., 5s → resolve 0).",
+    "VideoUpload MIME regex `/^video\\/(mp4|quicktime|mov)/i` accepts 'video/mov' which is not a real MIME type (browsers emit 'video/quicktime' for .mov). Harmless but misleading in the error message 'Format accepté : MP4 ou MOV'.",
+    "Product.jsx line 39-40 preselects size=sizes[0] and color=colors[0] even when hasRealVariants(p) is true — if (sizes[0],colors[0]) is not a valid combo, user sees stockForSize=0 and 'canAdd=false' on page load. Suggest preselecting from the first enabled variant: e.g. setSize(firstEnabledVariant.size); setColor(firstEnabledVariant.color).",
+    "server.py ProductIn uses `List[Dict[str, Any]]` for variants without a nested Pydantic model — no server-side validation that each entry has {size,color,enabled,stock}. Add VariantIn(BaseModel) for safety."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter27_variants_videos.py",
+    "/app/test_reports/iteration_27.json"
+  ],
+  "success_rate": {"backend": "100% (3/3)", "frontend": "100% — all P3 Produits testids verified; 18/18 regression pages load"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! — login OK.",
+  "seed_data_creation": "Created one product TEST_IT27_FE Escarpin via API for storefront variant-filtering test; deleted at end of run. No persistent state.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "P3 Produits & achats fully functional. Note on storefront variant filtering: Product.jsx preselects size=sizes[0]/color=colors[0] on load which can produce invalid combo UX if sizes[0]×colors[0] is disabled — see critical_code_review_comments #5. VariantsGrid testids follow pattern var-{action}-{size}-{color} with size placed FIRST (e.g. var-cell-39-Noir not var-cell-Noir-39). To bypass guided tour, fetch /api/auth/me to get user.id then localStorage.setItem('dina_tour_done_'+id,'1') BEFORE navigating.",
+  "rca of the issue": "N/A — no bugs found. All P3 features (variants grid, video upload, storefront filtering, videos display, AI modal) work as specified."
+}

@@ -34,10 +34,18 @@ export default function ProductPage() {
 
   useEffect(() => {
     api.get(`/public/product/${id}`).then(r => {
-      setP(r.data);
-      const firstStock = Object.entries(r.data.stock_by_size || {}).find(([,v])=>v>0);
-      setSize(firstStock?.[0] || r.data.sizes?.[0] || "");
-      setColor(r.data.colors?.[0] || "");
+      const prod = r.data;
+      setP(prod);
+      // Preselect from first enabled variant (if any) to ensure a valid combo
+      const firstVariant = (prod.variants || []).find(v => v.enabled && (v.stock ?? 0) > 0) || (prod.variants || []).find(v => v.enabled);
+      if (firstVariant) {
+        setSize(firstVariant.size || "");
+        setColor(firstVariant.color || "");
+      } else {
+        const firstStock = Object.entries(prod.stock_by_size || {}).find(([,v])=>v>0);
+        setSize(firstStock?.[0] || prod.sizes?.[0] || "");
+        setColor(prod.colors?.[0] || "");
+      }
       setImgIdx(0);
     });
     api.get(`/public/reviews/${id}`).then(r=>setReviews(r.data));
