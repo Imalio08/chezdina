@@ -59,6 +59,8 @@ import PurchaseOrders from "@/pages/console/PurchaseOrders";
 import StockInventories from "@/pages/console/StockInventories";
 import CustomerDetail from "@/pages/console/CustomerDetail";
 import Messagerie from "@/pages/console/Messagerie";
+import Segments from "@/pages/console/Segments";
+import Campagnes from "@/pages/console/Campagnes";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import Rider from "@/pages/console/Rider";
@@ -143,7 +145,8 @@ export default function App() {
               <Route path="fournisseurs" element={<ErrorBoundary><Suppliers/></ErrorBoundary>} />
               <Route path="paniers-abandonnes" element={<ErrorBoundary><AbandonedCarts/></ErrorBoundary>} />
               <Route path="parrainage" element={<ErrorBoundary><Referrals/></ErrorBoundary>} />
-              <Route path="campagnes-whatsapp" element={<ErrorBoundary><WhatsAppCampaigns/></ErrorBoundary>} />
+              <Route path="campagnes" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
+              <Route path="campagnes-whatsapp" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
               <Route path="encaissements" element={<ErrorBoundary><Encaissements/></ErrorBoundary>} />
               <Route path="resultat" element={<ErrorBoundary><ProfitLoss/></ErrorBoundary>} />
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
@@ -153,7 +156,9 @@ export default function App() {
               <Route path="accueil" element={<ErrorBoundary><SectionBuilder/></ErrorBoundary>} />
               <Route path="apercu" element={<Navigate to="/boutique" replace/>} />
               <Route path="finances" element={<Navigate to="/console/resultat" replace/>} />
-              <Route path="segments" element={<ErrorBoundary><WhatsAppCampaigns/></ErrorBoundary>} />
+              <Route path="segments" element={<ErrorBoundary><Segments/></ErrorBoundary>} />
+              <Route path="campagnes" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
+              <Route path="campagnes-whatsapp" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
               <Route path="manuel" element={<ErrorBoundary><Placeholder title="Manuel d'utilisation" subtitle="Guides et tutoriels — bientôt disponible"/></ErrorBoundary>} />
               <Route path="pages" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />
               <Route path="menus" element={<ErrorBoundary><CmsPages/></ErrorBoundary>} />

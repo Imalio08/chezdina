@@ -1535,6 +1535,237 @@ async def delete_promo(pid: str, user: dict = Depends(require_role("admin","mana
     await db.promotions.delete_one({"id": pid})
     return {"ok": True}
 
+# ---------- Pack 6B: Segments CRUD (manual/auto/hybrid) ----------
+class SegmentIn(BaseModel):
+    name: str
+    kind: str = "manual"  # manual | auto | hybrid
+    rules: Optional[Dict[str, Any]] = None  # {zone, tier, total_spent_min, last_order_days_max, category, size, source, status}
+    customer_ids: Optional[List[str]] = None  # manual picks or hybrid additions
+    excluded_ids: Optional[List[str]] = None  # hybrid removals
+    description: Optional[str] = None
+
+async def _resolve_segment_ids(seg: dict) -> List[str]:
+    kind = seg.get("kind", "manual")
+    if kind == "manual":
+        return seg.get("customer_ids") or []
+    rules = seg.get("rules") or {}
+    flt: Dict[str, Any] = {"status": {"$ne": "blacklist"}}
+    if rules.get("zone"): flt["zone"] = rules["zone"]
+    if rules.get("tier"): flt["tier"] = rules["tier"]
+    if rules.get("status"): flt["status"] = rules["status"]
+    if rules.get("source"): flt["source"] = rules["source"]
+    if rules.get("size"): flt["$or"] = [{"shoe_size": rules["size"]}, {"top_size": rules["size"]}, {"bottom_size": rules["size"]}]
+    if rules.get("total_spent_min"): flt["total_spent"] = {"$gte": int(rules["total_spent_min"])}
+    if rules.get("last_order_days_max"):
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=int(rules["last_order_days_max"]))).isoformat()
+        flt["last_order_at"] = {"$gte": cutoff}
+    ids = []
+    async for c in db.customers.find(flt, {"id": 1, "category_history": 1}):
+        cat = rules.get("category")
+        if cat and cat not in (c.get("category_history") or []):
+            # fallback: check if customer ordered this category
+            matched = await db.orders.find_one({"customer.id": c["id"], "items.category": cat})
+            if not matched: continue
+        ids.append(c["id"])
+    if kind == "hybrid":
+        add = set(seg.get("customer_ids") or [])
+        rem = set(seg.get("excluded_ids") or [])
+        return list((set(ids) | add) - rem)
+    return ids
+
+@api.get("/segments")
+async def segments_list(user: dict = Depends(get_user)):
+    rows = await db.customer_segments_v2.find({}).sort("created_at", -1).to_list(200)
+    for r in rows:
+        r["count"] = len(await _resolve_segment_ids(r))
+    return clean(rows)
+
+@api.post("/segments")
+async def segments_create(body: SegmentIn, user: dict = Depends(require_role("admin","manager"))):
+    doc = body.model_dump()
+    doc.update({"id": new_id(), "created_at": now_iso(), "created_by": user.get("name")})
+    await db.customer_segments_v2.insert_one(doc)
+    doc["count"] = len(await _resolve_segment_ids(doc))
+    return clean(doc)
+
+@api.patch("/segments/{sid}")
+async def segments_update(sid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("id", None); body.pop("_id", None); body["updated_at"] = now_iso()
+    await db.customer_segments_v2.update_one({"id": sid}, {"$set": body})
+    return {"ok": True}
+
+@api.delete("/segments/{sid}")
+async def segments_delete(sid: str, user: dict = Depends(require_role("admin","manager"))):
+    await db.customer_segments_v2.delete_one({"id": sid})
+    return {"ok": True}
+
+@api.get("/segments/{sid}/customers")
+async def segments_customers(sid: str, user: dict = Depends(get_user)):
+    seg = await db.customer_segments_v2.find_one({"id": sid})
+    if not seg: raise HTTPException(404)
+    ids = await _resolve_segment_ids(seg)
+    rows = await db.customers.find({"id": {"$in": ids}}, {"password_hash": 0}).to_list(2000)
+    return clean(rows)
+
+# ---------- Pack 6B: Campaigns (multi-channel with report) ----------
+class CampaignIn(BaseModel):
+    name: str
+    channels: List[str] = []  # whatsapp | inapp
+    target_type: str = "all"  # all | segments | ids
+    segment_ids: Optional[List[str]] = None
+    customer_ids: Optional[List[str]] = None
+    text: str
+    image: Optional[str] = None
+    link: Optional[str] = None
+    offer: Optional[Dict[str, Any]] = None  # {code, discount_pct|discount_amount, valid_from, valid_to}
+    scheduled_at: Optional[str] = None
+
+async def _resolve_campaign_customers(c: dict) -> List[str]:
+    if c.get("target_type") == "all":
+        ids = []
+        async for cust in db.customers.find({"status": "active"}, {"id": 1}): ids.append(cust["id"])
+        return ids
+    if c.get("target_type") == "ids": return c.get("customer_ids") or []
+    out: set = set()
+    for sid in c.get("segment_ids") or []:
+        seg = await db.customer_segments_v2.find_one({"id": sid})
+        if seg: out.update(await _resolve_segment_ids(seg))
+    return list(out)
+
+@api.get("/campaigns")
+async def campaigns_list(user: dict = Depends(get_user)):
+    rows = await db.campaigns.find({}).sort("created_at", -1).to_list(200)
+    return clean(rows)
+
+@api.post("/campaigns")
+async def campaigns_create(body: CampaignIn, user: dict = Depends(require_role("admin","manager"))):
+    doc = body.model_dump()
+    doc.update({"id": new_id(), "created_at": now_iso(), "created_by": user.get("name"), "status": "draft",
+                "stats": {"targets": 0, "sent": 0, "delivered": 0, "read": 0, "clicked": 0, "orders": 0, "revenue": 0}})
+    doc["stats"]["targets"] = len(await _resolve_campaign_customers(doc))
+    await db.campaigns.insert_one(doc)
+    return clean(doc)
+
+@api.patch("/campaigns/{cid}")
+async def campaigns_update(cid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    body.pop("id", None); body.pop("_id", None); body["updated_at"] = now_iso()
+    await db.campaigns.update_one({"id": cid}, {"$set": body})
+    return {"ok": True}
+
+@api.delete("/campaigns/{cid}")
+async def campaigns_delete(cid: str, user: dict = Depends(require_role("admin","manager"))):
+    await db.campaigns.delete_one({"id": cid})
+    return {"ok": True}
+
+def _render_template(text: str, c: dict, offer: dict | None) -> str:
+    out = (text or "").replace("{prenom}", (c.get("name") or "").split(" ")[0]).replace("{nom}", c.get("name") or "")
+    if offer:
+        out = out.replace("{code}", str(offer.get("code") or "")).replace("{reduction}", str(offer.get("discount_pct") or offer.get("discount_amount") or ""))
+    return out
+
+@api.post("/campaigns/{cid}/send")
+async def campaigns_send(cid: str, body: Dict[str, Any] | None = None, user: dict = Depends(require_role("admin","manager"))):
+    c = await db.campaigns.find_one({"id": cid})
+    if not c: raise HTTPException(404)
+    if c.get("status") == "sent": raise HTTPException(400, "Déjà envoyée")
+    customer_ids = await _resolve_campaign_customers(c)
+    channels = c.get("channels") or []
+    sent_wa = sent_in = 0
+    for cid2 in customer_ids:
+        cust = await db.customers.find_one({"id": cid2})
+        if not cust: continue
+        msg = _render_template(c.get("text", ""), cust, c.get("offer"))
+        if "whatsapp" in channels and cust.get("wa_consent", True):
+            phone_digits = "".join(ch for ch in (cust.get("phone") or "") if ch.isdigit())
+            if phone_digits:
+                link = f"https://wa.me/{phone_digits}?text={_url_quote(msg)}"
+                await db.whatsapp_outbox.insert_one({
+                    "id": new_id(), "customer_id": cid2, "customer_name": cust.get("name"),
+                    "phone": cust.get("phone"), "phone_digits": phone_digits,
+                    "message": msg, "link": link, "kind": "campaign", "campaign_id": cid,
+                    "sent": False, "created_at": now_iso(), "created_by": user.get("name"),
+                }); sent_wa += 1
+        if "inapp" in channels and cust.get("msg_consent", True):
+            try:
+                await send_message({"customer_id": cid2, "text": msg, "kind": "boutique_cliente"}, user)
+                sent_in += 1
+            except Exception:
+                pass
+    stats_update = {
+        "status": "sent", "sent_at": now_iso(),
+        "stats.sent": sent_wa + sent_in,
+        "stats.sent_wa": sent_wa,
+        "stats.sent_inapp": sent_in,
+        "stats.delivered": sent_in,  # in-app delivery is instant
+    }
+    await db.campaigns.update_one({"id": cid}, {"$set": stats_update})
+    return {"ok": True, "sent_wa": sent_wa, "sent_inapp": sent_in, "targets": len(customer_ids)}
+
+@api.get("/campaigns/{cid}/report")
+async def campaigns_report(cid: str, user: dict = Depends(get_user)):
+    c = await db.campaigns.find_one({"id": cid})
+    if not c: raise HTTPException(404)
+    # Compute CA generated: orders by target customers after sent_at
+    sent_at = c.get("sent_at")
+    orders_count = 0; revenue = 0
+    if sent_at:
+        customer_ids = await _resolve_campaign_customers(c)
+        orders = await db.orders.find({"customer.id": {"$in": customer_ids}, "created_at": {"$gte": sent_at}, "status": {"$ne": "annulee"}}).to_list(2000)
+        orders_count = len(orders); revenue = sum(int(o.get("total", 0) or 0) for o in orders)
+    stats = {**(c.get("stats") or {}), "orders": orders_count, "revenue": revenue}
+    return {"campaign": clean(c), "stats": stats}
+
+# ---------- Pack 6B: Promotion types (renamable by owner) ----------
+DEFAULT_PROMO_TYPES = [
+    {"id": "percent", "label": "Pourcentage (%)", "mechanic": "percent", "builtin": True},
+    {"id": "fixed", "label": "Montant fixe (FCFA)", "mechanic": "fixed", "builtin": True},
+    {"id": "special_price", "label": "Prix spécial", "mechanic": "special_price", "builtin": True},
+    {"id": "bogo", "label": "2 pour 1", "mechanic": "bogo", "builtin": True},
+    {"id": "x_for_y", "label": "X acheté Y offert", "mechanic": "x_for_y", "builtin": True},
+    {"id": "free_delivery", "label": "Livraison gratuite", "mechanic": "free_delivery", "builtin": True},
+    {"id": "gift", "label": "Cadeau offert", "mechanic": "gift", "builtin": True},
+]
+
+async def _seed_promo_types():
+    cnt = await db.promo_types.count_documents({})
+    if cnt == 0:
+        await db.promo_types.insert_many([{**t, "created_at": now_iso()} for t in DEFAULT_PROMO_TYPES])
+
+@api.get("/promo-types")
+async def promo_types_list(user: dict = Depends(get_user)):
+    await _seed_promo_types()
+    rows = await db.promo_types.find({}).to_list(200)
+    return clean(rows)
+
+@api.post("/promo-types")
+async def promo_types_create(body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    label = (body.get("label") or "").strip()
+    mechanic = body.get("mechanic") or "percent"
+    if not label: raise HTTPException(400, "Label requis")
+    doc = {"id": new_id(), "label": label, "mechanic": mechanic, "builtin": False, "created_at": now_iso()}
+    await db.promo_types.insert_one(doc)
+    return clean(doc)
+
+@api.patch("/promo-types/{pid}")
+async def promo_types_update(pid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    """Owner can rename labels on any type (even builtin). Mechanic is locked for builtin."""
+    pt = await db.promo_types.find_one({"id": pid})
+    if not pt: raise HTTPException(404)
+    patch = {}
+    if "label" in body and body["label"].strip(): patch["label"] = body["label"].strip()
+    if "mechanic" in body and not pt.get("builtin"): patch["mechanic"] = body["mechanic"]
+    patch["updated_at"] = now_iso()
+    await db.promo_types.update_one({"id": pid}, {"$set": patch})
+    return {"ok": True}
+
+@api.delete("/promo-types/{pid}")
+async def promo_types_delete(pid: str, user: dict = Depends(require_role("admin","manager"))):
+    pt = await db.promo_types.find_one({"id": pid})
+    if not pt: raise HTTPException(404)
+    if pt.get("builtin"): raise HTTPException(400, "Type intégré — ne peut être supprimé (renommez-le plutôt)")
+    await db.promo_types.delete_one({"id": pid})
+    return {"ok": True}
+
 # ---------- Invoices ----------
 @api.get("/invoices")
 async def invoices(user: dict = Depends(get_user)):
