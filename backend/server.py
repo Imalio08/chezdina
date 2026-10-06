@@ -96,7 +96,9 @@ class ReviewIn(BaseModel):
     product_id: str; rating: int; comment: str = ""
     customer_name: str = "Cliente"; customer_phone: Optional[str] = None
 class ReviewModerationIn(BaseModel): status: str
-class AskIn(BaseModel): question: str
+class AskIn(BaseModel):
+    question: str
+    page: Optional[str] = None
 class StatusIn(BaseModel): status: str; reason: Optional[str] = None; next_date: Optional[str] = None
 class AssignIn(BaseModel): rider_id: str; rider_name: str
 class SessionIn(BaseModel): rider_id: str; rider_name: str; date: Optional[str] = None
@@ -991,8 +993,103 @@ async def share_order(body: Dict[str,Any], user: dict = Depends(get_user)):
     return {"link": f"/suivi/{o['code']}", "whatsapp_text": f"Bonjour {o.get('customer',{}).get('name','')}, voici votre reçu Chez Dina: {o['code']}"}
 
 # ---------- AI Ask Dina ----------
+async def _ai_tool_sales(period_days: int = 7) -> str:
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=period_days)).isoformat()
+    prev_cutoff = (datetime.now(timezone.utc) - timedelta(days=period_days*2)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status": {"$in":["livree","confirmee","prete","en_livraison"]}}).to_list(5000)
+    prev = await db.orders.find({"created_at": {"$gte": prev_cutoff, "$lt": cutoff}, "status": {"$in":["livree","confirmee","prete","en_livraison"]}}).to_list(5000)
+    rev = sum(o.get("total",0) for o in orders); prev_rev = sum(o.get("total",0) for o in prev)
+    cnt = len(orders); prev_cnt = len(prev)
+    pct = ((rev - prev_rev) / prev_rev * 100) if prev_rev else 0
+    label = {1:"aujourd'hui",7:"cette semaine",30:"ce mois",90:"ce trimestre"}.get(period_days, f"ces {period_days} jours")
+    return f"**CA {label}** : {rev:,.0f} FCFA sur {cnt} commandes. {('↗' if pct>=0 else '↘')} {pct:+.1f}% vs période précédente ({prev_rev:,.0f} FCFA, {prev_cnt} cmd).".replace(",", " ")
+
+async def _ai_tool_top_products(period_days: int = 30, limit: int = 5) -> str:
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=period_days)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}}).to_list(5000)
+    tops: Dict[str, Dict[str,float]] = {}
+    for o in orders:
+        for it in o.get("items",[]):
+            key = it["name"]
+            d = tops.setdefault(key, {"qty":0,"rev":0})
+            d["qty"] += it.get("qty",0); d["rev"] += it.get("qty",0)*it.get("price",0)
+    best = sorted(tops.items(), key=lambda x:-x[1]["rev"])[:limit]
+    if not best: return "Aucune vente sur la période."
+    lines = [f"**Top {limit} produits** ({period_days}j) :"] + [f"{i+1}. {n} — {int(d['qty'])} vendus · {d['rev']:,.0f} FCFA".replace(",", " ") for i,(n,d) in enumerate(best)]
+    return "\n".join(lines)
+
+async def _ai_tool_stock_alerts() -> str:
+    low = await db.products.find({"stock": {"$lt": 5}}).sort("stock", 1).to_list(20)
+    if not low: return "Aucune rupture ni stock bas détecté. ✓"
+    lines = [f"**{len(low)} produits en stock faible**:"] + [f"• {p['name']} · {p['stock']} restant(s) · SKU {p.get('sku','?')}" for p in low[:10]]
+    if len(low) > 10: lines.append(f"… et {len(low)-10} autres")
+    return "\n".join(lines)
+
+async def _ai_tool_inactive_customers(days: int = 30) -> str:
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    recent_orders = await db.orders.find({"created_at": {"$gte": cutoff}}).to_list(5000)
+    active_ids = {o.get("customer",{}).get("id") for o in recent_orders if o.get("customer",{}).get("id")}
+    all_customers = await db.customers.find({}).to_list(2000)
+    inactive = [c for c in all_customers if c["id"] not in active_ids and c.get("total_spent",0) > 0]
+    if not inactive: return "Aucune cliente inactive avec historique."
+    inactive.sort(key=lambda c:-c.get("total_spent",0))
+    lines = [f"**{len(inactive)} clientes inactives** (>{days}j sans commande) :"] + [f"• {c['name']} · {c.get('phone','')} · {c.get('total_spent',0):,.0f} FCFA cumulés".replace(",", " ") for c in inactive[:8]]
+    return "\n".join(lines)
+
+async def _ai_tool_rider_perf(period_days: int = 30) -> str:
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=period_days)).isoformat()
+    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "rider_id": {"$exists": True, "$ne": None}}).to_list(5000)
+    by_rider: Dict[str, Dict[str,int]] = {}
+    for o in orders:
+        rid = o.get("rider_id") or "unknown"
+        d = by_rider.setdefault(rid, {"total":0,"livree":0,"annulee":0,"echouee":0,"name":o.get("rider_name","?")})
+        d["total"] += 1
+        d[o.get("status","")] = d.get(o.get("status",""),0) + 1
+    if not by_rider: return "Aucune commande affectée à un livreur sur la période."
+    rows = sorted(by_rider.items(), key=lambda x:-x[1].get("annulee",0))[:5]
+    lines = ["**Performance des livreurs** (annulations décroissantes) :"]
+    for rid, d in rows:
+        rate = (d.get("annulee",0)/d["total"]*100) if d["total"] else 0
+        lines.append(f"• {d['name']} · {d['total']} courses · ✓ {d.get('livree',0)} livrées · ✗ {d.get('annulee',0)} annulées ({rate:.0f}%)")
+    return "\n".join(lines)
+
+async def _ai_tool_daily_summary(user: dict) -> str:
+    today = await _ai_tool_sales(1)
+    week = await _ai_tool_sales(7)
+    alerts = await _ai_tool_stock_alerts()
+    return f"**Résumé — Chez Dina**\n\n{today}\n\n{week}\n\n{alerts}"
+
+def _match_tool(q: str) -> Optional[str]:
+    q = q.lower().strip()
+    if any(w in q for w in ["résumé", "resume", "brief", "point du jour", "bilan"]): return "summary"
+    if any(w in q for w in ["rupture", "stock bas", "stock faible", "va tomber", "ruptures"]): return "stock"
+    if any(w in q for w in ["inactif", "inactive", "pas commandé", "n'a pas commandé", "clientes perdues", "win-back"]): return "inactive"
+    if any(w in q for w in ["livreur", "livreurs"]) and any(w in q for w in ["annul", "performance", "classement"]): return "rider"
+    if any(w in q for w in ["top", "meilleur", "best seller", "best-seller", "produits qui marchent", "rentable"]): return "top"
+    if any(w in q for w in ["ca", "chiffre d'affaires", "chiffre affaires", "vente", "ventes"]): return "sales"
+    return None
+
 @api.post("/ai/ask")
 async def ask_dina(body: AskIn, user: dict = Depends(get_user)):
+    q = body.question
+    # 1) Try structured tool call first (never invents numbers)
+    tool = _match_tool(q)
+    try:
+        if tool == "sales":
+            days = 30 if any(w in q.lower() for w in ["mois","30"]) else 7 if "semaine" in q.lower() else 1 if any(w in q.lower() for w in ["aujourd","jour"]) else 7
+            return {"answer": await _ai_tool_sales(days), "source": "tool:sales"}
+        if tool == "top": return {"answer": await _ai_tool_top_products(), "source": "tool:top_products"}
+        if tool == "stock": return {"answer": await _ai_tool_stock_alerts(), "source": "tool:stock_alerts"}
+        if tool == "inactive": return {"answer": await _ai_tool_inactive_customers(), "source": "tool:inactive_customers"}
+        if tool == "rider": return {"answer": await _ai_tool_rider_perf(), "source": "tool:rider_perf"}
+        if tool == "summary": return {"answer": await _ai_tool_daily_summary(user), "source": "tool:summary"}
+    except Exception:
+        logger.exception("AI tool")
+    # 2) Fallback: LLM with real context
     products_cnt = await db.products.count_documents({})
     customers_cnt = await db.customers.count_documents({})
     recent = await db.orders.find({}).sort("created_at", -1).to_list(100)
@@ -1002,14 +1099,15 @@ async def ask_dina(body: AskIn, user: dict = Depends(get_user)):
         for it in o.get("items",[]): tops[it["name"]] = tops.get(it["name"],0) + it["qty"]
     best = sorted(tops.items(), key=lambda x:-x[1])[:5]
     ctx = f"Chez Dina (Abidjan). Produits: {products_cnt}. Clientes: {customers_cnt}. CA récent (100 cmd): {rev:,} FCFA. Top: {', '.join(f'{n} ({q})' for n,q in best)}."
+    page_ctx = f" Page actuelle : {body.page}." if getattr(body, 'page', None) else ""
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
-        chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-{user['id']}", system_message=f"Tu es 'Dina IA', l'assistante de Chez Dina à Abidjan. Réponds TOUJOURS en français, bref, chiffré, actionnable. Jamais d'erreur technique brute. Données: {ctx}").with_model("anthropic","claude-sonnet-4-5-20250929")
-        reply = await chat.send_message(UserMessage(text=body.question))
-        return {"answer": str(reply)}
-    except Exception as ex:
+        chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-{user['id']}", system_message=f"Tu es 'Dina IA', l'assistante de Chez Dina à Abidjan. Réponds TOUJOURS en français, bref, chiffré, actionnable. Jamais d'erreur technique brute.{page_ctx} Données: {ctx}").with_model("anthropic","claude-sonnet-4-5-20250929")
+        reply = await chat.send_message(UserMessage(text=q))
+        return {"answer": str(reply), "source": "llm"}
+    except Exception:
         logger.exception("AI")
-        return {"answer": f"Je n'arrive pas à récupérer la réponse IA pour le moment. Voici un résumé local : CA récent ≈ {rev:,} FCFA, top produits : {', '.join(n for n,_ in best) or '—'}. Réessayez dans un instant.", "error": True}
+        return {"answer": f"Je n'arrive pas à récupérer la réponse IA pour le moment. Voici un résumé local : CA récent ≈ {rev:,} FCFA, top produits : {', '.join(n for n,_ in best) or '—'}. Réessayez dans un instant.".replace(",", " "), "error": True, "source": "fallback"}
 
 # ---------- Seed ----------
 IVORIAN = ["Aminata Koné","Fatou Traoré","Mariam Diallo","Awa Ouattara","Rokia Bamba","Sarah Yao","Christelle Brou","Nadège Kouassi","Fatim Cissé","Hawa Touré","Grace N'Guessan","Linda Zoro","Priscille Konan","Chantal Adou","Mireille Gnamien","Audrey Diomandé","Esther Soro","Céline Kouadio","Rachel Toto","Diane Assi","Mélanie Boni","Judith Kipré","Léa Yapo","Olivia Konate","Carine Bakayoko"]

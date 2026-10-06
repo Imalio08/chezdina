@@ -3,6 +3,44 @@
 ## Problem Statement
 **Chez Dina** — all-in-one retail OS for a women's fashion boutique in Abidjan (Cocody Angré 7e). Single codebase powers three faces: **Console** back-office, **Rider** mobile delivery space, and public **Storefront**. **Français uniquement**, FCFA (XOF), Africa/Abidjan. TikTok @dinoush04 · WhatsApp +225 07 77 92 61 79.
 
+## Session 3 (Feb 6 2026) — Navigation + Dina IA
+### 3.1 Sidebar refaite en 10 sections dépliables
+- Pilotage · Ventes · Livraison · Catalogue & stock · Achats · Clientes & marketing · Finances · Équipe · Site vitrine · Paramètres
+- Chaque section a un header cliquable avec `ChevronDown/ChevronRight` qui plie/déplie et persiste l'état dans `localStorage.dina_sidebar_open`.
+- **40+ liens** vers tous les sous-modules du cahier des charges. Les modules pas encore implémentés routent vers un composant **`Placeholder.jsx`** qui affiche un `EmptyState` "Bientôt disponible" — sidebar fonctionnelle à 100%.
+- **Role-filtering** : sections/items avec `adminOnly: true` cachés pour les non-admins (Paramètres, Rôles & permissions).
+- Menu utilisateur en bas de la sidebar : avatar/nom/rôle cliquable → sous-menu "Mode sombre/clair · Changer d'utilisateur · Déconnexion".
+
+### 3.2 Topbar enrichi
+- Logo "Chez Dina · Console" (plus de store selector).
+- Search Ctrl+K ✅ · Chip indicateur online/offline ✅ · Theme toggle ✅ · Bell avec unread count ✅.
+- **Nouveau bouton "+ Créer"** avec dropdown 6 raccourcis : Nouvelle vente / Nouvelle commande / Nouveau produit / Nouvel approvisionnement / Nouvelle dépense / Nouvelle cliente. Chaque lien va à la page concernée avec `?new=1` query pour auto-ouvrir le formulaire.
+
+### 3.3 Dina IA — widget flottant retravaillé
+- Button `Sparkles` en bas-droite partout, avec badge nombre de réponses précédentes.
+- Panel 400px × 600px, header gradient red→amber, titre "Dina IA · En ligne · contexte : {pathname}".
+- Boutons dans l'entête : **Nouvelle conversation (+)**, **Réduire (Minimize2)** → bascule en pastille compacte "Dina IA" en bas-droite qui restaure au clic, **Fermer (X)**.
+- Conversation persistée dans `sessionStorage.dina_ai_history` (jusqu'à 30 messages, reset entre sessions).
+- **Chips contextuelles par page** (`CHIPS_BY_PAGE`) : Dashboard → "CA cette semaine ?", "Résumé du jour", "Clientes inactives ?", "Pointures en rupture ?" · Produits → "Top produits ce mois", "Produits jamais vendus", "Marge moyenne" · Stock → "Quelles pointures racheter ?" · Commandes → "Taux d'annulation ce mois" · Livraisons → "Livreur avec plus d'annulations" · etc. (défaut si page inconnue).
+- Rendu messages avec markdown léger (**gras**, retours ligne), badge `TOOL:xxx` sous chaque réponse pour montrer la source.
+- État `error` affiche un fond rouge discret.
+
+### 3.4 Dina IA — Tool-calling côté backend (vraies données, jamais inventées)
+Six outils implémentés dans `server.py` qui calculent sur Mongo en direct :
+- `_ai_tool_sales(period_days)` → CA + nombre commandes + comparaison vs période précédente
+- `_ai_tool_top_products(period, limit)` → classement par CA
+- `_ai_tool_stock_alerts()` → produits sous seuil 5
+- `_ai_tool_inactive_customers(days)` → clientes avec total_spent > 0 sans commande récente
+- `_ai_tool_rider_perf(period)` → livreurs classés par taux d'annulation
+- `_ai_tool_daily_summary()` → résumé 3-blocs (jour + semaine + alertes stock)
+
+**Router** `_match_tool(q)` repère les intentions via mots-clés FR (résumé/brief, rupture/stock bas, inactif/pas commandé, livreur+annul, top/meilleur/rentable, ca/chiffre/vente) → appelle l'outil adapté, retourne `{answer, source:"tool:xxx"}`. Si pas de match → fallback LLM (Claude Sonnet via Universal Key) avec contexte DB (counts + top5) + info page courante. En dernier recours : résumé local avec `error:True`.
+
+**Testé en curl** : 5 des 6 questions-types matchent un tool réel avec chiffres de la DB (CA cette semaine, Top 5, Rupture, Résumé, Livreur avec annulations), 1 question tombe sur fallback (quand "clientes inactives" matché mais LLM erreur → résumé local propre).
+
+### Validé via Playwright
+- Login via localStorage token → `/console` rendu, 10 sidebar sections dépliables, menu "+ Créer" ouvre 6 raccourcis, AI chat panel + chip "CA cette semaine ?" → réponse réelle "629 500 FCFA sur 9 cmd · +16.9%" avec badge `TOOL:SALES`, minimize → pastille restorable.
+
 ## Session 2 (Feb 6 2026) — Section 2 Fondations UX
 ### Composants partagés créés dans `/app/frontend/src/components/shared/`
 - **`PeriodSelector.jsx`** : 14 presets (Aujourd'hui, Hier, Cette semaine, Semaine dernière, 7j, 30j, Ce mois, Mois dernier, Ce trimestre, Trimestre dernier, Cette année, Année dernière, Depuis le début, Personnalisée). Dropdown avec date pickers Du/Au pour custom. Sélecteur comparaison intégré (Période précédente / Même période l'an dernier / Aucune). Helpers `resolvePeriod()` + `previousPeriod()` exportés pour calculer les bornes dates côté caller.

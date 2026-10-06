@@ -26,6 +26,7 @@ import AlertsAndCarts from "@/pages/console/AlertsAndCarts";
 import Integrations from "@/pages/console/Integrations";
 import Settings from "@/pages/console/Settings";
 import SiteSettings from "@/pages/console/SiteSettings";
+import Placeholder from "@/pages/console/Placeholder";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
 import Catalog from "@/pages/storefront/Catalog";
@@ -84,6 +85,28 @@ export default function App() {
               <Route path="site" element={<ErrorBoundary><SiteSettings /></ErrorBoundary>} />
               <Route path="integrations" element={<ErrorBoundary><Integrations /></ErrorBoundary>} />
               <Route path="parametres" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
+              {/* Placeholder routes for upcoming modules (keep sidebar functional) */}
+              <Route path="factures" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="sessions-caisse" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="journees-livraison" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="livreurs" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="zones" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="marques" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="categories" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="liste-attente" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="fournisseurs" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="paniers-abandonnes" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="parrainage" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="campagnes-whatsapp" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="encaissements" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="resultat" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="employes" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="roles" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="pointage" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="apparence" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="pages" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="menus" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
+              <Route path="seo" element={<ErrorBoundary><Placeholder/></ErrorBoundary>} />
             </Route>
             <Route path="/console/livreur" element={<ProtectedRider><ErrorBoundary><Rider /></ErrorBoundary></ProtectedRider>} />
             <Route path="/" element={<Navigate to="/console" replace />} />
