@@ -1,16 +1,26 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, User, Search, MessageCircle, X } from "lucide-react";
+import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket } from "lucide-react";
 import { useApp } from "@/context/AppContext";
+import { useCustomer } from "@/context/CustomerContext";
 import api from "@/lib/api";
 
 export default function StorefrontLayout() {
   const { cart } = useApp();
+  const { customer, logout } = useCustomer();
   const count = cart.reduce((s,x)=>s+x.qty,0);
   const nav = useNavigate();
   const [q, setQ] = useState("");
   const [sugg, setSugg] = useState([]);
   const [open, setOpen] = useState(false);
+  const [userMenu, setUserMenu] = useState(false);
+  const umRef = useRef(null);
+
+  useEffect(() => {
+    const onClick = (e) => { if (umRef.current && !umRef.current.contains(e.target)) setUserMenu(false); };
+    window.addEventListener("click", onClick);
+    return () => window.removeEventListener("click", onClick);
+  }, []);
 
   useEffect(() => {
     if (!q.trim() || q.trim().length < 2) { setSugg([]); return; }
@@ -84,7 +94,32 @@ export default function StorefrontLayout() {
               </div>
             )}
           </form>
-          <Link to="/boutique/account" className="w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-account"><User size={18}/></Link>
+          {customer ? (
+            <div ref={umRef} className="relative shrink-0">
+              <button onClick={(e) => { e.stopPropagation(); setUserMenu(v => !v); }} className="h-9 pl-2 pr-2 rounded-full hover:bg-[#fafafa] flex items-center gap-1.5 text-sm" data-testid="storefront-user-menu">
+                {customer.photo ? (
+                  <img src={customer.photo} alt="" className="w-7 h-7 rounded-full object-cover"/>
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-[#fde8e8] text-[#b02a2a] font-semibold grid place-items-center text-xs">{(customer.name || "D")[0]}</div>
+                )}
+                <span className="hidden md:inline font-medium text-[#1c1c1c]">Bonjour, {(customer.name || "").split(" ")[0]}</span>
+                <ChevronDown size={14} className="text-[#666]"/>
+              </button>
+              {userMenu && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-[#ececec] rounded-xl shadow-lg py-1 z-40" data-testid="user-dropdown" onClick={() => setUserMenu(false)}>
+                  <Link to="/boutique/compte" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-account"><User size={14}/>Mon compte</Link>
+                  <Link to="/boutique/compte/commandes" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-orders"><Package size={14}/>Mes commandes</Link>
+                  <Link to="/boutique/compte/messages" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-messages"><MessageSquare size={14}/>Messages</Link>
+                  <Link to="/boutique/compte/favoris" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-favorites"><Heart size={14}/>Favoris</Link>
+                  <Link to="/boutique/compte/bons-achat" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-vouchers"><Ticket size={14}/>Bons d'achat</Link>
+                  <div className="border-t border-[#f0f0f0] my-1"></div>
+                  <button onClick={() => { logout(); nav("/boutique"); }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm text-[#c62828]" data-testid="menu-logout-header"><LogOut size={14}/>Déconnexion</button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <Link to="/boutique/compte" className="w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-account"><User size={18}/></Link>
+          )}
           <Link to="/boutique/checkout" className="relative w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-cart">
             <ShoppingBag size={18}/>
             {count>0 && <span className="absolute -top-1 -right-1 bg-[#b02a2a] text-white text-[10px] font-bold rounded-full w-4 h-4 grid place-items-center">{count}</span>}

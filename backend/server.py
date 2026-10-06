@@ -519,12 +519,263 @@ async def regen_access_code(cid: str, user: dict = Depends(require_role("admin",
 
 @api.post("/public/account/change-code")
 async def change_code(body: Dict[str, Any], c: dict = Depends(get_customer)):
+    old = (body.get("old_code") or "").strip()
     new = (body.get("new_code") or "").strip()
+    if old and (c.get("access_code") or "").strip() != old:
+        raise HTTPException(400, "Code actuel incorrect")
     if len(new) != 6 or not new.isdigit(): raise HTTPException(400, "Code à 6 chiffres requis")
     if new in ("123456","000000","111111","222222","333333","444444","555555","666666","777777","888888","999999","121212"):
         raise HTTPException(400, "Code trop simple")
     await db.customers.update_one({"id": c["id"]}, {"$set": {"access_code": new, "access_code_must_change": False, "access_code_changed_at": now_iso()}})
     return {"ok": True}
+
+# ---------- Pack 8 Wave B: Customer account enrichment ----------
+@api.post("/public/account/photo")
+async def account_upload_photo(body: Dict[str,Any], c: dict = Depends(get_customer)):
+    photo = body.get("photo")
+    if not photo or not isinstance(photo, str): raise HTTPException(400, "photo (base64) requise")
+    await db.customers.update_one({"id": c["id"]}, {"$set": {"photo": photo, "photo_updated_at": now_iso()}})
+    return {"ok": True, "photo": photo}
+
+@api.patch("/public/account/update")
+async def account_update(body: Dict[str,Any], c: dict = Depends(get_customer)):
+    allowed = {"name","email","birthday","shoe_size","clothing_size","notes","preferences","communication_prefs"}
+    patch = {k: v for k,v in body.items() if k in allowed}
+    if not patch: raise HTTPException(400, "Aucun champ")
+    await db.customers.update_one({"id": c["id"]}, {"$set": patch})
+    cust = await db.customers.find_one({"id": c["id"]}, {"password_hash": 0})
+    return clean(cust)
+
+@api.get("/public/account/addresses")
+async def account_addresses_list(c: dict = Depends(get_customer)):
+    cust = await db.customers.find_one({"id": c["id"]}) or {}
+    return cust.get("addresses") or []
+
+@api.post("/public/account/addresses")
+async def account_addresses_add(body: Dict[str,Any], c: dict = Depends(get_customer)):
+    cust = await db.customers.find_one({"id": c["id"]}) or {}
+    addrs = cust.get("addresses") or []
+    body["id"] = new_id(); body["created_at"] = now_iso()
+    if body.get("default") or not addrs:
+        for a in addrs: a["default"] = False
+        body["default"] = True
+    addrs.append(body)
+    await db.customers.update_one({"id": c["id"]}, {"$set": {"addresses": addrs}})
+    return {"ok": True, "addresses": addrs}
+
+@api.patch("/public/account/addresses/{aid}")
+async def account_addresses_update(aid: str, body: Dict[str,Any], c: dict = Depends(get_customer)):
+    cust = await db.customers.find_one({"id": c["id"]}) or {}
+    addrs = cust.get("addresses") or []
+    for a in addrs:
+        if a.get("id") == aid: a.update(body)
+    if body.get("default"):
+        for a in addrs: a["default"] = (a.get("id") == aid)
+    await db.customers.update_one({"id": c["id"]}, {"$set": {"addresses": addrs}})
+    return {"ok": True, "addresses": addrs}
+
+@api.delete("/public/account/addresses/{aid}")
+async def account_addresses_delete(aid: str, c: dict = Depends(get_customer)):
+    cust = await db.customers.find_one({"id": c["id"]}) or {}
+    addrs = [a for a in (cust.get("addresses") or []) if a.get("id") != aid]
+    await db.customers.update_one({"id": c["id"]}, {"$set": {"addresses": addrs}})
+    return {"ok": True, "addresses": addrs}
+
+_IN_PROGRESS_STATUSES = ("nouvelle","confirmee","assignee","en_preparation","en_livraison","reportee")
+_CANCELLED_STATUSES = ("annulee","retournee","refusee")
+
+@api.get("/public/account/orders-split")
+async def account_orders_split(c: dict = Depends(get_customer)):
+    orders = await db.orders.find({"customer.id": c["id"]}).sort("created_at", -1).to_list(300)
+    in_progress = [o for o in orders if o.get("status") in _IN_PROGRESS_STATUSES]
+    delivered = [o for o in orders if o.get("status") == "livree"]
+    cancelled = [o for o in orders if o.get("status") in _CANCELLED_STATUSES]
+    return {
+        "in_progress": clean(in_progress),
+        "delivered": clean(delivered),
+        "cancelled": clean(cancelled),
+        "counts": {"in_progress": len(in_progress), "delivered": len(delivered), "cancelled": len(cancelled)},
+    }
+
+@api.get("/public/account/order/{code}")
+async def account_order_detail(code: str, c: dict = Depends(get_customer)):
+    o = await db.orders.find_one({"code": code, "customer.id": c["id"]})
+    if not o: raise HTTPException(404, "Commande introuvable")
+    rider = None
+    if o.get("rider_id"):
+        r = await db.users.find_one({"id": o.get("rider_id")}, {"password_hash":0, "pin_hash":0})
+        if r:
+            rider = {"id": r["id"], "name": r.get("name"), "first_name": (r.get("name") or "").split()[0],
+                     "phone": r.get("phone"), "whatsapp": r.get("whatsapp") or r.get("phone"), "photo": r.get("photo")}
+    return {"order": clean(o), "rider": rider}
+
+@api.get("/public/account/recently-viewed")
+async def account_recently_viewed(c: dict = Depends(get_customer), limit: int = 20):
+    cust = await db.customers.find_one({"id": c["id"]}) or {}
+    ids = [x["product_id"] for x in (cust.get("recently_viewed") or [])][:limit]
+    if not ids: return []
+    prods = await db.products.find({"id": {"$in": ids}}).to_list(len(ids))
+    pmap = {p["id"]: p for p in prods}
+    return clean([pmap[i] for i in ids if i in pmap])
+
+@api.post("/public/account/recently-viewed")
+async def account_recently_viewed_track(body: Dict[str,Any], c: dict = Depends(get_customer)):
+    pid = body.get("product_id")
+    if not pid: raise HTTPException(400, "product_id requis")
+    cust = await db.customers.find_one({"id": c["id"]}) or {}
+    recent = [x for x in (cust.get("recently_viewed") or []) if x.get("product_id") != pid]
+    recent.insert(0, {"product_id": pid, "at": now_iso()})
+    await db.customers.update_one({"id": c["id"]}, {"$set": {"recently_viewed": recent[:30]}})
+    return {"ok": True}
+
+@api.get("/public/account/reviews-pending")
+async def account_reviews_pending(c: dict = Depends(get_customer)):
+    orders = await db.orders.find({"customer.id": c["id"], "status": "livree"}).to_list(500)
+    rated_pids = set()
+    for r in await db.order_ratings.find({"customer_id": c["id"]}).to_list(500):
+        for pid in (r.get("product_ids") or []): rated_pids.add(pid)
+    pending = []
+    seen = set()
+    for o in orders:
+        for it in o.get("items", []):
+            pid = it.get("product_id")
+            if pid and pid not in rated_pids and pid not in seen:
+                seen.add(pid)
+                pending.append({"product_id": pid, "name": it.get("name"), "image": it.get("image"),
+                                "order_code": o.get("code"), "delivered_at": o.get("delivered_at") or o.get("created_at")})
+    return pending[:50]
+
+@api.post("/public/account/reviews")
+async def account_submit_review(body: Dict[str,Any], c: dict = Depends(get_customer)):
+    pid = body.get("product_id")
+    rating = int(body.get("rating") or 0)
+    comment = (body.get("comment") or "").strip()
+    if not pid or not (1 <= rating <= 5): raise HTTPException(400, "Produit et note (1-5) requis")
+    doc = {"id": new_id(), "product_id": pid, "customer_id": c["id"],
+           "customer_name": c.get("name"), "rating": rating, "comment": comment,
+           "approved": True, "hidden": False, "created_at": now_iso()}
+    await db.reviews.insert_one(doc)
+    # Update product rating
+    rs = await db.reviews.find({"product_id": pid, "hidden": {"$ne": True}}).to_list(500)
+    if rs:
+        avg = sum(x["rating"] for x in rs) / len(rs)
+        await db.products.update_one({"id": pid}, {"$set": {"rating_avg": round(avg,1), "rating_count": len(rs)}})
+    await db.order_ratings.insert_one({"id": new_id(), "customer_id": c["id"],
+                                       "product_ids": [pid], "rating": rating, "created_at": now_iso()})
+    return {"ok": True}
+
+@api.get("/public/account/vouchers")
+async def account_vouchers(c: dict = Depends(get_customer)):
+    rows = await db.vouchers.find({"customer_id": c["id"]}).sort("created_at", -1).to_list(100)
+    return clean(rows)
+
+# ---------- Rider live position (Wave B) ----------
+@api.post("/rider/position")
+async def rider_position(body: Dict[str,Any], user: dict = Depends(get_user)):
+    if user.get("role") != "rider": raise HTTPException(403, "Livreur seulement")
+    lat = body.get("lat"); lng = body.get("lng")
+    if lat is None or lng is None: raise HTTPException(400, "lat/lng requis")
+    doc = {"rider_id": user["id"], "rider_name": user.get("name"), "lat": float(lat), "lng": float(lng),
+           "heading": body.get("heading"), "speed": body.get("speed"),
+           "at": now_iso(), "order_id": body.get("order_id")}
+    await db.rider_positions.update_one({"rider_id": user["id"]}, {"$set": doc}, upsert=True)
+    return {"ok": True}
+
+# Simple simulator cache
+_SIM_POS: Dict[str, Dict[str,Any]] = {}
+
+def _interp(a: float, b: float, t: float) -> float: return a + (b - a) * t
+
+async def _simulated_rider_position(order: Dict[str,Any]) -> Optional[Dict[str,Any]]:
+    """Compute a plausible rider position based on order age and delivery zone."""
+    oid = order.get("id")
+    # Start point: store Cocody
+    start = (5.3765, -3.9915)
+    # End point: zone centroids (fallback near Cocody)
+    zone_centers = {"Cocody": (5.3600, -3.9800), "Yopougon": (5.3450, -4.0850),
+                    "Plateau": (5.3200, -4.0190), "Treichville": (5.2900, -4.0160),
+                    "Marcory": (5.3010, -3.9800), "Riviera": (5.3760, -3.9430),
+                    "Angré": (5.4040, -3.9540), "Abobo": (5.4300, -4.0100),
+                    "Adjamé": (5.3540, -4.0210), "Attécoubé": (5.3300, -4.0530)}
+    end = None
+    z = order.get("delivery_zone") or ""
+    for k, v in zone_centers.items():
+        if k.lower() in z.lower(): end = v; break
+    if not end:
+        end = (start[0] + 0.012, start[1] - 0.008)
+    # Progress: based on time since en_livraison, 0..1 over ~15 minutes
+    tl = order.get("timeline") or []
+    enl = next((t for t in reversed(tl) if t.get("status") == "en_livraison"), None)
+    if not enl: return None
+    try:
+        start_at = datetime.fromisoformat(enl["at"].replace("Z","+00:00"))
+    except Exception:
+        return None
+    elapsed = (datetime.now(timezone.utc) - start_at).total_seconds()
+    t = min(0.95, elapsed / (15 * 60))
+    return {"lat": _interp(start[0], end[0], t), "lng": _interp(start[1], end[1], t),
+            "simulated": True, "progress": round(t * 100), "at": now_iso()}
+
+@api.get("/public/order/{code}/rider-position")
+async def public_rider_position(code: str):
+    o = await db.orders.find_one({"code": code})
+    if not o: raise HTTPException(404)
+    if o.get("status") != "en_livraison":
+        return {"active": False, "status": o.get("status")}
+    pos = None
+    if o.get("rider_id"):
+        p = await db.rider_positions.find_one({"rider_id": o["rider_id"]})
+        if p:
+            try:
+                age = (datetime.now(timezone.utc) - datetime.fromisoformat(p["at"].replace("Z","+00:00"))).total_seconds()
+            except Exception:
+                age = 999
+            if age < 60:
+                pos = {"lat": p["lat"], "lng": p["lng"], "simulated": False, "at": p.get("at")}
+    if not pos:
+        pos = await _simulated_rider_position(o)
+    if not pos:
+        return {"active": True, "position": None}
+    rider = None
+    if o.get("rider_id"):
+        r = await db.users.find_one({"id": o.get("rider_id")}, {"password_hash":0,"pin_hash":0})
+        if r:
+            rider = {"id": r["id"], "name": r.get("name"), "first_name": (r.get("name") or "").split()[0],
+                     "phone": r.get("phone"), "photo": r.get("photo")}
+    # ETA: simple remaining %
+    eta_min = max(1, round((100 - pos.get("progress", 50)) * 0.15))
+    return {"active": True, "position": pos, "rider": rider, "eta_minutes": eta_min, "status": "en_livraison"}
+
+# ---------- Customer thread helpers (reuse messaging) ----------
+@api.get("/public/account/threads")
+async def account_threads(c: dict = Depends(get_customer)):
+    rows = await db.conversations.find({"participants.id": c["id"]}).sort("updated_at", -1).to_list(100)
+    out = []
+    for r in rows:
+        parts = r.get("participants") or []
+        other = next((p for p in parts if p.get("id") != c["id"]), {})
+        last = (r.get("messages") or [{}])[-1] if r.get("messages") else None
+        unread = sum(1 for m in (r.get("messages") or []) if c["id"] not in (m.get("read_by") or []))
+        out.append({"id": r.get("id"), "kind": r.get("kind"), "order_id": r.get("order_id"),
+                    "with": other, "last_message": last, "unread": unread, "updated_at": r.get("updated_at")})
+    return clean(out)
+
+@api.post("/public/account/thread/rider/{order_code}")
+async def account_open_rider_thread(order_code: str, c: dict = Depends(get_customer)):
+    o = await db.orders.find_one({"code": order_code, "customer.id": c["id"]})
+    if not o: raise HTTPException(404, "Commande introuvable")
+    rid = o.get("rider_id")
+    if not rid: raise HTTPException(400, "Pas de livreur assigné")
+    key = f"c:{c['id']}|r:{rid}"
+    existing = await db.conversations.find_one({"key": key})
+    if existing: return {"id": existing["id"]}
+    r = await db.users.find_one({"id": rid}, {"password_hash":0, "pin_hash":0})
+    conv = {"id": new_id(), "key": key, "kind": "cliente_livreur", "order_id": o["id"], "closed": False,
+            "participants": [{"kind":"customer","id":c["id"],"name":c.get("name")},
+                             {"kind":"rider","id":rid,"name":r.get("name") if r else "Livreur"}],
+            "messages": [], "created_at": now_iso(), "updated_at": now_iso()}
+    await db.conversations.insert_one(conv)
+    return {"id": conv["id"]}
 
 # ---------- Pack 6: In-app messaging ----------
 async def _conv_key(parts: List[str]) -> str:

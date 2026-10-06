@@ -1,0 +1,32 @@
+{
+  "summary": "Fix Pack 8 Wave A (Storefront) fully validated. Backend: 4/4 pytest green — public /api/public/storefront/sections exposes a 'mosaic' section with props.images (20 seeded), /api/public/search-suggestions returns products/categories/brands for q>=2 chars, PATCH /api/storefront/sections persists a new mosaic section (admin) and GET round-trips it, PATCH requires auth (401). Frontend: 18/18 E2E — storefront header shows 'Chez Dina' logo with NO 'boutique' subtitle, inline search input is permanently visible with correct French placeholder, autosuggest dropdown appears on >=2 chars (8 items for 'robe' including product thumbnails + type tags), Enter submits to /boutique/catalog?q=robe. Mosaic section renders at /boutique with 40 tiles (20 x2 for seamless loop), transforms update continuously (verified via style.transform diffs over 1.5s), pauses on hover (identical transforms after proper locator.hover). Responsive: 500px=2 cols, 900px=3 cols, 1300px=4 cols. prefers-reduced-motion:reduce disables scroll (empty transforms). Chez Dina string appears 4x (header + footer + mosaic title + CTA). Console /console/accueil SectionBuilder: 'Ajouter' menu exposes data-testid='add-mosaic' which creates a new section (toast 'Mosaïque défilante ajouté'); clicking Éditer on a mosaic opens the editor modal exposing mosaic-dropzone, mosaic-file-input, mosaic-img-0, mosaic-link-0, mosaic-remove-0 and per-image size selector. Account/cart buttons present, cart badge logic intact.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Mosaic tiles", "issues": ["Per spec non-linked tiles should 'render as a plain div'. Current implementation also attaches data-testid='mosaic-tile' to the non-linked div variant, which is harmless but may differ from strict reading of the acceptance criteria. If strict, exclude the testid when img.link is falsy."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack8_wavea.py",
+    "/app/test_reports/pytest/fixpack8_wavea.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "MosaicSection uses requestAnimationFrame + per-column useEffect(deps: paused) — effect re-starts raf on each pause toggle; works correctly but closures recreate frequently. Consider refs-only pattern.",
+    "Non-linked mosaic tile still carries data-testid='mosaic-tile'; see design note above.",
+    "StorefrontLayout search uses /public/search-suggestions with 200ms debounce — good. onBlur close delay 180ms allows link click; OK.",
+    "SectionBuilder: 20 seeded mosaic images render inside the editor modal fine; file input accepts multiple + max 3Mo per image gating correctly described in UI."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixpack8_wavea.py (new, 4 tests, reusable regression)"
+  ],
+  "success_rate": {"backend": "100% (4/4)", "frontend": "100% (18/18) acceptance criteria + console editor"},
+  "test_credentials": "admin aouattaraesca@gmail.com / Admin123! verified OK (no PIN gate hit on this flow)",
+  "seed_data_creation": "TEST_FP8_mosaic section was PATCHed and then rolled back to the original sections list — no residual data.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Wave A storefront (search + mosaic + Chez Dina branding) is production-ready. Reusable regression at /app/backend/tests/test_fixpack8_wavea.py. For hover-pause testing, use locator.hover() (not page.mouse.move) because synthetic mouse.move does not reliably fire React onMouseEnter in headless. Mosaic transforms become empty strings under prefers-reduced-motion. 20 mosaic images already seeded.",
+  "rca of the issue": "No blockers. All Wave A acceptance criteria verified at API + UI level."
+}

@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
+import { CustomerProvider } from "@/context/CustomerContext";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Login from "@/pages/Login";
 import ConsoleLayout from "@/components/layout/ConsoleLayout";
@@ -72,6 +73,7 @@ import ProductPage from "@/pages/storefront/Product";
 import Checkout from "@/pages/storefront/Checkout";
 import Tracking from "@/pages/storefront/Tracking";
 import Account from "@/pages/storefront/Account";
+import AccountShell from "@/pages/storefront/AccountShell";
 import SharedCart from "@/pages/storefront/SharedCart";
 
 function Protected({ children }) {
@@ -92,6 +94,7 @@ export default function App() {
   return (
     <AuthProvider>
       <AppProvider>
+        <CustomerProvider>
         <BrowserRouter>
           <Toaster position="top-right" richColors />
           <Routes>
@@ -111,6 +114,7 @@ export default function App() {
               <Route path="product/:id" element={<ProductPage />} />
               <Route path="checkout" element={<Checkout />} />
               <Route path="account" element={<Account />} />
+              <Route path="compte/*" element={<AccountShell />} />
               <Route path="bons-plans" element={<BonsPlans />} />
             </Route>
             <Route path="/console" element={<Protected><ConsoleLayout /></Protected>}>
@@ -175,6 +179,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/console" replace />} />
           </Routes>
         </BrowserRouter>
+        </CustomerProvider>
       </AppProvider>
     </AuthProvider>
   );
