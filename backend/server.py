@@ -1850,12 +1850,31 @@ async def kpis(user: dict = Depends(get_user), period: str = "30d"):
     avg_prev = int(rev_prev / max(1, len(orders_prev)))
     delivered = sum(1 for o in orders_curr if o.get("status")=="livree")
     delivered_prev = sum(1 for o in orders_prev if o.get("status")=="livree")
+    cancelled = sum(1 for o in orders_curr if o.get("status")=="annulee")
+    cancelled_prev = sum(1 for o in orders_prev if o.get("status")=="annulee")
+    deferred = sum(1 for o in orders_curr if o.get("status")=="reportee")
+    cancel_rate = round(cancelled * 100 / max(1, len(orders_curr)), 1)
+    cancel_rate_prev = round(cancelled_prev * 100 / max(1, len(orders_prev)), 1)
     pending = await db.orders.count_documents({"status": {"$in": ["nouvelle","confirmee","en_preparation","prete","assignee","en_livraison"]}})
     low_stock = await db.products.count_documents({"stock": {"$lt": 5}})
     expenses_total = sum(x.get("amount",0) for x in expenses_curr)
-    margin = rev - expenses_total
 
-    # Timeseries
+    # Load all products once for cost lookup
+    all_products = {p["id"]: p for p in await db.products.find({}).to_list(5000)}
+    cogs = 0
+    for o in orders_curr:
+        for it in o.get("items", []):
+            p = all_products.get(it.get("product_id")) or {}
+            cogs += int(p.get("cost", 0) or 0) * int(it.get("qty", 0) or 0)
+    gross_margin = rev - cogs
+    gross_margin_prev = 0
+    for o in orders_prev:
+        for it in o.get("items", []):
+            p = all_products.get(it.get("product_id")) or {}
+            gross_margin_prev += int(it.get("qty",0)*it.get("price",0)) - int(p.get("cost",0))*int(it.get("qty",0))
+
+    # Timeseries with status split
+    from datetime import datetime, timedelta, timezone
     days = (datetime.fromisoformat(e.replace("Z","+00:00")) - datetime.fromisoformat(s.replace("Z","+00:00"))).days or 1
     buckets = min(days, 30)
     step = max(1, days // buckets)
@@ -1864,33 +1883,75 @@ async def kpis(user: dict = Depends(get_user), period: str = "30d"):
         t0 = datetime.fromisoformat(s.replace("Z","+00:00")) + timedelta(days=i*step)
         t1 = t0 + timedelta(days=step)
         label = t0.strftime("%d/%m")
-        rv = sum(o.get("total",0) for o in orders_curr if t0.isoformat() <= o.get("created_at","") < t1.isoformat())
-        oc = sum(1 for o in orders_curr if t0.isoformat() <= o.get("created_at","") < t1.isoformat())
-        series.append({"date": label, "revenue": rv, "orders": oc})
+        in_bucket = [o for o in orders_curr if t0.isoformat() <= o.get("created_at","") < t1.isoformat()]
+        rv = sum(o.get("total",0) for o in in_bucket)
+        # Day-level status counts
+        d_order = len(in_bucket)
+        d_deliv = sum(1 for o in in_bucket if o.get("status") == "livree")
+        d_can = sum(1 for o in in_bucket if o.get("status") == "annulee")
+        d_def = sum(1 for o in in_bucket if o.get("status") == "reportee")
+        # Margin for this bucket
+        mgn = 0
+        for o in in_bucket:
+            for it in o.get("items", []):
+                p = all_products.get(it.get("product_id")) or {}
+                mgn += int(it.get("qty",0))*int(it.get("price",0)) - int(p.get("cost",0))*int(it.get("qty",0))
+        series.append({"date": label, "revenue": rv, "margin": mgn, "orders": d_order,
+                       "delivered": d_deliv, "cancelled": d_can, "deferred": d_def})
 
-    # Top products by category & by qty
+    # Top products
     counts: Dict[str, Dict[str,Any]] = {}
-    cat_rev: Dict[str, int] = {}
     for o in orders_curr:
         for it in o.get("items", []):
             k = it["product_id"]
             if k not in counts: counts[k] = {"id": k, "name": it["name"], "qty": 0, "revenue": 0, "image": it.get("image")}
             counts[k]["qty"] += it["qty"]; counts[k]["revenue"] += it["qty"]*it["price"]
-            # category rev (lookup from products later)
     top = sorted(counts.values(), key=lambda x: x["qty"], reverse=True)[:10]
+
+    # By category table (Row 3)
+    cat_agg: Dict[str, Dict[str,Any]] = {}
+    cat_prev: Dict[str, int] = {}
+    for o in orders_curr:
+        for it in o.get("items", []):
+            p = all_products.get(it.get("product_id")) or {}
+            cat = p.get("category") or it.get("category") or "—"
+            e_rev = int(it.get("qty",0)) * int(it.get("price",0))
+            e_cost = int(p.get("cost",0)) * int(it.get("qty",0))
+            if cat not in cat_agg: cat_agg[cat] = {"category": cat, "revenue": 0, "orders_ids": set(), "items": 0, "margin": 0}
+            cat_agg[cat]["revenue"] += e_rev
+            cat_agg[cat]["orders_ids"].add(o["id"])
+            cat_agg[cat]["items"] += int(it.get("qty",0))
+            cat_agg[cat]["margin"] += e_rev - e_cost
+    for o in orders_prev:
+        for it in o.get("items", []):
+            p = all_products.get(it.get("product_id")) or {}
+            cat = p.get("category") or it.get("category") or "—"
+            cat_prev[cat] = cat_prev.get(cat, 0) + int(it.get("qty",0)) * int(it.get("price",0))
+    by_category = []
+    for cat, data in cat_agg.items():
+        orders_n = len(data["orders_ids"])
+        rv_cat = data["revenue"]; rv_prev_cat = cat_prev.get(cat, 0)
+        by_category.append({
+            "category": cat, "revenue": rv_cat, "orders": orders_n, "items": data["items"],
+            "avg_basket": int(rv_cat / max(1, orders_n)),
+            "margin": data["margin"],
+            "margin_pct": round(data["margin"] * 100 / max(1, rv_cat), 1),
+            "delta_pct": delta_pct(rv_cat, rv_prev_cat),
+        })
+    by_category.sort(key=lambda x: x["revenue"], reverse=True)
 
     channels: Dict[str, Dict[str,int]] = {}
     for o in orders_curr:
         c = o.get("channel","store")
         if c not in channels: channels[c] = {"count": 0, "value": 0}
         channels[c]["count"] += 1; channels[c]["value"] += o.get("total",0)
-
     payments: Dict[str, int] = {}
     for o in orders_curr:
         pm = o.get("payment_method","cash"); payments[pm] = payments.get(pm,0) + o.get("total",0)
 
     return {
         "period": period,
+        "generated_at": now_iso(),
         "revenue": {"value": rev, "prev": rev_prev, "delta": delta_pct(rev, rev_prev),
                     "description": "Chiffre d'affaires brut sur la période sélectionnée. Somme des totaux de toutes les commandes."},
         "orders_count": {"value": len(orders_curr), "prev": len(orders_prev), "delta": delta_pct(len(orders_curr), len(orders_prev)),
@@ -1903,18 +1964,24 @@ async def kpis(user: dict = Depends(get_user), period: str = "30d"):
                           "description": "Nouvelles clientes inscrites sur la période."},
         "delivered": {"value": delivered, "prev": delivered_prev, "delta": delta_pct(delivered, delivered_prev),
                       "description": "Commandes livrées avec succès."},
+        "cancel_rate": {"value": cancel_rate, "prev": cancel_rate_prev, "delta": delta_pct(cancel_rate, cancel_rate_prev),
+                         "description": "Taux d'annulation = commandes annulées / total × 100."},
+        "cancelled": {"value": cancelled, "prev": cancelled_prev, "delta": delta_pct(cancelled, cancelled_prev),
+                      "description": "Commandes annulées sur la période."},
+        "deferred": {"value": deferred, "prev": 0, "delta": 0, "description": "Commandes reportées."},
         "pending_orders": {"value": pending, "prev": pending, "delta": 0,
                            "description": "Commandes en cours de traitement (non livrées, non annulées)."},
         "low_stock": {"value": low_stock, "prev": low_stock, "delta": 0,
                       "description": "Produits avec moins de 5 unités en stock."},
         "expenses": {"value": expenses_total, "prev": 0, "delta": 0,
                      "description": "Total des dépenses enregistrées sur la période."},
-        "margin": {"value": margin, "prev": 0, "delta": 0,
-                   "description": "Marge brute estimée : CA - dépenses."},
+        "margin": {"value": gross_margin, "prev": gross_margin_prev, "delta": delta_pct(gross_margin, gross_margin_prev),
+                   "description": "Marge brute = CA - coût des marchandises vendues."},
         "sales_series": series,
         "top_products": top[:5],
         "channels": [{"name": k, "count": v["count"], "value": v["value"]} for k,v in channels.items()],
         "payments": [{"name": k, "value": v} for k,v in payments.items()],
+        "by_category": by_category,
     }
 
 @api.get("/dashboard/drill/{kind}")
