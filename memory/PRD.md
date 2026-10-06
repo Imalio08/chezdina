@@ -1,5 +1,16 @@
 # Chez Dina — PRD
 
+## P2 Livraison (Feb 2026) ✅
+
+### Nouvelles pages / composants
+- `DeliveryDays.jsx` — rewritten : KPIs 4 cartes, modal `CreateDayModal` avec sélecteur date + livreur obligatoire (plus de auto-pick premier livreur), tableau cliquable
+- `DayDetail` enrichi : tab **Affectation** avec cases à cocher mobile-friendly + "Tout sélectionner" + bouton "Affecter à {rider session}" ou "Affecter à un autre livreur…" (modal `pick-rider-modal` qui call `PATCH /deliveries/{oid}/assign`); nouveau bouton **"Suggérer une répartition"** → `POST /deliveries/suggest-split` affiche panneau avec propositions zones+charge+Apply
+- `LiveDeliveryMap.jsx` (new) — tab **Suivi** : carte Leaflet, pins commandes colorés par statut (prete=f4b12c, assignee=5867fd, en_livraison=0021cc, livree=1f8a4c, annulee=c62828), markers livreurs ronds rouges avec initiales + popup. Polling `/riders/locations` toutes les 15 s. Légende statique en bas.
+- `Riders.jsx` → `RiderProfile` : filtre calendrier (from/to + chips 7j/30j), 4 StatMini (Total/Livrées/Annulées/CA livré), tableau historique filtré
+
+### Backend
+- `POST /api/deliveries/suggest-split` (admin/manager) : groupe par zone, round-robin biased vers livreur déjà sur la zone, équilibre la charge actuelle du jour
+
 ## P1 Sprint 2 (Feb 2026) — Préparation scan + Kiosk selfie ✅
 
 ### Nouvelles pages / composants
@@ -199,13 +210,7 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - ~~Blind inventory & reception~~ ✅ déjà en place (audit OK)
 - ~~Préparation screen : scan article par article + fallback manuel~~ ✅ livré
 
-### P2 — Fix pack 4 (Livraison)
-- 3 pages séparées : Journées / Livreurs / Zones & tarifs
-- Fix création journée
-- Affectation checkboxes (DnD desktop bonus seulement)
-- "Suggérer une répartition" par zone + charge livreur
-- Suivi Leaflet temps réel + pins colorés par statut
-- Historique livreur avec filtre calendrier
+### P2 — Fix pack 4 (Livraison) ✅ TERMINÉ
 
 ### P3 — Fix pack 5 (Produits & achats)
 - Séparer Catégories & collections de Marques ; Approvisionnements vs Fournisseurs

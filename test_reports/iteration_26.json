@@ -1,0 +1,31 @@
+{
+  "summary": "Iter26 P2 Livraison testing complete. Backend 7/7 pytest green (test_iter26_suggest_split.py): /api/deliveries/suggest-split returns proper zone-grouped + load-balanced suggestions with rider_id/rider_name/orders/zones/total_load; explicit rider_ids=['nope'] correctly returns {suggestions:[], message:'Aucun livreur actif'}; unauth 401/403; /delivery-sessions GET+POST+close CRUD OK; /riders/locations returns list. Frontend: /console/livraisons renders delivery-days-page with 4 KPIs (dd-open=4, dd-closed=1, dd-tocollect=1.1M FCFA, dd-riders=4). Create flow works: dd-create-open opens create-day-modal with create-day-date + create-day-rider (5 options including placeholder) + create-day-confirm; selecting a rider + submitting POSTs /delivery-sessions and reloads table (6 rows, was 5). Clicking a dd-row-{id} opens detail with all 4 tabs (affectation/suivi/reconciliation/fiches). Assignment: dd-select-all visible when ready orders exist; after clicking it, dd-affect-current and dd-affect-other appear (they are conditional on selected.length>0, as designed). dd-affect-other opens pick-rider-modal with 5 pick-rider-{id} buttons. dd-suggest triggers POST /deliveries/suggest-split and renders dd-suggestions panel with 5 sug-{rider_id} proposals showing zones + total_load. Suivi tab: live-delivery-map mounts, .leaflet-container present, OpenStreetMap tiles render (Abidjan map visible with KO rider marker). Riders page: 4 rider-card tiles, clicking opens rider-profile with rider-hist-from, rider-hist-to, rider-hist-7d, rider-hist-30d chips and rider-hist-table — all testids present and 7d chip is clickable. Regression: 14 console pages (dashboard, statistiques, commandes, approbations, audit, roles, sessions-caisse, pos, preparation, pointage, zones, produits, stock, clients) all load with 0 pageerrors.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Hydration warnings (pre-existing)", "issues": ["<span> cannot be a child of <option> still logged in PeriodSelector, Audit filter, Roles bulk selects. Non-blocking (tracked since iter24)."]},
+      {"screen": "Guided tour", "issues": ["Still uses dina_tour_done_${user.id} key — must be seeded AFTER login (user id unknown pre-login). Overlay intercepts first-visit clicks until closed/seeded."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter26_suggest_split.py",
+    "/app/test_reports/pytest/iter26.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "server.py suggest_split uses `from datetime import datetime, timezone` inside the function (line 1360) shadowing the module-level import — harmless but noisy; remove the local import.",
+    "DeliveryDays.jsx line 127 does `for (const oid of selected) await api.patch(...)` sequentially — N round-trips. For >10 selected orders, consider Promise.all or a batch endpoint PATCH /delivery-sessions/{sid}/add-orders.",
+    "LiveDeliveryMap polls every 15s but has no visibility/pause-on-blur guard — minor battery drain on mobile tabs.",
+    "GuidedTour key is user-id-scoped (dina_tour_done_${user.id}) with no 'skip-all' per-page keys — automated tests need /api/auth/me first to seed; consider accepting also a global `dina_tour_skip=1` flag for testability."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter26_suggest_split.py", "/app/test_reports/iteration_26.json"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% — all P2 Livraison testids verified; 14/14 regression pages load"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! — login successful.",
+  "seed_data_creation": "Created one new delivery-session (rider Bamba Oumar) during the create-day modal test. Non-destructive, left open for future testing.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "P2 Livraison fully functional. To test guided-tour-blocked UI flows, login first then evaluate `localStorage.setItem('dina_tour_done_'+userId,'1')` using /api/auth/me response. The pick-rider-modal uses Escape to close. dd-affect-current/dd-affect-other only render after selection — click dd-select-all or a ready-{oid} checkbox first.",
+  "rca of the issue": "N/A — no bugs found."
+}
