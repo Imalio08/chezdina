@@ -1,5 +1,36 @@
 # Chez Dina — PRD
 
+## Manuel enrichi · captures annotées 05→16 (Feb 2026) ✅
+
+### Extension du composant AnnotatedScreenshot
+14 nouveaux écrans SVG ajoutés dans `components/manual/AnnotatedScreenshot.jsx` :
+- `delivery_riders` · `delivery_zones` (module 05)
+- `products_grid` · `product_variants` (module 06)
+- `suppliers_po` (module 07)
+- `stock_list` (module 08)
+- `customers_list` (module 09)
+- `promo_codes` (module 10)
+- `stats_tabs` (module 11)
+- `cms_pages` (module 12)
+- `attendance_kiosk` (module 13)
+- `settings_identity` (module 14)
+- `rider_app` — mockup téléphone (module 15)
+- `approvals_inbox` (module 16)
+
+Total : 20 écrans annotés disponibles (6 initiaux + 14 nouveaux)
+
+### Modules 05→16 réécrits en mode "rich"
+`POST /api/manual/reseed` renvoie désormais `{updated: 16}` — tous les modules sont enrichis avec :
+- Captures SVG annotées (cercles rouges numérotés + légendes contextuelles)
+- Blocs `steps` numérotés avec étapes exploitables
+- Blocs `callout` (info / tip / warning)
+- Blocs `statuses` (ex: segments clientes, scores livreurs, statuts BC)
+- Blocs `faq` (modules 11, 13)
+- Blocs `memo` A4 imprimable (module 11 propriétaire)
+- Blocs `video_placeholder` (modules 2, 6)
+
+Chaque module couvre 2-3 sections avec en moyenne 3-4 blocs par section.
+
 ## Manuel enrichi avec captures annotées (Feb 2026) ✅
 
 ### Nouveau composant
@@ -13,7 +44,7 @@
 - `faq` : questions fréquentes dépliantes
 
 ### Backend
-- `POST /api/manual/reseed` (admin only, idempotent) : écrase les 4 modules clés avec la version illustrée — Prise en main, Faire une vente, Préparer et expédier une commande, Pour aller plus loin
+- `POST /api/manual/reseed` (admin only, idempotent) : écrase les 16 modules avec la version illustrée (étendu Feb 2026)
 - Chaque module contient captures annotées + étapes numérotées + mémos + FAQ + glossaire
 
 ## P4 Horaires éditeur (Feb 2026) ✅
