@@ -4,7 +4,8 @@ import api from "@/lib/api";
 import { fcfa, dateFmt } from "@/lib/format";
 import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
-import { MessageCircle, ShoppingBag, ChevronLeft, ChevronRight, Star, Check, Bell } from "lucide-react";
+import { MessageCircle, ShoppingBag, ChevronLeft, ChevronRight, Star, Check, Bell, Play } from "lucide-react";
+import { hasRealVariants, availableColorsForSize, availableSizesForColor, stockFor, comboExists } from "@/lib/variants";
 
 function Stars({ value = 0, size = 14, onPick }) {
   return (
@@ -49,9 +50,19 @@ export default function ProductPage() {
 
   if (!p) return <div className="p-10 text-sm text-[#666]">Chargement…</div>;
   const gallery = (p.images && p.images.length ? p.images : [p.image]).filter(Boolean);
+  const videos = p.videos || [];
   const current = gallery[imgIdx] || p.image;
-  const stockForSize = size ? (p.stock_by_size?.[size] ?? 0) : (p.stock || 0);
-  const canAdd = stockForSize > 0;
+  const stockForSize = hasRealVariants(p)
+    ? (size && color ? stockFor(p, size, color) : 0)
+    : (size ? (p.stock_by_size?.[size] ?? 0) : (p.stock || 0));
+  const canAdd = stockForSize > 0 && (!hasRealVariants(p) || comboExists(p, size, color));
+  // Filter visible sizes/colors by real variants
+  const visibleSizes = hasRealVariants(p)
+    ? Array.from(new Set((p.sizes || []).filter(s => (color ? availableSizesForColor(p, color).includes(s) : (p.variants || []).some(v => v.enabled && v.size === s)))))
+    : (p.sizes || []);
+  const visibleColors = hasRealVariants(p)
+    ? Array.from(new Set((p.colors || []).filter(c => (size ? availableColorsForSize(p, size).includes(c) : (p.variants || []).some(v => v.enabled && v.color === c)))))
+    : (p.colors || []);
 
   const add = () => { if(!canAdd) return toast.error("Rupture pour cette taille"); addToCart(p,1,size,color); toast.success("Ajouté au panier"); };
   const wa = () => {
@@ -83,6 +94,14 @@ export default function ProductPage() {
               </button>
             ))}</div>
           )}
+
+          {videos.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 gap-3" data-testid="product-videos">
+              {videos.map((src, i) => (
+                <video key={i} src={src} controls preload="metadata" playsInline muted className="w-full rounded-lg bg-black aspect-video" data-testid={`product-video-${i}`}/>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <div className="text-xs text-[#b02a2a] uppercase tracking-wide">{p.brand} · {p.category}</div>
@@ -91,12 +110,12 @@ export default function ProductPage() {
           <div className="tabular text-2xl font-semibold mt-3">{fcfa(p.price)}</div>
           <p className="text-sm text-[#666] mt-4 leading-relaxed">{p.description}</p>
 
-          {!!p.sizes?.length && (
+          {!!visibleSizes.length && (
             <div className="mt-6">
               <div className="text-xs uppercase text-[#666] mb-2">{p.category==="Chaussures"?"Pointure":"Taille"}</div>
               <div className="flex gap-2 flex-wrap">
-                {p.sizes.map(s=>{
-                  const stk = p.stock_by_size?.[s] ?? 0;
+                {visibleSizes.map(s=>{
+                  const stk = hasRealVariants(p) ? (color ? stockFor(p, s, color) : (p.variants || []).filter(v => v.enabled && v.size === s).reduce((a,v)=>a+(v.stock||0),0)) : (p.stock_by_size?.[s] ?? 0);
                   const out = stk === 0;
                   return (
                     <button key={s} onClick={()=>!out && setSize(s)} disabled={out} className={`relative flex flex-col items-center justify-center w-14 h-14 rounded-lg border text-sm transition ${size===s?"bg-[#1c1c1c] text-white border-[#1c1c1c]":out?"border-[#ececec] text-[#ccc] line-through cursor-not-allowed":"border-[#ececec] hover:border-[#b02a2a]"}`} data-testid={`product-size-${s}`}>
@@ -106,14 +125,20 @@ export default function ProductPage() {
                   );
                 })}
               </div>
-              {size && <div className="text-xs text-[#666] mt-2">{stockForSize>0?`${stockForSize} en stock pour la ${p.category==="Chaussures"?"pointure":"taille"} ${size}`:"Rupture — essayez une autre taille"}</div>}
+              {size && <div className="text-xs text-[#666] mt-2">{stockForSize>0?`${stockForSize} en stock pour la ${p.category==="Chaussures"?"pointure":"taille"} ${size}${color?` en ${color}`:""}`:"Rupture — essayez une autre combinaison"}</div>}
             </div>
           )}
 
-          {!!p.colors?.length && (
+          {!!visibleColors.length && (
             <div className="mt-5">
               <div className="text-xs uppercase text-[#666] mb-2">Couleur · <span className="text-[#1c1c1c] font-medium">{color}</span></div>
-              <div className="flex gap-2 flex-wrap">{p.colors.map(c=><button key={c} onClick={()=>setColor(c)} className={`px-3 h-9 rounded-lg border text-xs ${color===c?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid={`product-color-${c}`}>{c}</button>)}</div>
+              <div className="flex gap-2 flex-wrap">{visibleColors.map(c => {
+                const exists = !hasRealVariants(p) || !size || comboExists(p, size, c);
+                const stk = hasRealVariants(p) && size ? stockFor(p, size, c) : 1;
+                const out = exists && stk === 0;
+                if (!exists) return null; // never show non-existing combos
+                return <button key={c} onClick={()=>!out && setColor(c)} disabled={out} className={`px-3 h-9 rounded-lg border text-xs ${color===c?"bg-[#1c1c1c] text-white border-[#1c1c1c]":out?"border-[#ececec] text-[#ccc] line-through":"border-[#ececec]"}`} data-testid={`product-color-${c}`}>{c}{out && " · M'alerter"}</button>;
+              })}</div>
             </div>
           )}
 

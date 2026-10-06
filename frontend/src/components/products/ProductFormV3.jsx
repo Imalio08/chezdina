@@ -7,6 +7,8 @@ import ImageUpload from "@/components/shared/ImageUpload";
 import CreateOnFlySelect from "@/components/shared/CreateOnFlySelect";
 import AiDescribeModal from "./AiDescribeModal";
 import SeoSection from "./SeoSection";
+import VariantsGrid from "./VariantsGrid";
+import VideoUpload from "./VideoUpload";
 
 const SHOE_SIZES = ["36","37","38","39","40","41","42"];
 const CLOTH_SIZES = ["XS","S","M","L","XL","XXL"];
@@ -17,9 +19,9 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
   const [f, setF] = useState({
     name:"", category:"", brand:"", collections:"", tags:"", material:"", occasion:"",
     heel_type:"", care:"", supplier:"",
-    description:"", images:[], image:"",
+    description:"", images:[], image:"", videos:[],
     price:0, cost:0, price_old:0,
-    sizes:[], colors:[], stock_by_size:{}, stock:0,
+    sizes:[], colors:[], stock_by_size:{}, stock:0, variants:[],
     alert_threshold:3,
     status:"actif", visibility:"both", featured:false, is_new:false,
     seo_title:"", seo_description:"",
@@ -133,6 +135,11 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
             <ImageUpload value={f.images||(f.image?[f.image]:[])} onChange={imgs=>setF({...f,images:imgs,image:imgs[0]||""})} max={8} maxKB={400} testid="pfv-images"/>
           </Section>
 
+          {/* 3b. Vidéos */}
+          <Section title="3b. Vidéos (facultatif, 2 max)" icon={ImageIcon}>
+            <VideoUpload videos={f.videos || []} onChange={vs => upd("videos", vs)}/>
+          </Section>
+
           {/* 4. Prix */}
           <Section title="4. Prix & marge" icon={DollarSign}>
             <div className="grid grid-cols-3 gap-3">
@@ -191,6 +198,13 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
                 </table>
               </div>
             )}
+
+            {/* 5b. Grille réelle taille × couleur */}
+            <div className="mt-5 pt-4 border-t border-[#ececec] dark:border-[#2a2a2a]">
+              <div className="text-xs font-semibold uppercase text-[#666] mb-2">Combinaisons réelles taille × couleur</div>
+              <p className="text-[11px] text-[#999] mb-2 italic">Seules les combinaisons activées sont affichées en vitrine et dans la caisse. Si vous n'avez pas de pointure 43 en Rouge, désactivez cette cellule.</p>
+              <VariantsGrid sizes={f.sizes||[]} colors={f.colors||[]} variants={f.variants||[]} onChange={vs => upd("variants", vs)}/>
+            </div>
           </Section>
 
           {/* 6. Stock */}

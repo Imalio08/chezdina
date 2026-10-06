@@ -86,6 +86,11 @@ class ProductIn(BaseModel):
     seo_description: Optional[str] = None
     promo_pct: Optional[int] = None
     season: Optional[str] = None
+    # Real variants grid: list of {size, color, stock, enabled, price?} — only existing combos
+    variants: List[Dict[str, Any]] = []
+    # Videos (up to 2, MP4/MOV ≤ 60s ≤ 50MB) — base64 data URL or external URL
+    videos: List[str] = []
+    video_posters: List[str] = []
 class OrderItem(BaseModel):
     product_id: str; name: str; size: Optional[str]=None; color: Optional[str]=None
     qty: int = 1; price: int; image: Optional[str] = None
