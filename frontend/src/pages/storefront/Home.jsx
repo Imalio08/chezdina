@@ -98,17 +98,6 @@ export default function Home() {
       <Row title="Bons plans" eyebrow="Promotions" products={bonsPlans} link="/boutique/bons-plans" />
       <Row title="Nouveautés" eyebrow="Fraîchement arrivé" products={nouveautes} link="/boutique/catalog?sort=new" />
 
-      {sections.filter(s => s.type === "mosaic" && (s.props?.images || []).length > 0).map((s, idx) => (
-        <MosaicSection
-          key={s.id || `mos-${idx}`}
-          title={s.props?.title}
-          eyebrow={s.props?.eyebrow}
-          subtitle={s.props?.subtitle}
-          images={s.props.images}
-          speed={s.props?.speed || 25}
-        />
-      ))}
-
       {categories.slice(0, 4).map(c => <Row key={c} title={c} products={byCat(c)} link={`/boutique/catalog?cat=${encodeURIComponent(c)}`} />)}
 
       {lookbook.length > 0 && lookbook[0].product_ids?.length > 0 && (
@@ -144,8 +133,10 @@ export default function Home() {
   );
 }
 
-function HeroCarousel({ props, idx }) {
-  const slides = props.mosaic?.length ? props.mosaic.map((img, i) => ({ image: img, title: i === 0 ? props.title : "", subtitle: i === 0 ? props.subtitle : "" })) : [];
+function HeroCarousel({ props }) {
+  const images = (props.mosaic || []).filter(Boolean);
+  const col1 = images.filter((_, i) => i % 2 === 0);
+  const col2 = images.filter((_, i) => i % 2 === 1);
   return (
     <section className="relative bg-[#fff5f5] dark:bg-[#2a1818] overflow-hidden" data-testid="hero-carousel">
       <div className="max-w-7xl mx-auto px-4 py-10 md:py-16 grid md:grid-cols-2 gap-8 items-center">
@@ -155,10 +146,50 @@ function HeroCarousel({ props, idx }) {
           <p className="text-[#666] dark:text-[#aaa] mt-4 max-w-md leading-relaxed">{props.subtitle}</p>
           <Link to={props.cta_link || "/boutique/catalog"} className="dina-btn-primary mt-5 inline-flex" data-testid="hero-cta">{props.cta_label || "J'achète"} <ChevronRight size={16} /></Link>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          {(props.mosaic || []).slice(0, 4).map((src, i) => <div key={i} className={`aspect-[3/4] rounded-2xl overflow-hidden ${i === idx ? "ring-2 ring-[#b02a2a]" : ""}`}><img src={src} alt="" className="w-full h-full object-cover" /></div>)}
-        </div>
+        {images.length > 0 && (
+          <div className="grid grid-cols-2 gap-3 h-[520px] md:h-[560px] overflow-hidden" data-testid="hero-mosaic">
+            <HeroColumn images={col1} direction="up" speed={18} />
+            <HeroColumn images={col2.length ? col2 : col1} direction="up" speed={22} offset />
+          </div>
+        )}
       </div>
     </section>
+  );
+}
+
+function HeroColumn({ images, speed = 20, offset = false }) {
+  const trackRef = useRef(null);
+  const posRef = useRef(offset ? -120 : 0);
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced || !trackRef.current) return;
+    let raf, last = performance.now();
+    const half = () => (trackRef.current ? trackRef.current.scrollHeight / 2 : 0);
+    const step = (now) => {
+      const dt = (now - last) / 1000; last = now;
+      posRef.current += speed * dt;
+      const h = half();
+      if (h && posRef.current >= h) posRef.current -= h;
+      if (trackRef.current) trackRef.current.style.transform = `translate3d(0, ${-posRef.current}px, 0)`;
+      raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+  }, [images.length, speed]);
+  if (!images.length) return null;
+  return (
+    <div className="relative overflow-hidden rounded-2xl">
+      <div ref={trackRef} className="will-change-transform">
+        {[0, 1].map(dup => (
+          <div key={dup}>
+            {images.map((src, i) => (
+              <div key={`${dup}-${i}`} className={`${i % 3 === 0 ? "aspect-[3/4]" : i % 3 === 1 ? "aspect-[4/5]" : "aspect-square"} rounded-2xl overflow-hidden mb-3 bg-[#eee]`}>
+                <img src={src} alt="" loading="lazy" className="w-full h-full object-cover" />
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
