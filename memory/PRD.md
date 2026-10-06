@@ -1,6 +1,28 @@
 # Chez Dina — PRD
 
-## Fix pack 8 Vague A (Feb 2026) — Storefront ✅
+## Fix pack 8 Vague C (Feb 2026) — Site vitrine refonte ✅
+
+### Backend
+- `/public/site` GET expose `theme`, `social`, `seo`, `menu`, `footer`, `sections`
+- `/site` PATCH accepte updates partiels sur ces 5 clés
+- `/pages` POST enforced slug uniqueness (409), PATCH exige page existante (404)
+
+### Frontend — Nouvelle page `SiteVitrine` (`/console/site`)
+- **5 onglets** : Apparence / Accueil / Pages & navigation / SEO & partage / Aperçu
+- **Apparence** : 7 color pickers (primaire, secondaire, bouton, fond, texte, dark bg, dark text), 4 presets, contrast badges WCAG, font selector 7 polices Google (Sora, Inter, Playfair, DM Sans, Poppins, Montserrat, Cormorant), radius slider 0-24, 3 card styles
+- **Accueil** : réutilise `SectionBuilder` (hero, mosaic, product_grid, banner, trust_strip, text_block, newsletter)
+- **Pages & nav** : 4 sous-onglets — Pages (CRUD + éditeur plein), Menu (header), Pied de page (colonnes), Réseaux sociaux (7 réseaux, seuls les remplis apparaissent)
+- **SEO** : titre/description avec compteurs, upload image partage base64, pixels FB/TikTok/GA, lien sitemap
+- **Aperçu** : iframe desktop/mobile, partage lien, publier
+- `useSiteTheme` hook : applique CSS vars + injecte Google Fonts sur storefront
+- Footer storefront : affiche uniquement les réseaux renseignés avec icônes
+- Tests iteration_19 : backend 8/8, frontend 98% ✅
+
+## Fix pack 8 Vague B — Compte client ✅
+(voir ci-dessus)
+
+## Fix pack 8 Vague A — Storefront & mosaïque ✅
+(voir ci-dessus)
 - Marque "Chez Dina" nettoyée partout (plus de sous-titre "boutique")
 - Barre de recherche permanente dans le header avec autosuggest (produits/catégories/marques, debounce 200ms)
 - Nouvelle section `MosaicSection` (masonry 3-4 cols desktop / 2 mobile, défilement vertical continu à vitesses alternées, pause au hover, prefers-reduced-motion respecté, lien optionnel par image)

@@ -3729,15 +3729,19 @@ async def list_pages(user: dict = Depends(get_user)):
 
 @api.post("/pages")
 async def create_page(body: CmsPageIn, user: dict = Depends(require_role("admin","manager"))):
+    existing = await db.cms_pages.find_one({"slug": body.slug})
+    if existing: raise HTTPException(409, "Slug déjà utilisé")
     doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso()})
     await db.cms_pages.insert_one(doc)
     return clean(doc)
 
 @api.patch("/pages/{slug}")
 async def update_page(slug: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    existing = await db.cms_pages.find_one({"slug": slug})
+    if not existing: raise HTTPException(404, "Page introuvable")
     body.pop("_id", None); body.pop("id", None)
     body["updated_at"] = now_iso()
-    await db.cms_pages.update_one({"slug": slug}, {"$set": body}, upsert=True)
+    await db.cms_pages.update_one({"slug": slug}, {"$set": body})
     return {"ok": True}
 
 @api.delete("/pages/{slug}")

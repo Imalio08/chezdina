@@ -1,0 +1,45 @@
+{
+  "summary": "Fix Pack 8/9 Wave C — Site vitrine refonte tested end-to-end. Backend: 8/8 pytest green on /app/backend/tests/test_fixpack8_wavec.py (GET /public/site returns optional keys with sections default; PATCH /site persists partial theme/social/seo/menu/footer; /pages list+CRUD cycle including public exposure of enabled page and 404 after delete; sitemap.xml reachable). Frontend: /console/site renders the 5-tab shell (sv-tab-apparence/accueil/pages/seo/apercu all visible). Apparence tab exposes all 7 color inputs (color-primary/secondary/button/background/text/dark-background/dark-text) + theme-preset select (applies Dina classique #b02a2a successfully) + theme-font (Inter switch verified end-to-end on storefront) + theme-radius slider + 3 card-style buttons + apparence-save → PATCHes /site and shows toast 'Apparence enregistrée — rechargez /boutique'. Accueil tab mounts the SectionBuilder. Pages & nav sub-tabs all present (pn-sub-pages/menu/footer/social) and switch correctly; menu-add/menu-save, footer-tagline/footer-save, all 7 social inputs + social-save, page-new all functional. SEO tab shows seo-title, seo-description (char counters), pixel-fb, sitemap-link, seo-save (seo-share-upload is a hidden <input type=file> so is_visible=False — functionally fine). Aperçu tab: preview-desktop/preview-mobile toggles iframe parent width 1280 → 375; share-link + publish link present. ?tab=seo deep link persists correctly. All 5 legacy routes (/console/apparence|accueil|pages|menus|seo) redirect to /console/site?tab=X. Storefront integration: GET /public/site is called on mount, CSS vars --dina-yellow=#b02a2a, --dina-radius=10px, --dina-font=\"Inter\",... applied, Google Fonts link injected for Inter, body.style.fontFamily set. Footer renders only the filled social icons (facebook+instagram) via data-testid='footer-social-facebook/instagram' — the 5 empty ones are correctly hidden.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/pages", "issue": "Slug uniqueness is NOT enforced — second POST with the same slug returns 200 and inserts a duplicate row (verified: status1=200, status2=200). Spec says 'POST /pages creates with unique slug'. Add a check 'await db.cms_pages.find_one({slug})' and return 409 if exists."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "SeoTab share image uploader", "issue": "data-testid='seo-share-upload' is on a hidden <input type=file> wrapped by a label — Playwright reports it as not visible. Upload works via the parent label. Not a bug, but tests must trigger it via set_input_files or click the parent label. Consider adding data-testid on the visible label as 'seo-share-upload-btn'.", "selector": "[data-testid=\"seo-share-upload\"]", "priority": "LOW"},
+      {"component": "ContrastBadge", "issue": "Badges render ratio text correctly in the DOM but my evaluate() regex returned empty — functional spot-check through subsequent screenshot shows they are rendered. Not a bug; verify visually that 'Texte sur fond : {ratio}:1 ✓' uses green class bg-[#e8f6ee] when ratio>=4.5.", "selector": "[data-testid=\"theme-preset\"] ~ div .rounded", "priority": "INFO"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console Dashboard (post-login)", "issues": ["Pre-existing React hydration warning: PeriodSelector <option> has <span> child via x-source instrumentation (console error 'In HTML, <span> cannot be a child of <option>'). Not Wave C scope but noisy — same warning on every console page load."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_fixpack8_wavec.py",
+    "/app/test_reports/pytest/fixpack8_wavec.xml"
+  ],
+  "action_items": [
+    "Backend: enforce unique slug in POST /api/pages (return 409 if slug already exists).",
+    "Frontend (optional): add data-testid='seo-share-upload-btn' on the visible upload label so Playwright can target the clickable surface rather than the hidden file input."
+  ],
+  "critical_code_review_comments": [
+    "SiteVitrine.jsx (459 lines) packs 5 tabs + 4 sub-components + helpers into a single file. Still under the 700-line threshold but each tab (Apparence/Accueil/Pages/Menu/Footer/Social/SEO/Apercu) is a candidate for its own file under /pages/console/sitevitrine/ for maintainability.",
+    "PagesSub uses prompt()/confirm() for create+delete flows — non-French natives aside, these native browser dialogs break Playwright happy-path testing and look unpolished vs the rest of the console. Replace with a Dialog modal (slug/title/content inputs).",
+    "ApparenceTab uses navigator.clipboard.writeText(url) in Aperçu's share-link without feature detection — will throw on insecure contexts or Firefox w/o permission. Wrap in try/catch and fallback to a toast with the URL.",
+    "useSiteTheme.js loads Google Fonts via createElement every mount but guards with LOADED_FONTS set — the set is a module-level global, so works across unmount/remount in same session. Good. But --dina-yellow and --dina-yellow-dark are set to the same value (`primary`); if dark variant is intentional, derive via HSL darken or expose a separate theme.primary_dark key.",
+    "POST /api/pages lacks slug uniqueness enforcement (see backend issue). Also PATCH /pages/{slug} uses upsert=True which silently creates a page if slug is wrong, bypassing POST validation.",
+    "SeoTab inlines pixel_tiktok and pixel_google inputs without data-testid — spec only required pixel-fb but add 'pixel-tiktok' and 'pixel-google' for consistency and testability."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_fixpack8_wavec.py (new, 8 tests)"
+  ],
+  "success_rate": {"backend": "100% (8/8 pytest green)", "frontend": "~98% — all required data-testids present and functional; only seo-share-upload is a hidden input (expected UX pattern), everything else green"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123! verified OK.",
+  "seed_data_creation": "Site settings were mutated (theme.primary=#b02a2a, theme.font=Inter, theme.radius=18, theme.card_style=flat, social.facebook/instagram set, seo.title='TEST_WaveC Site', footer.tagline='TEST_tagline WaveC', menu with 1 appended item). One extra duplicate page 'test-dup-check' was deliberately created to prove slug uniqueness is missing — recommend main agent cleanup via DELETE /api/pages/test-dup-check once (removes one of the two rows; the duplicate backs onto the same slug so the remaining can be purged via DB).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Backend regression at /app/backend/tests/test_fixpack8_wavec.py (8 tests, ~3s). Site vitrine state has been mutated by tests — Dina classique preset applied with font=Inter, radius=18, card_style=flat. If re-running Wave C UI tests, expect the storefront to be using the Inter font. Slug uniqueness still unenforced: creating two pages with same slug both return 200. The storefront useSiteTheme hook correctly updates CSS vars and injects Google Fonts link — verified visually. Only filled social links render footer icons (facebook+instagram present, 5 others correctly absent).",
+  "rca of the issue": "No blocking issues. The lone backend minor is in server.py around line 3730: `@api.post('/pages')` -> `create_page` simply calls `db.cms_pages.insert_one(doc)` without checking slug uniqueness. Fix: add `if await db.cms_pages.find_one({'slug': body.slug}): raise HTTPException(409, 'Slug déjà utilisé')` at the top of the handler."
+}

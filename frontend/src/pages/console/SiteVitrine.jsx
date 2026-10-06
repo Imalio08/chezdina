@@ -188,8 +188,11 @@ function ContrastBadge({ label, ratio }) {
 }
 
 function hexToRgb(h) {
-  const m = h.replace("#", "").match(/.{1,2}/g); if (!m) return [0,0,0];
-  return m.map(x => parseInt(x.length === 1 ? x+x : x, 16));
+  let s = (h || "").replace("#", "");
+  if (s.length === 3) s = s.split("").map(c => c + c).join("");
+  if (s.length !== 6) return [0, 0, 0];
+  const m = s.match(/.{2}/g); if (!m) return [0, 0, 0];
+  return m.map(x => parseInt(x, 16));
 }
 function relLum([r,g,b]) {
   const f = (c) => { c/=255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); };
@@ -401,7 +404,7 @@ function SeoTab() {
         <div>
           <label className="text-xs uppercase text-[#666]">Image de partage (OpenGraph)</label>
           {seo.share_image && <img src={seo.share_image} alt="" className="h-24 rounded-lg mt-1 mb-2"/>}
-          <label className="dina-btn-secondary cursor-pointer inline-flex !min-h-[36px]">
+          <label className="dina-btn-secondary cursor-pointer inline-flex !min-h-[36px]" data-testid="seo-share-upload-btn">
             <Upload size={14}/> Téléverser
             <input type="file" accept="image/*" className="hidden" onChange={onShareImg} data-testid="seo-share-upload"/>
           </label>
@@ -411,8 +414,8 @@ function SeoTab() {
       <div className="dina-card-white p-5 space-y-3">
         <div className="font-serif text-xl">Pixels & analytics</div>
         <input className="dina-input" placeholder="Facebook Pixel ID" value={seo.pixel_fb || ""} onChange={e => setSeo({...seo, pixel_fb: e.target.value})} data-testid="pixel-fb"/>
-        <input className="dina-input" placeholder="TikTok Pixel ID" value={seo.pixel_tiktok || ""} onChange={e => setSeo({...seo, pixel_tiktok: e.target.value})}/>
-        <input className="dina-input" placeholder="Google Analytics (G-...)" value={seo.pixel_google || ""} onChange={e => setSeo({...seo, pixel_google: e.target.value})}/>
+        <input className="dina-input" placeholder="TikTok Pixel ID" value={seo.pixel_tiktok || ""} onChange={e => setSeo({...seo, pixel_tiktok: e.target.value})} data-testid="pixel-tiktok"/>
+        <input className="dina-input" placeholder="Google Analytics (G-...)" value={seo.pixel_google || ""} onChange={e => setSeo({...seo, pixel_google: e.target.value})} data-testid="pixel-google"/>
       </div>
 
       <div className="dina-card-white p-5 flex items-center gap-3">
@@ -435,7 +438,10 @@ function SeoTab() {
 function ApercuTab() {
   const [mode, setMode] = useState("desktop");
   const url = `${window.location.origin}/boutique`;
-  const copy = () => { navigator.clipboard.writeText(url); toast.success("Lien copié !"); };
+  const copy = () => {
+    try { navigator.clipboard.writeText(url).then(() => toast.success("Lien copié !")).catch(() => toast.info(url)); }
+    catch { toast.info(url); }
+  };
   return (
     <div className="space-y-3">
       <div className="flex gap-2 items-center flex-wrap">
