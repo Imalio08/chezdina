@@ -1809,10 +1809,9 @@ async def profit_loss(user: dict = Depends(get_user), days: int = 30):
 
 # ---------- Integrations (settings) ----------
 @api.get("/integrations")
-async def get_integrations(user: dict = Depends(get_user)):
+async def get_integrations(user: dict = Depends(require_role("admin","manager"))):
     s = await db.site_settings.find_one({"id": "main"}) or {}
     integ = s.get("integrations") or {}
-    # Mask secrets in response
     out = dict(integ)
     if out.get("whatsapp_meta_token"):
         out["whatsapp_meta_token"] = "****" + out["whatsapp_meta_token"][-4:]

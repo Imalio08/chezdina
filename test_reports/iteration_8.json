@@ -1,0 +1,36 @@
+{
+  "summary": "Section 11 consolidation + rebrand verified end-to-end. Backend 15/15 pytest cases pass (test_section11.py): CMS pages (list seeds 4 defaults, public no-auth returns >=4, create/update/delete custom slug with proper role gating — admin-only DELETE 403 for manager), Brands & Categories derived with product_count + CRUD, cash-sessions open/close flow (409 if already open, 403 wrong PIN, 200 with correct PIN 1234 returning expected/ecart), encaissements?days=7 returns by_method/daily/total/count, profit-loss?days=30 returns revenue/cogs/gross_margin/expenses_by_cat/net, integrations GET returns dict, PATCH persists whatsapp_auto/meta_pixel_id/tiktok_pixel_id/wifi_printer_ip and MASKS whatsapp_meta_token to '****XXXX', 403 for sales role, WA template rebrand confirmed (no 'Chez Dina Boutique' in outbox). Frontend: /login no longer shows 'PIN démo : 1234' hint, sidebar shows 'Chez Dina / CONSOLE' subtitle (not 'boutique · Abidjan'). All 7 new modules load with correct data-testid selectors: sessions-caisse (cash-open + modal cash-open-amount/cash-open-confirm), /console/pages (page-about/delivery/terms/faq + pages-title/content/save/add), /console/marques & /console/categories (bc-tab-brands/bc-tab-categories/bc-add), /console/encaissements (enc-days-7/30/90), /console/resultat (pl-days-7/30/90/365), /console/integrations (integ-wa-auto/wa-token/wa-phone/meta-pixel/tt-pixel/print-ip/save), /console/checklist (16 check-* rows + checklist-run). Placeholder routes correctly resolve: /console/livreurs|zones|journees-livraison -> Deliveries, /console/fournisseurs -> Purchases, /console/liste-attente|paniers-abandonnes -> AlertsAndCarts, /console/employes -> Team. No ErrorBoundary catches on any route.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_section11.py",
+    "/app/test_reports/pytest/section11.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "/app/frontend/src/App.js had DUPLICATE imports (CmsPages, CashSessions, Encaissements, ProfitLoss, BrandsCategories, AcceptanceChecklist declared twice, lines 36-41 AND 42-47), causing a hard Babel parse error 'Identifier CmsPages has already been declared' — frontend was failing to compile when I arrived. Fixed by removing the second import block. Main agent should audit for similar duplicate import regressions after bulk refactors.",
+    "GET /api/integrations only masks whatsapp_meta_token but leaves meta_pixel_id, tiktok_pixel_id, whatsapp_phone_id, wifi_printer_ip raw. Pixel IDs are generally non-secret, but phone_id/printer_ip could be considered sensitive. Minor hardening suggestion: mask all vendor IDs for non-admin viewers (currently any authenticated user can GET).",
+    "GET /api/integrations is readable by any authenticated user (Depends(get_user)). A sales agent should not need to see WA token prefix/suffix. Suggest require_role('admin','manager') on GET as well.",
+    "/api/cash-sessions/open rejects a new session with 400 globally when ANY session is still open — this does not scope by store or by user. If two stores (store-cocody, future store-2) run POS simultaneously, store 2 cannot open a drawer. Add store_id to the uniqueness filter.",
+    "/api/profit-loss recomputes COGS by iterating all orders then doing N product look-ups serially (await db.products.find_one in a loop). On 5000 orders this is 5000 RTTs. Suggest a single $lookup pipeline or bulk fetch of distinct product_ids first.",
+    "DEFAULT_PAGES is auto-seeded only on first GET /api/pages — if an admin DELETEs 'about', then GET returns only remaining 3 and will NOT re-seed because the collection is non-empty. Documented behaviour, but worth a UI warning before deleting default pages.",
+    "/api/encaissements and /api/profit-loss ignore store filter — any store manager sees aggregated company data. Consider scoping by user's assigned store for role=manager.",
+    "CmsPages.jsx React Hook useEffect warning (missing dep 'load') — cosmetic ESLint warning, not blocking.",
+    "/api/integrations PATCH response is {ok:true} but does not echo back the mutated/masked integrations snapshot — frontend must GET again to refresh. Minor UX: return the same payload shape as GET for optimistic UI."
+  ],
+  "updated_files": [
+    "/app/frontend/src/App.js (removed duplicate imports)",
+    "/app/backend/tests/test_section11.py (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15)", "frontend": "100% (all 7 new modules + 7 placeholder-route redirects + login/sidebar rebrand)"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! PIN 1234, Manager manager.cocody@dinastore.ci / Manager123! PIN 2222, Sales agent1@dinastore.ci / Agent123!",
+  "seed_data_creation": "Test creates+deletes 'TEST-dina-boutique' CMS page and TEST_Brand_X brand inline (cleaned up). Cash session test opens+closes a session with 50000/60000 FCFA (persists in db.cash_sessions history — expected).",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Rerun regression: pytest /app/backend/tests/test_section11.py /app/backend/tests/test_section10.py /app/backend/tests/test_section8_9.py -v. If future runs show cash-sessions test failing with 400 'already open', means a prior run left a session open — the test now auto-closes any lingering open session before opening a fresh one. If App.js duplicate imports regress, delete lines 42-47 or similar second block.",
+  "rca_of_the_issue": "Compile-blocker RCA: Main agent appended new imports to App.js twice during final consolidation, producing redeclaration SyntaxError. Removed second block (lines 42-47); hot-reload picked up fix immediately. No other regressions."
+}
