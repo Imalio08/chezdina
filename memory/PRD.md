@@ -1,5 +1,25 @@
 # Chez Dina — PRD
 
+## Vague E — Final Pass before Production (Feb 2026) ✅
+
+### Responsive
+- `ConsoleLayout.jsx` : hamburger menu `[data-testid=mobile-menu-toggle]` sur <lg, drawer sidebar en overlay fixe sur mobile/tablet portrait, auto-fermeture au changement de route, bouton Créer/sync/HelpButton masqués sous md pour libérer l'espace
+- `POS.jsx` : grille passe de `lg:grid-cols-[1fr_min(400px,33vw)]` à `md:grid-cols-[1fr_min(360px,36vw)] lg:grid-cols-[1fr_min(400px,33vw)]` — panier + bouton Encaisser toujours visibles dès 768px (tablet portrait)
+- `index.css` : wrapper responsive sur `.dina-table` (overflow-x), header title tronqué sous sm, padding card réduit sous lg
+- Vitrine : header déjà `sticky top-0` + bouton WhatsApp `fixed bottom-5 right-5` toujours visible
+
+### Storefront Footer
+- Social : **Facebook + WhatsApp + TikTok uniquement** (Instagram/YouTube/LinkedIn supprimés), chaque icône pointe vers l'URL stockée dans `/business.social` avec fallback live
+- Les 7 liens Boutique/Aide confirmés 200 OK (Catalogue, Nouveautés, Promotions, Guide tailles, Livraison & retours, Suivi commande, Contact)
+
+### Mocks persistants (reportés)
+- Base MongoDB : seed démo généré au startup (produits, commandes, clientes, livreurs, zones, promotions) — **comportement attendu avant mise en prod** · passer `/api/seed?force=true` pour réinitialiser
+- Position GPS du livreur : `_simulated_rider_position()` interpole entre magasin et adresse de livraison tant qu'aucun ping réel n'est enregistré via `/rider/location` (prêt à recevoir des vrais GPS)
+- Scores satisfaction / dernier achat : `random.uniform()` et `random.randint()` dans le seed de démo (ligne 1584, 4148, 6532)
+- Wave : lien de paiement statique dans `/public/payment-config` (éditable dans Paramètres → Paiements), aucun SDK Wave intégré (webhook de confirmation à ajouter côté backend quand le compte Wave Business sera actif)
+- SMS / Email : aucun provider branché · WhatsApp opère via lien `wa.me` (ouverture app, zéro coût API) · si envoi serveur requis, intégrer Resend + Twilio
+- Analytics first-party : opérationnel · note "nécessite outil d'analytique" dans `/stats/site` est **obsolète** (remplacé par `/analytics/funnel`)
+
 ## Vague D — Logo partout + Analytics first-party (Feb 2026) ✅
 
 ### Logo centralisé

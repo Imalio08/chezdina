@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket, Facebook, Instagram, Youtube, Linkedin, Hash, Share2, Sun, Moon } from "lucide-react";
+import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket, Facebook, Hash, Sun, Moon } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useCustomer } from "@/context/CustomerContext";
 import useSiteTheme from "@/hooks/useSiteTheme";
 import api from "@/lib/api";
 
 const SOCIAL_ICONS = {
-  facebook: Facebook, instagram: Instagram, tiktok: Hash,
-  whatsapp: Share2, snapchat: Share2, youtube: Youtube, linkedin: Linkedin,
+  facebook: Facebook, tiktok: Hash, whatsapp: MessageCircle,
 };
 
 export default function StorefrontLayout() {
@@ -197,13 +196,14 @@ export default function StorefrontLayout() {
           </div>
           <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li><Link to="/boutique/nouveautes">Nouveautés</Link></li><li><Link to="/boutique/promotions">Promotions</Link></li><li><Link to="/boutique/guide-tailles">Guide des tailles</Link></li></ul></div>
           <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Aide</div><ul className="space-y-1"><li><Link to="/boutique/livraison-retours">Livraison & retours</Link></li><li><Link to="/boutique/suivi-commande">Suivi de commande</Link></li><li><Link to="/boutique/contact">Contact</Link></li></ul></div>
-          <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Suivez-nous</div><ul className="space-y-1">
-            {Object.entries(social).filter(([k,v])=>v).map(([k,v])=>{
-              const Icon = SOCIAL_ICONS[k] || Share2;
-              return <li key={k}><a href={v} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid={`footer-social-${k}`}><Icon size={12}/>{k.charAt(0).toUpperCase()+k.slice(1)}</a></li>;
-            })}
-            {!Object.values(social).some(v=>v) && <li><a href="https://www.tiktok.com/@dinoush04" target="_blank" rel="noreferrer">TikTok @dinoush04</a></li>}
-          </ul></div>
+          <div>
+            <div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Suivez-nous</div>
+            <ul className="space-y-1">
+              <li><a href={social.facebook || "https://www.facebook.com/chezdina"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid="footer-social-facebook"><Facebook size={12}/>Facebook</a></li>
+              <li><a href={`https://wa.me/${(biz.whatsapp || "+2250777926179").replace(/\D/g,"")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid="footer-social-whatsapp"><MessageCircle size={12}/>WhatsApp</a></li>
+              <li><a href={social.tiktok || "https://www.tiktok.com/@dinoush04"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid="footer-social-tiktok"><Hash size={12}/>TikTok</a></li>
+            </ul>
+          </div>
         </div>
         <div className="max-w-6xl mx-auto px-4 mt-8 text-xs text-[#999]">© 2026 Chez Dina · Abidjan</div>
       </footer>

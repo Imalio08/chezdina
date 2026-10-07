@@ -110,6 +110,7 @@ export default function ConsoleLayout() {
     const saved = JSON.parse(localStorage.getItem("dina_sidebar_open") || "null");
     return saved || Object.fromEntries(SECTIONS.map(s => [s.label, true]));
   });
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => localStorage.getItem("dina_sidebar_collapsed") === "1");
   const [sidebarWidth, setSidebarWidth] = useState(() => {
     const v = parseInt(localStorage.getItem("dina_sidebar_width") || "260", 10);
@@ -167,10 +168,14 @@ export default function ConsoleLayout() {
 
   const effectiveWidth = collapsed ? 72 : sidebarWidth;
   const startResize = (e) => { if (collapsed) return; e.preventDefault(); resizingRef.current = true; document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none"; };
+  // Close mobile drawer on route change
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
 
   return (
     <div className="min-h-screen flex bg-[#f5f5f5] dark:bg-[#0f0f0f]">
-      <aside style={{ width: effectiveWidth }} className={`shrink-0 bg-[#1c1c1c] text-white flex flex-col sticky top-0 h-screen relative transition-[width] duration-150`} data-testid="console-sidebar" data-collapsed={collapsed ? "1" : "0"}>
+      {/* Mobile drawer overlay */}
+      {mobileOpen && <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setMobileOpen(false)} data-testid="sidebar-mobile-overlay"/>}
+      <aside style={{ width: effectiveWidth }} className={`shrink-0 bg-[#1c1c1c] text-white flex flex-col h-screen relative transition-[width,transform] duration-150 lg:sticky lg:top-0 lg:translate-x-0 fixed inset-y-0 left-0 z-50 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`} data-testid="console-sidebar" data-collapsed={collapsed ? "1" : "0"}>
         <div className={`${collapsed ? "px-2 py-4" : "px-5 py-5"} border-b border-[#2a2a2a] flex items-center ${collapsed ? "justify-center" : "justify-between gap-2"}`}>
           {!collapsed ? (
             <div className="flex items-center gap-2 min-w-0">
@@ -252,12 +257,20 @@ export default function ConsoleLayout() {
       </aside>
 
       <main className="flex-1 min-w-0 flex flex-col">
-        <header className="h-16 bg-white dark:bg-[#1a1a1a] border-b border-[#ececec] dark:border-[#2a2a2a] px-5 flex items-center gap-3 sticky top-0 z-30">
-          <div className="flex items-center gap-2">
-            {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-lg object-cover"/> : <div className="w-9 h-9 rounded-lg bg-[#fde8e8] dark:bg-[#2a1818] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>}
-            <div className="font-serif text-lg leading-none">{site.name || "Chez Dina"}<span className="block text-[10px] text-[#999] tracking-widest uppercase mt-0.5">Console</span></div>
+        <header className="h-16 bg-white dark:bg-[#1a1a1a] border-b border-[#ececec] dark:border-[#2a2a2a] px-3 md:px-5 flex items-center gap-2 md:gap-3 sticky top-0 z-30">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="lg:hidden p-2 -ml-1 text-[#1c1c1c] dark:text-white hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] rounded-lg"
+            aria-label="Ouvrir le menu"
+            data-testid="mobile-menu-toggle"
+          >
+            <Menu size={20}/>
+          </button>
+          <div className="flex items-center gap-2 min-w-0">
+            {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0"/> : <div className="w-9 h-9 rounded-lg bg-[#fde8e8] dark:bg-[#2a1818] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm shrink-0">CD</div>}
+            <div className="font-serif text-lg leading-none hidden sm:block"><span className="truncate block max-w-[180px]">{site.name || "Chez Dina"}</span><span className="block text-[10px] text-[#999] tracking-widest uppercase mt-0.5">Console</span></div>
           </div>
-          <div className="flex-1 max-w-xl mx-4 relative">
+          <div className="flex-1 min-w-0 max-w-xl mx-1 md:mx-4 relative">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]"/>
               <input className="dina-input pl-9 pr-16" placeholder="Rechercher produits, variantes, clientes, commandes…" value={search} onChange={(e)=>doSearch(e.target.value)} data-testid="global-search"/>
@@ -274,7 +287,7 @@ export default function ConsoleLayout() {
           </div>
 
           {/* Quick actions "+" */}
-          <div className="relative">
+          <div className="relative hidden sm:block">
             <button onClick={()=>setShowQuickActions(!showQuickActions)} className="dina-chip !bg-[#b02a2a] !text-white !border-[#b02a2a]" data-testid="quick-actions-trigger"><Plus size={13}/>Créer</button>
             {showQuickActions && (
               <div className="absolute right-0 top-10 w-56 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-1.5 z-40" data-testid="quick-actions-menu" onMouseLeave={()=>setShowQuickActions(false)}>
@@ -287,11 +300,11 @@ export default function ConsoleLayout() {
             )}
           </div>
 
-          <div className={`dina-chip ${online?"":"!border-[#c62828] !text-[#c62828]"}`} data-testid="sync-indicator">
+          <div className={`dina-chip hidden md:inline-flex ${online?"":"!border-[#c62828] !text-[#c62828]"}`} data-testid="sync-indicator">
             {online ? <><Wifi size={12}/>En ligne</> : <><WifiOff size={12}/>Hors ligne</>}
           </div>
-          <HelpButton/>
-          <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
+          <div className="hidden md:inline-flex"><HelpButton/></div>
+          <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip hidden md:inline-flex" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
           <div className="relative">
             <button onClick={()=>setShowNotif(!showNotif)} className="dina-chip relative" data-testid="notifications-button">
               <Bell size={12}/>{unreadCount>0 && <span className="absolute -top-1 -right-1 bg-[#c62828] text-white text-[9px] rounded-full min-w-[16px] h-4 px-1 grid place-items-center font-bold">{unreadCount}</span>}

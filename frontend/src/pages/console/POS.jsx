@@ -165,7 +165,7 @@ function POSInner() {
 
   // --- UI ---
   return (
-    <div className="grid lg:grid-cols-[1fr_min(400px,33vw)] gap-4 min-h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)]">
+    <div className="grid md:grid-cols-[1fr_min(360px,36vw)] lg:grid-cols-[1fr_min(400px,33vw)] gap-4 min-h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)]">
       {/* LEFT: Product area */}
       <div className="dina-card-white p-4 flex flex-col min-h-0">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -282,11 +282,11 @@ function POSInner() {
       </div>
 
       {/* RIGHT: Cart (desktop) + mobile bottom sheet */}
-      <div className={`dina-card-white p-4 flex flex-col min-h-0 overflow-y-auto scrollbar-thin ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 lg:static":"hidden lg:flex"}`}>
+      <div className={`dina-card-white p-4 flex flex-col min-h-0 overflow-y-auto scrollbar-thin ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 md:static":"hidden md:flex"}`}>
         <div className="flex items-center justify-between mb-3">
           <div className="font-semibold">Panier · <span className="text-[#666] text-xs">{cart.length} article{cart.length>1?"s":""}</span></div>
           <div className="flex items-center gap-2">
-            <button onClick={()=>setViewMobileCart(false)} className="lg:hidden text-[#666]"><X size={16}/></button>
+            <button onClick={()=>setViewMobileCart(false)} className="md:hidden text-[#666]"><X size={16}/></button>
             {cart.length>0 && <button onClick={shareCart} className="text-xs text-[#1f8a4c] flex items-center gap-1 hover:underline" data-testid="pos-share-cart"><Share2 size={11}/>Partager</button>}
             {cart.length>0 && <button onClick={async()=>{
               const note = prompt("Note pour cette commande ouverte ? (optionnel)") || "";
@@ -391,7 +391,7 @@ function POSInner() {
 
       {/* Mobile floating cart button */}
       {!viewMobileCart && cart.length > 0 && (
-        <button onClick={()=>setViewMobileCart(true)} className="lg:hidden fixed bottom-4 right-4 z-30 bg-[#b02a2a] text-white rounded-full shadow-2xl pl-5 pr-6 py-3 flex items-center gap-2" data-testid="pos-mobile-cart-fab">
+        <button onClick={()=>setViewMobileCart(true)} className="md:hidden fixed bottom-4 right-4 z-30 bg-[#b02a2a] text-white rounded-full shadow-2xl pl-5 pr-6 py-3 flex items-center gap-2" data-testid="pos-mobile-cart-fab">
           <div className="relative"><div className="w-6 h-6 grid place-items-center font-bold">{cart.length}</div></div>
           <div className="text-sm font-semibold tabular">{fcfa(total)}</div>
         </button>
