@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   Save, Upload, Store, Phone, ShoppingCart, Truck, CreditCard, FileText,
   Bell, Plug, Users, Shield, Database, Trash2, Image as ImageIcon, Clock,
+  Smartphone, GripVertical, Plus, X, RotateCcw,
 } from "lucide-react";
 import SaveButton from "@/components/shared/SaveButton";
 
@@ -22,6 +23,7 @@ const TABS = [
   { id: "integrations", label: "Intégrations", icon: Plug },
   { id: "equipe", label: "Équipe & horaires", icon: Users },
   { id: "pointage", label: "Pointage", icon: Clock },
+  { id: "rider-app", label: "App Livreur", icon: Smartphone },
   { id: "securite", label: "Sécurité", icon: Shield },
   { id: "donnees", label: "Données", icon: Database },
 ];
@@ -76,6 +78,7 @@ export default function Settings() {
           {tab === "integrations" && <IntegrationsTab />}
           {tab === "equipe" && <EquipeTab />}
           {tab === "pointage" && <PointageTab />}
+          {tab === "rider-app" && <RiderAppTab />}
           {tab === "securite" && <SecuriteTab />}
           {tab === "donnees" && <DonneesTab />}
         </main>
@@ -515,6 +518,261 @@ function PointageTab() {
       </div>
 
       <SaveButton loading={saving} onClick={save} testid="pointage-save">Enregistrer la configuration</SaveButton>
+    </div>
+  );
+}
+
+/* -------- App Livreur (CMS complet) -------- */
+const RIDER_ICONS = [
+  "Package", "Map", "History", "Trophy", "User", "HelpCircle",
+  "Phone", "MessageCircle", "Info", "ExternalLink", "Megaphone",
+  "Star", "Heart", "Home", "SettingsIcon",
+];
+const DEFAULT_RIDER_TABS = [
+  { key: "courses",     to: "/rider",             icon: "Package", label: "Courses",     visible: true, builtin: true },
+  { key: "carte",       to: "/rider/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
+  { key: "historique",  to: "/rider/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
+  { key: "performance", to: "/rider/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
+  { key: "profil",      to: "/rider/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
+];
+const DEFAULT_RIDER_CMS = {
+  logo: "",
+  primary_color: "#b02a2a",
+  accent_color: "#fff5f5",
+  greeting: "Bonjour {name}",
+  subtitle: "{brand} · Livreur",
+  announcement: { enabled: false, text: "", variant: "info" },
+  help: { enabled: true, title: "Besoin d'aide ?", content: "Appelez votre gérante · +225 07 77 92 61 79" },
+  tabs: DEFAULT_RIDER_TABS,
+};
+
+function RiderAppTab() {
+  const [cms, setCms] = useState(DEFAULT_RIDER_CMS);
+  const [saving, setSaving] = useState(false);
+  const logoRef = useRef(null);
+
+  useEffect(() => {
+    api.get("/rider-cms").then(r => {
+      const d = r.data || {};
+      setCms({
+        ...DEFAULT_RIDER_CMS,
+        ...d,
+        announcement: { ...DEFAULT_RIDER_CMS.announcement, ...(d.announcement || {}) },
+        help: { ...DEFAULT_RIDER_CMS.help, ...(d.help || {}) },
+        tabs: (d.tabs && d.tabs.length) ? d.tabs : DEFAULT_RIDER_TABS,
+      });
+    }).catch(() => {});
+  }, []);
+
+  const upd = (k, v) => setCms(c => ({ ...c, [k]: v }));
+  const updAnn = (k, v) => setCms(c => ({ ...c, announcement: { ...c.announcement, [k]: v } }));
+  const updHelp = (k, v) => setCms(c => ({ ...c, help: { ...c.help, [k]: v } }));
+
+  const uploadLogo = (file) => {
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) return toast.error("Max 2 Mo");
+    const r = new FileReader();
+    r.onload = () => upd("logo", r.result);
+    r.readAsDataURL(file);
+  };
+
+  const moveTab = (idx, delta) => {
+    const next = [...cms.tabs];
+    const j = idx + delta;
+    if (j < 0 || j >= next.length) return;
+    [next[idx], next[j]] = [next[j], next[idx]];
+    upd("tabs", next);
+  };
+  const toggleTab = (idx) => {
+    const next = cms.tabs.map((t, i) => i === idx ? { ...t, visible: !t.visible } : t);
+    upd("tabs", next);
+  };
+  const renameTab = (idx, label) => {
+    const next = cms.tabs.map((t, i) => i === idx ? { ...t, label } : t);
+    upd("tabs", next);
+  };
+  const changeTabIcon = (idx, icon) => {
+    const next = cms.tabs.map((t, i) => i === idx ? { ...t, icon } : t);
+    upd("tabs", next);
+  };
+  const changeTabTo = (idx, to) => {
+    const next = cms.tabs.map((t, i) => i === idx ? { ...t, to } : t);
+    upd("tabs", next);
+  };
+  const removeTab = (idx) => {
+    if (cms.tabs[idx]?.builtin) return toast.error("Onglet intégré · masquer plutôt que supprimer");
+    const next = cms.tabs.filter((_, i) => i !== idx);
+    upd("tabs", next);
+  };
+  const addCustomTab = () => {
+    const n = cms.tabs.length + 1;
+    const next = [...cms.tabs, {
+      key: `custom-${Date.now()}`, label: `Onglet ${n}`, icon: "Info",
+      to: "https://", visible: true, builtin: false,
+    }];
+    upd("tabs", next);
+  };
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await api.patch("/rider-cms", cms);
+      window.dispatchEvent(new Event("rider-cms-changed"));
+      toast.success("App Livreur mise à jour · déployée en temps réel");
+    } catch { toast.error(ERROR_MSG); } finally { setSaving(false); }
+  };
+
+  const reset = async () => {
+    if (!window.confirm("Réinitialiser l'App Livreur aux valeurs par défaut ?")) return;
+    try {
+      await api.post("/rider-cms/reset");
+      setCms(DEFAULT_RIDER_CMS);
+      window.dispatchEvent(new Event("rider-cms-changed"));
+      toast.success("App Livreur réinitialisée");
+    } catch { toast.error("Réservé Super admin"); }
+  };
+
+  return (
+    <div className="space-y-4" data-testid="tab-rider-app">
+      {/* Logo + couleurs */}
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="font-serif text-xl">Identité visuelle</div>
+        <p className="text-xs text-[#666]">Logo, couleur primaire et couleur de fond affichés dans l'app des livreurs.</p>
+        <div className="flex items-center gap-4">
+          {cms.logo ? <img src={cms.logo} alt="Logo rider" className="h-16 w-16 object-cover border rounded-lg bg-white" data-testid="rider-logo-preview"/> : <div className="h-16 w-16 rounded-lg bg-[#fff5f5] grid place-items-center text-[#b02a2a] font-serif text-xl font-bold">LV</div>}
+          <label className="dina-btn-secondary cursor-pointer !min-h-[36px]" data-testid="rider-logo-upload-btn">
+            <Upload size={14}/> Téléverser
+            <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => uploadLogo(e.target.files[0])}/>
+          </label>
+          {cms.logo && <button onClick={() => upd("logo", "")} className="text-[#c62828] text-xs" data-testid="rider-logo-clear">Retirer</button>}
+          <div className="text-[11px] text-[#999] ml-auto">💡 Vide = utilise le logo principal</div>
+        </div>
+        <div className="grid grid-cols-2 gap-3 mt-2">
+          <label className="text-xs text-[#666]">Couleur primaire
+            <div className="flex items-center gap-2 mt-1">
+              <input type="color" value={cms.primary_color} onChange={e => upd("primary_color", e.target.value)} className="w-10 h-9 rounded border" data-testid="rider-primary-color"/>
+              <input className="dina-input tabular" value={cms.primary_color} onChange={e => upd("primary_color", e.target.value)}/>
+            </div>
+          </label>
+          <label className="text-xs text-[#666]">Couleur de fond
+            <div className="flex items-center gap-2 mt-1">
+              <input type="color" value={cms.accent_color} onChange={e => upd("accent_color", e.target.value)} className="w-10 h-9 rounded border" data-testid="rider-accent-color"/>
+              <input className="dina-input tabular" value={cms.accent_color} onChange={e => upd("accent_color", e.target.value)}/>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      {/* Textes d'accueil */}
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="font-serif text-xl">Message d'accueil</div>
+        <p className="text-[11px] text-[#999]">Variables disponibles : <code className="bg-[#fff5f5] px-1 rounded text-[#b02a2a]">{"{name}"}</code> (prénom du livreur) · <code className="bg-[#fff5f5] px-1 rounded text-[#b02a2a]">{"{brand}"}</code> (nom boutique)</p>
+        <label className="text-xs text-[#666] block">Salutation (titre)
+          <input className="dina-input mt-1" value={cms.greeting} onChange={e => upd("greeting", e.target.value)} placeholder="Bonjour {name}" data-testid="rider-greeting"/>
+        </label>
+        <label className="text-xs text-[#666] block">Sous-titre
+          <input className="dina-input mt-1" value={cms.subtitle} onChange={e => upd("subtitle", e.target.value)} placeholder="{brand} · Livreur" data-testid="rider-subtitle"/>
+        </label>
+      </div>
+
+      {/* Annonce */}
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-serif text-xl">Annonce (bannière)</div>
+            <p className="text-xs text-[#666]">Affichée en haut de l'app livreur. Chaque livreur peut la masquer une fois lue.</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" checked={cms.announcement.enabled} onChange={e => updAnn("enabled", e.target.checked)} className="sr-only peer" data-testid="rider-ann-enabled"/>
+            <div className="w-11 h-6 bg-[#ddd] rounded-full peer peer-checked:bg-[#1f8a4c] after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"/>
+          </label>
+        </div>
+        {cms.announcement.enabled && (
+          <>
+            <textarea className="dina-input" rows={3} value={cms.announcement.text} onChange={e => updAnn("text", e.target.value)} placeholder="Ex : Pluie ce matin · roulez prudemment !" data-testid="rider-ann-text"/>
+            <label className="text-xs text-[#666] block">Style
+              <select className="dina-input mt-1" value={cms.announcement.variant} onChange={e => updAnn("variant", e.target.value)} data-testid="rider-ann-variant">
+                <option value="info">Information (bleu)</option>
+                <option value="success">Succès (vert)</option>
+                <option value="warning">Attention (orange)</option>
+                <option value="danger">Urgent (rouge)</option>
+              </select>
+            </label>
+          </>
+        )}
+      </div>
+
+      {/* Aide */}
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-serif text-xl">Aide intégrée</div>
+            <p className="text-xs text-[#666]">Modal affichée quand le livreur clique sur « Aide ».</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" checked={cms.help.enabled} onChange={e => updHelp("enabled", e.target.checked)} className="sr-only peer" data-testid="rider-help-enabled"/>
+            <div className="w-11 h-6 bg-[#ddd] rounded-full peer peer-checked:bg-[#1f8a4c] after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"/>
+          </label>
+        </div>
+        {cms.help.enabled && (
+          <>
+            <input className="dina-input" value={cms.help.title} onChange={e => updHelp("title", e.target.value)} placeholder="Titre" data-testid="rider-help-title"/>
+            <textarea className="dina-input" rows={4} value={cms.help.content} onChange={e => updHelp("content", e.target.value)} placeholder="Contenu de l'aide…" data-testid="rider-help-content"/>
+          </>
+        )}
+      </div>
+
+      {/* Onglets */}
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-serif text-xl">Onglets de la barre basse</div>
+            <p className="text-xs text-[#666]">Réorganiser, renommer, masquer ou ajouter des onglets personnalisés (lien externe autorisé).</p>
+          </div>
+          <button onClick={addCustomTab} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="rider-tab-add"><Plus size={12}/> Ajouter</button>
+        </div>
+        <div className="space-y-2">
+          {cms.tabs.map((t, idx) => (
+            <div key={t.key || idx} className="border rounded-xl p-3 flex items-start gap-2" data-testid={`rider-tab-row-${idx}`}>
+              <div className="flex flex-col items-center gap-1 pt-1 text-[#999]">
+                <button onClick={() => moveTab(idx, -1)} className="text-xs hover:text-[#b02a2a]" title="Monter" data-testid={`rider-tab-up-${idx}`}>▲</button>
+                <GripVertical size={12}/>
+                <button onClick={() => moveTab(idx, 1)} className="text-xs hover:text-[#b02a2a]" title="Descendre" data-testid={`rider-tab-down-${idx}`}>▼</button>
+              </div>
+              <div className="flex-1 grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr] gap-2">
+                <label className="text-[10px] text-[#666]">Libellé
+                  <input className="dina-input" value={t.label || ""} onChange={e => renameTab(idx, e.target.value)} data-testid={`rider-tab-label-${idx}`}/>
+                </label>
+                <label className="text-[10px] text-[#666]">Icône
+                  <select className="dina-input" value={t.icon || "Info"} onChange={e => changeTabIcon(idx, e.target.value)} data-testid={`rider-tab-icon-${idx}`}>
+                    {RIDER_ICONS.map(i => <option key={i} value={i}>{i}</option>)}
+                  </select>
+                </label>
+                <label className="text-[10px] text-[#666]">
+                  {t.builtin ? "Route (lecture seule)" : "Lien (URL ou /chemin)"}
+                  <input className="dina-input" value={t.to || ""} onChange={e => changeTabTo(idx, e.target.value)} disabled={t.builtin} data-testid={`rider-tab-to-${idx}`}/>
+                </label>
+              </div>
+              <div className="flex flex-col items-end gap-1 pt-1">
+                <label className="flex items-center gap-1 text-[10px] text-[#666]">
+                  <input type="checkbox" checked={t.visible !== false} onChange={() => toggleTab(idx)} data-testid={`rider-tab-visible-${idx}`}/>
+                  Visible
+                </label>
+                {!t.builtin && (
+                  <button onClick={() => removeTab(idx)} className="text-[#c62828] text-xs flex items-center gap-1" title="Supprimer" data-testid={`rider-tab-remove-${idx}`}><X size={12}/></button>
+                )}
+                {t.builtin && <span className="text-[9px] text-[#999]">intégré</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <SaveButton loading={saving} onClick={save} testid="rider-cms-save">Enregistrer l'App Livreur</SaveButton>
+        <button onClick={reset} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="rider-cms-reset"><RotateCcw size={12}/> Réinitialiser</button>
+      </div>
     </div>
   );
 }

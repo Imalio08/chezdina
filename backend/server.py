@@ -5780,6 +5780,7 @@ from routers.catalog import router as catalog_router
 from routers.orders import router as orders_router
 from routers.riders import router as riders_router
 from routers.admin import router as admin_router
+from routers.rider_cms import router as rider_cms_router
 app.include_router(meta_router)
 app.include_router(attendance_router)
 app.include_router(auth_router)
@@ -5787,6 +5788,7 @@ app.include_router(catalog_router)
 app.include_router(orders_router)
 app.include_router(riders_router)
 app.include_router(admin_router)
+app.include_router(rider_cms_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")

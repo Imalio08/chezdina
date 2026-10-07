@@ -52,7 +52,7 @@ export default function Login() {
             {site.logo ? (
               <img src={site.logo} alt={site.name || "Chez Dina"} className="w-12 h-12 rounded-full object-cover bg-[#fde8e8]" />
             ) : (
-              <div className="w-12 h-12 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div>
+              <div className="w-12 h-12 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{(site.name || "CD").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase() || "CD"}</div>
             )}
             <div><div className="font-serif text-2xl tracking-tight">{site.name || "Chez Dina"}</div><div className="text-[10px] uppercase tracking-widest text-[#f0b8b8]">Abidjan</div></div>
           </div>
@@ -77,7 +77,7 @@ export default function Login() {
             {site.logo ? (
               <img src={site.logo} alt={site.name || "Chez Dina"} className="w-10 h-10 rounded-full object-cover bg-[#fde8e8]" />
             ) : (
-              <div className="w-10 h-10 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>
+              <div className="w-10 h-10 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">{(site.name || "CD").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase() || "CD"}</div>
             )}
             <div><div className="font-serif text-xl text-[#b02a2a]">{site.name || "Chez Dina"}</div><div className="text-[10px] uppercase tracking-widest text-[#666]">Abidjan</div></div>
           </div>

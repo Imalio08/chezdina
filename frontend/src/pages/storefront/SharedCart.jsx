@@ -15,6 +15,7 @@ export default function SharedCart() {
   const [paymentMethod, setPaymentMethod] = useState("cod");
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(null);
+  const [brand, setBrand] = useState({ name: "Chez Dina", logo: "" });
 
   useEffect(() => {
     axios.get(`${API}/public/shared-cart/${id}`).then(r => {
@@ -22,6 +23,7 @@ export default function SharedCart() {
       if (r.data?.error === "already_confirmed") { setData({ already: true, code: r.data.order_code }); return; }
       setData(r.data); setItems(r.data.items||[]);
     }).catch(()=>setData({ error: true }));
+    axios.get(`${API}/public/site`).then(r => { const s = r.data || {}; setBrand(b => ({ ...b, logo: s.logo || "", name: s.name || b.name })); }).catch(() => {});
   }, [id]);
 
   if (!data) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
@@ -59,8 +61,8 @@ export default function SharedCart() {
   return (
     <div className="max-w-xl mx-auto px-4 py-6">
       <div className="text-center mb-5">
-        <div className="w-12 h-12 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div>
-        <div className="font-serif text-2xl mt-2">Votre panier Chez Dina</div>
+        {brand.logo ? <img src={brand.logo} alt="" className="w-12 h-12 mx-auto rounded-full object-cover bg-[#fde8e8]"/> : <div className="w-12 h-12 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{(brand.name || "CD").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase() || "CD"}</div>}
+        <div className="font-serif text-2xl mt-2">Votre panier {brand.name}</div>
         {data.customer?.name && <div className="text-sm text-[#666]">Bonjour {data.customer.name.split(" ")[0]} · préparé par {data.created_by_name}</div>}
       </div>
 

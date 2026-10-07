@@ -443,8 +443,8 @@ function Receipt({ data, onClose }) {
     <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-[#1a1a1a] rounded-xl p-6 w-80 font-sora" onClick={e=>e.stopPropagation()}>
         <div className="text-center mb-3">
-          <div className="w-12 h-12 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div>
-          <div className="font-serif text-lg mt-2">Chez Dina</div>
+          {bizRef.logo ? <img src={bizRef.logo} alt="" className="w-12 h-12 mx-auto rounded-full object-cover bg-[#fde8e8]"/> : <div className="w-12 h-12 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{(bizRef.name || "CD").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase() || "CD"}</div>}
+          <div className="font-serif text-lg mt-2">{bizRef.name || "Chez Dina"}</div>
           <div className="text-[10px] text-[#666]">{bizRef.address} · {bizRef.phone}</div>
           <div className="text-[10px] text-[#666]">TikTok {bizRef.tiktok}</div>
         </div>

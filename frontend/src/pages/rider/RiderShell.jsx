@@ -1,25 +1,67 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
-import { Package, Map, History, Trophy, User, LogOut, Clock } from "lucide-react";
+import {
+  Package, Map, History, Trophy, User, LogOut, Clock,
+  HelpCircle, Phone, MessageCircle, Info, ExternalLink, Megaphone, Star, Heart, Home, Settings as SettingsIcon
+} from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
 
-const TABS = [
-  { to: "/rider", end: true, icon: Package, label: "Courses" },
-  { to: "/rider/carte", icon: Map, label: "Carte" },
-  { to: "/rider/historique", icon: History, label: "Historique" },
-  { to: "/rider/performance", icon: Trophy, label: "Performance" },
-  { to: "/rider/profil", icon: User, label: "Profil" },
-];
+// Icons available for custom rider tabs
+const ICONS = {
+  Package, Map, History, Trophy, User, HelpCircle, Phone,
+  MessageCircle, Info, ExternalLink, Megaphone, Star, Heart, Home, SettingsIcon
+};
+const resolveIcon = (name) => ICONS[name] || Info;
 
 export default function RiderShell() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
   const [theme, setTheme] = useState(() => localStorage.getItem("rider_theme") || "light");
   const [site, setSite] = useState({});
-  useEffect(() => { api.get("/public/site").then(r => setSite(r.data || {})).catch(() => {}); }, []);
-  const logo = site.logo;
+  const [cms, setCms] = useState(null);
+  const [showHelp, setShowHelp] = useState(false);
+  const [annDismissed, setAnnDismissed] = useState(() => localStorage.getItem("rider_ann_dismissed") || "");
+
+  useEffect(() => {
+    api.get("/public/site").then(r => setSite(r.data || {})).catch(() => {});
+    const fetchCms = () => api.get("/public/rider-cms").then(r => setCms(r.data || {})).catch(() => setCms({}));
+    fetchCms();
+    const onCms = () => fetchCms();
+    window.addEventListener("rider-cms-changed", onCms);
+    return () => window.removeEventListener("rider-cms-changed", onCms);
+  }, []);
+
+  // Build dynamic tab list from CMS config, fallback to defaults
+  const tabs = useMemo(() => {
+    const defaults = [
+      { key: "courses",     to: "/rider",             icon: "Package", label: "Courses",     visible: true, builtin: true },
+      { key: "carte",       to: "/rider/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
+      { key: "historique",  to: "/rider/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
+      { key: "performance", to: "/rider/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
+      { key: "profil",      to: "/rider/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
+    ];
+    const raw = (cms?.tabs && Array.isArray(cms.tabs) && cms.tabs.length) ? cms.tabs : defaults;
+    return raw.filter(t => t.visible !== false);
+  }, [cms]);
+
+  // CMS colors — expose as CSS variables
+  const primary = cms?.primary_color || "#b02a2a";
+  const accent  = cms?.accent_color  || "#fff5f5";
+  const logo    = cms?.logo || site.logo;
+  const brandName = site.name || "Chez Dina";
+  const greetingTpl = cms?.greeting || "Bonjour {name}";
+  const subtitleTpl = cms?.subtitle || "{brand} · Livreur";
+  const subst = (s) => (s || "")
+    .replace("{name}", user?.name?.split(" ")[0] || "Livreur")
+    .replace("{brand}", brandName);
+
+  const announcement = cms?.announcement || { enabled: false };
+  const annKey = `${announcement.text || ""}|${announcement.variant || ""}`;
+  const showAnn = announcement.enabled && announcement.text && annDismissed !== annKey;
+  const help = cms?.help || { enabled: true, title: "Besoin d'aide ?", content: "" };
+
   const [punchStatus, setPunchStatus] = useState(null);
   const [showPunch, setShowPunch] = useState(false);
   const [attendanceCfg, setAttendanceCfg] = useState({ enabled: true, enabled_roles: null });
@@ -33,7 +75,7 @@ export default function RiderShell() {
     localStorage.setItem("rider_theme", theme);
   }, [theme]);
 
-  // Attendance status (display only — no gate) — refetch config on event
+  // Attendance
   useEffect(() => {
     const fetchStatus = () => api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {});
     const fetchCfg = () => api.get("/business").then(r => {
@@ -46,7 +88,7 @@ export default function RiderShell() {
     return () => { clearInterval(t); window.removeEventListener("attendance-config-changed", onCfg); };
   }, []);
 
-  // Live GPS tracking for deliveries (not tied to clock-in)
+  // Live GPS tracking
   useEffect(() => {
     if (!navigator.geolocation) { setGpsState(s => ({ ...s, denied: true })); return; }
     const latest = { current: null, heading: null };
@@ -114,18 +156,42 @@ export default function RiderShell() {
   }, []);
 
   const punchLabel = punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer";
-  const punchColor = punchStatus?.departure ? "text-[#999]" : punchStatus?.checked_in ? "text-[#1f8a4c]" : "text-[#b02a2a]";
+  const punchColor = punchStatus?.departure ? "text-[#999]" : punchStatus?.checked_in ? "text-[#1f8a4c]" : "text-[color:var(--rider-primary)]";
   const punchAllowed = attendanceCfg.enabled !== false && (!Array.isArray(attendanceCfg.enabled_roles) || attendanceCfg.enabled_roles.includes("rider"));
 
+  const annColors = {
+    info:    { bg: "#eef4ff", fg: "#1e3a8a", border: "#b4c7ff" },
+    success: { bg: "#eafaf1", fg: "#1f6b3a", border: "#a3dfbc" },
+    warning: { bg: "#fff7e6", fg: "#8a5a00", border: "#f5c56b" },
+    danger:  { bg: "#fdecec", fg: "#991b1b", border: "#f5b0b0" },
+  }[announcement.variant || "info"] || { bg: "#eef4ff", fg: "#1e3a8a", border: "#b4c7ff" };
+
+  const styleVars = {
+    "--rider-primary": primary,
+    "--rider-accent": accent,
+  };
+
+  const gridClass = `grid-cols-${Math.max(1, Math.min(tabs.length, 6))}`;
+
   return (
-    <div className="min-h-screen bg-[#fff5f5] dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-white pb-20 font-sora">
+    <div
+      className="min-h-screen bg-[color:var(--rider-accent)] dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-white pb-20 font-sora"
+      style={styleVars}
+      data-testid="rider-shell"
+    >
+      {/* Topbar */}
       <div className="sticky top-0 z-30 bg-white/95 dark:bg-[#1a1a1a]/95 backdrop-blur border-b border-[#ececec] dark:border-[#2a2a2a] px-4 py-2.5 flex items-center justify-between" data-testid="rider-topbar">
         <div className="flex items-center gap-2 min-w-0">
-          {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-lg object-cover bg-white"/> : (user?.photo ? <img src={user.photo} alt="" className="w-9 h-9 rounded-full object-cover" /> : <div className="w-9 h-9 rounded-full bg-[#fde8e8] text-[#b02a2a] grid place-items-center text-sm font-bold">{user?.name?.[0] || "L"}</div>)}
+          {logo
+            ? <img src={logo} alt="" className="w-9 h-9 rounded-lg object-cover bg-white" data-testid="rider-logo"/>
+            : (user?.photo
+                ? <img src={user.photo} alt="" className="w-9 h-9 rounded-full object-cover" />
+                : <div className="w-9 h-9 rounded-full grid place-items-center text-sm font-bold text-white" style={{ background: primary }}>{(brandName[0] || "D").toUpperCase()}</div>)
+          }
           <div className="min-w-0">
-            <div className="font-serif text-sm leading-none truncate">Bonjour {user?.name?.split(" ")[0] || "Livreur"}</div>
+            <div className="font-serif text-sm leading-none truncate" data-testid="rider-greeting">{subst(greetingTpl)}</div>
             <div className="text-[10px] text-[#999] flex items-center gap-1" data-testid="rider-gps-indicator">
-              {site.name || "Chez Dina"} · Livreur
+              <span className="truncate">{subst(subtitleTpl)}</span>
               {gpsState.denied ? (
                 <span className="text-[#c62828]" title="Autorisez la géolocalisation pour un suivi en direct">· ⚠ GPS refusé</span>
               ) : gpsState.live ? (
@@ -137,6 +203,11 @@ export default function RiderShell() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          {help?.enabled && (
+            <button onClick={() => setShowHelp(true)} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-help-btn">
+              <HelpCircle size={13}/>Aide
+            </button>
+          )}
           {punchAllowed && (
             <button
               onClick={() => setShowPunch(true)}
@@ -149,14 +220,62 @@ export default function RiderShell() {
           <button onClick={() => { logout(); nav("/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout"><LogOut size={11} />Sortir</button>
         </div>
       </div>
+
+      {/* Announcement banner */}
+      {showAnn && (
+        <div
+          className="px-4 py-2 text-xs font-medium flex items-start justify-between gap-2 border-b"
+          style={{ background: annColors.bg, color: annColors.fg, borderColor: annColors.border }}
+          data-testid="rider-announcement"
+        >
+          <div className="flex items-start gap-2 min-w-0">
+            <Megaphone size={14} className="shrink-0 mt-0.5"/>
+            <div className="min-w-0 whitespace-pre-wrap break-words">{announcement.text}</div>
+          </div>
+          <button onClick={() => { setAnnDismissed(annKey); localStorage.setItem("rider_ann_dismissed", annKey); }} className="shrink-0 text-xs opacity-70 hover:opacity-100" data-testid="rider-ann-dismiss">✕</button>
+        </div>
+      )}
+
       <div className="max-w-md mx-auto p-3"><Outlet /></div>
-      <nav className="fixed bottom-0 inset-x-0 bg-white dark:bg-[#1a1a1a] border-t border-[#ececec] dark:border-[#2a2a2a] grid grid-cols-5 z-40" data-testid="rider-bottom-nav">
-        {TABS.map(t => (
-          <NavLink key={t.to} to={t.to} end={t.end} data-testid={`rider-tab-${t.label.toLowerCase()}`}
-            className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${isActive ? "text-[#b02a2a]" : "text-[#666] dark:text-[#999]"}`}>
-            <t.icon size={18} /><span>{t.label}</span>
-          </NavLink>
-        ))}
+
+      {/* Bottom nav */}
+      <nav
+        className={`fixed bottom-0 inset-x-0 bg-white dark:bg-[#1a1a1a] border-t border-[#ececec] dark:border-[#2a2a2a] grid z-40 ${gridClass}`}
+        style={{ gridTemplateColumns: `repeat(${Math.max(1, tabs.length)}, minmax(0, 1fr))` }}
+        data-testid="rider-bottom-nav"
+      >
+        {tabs.map(t => {
+          const Icon = resolveIcon(t.icon);
+          const label = t.label || t.key;
+          const isExternal = /^https?:\/\//i.test(t.to || "");
+          if (isExternal) {
+            return (
+              <a
+                key={t.key || t.to}
+                href={t.to}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium text-[#666] dark:text-[#999]"
+                data-testid={`rider-tab-${(t.key || label).toString().toLowerCase()}`}
+              >
+                <Icon size={18} /><span>{label}</span>
+              </a>
+            );
+          }
+          const to = t.to || `/rider/${t.key || ""}`;
+          const end = to === "/rider";
+          return (
+            <NavLink
+              key={t.key || to}
+              to={to}
+              end={end}
+              data-testid={`rider-tab-${(t.key || label).toString().toLowerCase()}`}
+              className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${isActive ? "text-[color:var(--rider-primary)]" : "text-[#666] dark:text-[#999]"}`}
+            >
+              <Icon size={18} /><span>{label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
 
       <AttendancePunchModal
@@ -164,6 +283,22 @@ export default function RiderShell() {
         onClose={() => setShowPunch(false)}
         onDone={() => { api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {}); }}
       />
+
+      {/* Help modal */}
+      {showHelp && help?.enabled && (
+        <div className="fixed inset-0 bg-black/60 z-50 grid place-items-center p-4" onClick={() => setShowHelp(false)} data-testid="rider-help-modal">
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-5 w-full max-w-sm" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 mb-2">
+              <HelpCircle size={18} className="text-[color:var(--rider-primary)]"/>
+              <div className="font-serif text-xl">{help.title || "Besoin d'aide ?"}</div>
+            </div>
+            <div className="text-sm text-[#444] dark:text-[#ccc] whitespace-pre-wrap break-words leading-relaxed">
+              {help.content || "Contactez votre gérante en cas de problème."}
+            </div>
+            <button onClick={() => setShowHelp(false)} className="mt-4 w-full py-2 rounded-lg text-white text-sm font-semibold" style={{ background: primary }} data-testid="rider-help-close">Fermer</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
