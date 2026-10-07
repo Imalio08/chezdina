@@ -1,0 +1,25 @@
+{
+  "summary": "Retest of iter52 frontend PWA manifest swap bug. Verified both (a) /boutique page loads with <link rel=manifest> href pointing to backend /api/public/manifest.webmanifest?v=... (not static /manifest.json), and (b) uploading a logo via /console/parametres?tab=identite and clicking Enregistrer dispatches a branding-changed event (fired within 200ms, well under the 2s budget) and the manifest href is updated to a new ?v= cache-buster. Fix is working end-to-end. Backend check skipped per request (testing_type=frontend only).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console (every page)", "issues": ["React hydration warning: <span> cannot be a child of <option> in PeriodSelector.jsx line 96 (non-blocking but noisy in console)"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "BrandingBootstrapper.jsx still uses getElementById('dynamic-manifest') only; the described querySelector fallback is NOT present in the file. It works today because CRA happens to preserve the id on the <link rel=manifest> tag, but if HTML normalization ever strips it the swap will silently stop. Add the documented fallback: const manifest = document.getElementById('dynamic-manifest') || document.querySelector('link[rel=\"manifest\"]'); and set manifest.id = 'dynamic-manifest' after lookup, as stated in the files_of_reference note.",
+    "PeriodSelector.jsx line 96: <option> contains a <span> wrapper (dev tooling injection) causing hydration warnings. Should render plain text inside <option>."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100%"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! (worked)",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Manifest swap on /boutique and on branding-changed event both verified. Observed values: before=.../api/public/manifest.webmanifest?v=2026-10-07T22:09:04..., after save=.../api/public/manifest.webmanifest?v=2026-10-07T22:15:27.... Note: /console pages show a GuidedTour overlay (data-testid=guided-tour) that intercepts clicks for new sessions; dismiss or JS-remove it before interacting with console save buttons.",
+  "rca of the issue": "N/A - bug fix verified working."
+}

@@ -1,5 +1,29 @@
 # Chez Dina — PRD
 
+### Vague P — Messagerie extraction + PWA icons dynamiques (Feb 2026) ✅
+**Refactor P5 phase 7 : extraction du router messagerie**
+- Nouveau `/app/backend/routers/messagerie.py` (328 lignes, 11 endpoints) :
+  - `GET /api/public/account/threads` + `POST /api/public/account/thread/rider/{order_code}` (côté cliente)
+  - `GET /api/messages/conversations` + `POST /api/messages/open` (staff)
+  - `PATCH /api/messages/conversations/{id}/archive` + `/pin` + `POST /react`
+  - `GET /api/messages/conversations/{id}` + `POST /api/messages/send`
+  - `GET /api/public/account/messages` + `POST /api/public/account/messages/send` (cliente)
+  - `POST /api/messages/broadcast` (owner/manager)
+- Helpers exportés `send_message_core` et `close_rider_customer_convs` réutilisés depuis server.py (campaigns/send ligne 1976 + statut livraison).
+- server.py : 5796 → 5590 lignes (−206, soit −3,5%). Total refactor P5 à date : 6827 → 5590 (−18,1%).
+
+**PWA Logo dynamique (install icon = vrai logo)**
+- Nouveau `/app/backend/routers/pwa.py` (156 lignes) utilisant Pillow 12.3 :
+  - `GET /api/public/manifest.webmanifest` → JSON manifest avec nom/short_name tirés de `site_settings`+`business`, theme_color/bg_color configurables, 3 icônes pointant vers les endpoints de résize.
+  - `GET /api/public/pwa-icon/{size}` → PNG 192/512/512-maskable généré à la volée depuis `site_settings.logo` (base64 data URL) via Pillow (resize LANCZOS, safe area 80% pour maskable, rounded square 22% radius sinon). Fallback : initiales du nom de marque sur fond `theme_color`.
+- Service workers / navigateurs : `Cache-Control: max-age=60`. Cache-buster `?v={updated_at}` ajouté par le frontend après chaque save pour forcer le refresh.
+- `/app/frontend/public/index.html` : `<link rel="manifest">` récupéré par querySelector (CRA normalise et strip l'id).
+- `/app/frontend/src/components/BrandingBootstrapper.jsx` : fetch `/public/site`, swap `link[rel="manifest"].href` vers l'endpoint backend, met à jour favicon + apple-touch-icon + document.title. Écoute l'event `branding-changed` pour refresher sans recharger la page.
+- `Settings.jsx IdentiteTab.save` : dispatche `window.dispatchEvent(new Event("branding-changed"))` après sauvegarde réussie.
+
+**Tests Iter52+53 : 10/10 backend (messagerie regression + manifest + icons incl. logo utilisateur), 100% frontend (manifest href swappé sur /boutique et refresh sur upload logo). Backend reporté à 100%.**
+
+
 ### Vague O — Rider CMS + Catalog 100 SKUs + Logo partout (Feb 2026) ✅
 **Rider CMS complet (console → app livreur temps réel)**
 - Nouveau router `/app/backend/routers/rider_cms.py` (85 lignes) : `GET /api/public/rider-cms` (public), `GET /api/rider-cms` (auth), `PATCH /api/rider-cms` (admin/manager), `POST /api/rider-cms/reset` (admin). Stocké sous `db.site_settings.rider_cms`. Config par défaut incluant logo, primary_color, accent_color, greeting template (`{name}` + `{brand}`), subtitle, announcement (enabled/text/variant info/success/warning/danger), help (enabled/title/content), tabs (5 par défaut : Courses/Carte/Historique/Performance/Profil).

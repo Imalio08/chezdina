@@ -22,8 +22,13 @@ export default function BrandingBootstrapper() {
       if (apple) apple.href = logo;
       if (title) document.title = title;
       // Swap manifest to backend-generated version so install icon tracks logo.
-      const manifest = document.getElementById("dynamic-manifest");
+      // CRA's HtmlWebpackPlugin strips the id from <link rel="manifest">, so we
+      // fall back to querySelector by rel which is robust against build-time
+      // HTML normalization.
+      const manifest = document.getElementById("dynamic-manifest")
+        || document.querySelector('link[rel="manifest"]');
       if (manifest) {
+        if (!manifest.id) manifest.id = "dynamic-manifest";
         const base = process.env.REACT_APP_BACKEND_URL || "";
         const bust = d.updated_at ? `?v=${encodeURIComponent(d.updated_at)}` : "";
         manifest.href = `${base}/api/public/manifest.webmanifest${bust}`;
