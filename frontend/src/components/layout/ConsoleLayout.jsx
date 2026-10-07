@@ -8,11 +8,13 @@ import {
   Sparkles, Plug, Settings as Cog, Bell, Moon, Sun, LogOut, Store, Wifi, WifiOff, Search, Receipt, Gift, Star,
   X, ShoppingBag, Globe, MessageSquare, Send, ChevronDown, ChevronRight, ChevronLeft, Plus, Minimize2, Maximize2, Target,
   TrendingUp, Palette, FileCode, Menu, Shield, Database, ClipboardList, MapPin, Tag, Layers, Hourglass, Heart,
-  Building2, UserCheck, BookOpen, Calendar, GraduationCap, HelpCircle, CheckCircle2, PanelLeftClose, PanelLeftOpen
+  Building2, UserCheck, BookOpen, Calendar, GraduationCap, HelpCircle, CheckCircle2, PanelLeftClose, PanelLeftOpen, Clock
 } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import HelpButton from "@/components/console/HelpButton";
 import GuidedTour from "@/components/console/GuidedTour";
+import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
+import { canAccess, landingFor } from "@/lib/rbac";
 
 const SECTIONS = [
   { label: "", items: [
@@ -54,7 +56,7 @@ const SECTIONS = [
     { to: "/console/approbations", icon: CheckCircle2, label: "À approuver", adminOnly: true },
     { to: "/console/audit", icon: ClipboardList, label: "Journal d'audit", adminOnly: true },
     { to: "/console/pointage", icon: Calendar, label: "Pointage (kiosk)" },
-    { to: "/console/presence", icon: UserCheck, label: "Présence & géofence", adminOnly: true },
+    { to: "/console/presence", icon: UserCheck, label: "Historique pointages" },
   ]},
   { label: "Site vitrine", items: [
     { to: "/console/site?tab=apparence", icon: Palette, label: "Apparence" },
@@ -120,9 +122,28 @@ export default function ConsoleLayout() {
   const [showAi, setShowAi] = useState(false);
   const [aiMinimized, setAiMinimized] = useState(false);
   const [aiMsgs, setAiMsgs] = useState(() => JSON.parse(sessionStorage.getItem("dina_ai_history") || "[]"));
+  const [showPunch, setShowPunch] = useState(false);
+  const [punchStatus, setPunchStatus] = useState(null);
   const nav = useNavigate();
   const { pathname } = useLocation();
   const unreadCount = notifs.filter(n => !readIds.has(n.id)).length;
+
+  // RBAC — redirect user away from forbidden pages
+  useEffect(() => {
+    if (!user?.role) return;
+    if (!canAccess(user.role, pathname)) {
+      const dest = landingFor(user.role);
+      if (dest !== pathname) nav(dest, { replace: true });
+    }
+  }, [pathname, user?.role, nav]);
+
+  // Attendance status for topbar badge
+  useEffect(() => {
+    const fetchStatus = () => api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {});
+    fetchStatus();
+    const t = setInterval(fetchStatus, 60000);
+    return () => clearInterval(t);
+  }, []);
 
   useEffect(() => { localStorage.setItem("dina_sidebar_open", JSON.stringify(openSections)); }, [openSections]);
   useEffect(() => { localStorage.setItem("dina_sidebar_collapsed", collapsed ? "1" : "0"); }, [collapsed]);
@@ -202,7 +223,10 @@ export default function ConsoleLayout() {
         <nav className={`flex-1 overflow-y-auto scrollbar-thin ${collapsed ? "px-1" : "px-2"} py-3`}>
           {SECTIONS.filter(s => !s.adminOnly || isAdmin).map((sec) => {
             const open = openSections[sec.label] !== false;
-            const items = sec.items.filter(it => !it.adminOnly || isAdmin);
+            const items = sec.items
+              .filter(it => !it.adminOnly || isAdmin)
+              .filter(it => canAccess(user?.role, it.to));
+            if (items.length === 0) return null;
             return (
               <div key={sec.label || `top-${items[0]?.to}`} className="mb-1">
                 {sec.label && !collapsed ? (
@@ -304,6 +328,14 @@ export default function ConsoleLayout() {
             {online ? <><Wifi size={12}/>En ligne</> : <><WifiOff size={12}/>Hors ligne</>}
           </div>
           <div className="hidden md:inline-flex"><HelpButton/></div>
+          <button
+            onClick={() => setShowPunch(true)}
+            className={`dina-chip ${punchStatus?.checked_in && !punchStatus?.departure ? "!border-[#1f8a4c] !text-[#1f8a4c]" : punchStatus?.departure ? "!border-[#999] !text-[#999]" : "!border-[#b02a2a] !text-[#b02a2a]"}`}
+            data-testid="topbar-punch"
+            title={punchStatus?.departure ? "Journée terminée" : punchStatus?.checked_in ? "Pointer le départ" : "Pointer l'arrivée"}
+          >
+            <Clock size={12}/><span className="hidden sm:inline">{punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer"}</span>
+          </button>
           <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip hidden md:inline-flex" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
           <div className="relative">
             <button onClick={()=>setShowNotif(!showNotif)} className="dina-chip relative" data-testid="notifications-button">
@@ -347,6 +379,12 @@ export default function ConsoleLayout() {
       {showAi && !aiMinimized && (
         <AiChat page={pathname} msgs={aiMsgs} setMsgs={setAiMsgs} onMinimize={()=>setAiMinimized(true)} onClose={()=>{setShowAi(false); setAiMinimized(false);}}/>
       )}
+
+      <AttendancePunchModal
+        open={showPunch}
+        onClose={() => setShowPunch(false)}
+        onDone={(data) => { api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {}); }}
+      />
     </div>
   );
 }

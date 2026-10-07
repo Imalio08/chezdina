@@ -6037,19 +6037,22 @@ IMG_POOL = {
 }
 
 async def seed_if_empty():
-    # Users
-    if await db.users.count_documents({}) == 0:
-        base = [
-            ("aouattaraesca@gmail.com","Admin123!","1234","Aïcha Ouattara","admin"),
-            ("manager.cocody@dinastore.ci","Manager123!","2222","Fatou Konaté","manager"),
-            ("agent1@dinastore.ci","Agent123!","3333","Grace N'Guessan","sales"),
-            ("stock@dinastore.ci","Stock123!","4444","Jean-Marc Soro","stock_keeper"),
-            ("rider1@dinastore.ci","Rider123!","5555","Kouamé Serge","rider"),
-            ("rider2@dinastore.ci","Rider123!","5556","Yao Franck","rider"),
-            ("rider3@dinastore.ci","Rider123!","5557","Diomandé Issouf","rider"),
-        ]
+    # Users — idempotent: adds any missing seed accounts (e.g. new roles)
+    base = [
+        ("aouattaraesca@gmail.com","Admin123!","1234","Aïcha Ouattara","admin"),
+        ("manager.cocody@dinastore.ci","Manager123!","2222","Fatou Konaté","manager"),
+        ("agent1@dinastore.ci","Agent123!","3333","Grace N'Guessan","sales"),
+        ("stock@dinastore.ci","Stock123!","4444","Jean-Marc Soro","stock_keeper"),
+        ("cm@dinastore.ci","Cm123!","6666","Nadia Koffi","community_manager"),
+        ("rider1@dinastore.ci","Rider123!","5555","Kouamé Serge","rider"),
+        ("rider2@dinastore.ci","Rider123!","5556","Yao Franck","rider"),
+        ("rider3@dinastore.ci","Rider123!","5557","Diomandé Issouf","rider"),
+    ]
+    existing = {u.get("email") for u in await db.users.find({}, {"email": 1}).to_list(1000)}
+    missing = [(e, pw, pin, n, r) for e, pw, pin, n, r in base if e not in existing]
+    if missing:
         docs = []
-        for email, pw, pin, name, role in base:
+        for email, pw, pin, name, role in missing:
             docs.append({"id": new_id(), "email": email, "password_hash": hash_pw(pw), "pin_hash": hash_pw(pin), "attendance_code": pin, "name": name, "role": role,
                          "phone": f"+225 07 {random.randint(10,99)} {random.randint(10,99)} {random.randint(10,99)} {random.randint(10,99)}",
                          "store_id":"store-cocody", "active": True, "created_at": now_iso()})
@@ -6283,24 +6286,16 @@ async def attendance_me(user: dict = Depends(get_user)):
 
 @api.post("/attendance/check-in")
 async def check_in(body: Dict[str,Any], user: dict = Depends(get_user)):
-    """kind: 'arrival' | 'departure'. Requires selfie (b64) and GPS if method='phone'."""
+    """kind: 'arrival' | 'departure'. Requires only a live selfie (b64). GPS/geofence are NOT required."""
     kind = body.get("kind","arrival")
     method = body.get("method","phone")  # phone | tablet
     selfie = body.get("selfie")
-    lat = body.get("lat"); lng = body.get("lng")
-    if method == "phone" and not selfie:
+    if not selfie:
         raise HTTPException(400, "Selfie requis (caméra avant)")
-    biz = await db.business.find_one({"id":"main"}) or {}
-    geo = biz.get("geofence") or {"lat": 5.360, "lng": -3.994, "radius_m": 150, "mandatory": False}
-    distance = None; outside = False
-    if lat is not None and lng is not None and geo.get("lat"):
-        distance = _haversine_m(float(lat), float(lng), float(geo["lat"]), float(geo["lng"]))
-        outside = distance > int(geo.get("radius_m", 150))
-    if outside and geo.get("mandatory") and method == "phone":
-        raise HTTPException(400, f"Pointage refusé : vous êtes à {distance} m de la boutique (max {geo.get('radius_m')} m)")
     today = datetime.now(timezone.utc).date().isoformat()
     now = datetime.now(timezone.utc)
-    # Compute lateness vs role hours
+    biz = await db.business.find_one({"id":"main"}) or {}
+    # Compute lateness vs role hours (informational only)
     hours = (biz.get("working_hours") or {}).get(user.get("role","")) or {"open":"08:00","tolerance_min":10}
     late = False; late_min = 0
     if kind == "arrival":
@@ -6311,7 +6306,6 @@ async def check_in(body: Dict[str,Any], user: dict = Depends(get_user)):
         if delta > tol: late = True; late_min = delta
     # Departure without reconciliation flag (riders)
     flags = []
-    if outside: flags.append("hors_boutique")
     if kind == "departure" and user.get("role") == "rider":
         pending_recon = await db.delivery_sessions.count_documents({"rider_id": user.get("id"), "status": {"$ne": "reconciled"}})
         if pending_recon > 0:
@@ -6319,18 +6313,16 @@ async def check_in(body: Dict[str,Any], user: dict = Depends(get_user)):
             await db.notifications.insert_one({"id":new_id(),"type":"attendance_alert","title":"Départ sans réconciliation","msg":f"{user.get('name')} a pointé le départ sans réconcilier ses livraisons","color":"#c62828","at":now_iso(),"link":"/console/livraisons"})
     doc = {"id": new_id(), "user_id": user.get("id"), "user_name": user.get("name"), "user_role": user.get("role"),
            "day": today, "kind": kind, "method": method, "at": now_iso(), "selfie": selfie,
-           "lat": lat, "lng": lng, "distance_m": distance, "outside": outside,
+           "lat": None, "lng": None, "distance_m": None, "outside": False,
            "late": late, "late_min": late_min, "flags": flags}
     await db.attendance.insert_one(doc)
-    if outside:
-        await db.notifications.insert_one({"id":new_id(),"type":"attendance_alert","title":"Pointage hors boutique","msg":f"{user.get('name')} à {distance} m","color":"#e4991e","at":now_iso(),"link":"/console/pointage"})
-    return {"ok": True, "late": late, "late_min": late_min, "distance_m": distance, "outside": outside, "flags": flags, "at": doc["at"]}
+    return {"ok": True, "late": late, "late_min": late_min, "flags": flags, "at": doc["at"]}
 
 @api.get("/attendance/today")
 async def attendance_today(user: dict = Depends(require_role("admin","manager"))):
     today = datetime.now(timezone.utc).date().isoformat()
     rows = await db.attendance.find({"day": today}).sort("at",-1).to_list(200)
-    all_employees = await db.users.find({"role": {"$in": ["manager","rider","caissiere","stock_keeper"]}, "active": True}).to_list(200)
+    all_employees = await db.users.find({"role": {"$in": ["manager","rider","caissiere","sales","stock_keeper","community_manager"]}, "active": True}).to_list(200)
     present_ids = {r["user_id"] for r in rows if r["kind"]=="arrival"}
     not_checked = [{"id":u["id"],"name":u["name"],"role":u["role"]} for u in all_employees if u["id"] not in present_ids]
     return {"today": clean(rows), "not_checked_in": not_checked, "present_count": len(present_ids), "total_employees": len(all_employees)}
