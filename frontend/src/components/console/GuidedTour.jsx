@@ -65,8 +65,10 @@ export default function GuidedTour() {
   useEffect(() => {
     const onReplay = () => { setStep(0); setOpen(true); setReplay(true); };
     window.addEventListener("dina-replay-tour", onReplay);
-    return () => window.removeEventListener("dina-replay-tour", onReplay);
-  }, []);
+    const onKey = (e) => { if (e.key === "Escape" && open) close(); };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("dina-replay-tour", onReplay); window.removeEventListener("keydown", onKey); };
+  }, [open]); // eslint-disable-line
 
   if (!open || !steps.length) return null;
   const current = steps[step];

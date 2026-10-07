@@ -1,0 +1,30 @@
+{
+  "summary": "Frontend-only testing of Vague B+C UX improvements. Validated: (1) Storefront dark mode toggle (light↔dark, localStorage dina_theme, document.documentElement.dark class), (2) Footer brand name 'Chez Dina' present and rendered next to logo image, (3) Console sidebar collapse to ~72px with localStorage dina_sidebar_collapsed=1 then expand back to 260px (=0), (4) Console sidebar resize via drag handle to 320px with localStorage dina_sidebar_width=320 persisted, (5) IconPicker component works (grid, search filter 'livraison', click 'truck' option updates trigger label to 'Livraison / Camion'), (6) SaveButton pattern on /console/parametres — all 8 tab testids present (identite-save, coordonnees-save, ventes-save, livraison-save, documents-save, notifications-save, securite-save, paiements-save), identite-save shows disabled during save and success toast 'Identité enregistrée · logo propagé partout', (7) apparence-save on /console/site works with toast 'Apparence enregistrée'. ALL 5 features from the request work. One architectural issue found: SiteAppearance.jsx (containing testids trust-icon-{idx} and Rassurance sub-tab) is imported in App.js but NEVER mounted on any route — only the SectionBuilder's sb-trust-icon-{idx} inside /console/site?tab=accueil is reachable. The review request referenced trust-icon-0 at /console/site?tab=apparence?Rassurance which does not exist in the current UI (apparence tab shows Logo/Palette/Typographie only). IconPicker was successfully validated via sb-trust-icon-0 instead.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/console (Dashboard)", "issues": ["Guided tour modal overlay (role=dialog) intercepts clicks on the sidebar-collapse-toggle for first-time users. Had to force JS click or hide overlay in testing. Consider z-index adjustment or allowing sidebar interactions behind the tour."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "SiteAppearance.jsx is dead code (imported in App.js but no <Route> uses it). Either (a) add a route for it and expose the Rassurance tab with trust-icon-{idx}, or (b) remove the orphaned import and update the review spec to reference sb-trust-icon-{idx} inside tab=accueil instead.",
+    "React hydration warning on Dashboard: <span> rendered inside <option> element (PeriodSelector line ~96). Causes a console error in production. Replace inner span with plain text.",
+    "GuidedTour overlay z-index blocks sidebar interactions; consider lower z-index or dismissible via Escape."
+  ],
+  "critical_code_review_comments": [
+    "ConsoleLayout.jsx is 400+ lines and contains AiChat component inline — should be split into smaller focused modules (sidebar, header, AiChat).",
+    "SiteAppearance.jsx is imported but never rendered — orphan component, remove or wire up a route.",
+    "PeriodSelector renders <span> inside <option>, triggers React hydration error.",
+    "ConsoleLayout useEffect for mousemove/mouseup resize listeners attached globally with empty deps — OK, but startResize uses a ref so React never re-renders during drag (correct). Width upper cap 400 may be a bit low for ultra-wide users."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% (all 5 features validated; 1 testid spec discrepancy noted)"},
+  "test_credentials": "Super Admin aouattaraesca@gmail.com / Admin123! — login works via getByRole('button', { name: 'Se connecter' })",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All 5 Vague B+C UX improvements are implemented and working. The only outstanding items are (a) decide what to do with the orphan SiteAppearance.jsx + its trust-icon-{idx} testids referenced in the review spec, (b) fix PeriodSelector's <span>-in-<option> hydration warning, and (c) adjust GuidedTour overlay so new users can still interact with the sidebar during the tour. All localStorage keys (dina_theme, dina_sidebar_collapsed, dina_sidebar_width) persist correctly."
+}

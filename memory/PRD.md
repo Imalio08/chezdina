@@ -1,5 +1,18 @@
 # Chez Dina — PRD
 
+## Vague C — Polish & footer (Feb 2026) ✅
+- `StorefrontLayout.jsx` footer : logo + nom « Chez Dina » affichés côte à côte (data-testid `footer-brand-name`)
+- `SaveButton` component (`/components/shared/SaveButton.jsx`) : loading spinner + anti-double-clic, utilisé sur Settings (identite/coordonnees/ventes/livraison/documents/notifications/securite/paiements), SiteAppearance (hero/popup/announcement/lookbook/trust), SectionBuilder, SiteVitrine (apparence), CmsPages, Loyalty, RolesPermissions, Integrations
+- GuidedTour : fermeture par touche Escape
+- Toasts uniformisés : « Modifications enregistrées » / « Erreur · modifications non enregistrées »
+- Backend `/pages POST` : unicité du slug déjà appliquée (409 si déjà pris)
+
+## Vague B — UX console & vitrine (Feb 2026) ✅
+- `ConsoleLayout.jsx` : sidebar redimensionnable (poignée droite 200-400 px, persistance `dina_sidebar_width`) + bouton réduction/déploiement (`sidebar-collapse-toggle`, 72 px en mode icônes seulement, persistance `dina_sidebar_collapsed`)
+- `StorefrontLayout.jsx` : toggle dark mode manuel header (`storefront-theme-toggle`, soleil/lune), défaut = préférence système, persistance `dina_theme`, dark variants ajoutés header + footer + menus utilisateur + inputs
+- `IconPicker` component (`/components/shared/IconPicker.jsx`) : grille visuelle de 60+ icônes Lucide avec recherche, remplace les `<select>` dans SiteAppearance (trust_band) + SectionBuilder (trust_strip)
+- Fix pré-existant Checkout.jsx : wrapping Fragment pour supporter le modal acompte en frère du grid
+
 ## Vague A — Wave acompte + Footer vitrine + Nettoyage TEST (Feb 2026) ✅
 
 ### Wave + Acompte à la livraison

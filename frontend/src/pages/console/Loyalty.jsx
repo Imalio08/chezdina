@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
 import { Gift, Star, Users, Save, Plus, Trash2 } from "lucide-react";
+import SaveButton from "@/components/shared/SaveButton";
 
 export default function Loyalty() {
   const [s, setS] = useState(null);
