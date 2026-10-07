@@ -1,5 +1,15 @@
 # Chez Dina — PRD
 
+### Vague E.3 — Code quality cleanup (Feb 2026) ✅
+Appliqué à partir du rapport de revue de code (deployment-ready) :
+- **9 vrais correctifs** dans `server.py` : 3 variables locales inutilisées supprimées (`oid` dans `_simulated_rider_position`, `cod_delivered` dans `rider_score`, `total_qty` dans `receive_po`), 3 imports datetime dupliqués retirés (déjà présents au niveau module), 2 f-strings sans placeholders corrigées, 1 variable d'exception inutilisée (`as e`)
+- **Pyflakes propre** : 0 warning après cleanup
+- **Faux positifs identifiés** (non modifiés) :
+  - « Hardcoded secrets » dans `tests/` : fixtures de test intentionnelles avec fallback `os.environ.get("REACT_APP_BACKEND_URL")` et credentials démo documentés dans `test_credentials.md`
+  - « 115 instances `is True`/`is False` » dans les tests : fonctionne correctement en Python car `True`/`False`/`None` sont des singletons garantis
+  - « 45 instances `random` » : utilisées uniquement dans le seed de démo pour générer des noms/dates/prix d'exemple, aucun usage sécuritaire (pas de PIN/token/password)
+  - Complexité `send_message`/`stock_kpis`/`rider_score` et 50 imports : refactoring déjà au backlog (`server.py` → `routers/`)
+
 ### Vague E.2 — Rider GPS Live (Feb 2026) ✅
 **Objectif** : supprimer le chemin simulé en captant la position réelle du livreur toutes les 30 s.
 

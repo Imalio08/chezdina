@@ -1,0 +1,28 @@
+{
+  "summary": "Regression smoke test after server.py code-cleanup (unused vars/imports/f-strings removed). All 11 targeted backend endpoints pass. No behavioral regression detected.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": ["/app/backend/tests/test_regression_smoke.py", "/app/test_reports/pytest/regression_smoke.xml"],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": ["/app/backend/tests/test_regression_smoke.py"],
+  "success_rate": {"backend": "100%", "frontend": "skipped"},
+  "test_credentials": "Super Admin: aouattaraesca@gmail.com / Admin123!",
+  "seed_data_creation": "None. Used existing seeded rider and live demo order DN-260920-1032.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Regression smoke suite at /app/backend/tests/test_regression_smoke.py — 11 endpoint checks + rider score + public rider-position for live order DN-260920-1032. All green. Covers endpoints touched by the recent code cleanup (unused var/import removals in _simulated_rider_position, rider_score, receive_po, stats_sales timeseries, dashboard_actions, attendance_today_kiosk, parse_order, abandoned-cart relaunch).",
+  "test_results_detail": {
+    "GET /api/orders": "200",
+    "GET /api/products": "200",
+    "GET /api/customers": "200",
+    "GET /api/dashboard/action-items": "200",
+    "GET /api/attendance/today-kiosk": "200",
+    "GET /api/purchase-orders": "200",
+    "GET /api/stats/sales?period=30d": "200",
+    "GET /api/stats/orders-delivery?period=30d": "200",
+    "GET /api/analytics/funnel?days=7": "200",
+    "GET /api/riders/{id}/score": "200 with numeric score",
+    "GET /api/public/order/DN-260920-1032/rider-position": "200 with active=true and valid position"
+  }
+}
