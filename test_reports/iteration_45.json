@@ -1,0 +1,30 @@
+{
+  "summary": "Iteration 45 — Retest of iter44 bug fixes. All 4 frontend scenarios PASS: (1) all 5 role-toggle checkboxes (manager, sales, stock_keeper, community_manager, rider) are CHECKED on load at /console/parametres?tab=pointage; (2) topbar-punch is visible initially on /console, then DISAPPEARS after admin toggles attendance-enabled OFF and clicks pointage-save (window event 'attendance-config-changed' propagates to ConsoleLayout which refetches /api/business); (3) toggling attendance-enabled back ON, saving, and navigating to /console shows topbar-punch again; (4) rider1 login shows rider-punch-btn. Backend regression (test_iter44_attendance_stats.py) 13/13 PASS — GET /api/attendance/all-stats admin+manager OK / sales+cm 403, PATCH /api/business/attendance-config admin-only + persist, check-in without GPS still 200/409. Final backend state restored to {enabled:true, enabled_roles:[manager,sales,stock_keeper,community_manager,rider]} as requested for next iteration.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Login page", "issues": ["Pre-existing non-blocking React hydration warning: '<span> cannot be a child of <option>' originating from a SearchSelect/select component referenced from ConsoleLayout tree. Not introduced in iter45, carried from iter44."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter44_attendance_stats.py", "/app/test_reports/pytest/iter45.xml"],
+  "action_items": [
+    "(Optional/non-blocking) Fix the <span> inside <option> hydration warning on login page — likely in a shadcn Select/SearchSelect component rendering option content inside a native <option>."
+  ],
+  "critical_code_review_comments": [
+    "Fix verified in ConsoleLayout.jsx (lines 142-155): useEffect fetching /api/business is now re-run on pathname change AND listens to 'attendance-config-changed' window event. punchAllowed correctly short-circuits on attendanceCfg.enabled !== false regardless of role (including admin).",
+    "Fix verified in Settings.jsx PointageTab (lines 452-464): save() dispatches window Event('attendance-config-changed') after PATCH, so both ConsoleLayout and RiderShell refetch config immediately.",
+    "Fix verified in RiderShell.jsx (lines 37-47): adds the same event listener; however RiderShell's main effect has empty dep array (not pathname-based) — fine since riders don't navigate to settings. OK.",
+    "Role toggle hydration bug (iter44) was also fixed — all 5 role toggles now reflect backend enabled_roles correctly."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% (4/4 scenarios)"},
+  "test_credentials": "admin=aouattaraesca@gmail.com/Admin123! · rider=rider1@dinastore.ci/Rider123!",
+  "seed_data_creation": "None. Backend attendance_config left in clean state (enabled=true, all 5 roles enabled) for next iteration.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter45 fixes fully verified. attendance_config state at end of run: {enabled:true, enabled_roles:[manager,sales,stock_keeper,community_manager,rider]}. The 'attendance-config-changed' window event pattern works well — if adding more consumers (new shells/dashboards), subscribe them to this event + /api/business GET for consistent cross-tab/cross-view sync.",
+  "rca_of_the_issue": "iter44 Bug 1 (topbar-punch not hiding) and Bug 2 (role toggles unchecked) both resolved. Fix pattern: (a) Settings PointageTab now initializes enabled_roles from attendance_config.enabled_roles with matching backend keys (rider, stock_keeper) and falls back to full list; (b) After save, dispatches window event; (c) ConsoleLayout/RiderShell subscribe to event and refetch /business, re-computing punchAllowed. End-to-end confirmed."
+}
