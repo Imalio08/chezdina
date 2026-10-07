@@ -1,0 +1,31 @@
+{
+  "summary": "Iter49 P5 refactor tranche 4 (orders/POS/cash-sessions -> routers/orders.py + OrderIn/OrderItem/CashSessionOpenIn/CashSessionCloseIn/PinAuthIn/CashMovementIn/HoldIn in models.py + gen_code in deps.py) fully validated. 18/18 new iter49 tests pass covering all 11 endpoints: GET/POST/PATCH /orders, GET /orders/track/{code}, POST /pos/pin-authorize (403 wrong / 200 PIN 1234), POST+GET /cash-movements (with payload keys movements/cash_sales/ins/outs/expected), POST/GET/DELETE /pos/holds, GET /cash-sessions, POST /cash-sessions/open (400 when already open), POST /cash-sessions/{sid}/close (403 wrong PIN / 200 correct). Order creation flow verified: mode=store+payment=cash => status=livree, payment_status=paye, stock decrements by qty then rolled back by test. 73/73 iter46+iter47+iter48 regression tests still pass (attendance, auth, catalog). Frontend smoke: admin login + /console/commandes, /console/pos, /console/sessions-caisse all load; sessions page shows 3 sessions, 1 à valider, 25000 FCFA écarts cumulés. Only pre-existing hydration warning (<span> inside <option>) in console — not iter49-related.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter49_orders_refactor.py",
+    "/app/test_reports/pytest/iter49_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/orders.py POST /orders — stock decrement loop issues 3 sequential awaits per item (update_one base stock, optional update_one stock_by_size, then find_one). For a 10-item cart that is up to 30 round-trips. Consider bulk_write or at minimum merging the base + per-size $inc into a single update per item (pre-existing from server.py).",
+    "routers/orders.py POST /orders — no stock pre-check: if stock is 0 or negative, the decrement still runs and leaves stock negative (then flips status to liste_attente only when total_stk <= 0). An out-of-stock product can therefore be sold through POS. Pre-existing but worth flagging — add a guard that raises 400 'Rupture' when fresh.stock_by_size[size] < qty.",
+    "routers/orders.py POST /orders — mode='store' orders bypass delivery_fee validation but still accept delivery_fee>0, resulting in total that includes a phantom delivery fee for an in-store sale. Consider forcing delivery_fee=0 when mode=='store'.",
+    "routers/orders.py POST /pos/pin-authorize — PIN lookup uses body.pin.strip() but allows ANY admin/manager PIN to approve any requester's action (sales user approving their own cancellation would fail only because sales isn't in the role list). Good. However no rate-limiting: brute-forcing a 4-digit PIN against this endpoint is trivial (10 000 attempts). Add attempt throttling.",
+    "routers/orders.py POST /cash-sessions/open — accepts arbitrary opening_cash from client (even negative). Add validation opening_cash >= 0.",
+    "routers/orders.py POST /cash-sessions/{sid}/close — queries db.cash_movements with {'created_at': {'$gte': start}} but no upper bound. If a movement is created DURING the close call it is still included, which is fine; but if the session being closed is older and the same cashier opened a new one in between, the close will incorrectly include the newer session's movements. Scope by session_id (requires linking movements to session on creation)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter49_orders_refactor.py (new)"
+  ],
+  "success_rate": { "backend": "100% (18/18 iter49 + 73/73 regression iter46/47/48)", "frontend": "100% (3/3 target pages loaded)" },
+  "test_credentials": "Used /app/memory/test_credentials.md — admin 1234, manager 2222, sales 3333 all verified.",
+  "seed_data_creation": "No persistent data. Each test cleans up: TEST_iter49 orders left in DB intentionally (represents real POS sales), stock rolled back via PATCH, cash-sessions opened by test are closed with PIN 1234, holds marked resumed. One TEST_iter49_in cash-movement remains in history (small +1000 FCFA 'in' row) — not blocking.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Orders refactor is clean. 11 endpoints live in routers/orders.py: /api/orders (GET,POST,PATCH), /api/orders/track/{code} (public), /api/pos/pin-authorize, /api/cash-movements (GET,POST), /api/pos/holds (GET,POST,DELETE), /api/cash-sessions (GET), /api/cash-sessions/open (POST), /api/cash-sessions/{sid}/close (POST). Status-transition endpoint /api/orders/{oid}/status, /api/deliveries, /api/products/kpis still in server.py and still pass regression. For PIN tests: admin PIN=1234, manager=2222, sales=3333 (attendance_code field). Cash-session open: if a session is already open, POST /open returns 400; close with correct PIN=1234 to cleanup. Keep in mind test_create_and_list_in leaves a 1000 FCFA 'in' movement — may slightly affect subsequent expected cash reconciliation tests."
+}

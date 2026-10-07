@@ -1,5 +1,21 @@
 # Chez Dina — PRD
 
+### Vague L — Refactor P5 : extraction orders / POS / cash-sessions (Feb 2026) ✅
+**Tranche 4 du refactor du monolithe server.py (6262 → 6076 lignes, -186).**
+
+- `/app/backend/models.py` étendu (172 lignes) : ajout de `OrderItem`, `OrderIn`, `CashSessionOpenIn`, `CashSessionCloseIn`, `PinAuthIn`, `CashMovementIn`, `HoldIn`
+- `/app/backend/deps.py` étendu (124 lignes) : ajout de `gen_code()` (code commande `DN-YYMMDD-XXXX`)
+- Création `/app/backend/routers/orders.py` (230 lignes, 11 endpoints) :
+  - Commandes : `GET /orders`, `POST /orders` (décrément stock + auto-liste_attente), `PATCH /orders/{oid}`, `GET /orders/track/{code}` (public)
+  - POS : `POST /pos/pin-authorize`, `POST /cash-movements`, `GET /cash-movements` (avec `cash_sales`, `ins`, `outs`, `expected`)
+  - Holds : `POST /pos/holds`, `GET /pos/holds`, `DELETE /pos/holds/{hid}`
+  - Caisse : `GET /cash-sessions`, `POST /cash-sessions/open`, `POST /cash-sessions/{sid}/close` (avec PIN gérante + calcul écart)
+- `server.py` modifié : imports étendus (`gen_code`, 7 modèles). Classes et endpoints extraits supprimés. `app.include_router(orders_router)` ajouté.
+- Endpoints laissés dans server.py (couplés messagerie/PDF/notifs non extraites) : `PATCH /orders/{oid}/status` (templates WhatsApp), `/orders/{oid}/deliver` (preuve livraison), `/orders/{oid}/contact-log`, `/pos/shortcuts`, `/pos/shared-cart`, `/pos/pdf-receipt`, `/cash-sessions/*/handover`, `/orders/{oid}/status-v3`, `/orders/{oid}/invoice`, `/orders/{oid}/generate-invoice`.
+- Smoke curl parallèle : `/orders` → 585, `/cash-sessions` → 3, `/pos/holds` → 0, `/cash-movements` → expected 0, POS PIN 0000 → 403, PIN 1234 → 200 avec approver Aïcha Ouattara. `/products` (120), `/attendance/me`, `/auth/me` toujours OK.
+
+**Total refactor P5 à date :** server.py **6827 → 6076 (-751 lignes, -11,0%)**. Modules extraits : attendance, auth, catalog, orders. Modèles mutualisés : 17 classes dans `models.py`.
+
 ### Vague K — Refactor P5 : extraction catalog (Feb 2026) ✅
 **Tranche 3 du refactor du monolithe server.py (6548 → 6262 lignes, -286).**
 
