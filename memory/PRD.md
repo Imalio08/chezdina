@@ -1,5 +1,26 @@
 # Chez Dina — PRD
 
+### Vague J — Refactor P5 : extraction auth (Feb 2026) ✅
+**Tranche 2 du refactor du monolithe server.py (6656 → 6548 lignes, -108).**
+
+- Création `/app/backend/models.py` (52 lignes) : schémas Pydantic partagés
+  - `LoginIn`, `PinIn`, `UserIn` (staff auth)
+  - `CustomerIn`, `CustomerLoginIn`, `CustomerLoginCodeIn` (customer auth)
+- `/app/backend/deps.py` étendu (118 lignes) :
+  - `get_customer` (dép FastAPI pour clients authentifiés — JWT `customer_token`)
+  - `norm_phone` (util matching téléphone sur les 8 derniers chiffres)
+- Création `/app/backend/routers/auth.py` (127 lignes, 9 endpoints) :
+  - Staff : `POST /auth/login`, `POST /auth/login-pin`, `GET /auth/me`, `POST /auth/logout`
+  - Client : `POST /public/customer-register`, `POST /public/customer-login`, `POST /public/customer-login-code`, `POST /public/customer-logout`, `GET /public/account/me`
+- `server.py` modifié :
+  - Imports étendus depuis `deps` (ajout de `get_customer`, `norm_phone`) et `models` (6 classes)
+  - Classes `LoginIn`/`PinIn`/`UserIn`/`CustomerIn`/`CustomerLoginIn`/`CustomerLoginCodeIn` : supprimées
+  - Ancien bloc auth (lignes 258-361) : supprimé
+  - Inclusion : `app.include_router(auth_router)` ajouté
+- Smoke curl parallèle : login admin OK (token + user), /auth/me OK, /auth/logout OK, customer-register OK (400 correct pour compte existant), /api/products OK (120), /api/attendance/me OK.
+
+**Total refactor P5 à date :** server.py 6827 → 6548 (-279 lignes, -4,1%). Modules extraits : attendance, auth.
+
 ### Vague I — Refactor P5 : extraction attendance (Feb 2026) ✅
 **Tranche 1 du refactor du monolithe server.py (6827 → 6656 lignes).**
 

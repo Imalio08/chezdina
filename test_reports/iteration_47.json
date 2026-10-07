@@ -1,0 +1,32 @@
+{
+  "summary": "Iter47 P5 refactor tranche 2 (auth extracted to routers/auth.py + models.py + deps.py for get_customer/norm_phone) validated. All 24 new iter47 tests pass + all 25 iter46 regression tests still pass (49/49 total). Frontend login smoke verified for all 5 staff roles — admin/manager/sales/cm redirect to /console, rider to /rider. No regression detected.",
+  "backend_issues": { "critical": [], "minor": [] },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ConsoleLayout", "issues": ["React hydration warning: <span> cannot be a child of <option> in ConsoleLayout.jsx line 292. Non-blocking but should be cleaned up."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter47_auth_refactor.py",
+    "/app/backend/tests/test_iter46_refactor_regression.py",
+    "/app/test_reports/pytest/iter47_results.xml"
+  ],
+  "action_items": [
+    "Optional: Fix ConsoleLayout.jsx line 292 — <span> inside <option> hydration warning."
+  ],
+  "critical_code_review_comments": [
+    "routers/auth.py uses `async for u in db.users.find({})` in /auth/login-pin — O(n) scan of all users for every PIN login. Pre-existing (not a refactor regression), but should move to a hashed-PIN lookup eventually.",
+    "Customer login code lookup also iterates all customers (`async for row in db.customers.find`) — same O(n) scan concern. Pre-existing."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter47_auth_refactor.py (new)"
+  ],
+  "success_rate": { "backend": "100% (49/49)", "frontend": "100% (5/5 role logins)" },
+  "test_credentials": "Used credentials from review_request; all 5 staff accounts (admin/manager/sales/cm/rider) + PIN 1234 verified working.",
+  "seed_data_creation": "None persistent. Transient TEST_iter47 customer/user created & deleted during CRUD shape tests.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter47 refactor is clean. Auth routes live at /api/auth/* and /api/public/customer-* and /api/public/account/me (routers/auth.py). Customer-authenticated endpoints like /api/public/account/addresses and /api/public/account/orders-split remain in server.py and depend on get_customer imported from deps.py — all still return 401 when unauth. If seeding changes, note the test customer phone +225 07 85 55 58 88 with code 386436 is NOT seeded in current DB (unknown_phone test returned 404 as expected)."
+}
