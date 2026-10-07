@@ -1,5 +1,32 @@
 # Chez Dina — PRD
 
+### Vague O — Rider CMS + Catalog 100 SKUs + Logo partout (Feb 2026) ✅
+**Rider CMS complet (console → app livreur temps réel)**
+- Nouveau router `/app/backend/routers/rider_cms.py` (85 lignes) : `GET /api/public/rider-cms` (public), `GET /api/rider-cms` (auth), `PATCH /api/rider-cms` (admin/manager), `POST /api/rider-cms/reset` (admin). Stocké sous `db.site_settings.rider_cms`. Config par défaut incluant logo, primary_color, accent_color, greeting template (`{name}` + `{brand}`), subtitle, announcement (enabled/text/variant info/success/warning/danger), help (enabled/title/content), tabs (5 par défaut : Courses/Carte/Historique/Performance/Profil).
+- Nouvel onglet "App Livreur" dans `/console/parametres?tab=rider-app` (`Settings.jsx` : `RiderAppTab` component, data-testid=`settings-tab-rider-app` + `tab-rider-app`) :
+  - Upload logo rider (base64), color pickers primaire + fond, placeholders explicites
+  - Message d'accueil (greeting + subtitle avec substitutions `{name}` / `{brand}`)
+  - Annonce avec 4 variantes stylisées
+  - Modal aide intégrée (titre + contenu libre)
+  - Gestion des onglets : réordonner (▲▼), renommer, changer icône (15 options lucide), masquer, ajouter des onglets personnalisés avec URL externe (ouverture nouvel onglet via `<a target=_blank>`), supprimer custom (builtins protégés)
+  - Save broadcasts `rider-cms-changed` event → RiderShell refetch sans recharger la page
+- `RiderShell.jsx` entièrement refactorisé (280 lignes) : consomme `/public/rider-cms`, applique les couleurs via CSS variables (`--rider-primary` / `--rider-accent`), bottom nav dynamique (grid-template-columns calculé), annonce dismissible par livreur (localStorage), bouton Aide dans topbar ouvrant une modal.
+
+**Catalog expansion 40 → 100 SKUs**
+- `/app/backend/routers/admin.py` étendu : `POST /api/admin/reseed-women-fashion` insère désormais exactement **100 produits avec 100% d'images Unsplash uniques** (vérifié 100/100 distinctes).
+- Répartition : Chaussures 37 (10 talons · 8 sandales · 3 mules · 2 ballerines · 5 baskets · 4 bottes · 3 mocassins · 2 espadrilles), Sacs 27 (12 sacs à main · 6 pochettes · 3 mini sacs · 4 cabas · 2 sacs à dos), Vêtements 36 (10 robes · 7 hauts · 4 pantalons · 3 jupes · 8 pagne/wax · 4 vestes/combinaisons).
+- Marques : Dina Soles / Dina Carry / Dina Dress. Prix 11 500 – 55 000 FCFA. Stocks aléatoires 3-15 par taille.
+
+**Logo propagation globale (vrai logo écrase CD partout)**
+- `BrandingBootstrapper.jsx` déjà en place : favicon dynamique + document.title.
+- Login desktop collage + mobile header → initiales du `site.name` au lieu de "CD" dur, affiche `site.logo` quand uploadé.
+- POS receipt (`POS.jsx` ligne 445-449) → logo biz + initiales fallback.
+- Invoice preview (`Invoicing.jsx` ligne ~62) → logo biz + initiales fallback.
+- Shared cart (`SharedCart.jsx` ligne 62) → fetch `/public/site`, logo + initiales fallback.
+
+**Tests Iter51 : 8/8 backend, 100% frontend validé (data-testids présents, flux end-to-end OK, livreur voit annonce + onglet WhatsApp custom + couleur primaire personnalisée).**
+
+
 ### Vague N — Logo + Favicon + PWA + WhatsApp + Catalog femme (Feb 2026) ✅
 **Branding & icônes PWA**
 - Création `/app/frontend/public/manifest.json` (short_name, icons 192/512/512-maskable, theme_color #b02a2a, start_url /boutique, display standalone)
