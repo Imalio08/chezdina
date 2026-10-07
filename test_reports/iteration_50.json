@@ -1,0 +1,37 @@
+{
+  "summary": "Iter 50 — P5 tranche 5 (riders/deliveries/sessions/GPS extraction). Ran 28 pytest cases covering all 15 endpoints in routers/riders.py plus RBAC and regression. All 28 PASSED. New router cleanly wired, models AssignIn/SessionIn/ReconcileIn/RiderLocationIn validated, RBAC enforced (sales 403 on assign/suggest-split/create-session; rider only self can POST /rider/position; rider_id in body is ignored — server uses token identity). Reconcile correctly requires PIN gérante for collected=true (400 if missing, 403 if invalid, 200 with approver recorded). Rider-scoped /deliveries confirmed. Regression smoke on /auth/me, /attendance/me, /products, /orders, /cash-sessions, /pos/holds, /pos/pin-authorize all green. /orders/{oid}/status still served from server.py (line 888) as intended.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/riders/{rid}/kpis", "issue": "`satisfaction` field uses random.uniform(4.1, 4.8) instead of real review avg — non-deterministic, misleading for UI."},
+      {"endpoint": "GET /api/riders/locations", "issue": "No RBAC — any authenticated role (incl. rider/sales/customer-staff) can view live positions of all riders. Should likely be admin/manager only."},
+      {"endpoint": "POST /api/riders/location", "issue": "No explicit role check — any authenticated user can write to rider_locations/rider_positions keyed by their own user.id. Harmless but should restrict to role=='rider'."},
+      {"endpoint": "GET /api/riders/{rid}/score and /reviews and /kpis", "issue": "No RBAC — a rider can read scores/KPIs of OTHER riders by passing another rid. Should restrict to self or admin/manager."},
+      {"endpoint": "GET /api/delivery-sessions", "issue": "No rider scoping — a rider can list sessions of any rider by passing rider_id query. Should auto-scope when role=='rider'."},
+      {"endpoint": "PATCH /api/delivery-sessions/{sid}/reconcile", "issue": "`amount` is cast via float(body.amount) without clamping; negative amounts accepted and recorded as écart. Minor validation gap."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter50_riders_refactor.py",
+    "/app/test_reports/pytest/iter50.xml"
+  ],
+  "action_items": [
+    "(Optional, security) Add RBAC guards to GET /riders/locations, GET /riders/{rid}/{score,reviews,kpis} (self or admin/manager), and auto-scope GET /delivery-sessions when caller role=='rider'.",
+    "(Optional) Replace random satisfaction in /riders/{rid}/kpis with real review rating average."
+  ],
+  "critical_code_review_comments": [
+    "server.py is now 5791 lines — still too large; continue extraction (P5 tranche 6 candidates: notifications/whatsapp/reviews).",
+    "routers/riders.py uses `random` for satisfaction KPI — not reproducible, consider removing.",
+    "Several GETs in riders.py lack role scoping (see minor issues) — low risk now but worth hardening.",
+    "AssignIn/SessionIn/ReconcileIn/RiderLocationIn are clean and typed — good."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter50_riders_refactor.py"],
+  "success_rate": {"backend": "100% (28/28)", "frontend": "N/A (not tested per request)"},
+  "test_credentials": "Loaded from /app/memory/test_credentials.md — all 5 roles authenticated OK.",
+  "seed_data_creation": "Created 1 delivery_session for rider1 (then closed via PATCH /{sid}/close as instructed). Added 1 order to session and set reconciliation (collected=true then collected=false). Session now closed=true.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Iter 50 refactor is green. For tranche 6, focus on: notifications/whatsapp templates, review submission flow, and the still-in-server endpoints /orders/{oid}/status and /orders/{oid}/deliver (proof-of-delivery). Also consider testing RBAC hardening if main agent patches riders.py GET endpoints.",
+  "rca of the issue": "N/A — no regressions. All refactored endpoints behave identically to pre-tranche smoke results."
+}

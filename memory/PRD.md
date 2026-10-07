@@ -1,5 +1,21 @@
 # Chez Dina — PRD
 
+### Vague M — Refactor P5 : extraction riders / deliveries / GPS / scoring (Feb 2026) ✅
+**Tranche 5 du refactor du monolithe server.py (6076 → 5791 lignes, -285).**
+
+- `/app/backend/models.py` étendu (202 lignes) : ajout de `AssignIn`, `SessionIn`, `ReconcileIn`, `RiderLocationIn`
+- Création `/app/backend/routers/riders.py` (320 lignes, 15 endpoints) :
+  - GPS : `POST /rider/position` (rider only), `POST /riders/location` (dual upsert dans `rider_locations` + `rider_positions`), `GET /riders/locations` (filtre stale >30min)
+  - Scoring : `GET /riders/{rid}/score` (5 composantes pondérées + niveau Bronze→Excellence), `GET /riders/{rid}/reviews` (phones masqués), `GET /riders/{rid}/kpis`
+  - Self-service livreur : `GET /riders/me/today`, `GET /riders/me/history` (phones masqués)
+  - Livraisons : `GET /deliveries` (scope rider si rôle rider), `PATCH /deliveries/{oid}/assign`, `POST /deliveries/suggest-split` (algo zone-based + load-balancing)
+  - Sessions quotidiennes : `POST /delivery-sessions`, `GET /delivery-sessions` (avec `total_to_collect`, `collected_total`, counts), `PATCH /{sid}/add-order`, `PATCH /{sid}/reconcile` (PIN gérante requis pour cash), `PATCH /{sid}/close`
+- `server.py` modifié : imports étendus. Classes et endpoints extraits supprimés. `app.include_router(riders_router)` ajouté.
+- Endpoints laissés dans server.py (couplés messagerie/notifs non extraites) : `PATCH /orders/{oid}/status`, `/orders/{oid}/deliver` (preuve livraison), `PATCH /reviews/{rid}/moderate`.
+- Smoke curl parallèle : `/deliveries` → 324, `/delivery-sessions` → 6, rider1 score=76 (niveau Or), rider1 KPIs total=29 delivered=19, `/riders/me/today` counts dict OK, `/riders/location` POST OK. Regression `/orders` (587), `/attendance/me`, `/products` (120) toujours OK.
+
+**Total refactor P5 à date :** server.py **6827 → 5791 (-1036 lignes, -15,2%)**. Modules extraits : attendance, auth, catalog, orders, riders. Modèles mutualisés : 21 classes dans `models.py`.
+
 ### Vague L — Refactor P5 : extraction orders / POS / cash-sessions (Feb 2026) ✅
 **Tranche 4 du refactor du monolithe server.py (6262 → 6076 lignes, -186).**
 
