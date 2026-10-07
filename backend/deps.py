@@ -116,3 +116,9 @@ async def get_customer(request: Request):
 def norm_phone(p: str) -> str:
     """Keep only digits — used for loose phone matching (last 8 digits)."""
     return "".join(ch for ch in (p or "") if ch.isdigit())
+
+
+def gen_code() -> str:
+    """Short human-friendly order code e.g. DN-250207-4713."""
+    import random
+    return f"DN-{datetime.now().strftime('%y%m%d')}-{random.randint(1000, 9999)}"

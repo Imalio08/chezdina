@@ -115,3 +115,58 @@ class CollectionIn(BaseModel):
     starts_at: Optional[str] = None
     ends_at: Optional[str] = None
     visible: bool = True
+
+
+# ---------- Orders / POS / Cash sessions ----------
+class OrderItem(BaseModel):
+    product_id: str
+    name: str
+    size: Optional[str] = None
+    color: Optional[str] = None
+    qty: int = 1
+    price: int
+    image: Optional[str] = None
+
+
+class OrderIn(BaseModel):
+    items: List[OrderItem]
+    customer: Optional[Dict[str, Any]] = None
+    channel: str = "store"
+    payment_method: str = "cash"
+    delivery_zone: Optional[str] = None
+    delivery_fee: int = 0
+    discount: int = 0
+    note: str = ""
+    mode: str = "store"
+    store_id: Optional[str] = None
+
+
+class CashSessionOpenIn(BaseModel):
+    opening_cash: float = 0
+    note: Optional[str] = None
+
+
+class CashSessionCloseIn(BaseModel):
+    closing_cash: float
+    pin: str  # manager PIN required
+    note: Optional[str] = None
+
+
+class PinAuthIn(BaseModel):
+    pin: str
+    action: str  # discount | cancel | refund | reopen | other
+    amount: Optional[float] = None
+
+
+class CashMovementIn(BaseModel):
+    type: str  # "in" | "out"
+    amount: float
+    reason: str  # label
+    note: Optional[str] = None
+
+
+class HoldIn(BaseModel):
+    items: List[Dict[str, Any]]
+    customer: Optional[Dict[str, Any]] = None
+    note: Optional[str] = None
+    expires_in_hours: Optional[int] = 24
