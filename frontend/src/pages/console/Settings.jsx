@@ -114,7 +114,8 @@ function IdentiteTab() {
     try {
       await api.patch("/business", b);
       await api.patch("/site", { logo: site.logo, favicon: site.favicon });
-      toast.success("Identité enregistrée · logo propagé partout");
+      window.dispatchEvent(new Event("branding-changed"));
+      toast.success("Identité enregistrée · logo propagé partout (PWA incluse)");
     } catch { toast.error(ERROR_MSG); } finally { setSaving(false); }
   };
 

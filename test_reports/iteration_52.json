@@ -1,0 +1,33 @@
+{
+  "summary": "Iter52 testing — Messagerie router extraction regression + new PWA dynamic manifest / icon endpoints. Backend: 10/10 pytest cases pass (list / open / send / get / archive / pin / react / broadcast / customer messages / manifest+icons incl. user logo). Frontend: /console/messagerie loads and renders conversation list correctly. CRITICAL frontend bug: id='dynamic-manifest' is stripped by CRA HtmlWebpackPlugin from the served index.html (dynamic-favicon and dynamic-apple-icon ids are preserved, only manifest id is dropped), so getElementById('dynamic-manifest') returns null and the backend-generated manifest is never applied — the install icon will NOT track the merchant logo.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [
+      {
+        "flow": "PWA dynamic manifest swap on /boutique",
+        "issue": "Served index.html loses id=\"dynamic-manifest\" (CRA/HtmlWebpackPlugin normalizes <link rel=\"manifest\">). document.getElementById('dynamic-manifest') is null at runtime, so BrandingBootstrapper never swaps href to /api/public/manifest.webmanifest. Install icon will keep using static /manifest.json instead of the backend-generated one. Reproduced on both the preview URL and localhost:3000. Note the sibling dynamic-favicon and dynamic-apple-icon ids ARE preserved.",
+        "affected_selectors": ["link#dynamic-manifest", "link[rel=\"manifest\"]"]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter52_messagerie_pwa.py", "/app/test_reports/pytest/iter52.xml"],
+  "action_items": [
+    "Fix BrandingBootstrapper: use document.querySelector('link[rel=\"manifest\"]') (fallback) instead of getElementById('dynamic-manifest'), and set its id when found. Alt: in index.html, keep rel + id but also set a data attribute, or disable HtmlWebpackPlugin minify for the manifest link.",
+    "After the fix, re-verify on /boutique: `document.querySelector('link[rel=manifest]').href` must contain '/api/public/manifest.webmanifest'."
+  ],
+  "critical_code_review_comments": [
+    "BrandingBootstrapper relies on an id that CRA strips — brittle. Should fall back to querySelector by rel attribute (robust against build-time HTML transforms).",
+    "pwa.py: _render_initials_png / _resize_logo_png import PIL inside the function (ok, lazy). Pillow handles bad logos via try/except — verified with 1x1 PNG, no crash.",
+    "messagerie.py: send_message_core attachment URL validation is strong (rejects javascript: via allowlist of http/https/data:image|video|audio|application/pdf). Good."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter52_messagerie_pwa.py"],
+  "success_rate": {"backend": "100%", "frontend": "66%"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! ; Customer +225 07 85 55 58 88 / 386436",
+  "seed_data_creation": "None; broadcast created 1 extra message per active customer (acceptable per spec).",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend pytest file /app/backend/tests/test_iter52_messagerie_pwa.py covers all messagerie endpoints + PWA manifest/icons incl. user-provided logo. Dynamic manifest swap on frontend is broken due to stripped id — see action_items. After E1 patches BrandingBootstrapper, re-run the frontend check (reload /boutique, read link[rel=manifest].href).",
+  "rca of the issue": "Served index.html (both preview and localhost CRA dev) renders `<link rel=\"manifest\" href=\"/manifest.json\" />` without the id. The sibling icon links keep id=dynamic-favicon / dynamic-apple-icon. Hypothesis: HtmlWebpackPlugin / InterpolateHtmlPlugin removes extra attributes on `<link rel=manifest>` because it is treated specially (webmanifest injection). Simple mitigation: query by `link[rel=\"manifest\"]` in BrandingBootstrapper."
+}
