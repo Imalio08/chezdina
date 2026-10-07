@@ -23,41 +23,16 @@ from deps import (
     get_user, require_role, get_customer, norm_phone,
 )
 # Shared Pydantic models (moved to models.py — P5 Refactor Feb 2026)
-from models import LoginIn, PinIn, UserIn, CustomerIn, CustomerLoginIn, CustomerLoginCodeIn
+from models import (
+    LoginIn, PinIn, UserIn, CustomerIn, CustomerLoginIn, CustomerLoginCodeIn,
+    ProductIn, CategoryIn, CollectionIn, SimpleNameIn,
+)
 
 app = FastAPI(title="Chez Dina API")
 api = APIRouter(prefix="/api")
 
 # ---------- Pydantic models ----------
-# LoginIn, PinIn moved to models.py
-class ProductIn(BaseModel):
-    name: str; category: str; brand: str = "Dina"; price: int; cost: int = 0
-    description: str = ""; image: str = ""; images: List[str] = []
-    sizes: List[str] = []; colors: List[str] = []; stock_by_size: Dict[str,int] = {}
-    stock: int = 0; sku: Optional[str] = None; visibility: str = "both"
-    # Phase B fields
-    price_old: Optional[int] = None
-    status: str = "actif"
-    collections: Optional[str] = None
-    tags: Optional[str] = None
-    material: Optional[str] = None
-    occasion: Optional[str] = None
-    heel_type: Optional[str] = None
-    care: Optional[str] = None
-    supplier: Optional[str] = None
-    alert_threshold: Optional[int] = 3
-    location: Optional[str] = None
-    featured: bool = False
-    is_new: bool = False
-    seo_title: Optional[str] = None
-    seo_description: Optional[str] = None
-    promo_pct: Optional[int] = None
-    season: Optional[str] = None
-    # Real variants grid: list of {size, color, stock, enabled, price?} — only existing combos
-    variants: List[Dict[str, Any]] = []
-    # Videos (up to 2, MP4/MOV ≤ 60s ≤ 50MB) — base64 data URL or external URL
-    videos: List[str] = []
-    video_posters: List[str] = []
+# LoginIn, PinIn, ProductIn moved to models.py
 class OrderItem(BaseModel):
     product_id: str; name: str; size: Optional[str]=None; color: Optional[str]=None
     qty: int = 1; price: int; image: Optional[str] = None
@@ -202,9 +177,7 @@ class CmsPageIn(BaseModel):
     enabled: bool = True
     seo_title: Optional[str] = None
     seo_description: Optional[str] = None
-class SimpleNameIn(BaseModel):
-    name: str
-    note: Optional[str] = None
+# SimpleNameIn moved to models.py
 class CashSessionOpenIn(BaseModel):
     opening_cash: float = 0
     note: Optional[str] = None
@@ -284,36 +257,7 @@ async def delete_user(uid: str, user: dict = Depends(require_role("admin"))):
     await db.users.delete_one({"id": uid})
     return {"ok": True}
 
-# ---------- Products ----------
-@api.get("/products")
-async def products(user: dict = Depends(get_user), q: Optional[str] = None):
-    f = {}
-    if q: f["$or"] = [{"name": {"$regex": q, "$options": "i"}}, {"sku": {"$regex": q, "$options": "i"}}]
-    return clean(await db.products.find(f).to_list(500))
-
-@api.post("/products")
-async def create_product(body: ProductIn, user: dict = Depends(require_role("admin","manager","stock_keeper"))):
-    doc = body.model_dump()
-    doc.update({"id": new_id(), "created_at": now_iso(),
-                "sku": body.sku or f"DN-{random.randint(10000,99999)}",
-                "store_id": "store-cocody", "rating_avg": 0, "rating_count": 0})
-    if body.stock_by_size and not body.stock:
-        doc["stock"] = sum(body.stock_by_size.values())
-    await db.products.insert_one(doc)
-    return clean(doc)
-
-@api.patch("/products/{pid}")
-async def update_product(pid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
-    body.pop("id", None); body.pop("_id", None)
-    if "stock_by_size" in body and body["stock_by_size"]:
-        body["stock"] = sum(body["stock_by_size"].values())
-    await db.products.update_one({"id": pid}, {"$set": body})
-    return {"ok": True}
-
-@api.delete("/products/{pid}")
-async def delete_product(pid: str, user: dict = Depends(require_role("admin","manager"))):
-    await db.products.delete_one({"id": pid})
-    return {"ok": True}
+# ---------- Products: endpoints moved to routers/catalog.py — P5 Refactor Feb 2026 ----------
 
 # ---------- Customers ----------
 async def customer_metrics(cid: str):
@@ -4092,16 +4036,7 @@ async def delete_demo_data(user: dict = Depends(require_role("admin"))):
     return {"ok": True, "deleted": deleted}
 
 
-@api.patch("/brands/{bid}")
-async def update_brand(bid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
-    body.pop("_id",None); body.pop("id",None)
-    body["updated_at"] = now_iso()
-    old = await db.brands.find_one({"id": bid})
-    if not old: raise HTTPException(404, "Marque introuvable")
-    if body.get("name") and old.get("name") and old["name"] != body["name"]:
-        await db.products.update_many({"brand": old["name"]}, {"$set": {"brand": body["name"]}})
-    await db.brands.update_one({"id": bid}, {"$set": body})
-    return {"ok": True}
+# update_brand moved to routers/catalog.py — P5 Refactor Feb 2026
 
 
 
@@ -4152,51 +4087,7 @@ async def delete_page(slug: str, user: dict = Depends(require_role("admin"))):
     await db.cms_pages.delete_one({"slug": slug})
     return {"ok": True}
 
-# ---------- Brands & Categories ----------
-@api.get("/brands")
-async def list_brands(user: dict = Depends(get_user)):
-    # Derive from distinct product.brand + stored overrides
-    distinct = await db.products.distinct("brand")
-    stored = {b["name"]: b for b in await db.brands.find({}).to_list(200)}
-    out = []
-    for name in sorted(set(distinct) | set(stored.keys())):
-        cnt = await db.products.count_documents({"brand": name})
-        s = stored.get(name, {})
-        out.append({"id": s.get("id") or new_id(), "name": name, "product_count": cnt, "note": s.get("note","")})
-    return out
-
-@api.post("/brands")
-async def create_brand(body: SimpleNameIn, user: dict = Depends(require_role("admin","manager"))):
-    doc = {"id": new_id(), "name": body.name, "note": body.note or "", "created_at": now_iso()}
-    await db.brands.insert_one(doc)
-    return clean(doc)
-
-@api.delete("/brands/{bid}")
-async def delete_brand(bid: str, user: dict = Depends(require_role("admin","manager"))):
-    await db.brands.delete_one({"id": bid})
-    return {"ok": True}
-
-@api.get("/categories")
-async def list_categories(user: dict = Depends(get_user)):
-    distinct = await db.products.distinct("category")
-    stored = {c["name"]: c for c in await db.categories.find({}).to_list(200)}
-    out = []
-    for name in sorted(set(distinct) | set(stored.keys())):
-        cnt = await db.products.count_documents({"category": name})
-        s = stored.get(name, {})
-        out.append({"id": s.get("id") or new_id(), "name": name, "product_count": cnt, "note": s.get("note","")})
-    return out
-
-@api.post("/categories")
-async def create_category(body: SimpleNameIn, user: dict = Depends(require_role("admin","manager"))):
-    doc = {"id": new_id(), "name": body.name, "note": body.note or "", "created_at": now_iso()}
-    await db.categories.insert_one(doc)
-    return clean(doc)
-
-@api.delete("/categories/{cid}")
-async def delete_category(cid: str, user: dict = Depends(require_role("admin","manager"))):
-    await db.categories.delete_one({"id": cid})
-    return {"ok": True}
+# ---------- Brands & Categories: endpoints moved to routers/catalog.py — P5 Refactor Feb 2026 ----------
 
 # ---------- Pack 5: AI Product description & SEO ----------
 class ProductDescIn(BaseModel):
@@ -4333,184 +4224,11 @@ async def brands_kpis(user: dict = Depends(get_user)):
         "avg_margin": avg_m,
     }
 
-# Enrich /brands with ca_30d + margin per brand
-@api.get("/brands/full")
-async def list_brands_full(user: dict = Depends(get_user)):
-    distinct = await db.products.distinct("brand")
-    stored = {b["name"]: b for b in await db.brands.find({}).to_list(500)}
-    names = sorted(set(distinct) | set(stored.keys()))
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
-    ca_by_brand: Dict[str, int] = {}
-    for o in orders:
-        for it in o.get("items", []):
-            b = it.get("brand") or ""
-            if not b and it.get("product_id"):
-                p = await db.products.find_one({"id": it["product_id"]})
-                b = (p or {}).get("brand", "")
-            if b: ca_by_brand[b] = ca_by_brand.get(b, 0) + int(it.get("qty",0)) * int(it.get("price",0))
-    out = []
-    for name in names:
-        s = stored.get(name, {})
-        products = await db.products.find({"brand": name}).to_list(500)
-        margins = [((p["price"]-p["cost"])/p["price"]*100) for p in products if p.get("price",0) > 0 and p.get("cost",0) > 0]
-        out.append({
-            "id": s.get("id") or new_id(),
-            "name": name,
-            "logo": s.get("logo",""),
-            "note": s.get("note",""),
-            "status": s.get("status","active"),
-            "product_count": len(products),
-            "ca_30d": ca_by_brand.get(name, 0),
-            "avg_margin": round(sum(margins)/len(margins),1) if margins else 0,
-        })
-    return out
+# list_brands_full + brand_detail moved to routers/catalog.py — P5 Refactor Feb 2026
 
-@api.get("/brands/{bid}")
-async def brand_detail(bid: str, user: dict = Depends(get_user)):
-    b = await db.brands.find_one({"id": bid})
-    if not b:
-        # fallback: find by name among products (derived brand)
-        b = {"id": bid, "name": bid, "note": "", "logo": "", "status":"active"}
-    name = b.get("name")
-    products = await db.products.find({"brand": name}).to_list(500)
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
-    ca_30 = 0
-    for o in orders:
-        for it in o.get("items", []):
-            if it.get("brand") == name or any(p for p in products if p["id"] == it.get("product_id")):
-                ca_30 += int(it.get("qty",0)) * int(it.get("price",0))
-    margins = [((p["price"]-p["cost"])/p["price"]*100) for p in products if p.get("price",0) > 0 and p.get("cost",0) > 0]
-    stock_value = sum((p.get("stock",0) or 0) * (p.get("price",0) or 0) for p in products)
-    return clean({**b, "products": products, "stats": {
-        "product_count": len(products),
-        "ca_30d": ca_30,
-        "avg_margin": round(sum(margins)/len(margins),1) if margins else 0,
-        "stock_value": stock_value,
-    }})
+# ---------- Pack 5: Categories tree — moved to routers/catalog.py (incl. CategoryIn) — P5 Refactor Feb 2026 ----------
 
-# ---------- Pack 5: Categories tree (parent_id + visible + image + order) ----------
-class CategoryIn(BaseModel):
-    name: str
-    parent_id: Optional[str] = None
-    image: Optional[str] = None
-    order: int = 0
-    visible: bool = True
-    note: Optional[str] = None
-
-@api.get("/categories/tree")
-async def categories_tree(user: dict = Depends(get_user)):
-    stored = await db.categories.find({}).to_list(500)
-    distinct = await db.products.distinct("category")
-    # Ensure a doc exists for every product-derived category (for counts)
-    stored_names = {c["name"] for c in stored}
-    extras = [{"id": new_id(), "name": n, "parent_id": None, "image":"","order":999,"visible":True,"note":""} for n in distinct if n and n not in stored_names]
-    all_cats = stored + extras
-    # product_count
-    for c in all_cats:
-        c["product_count"] = await db.products.count_documents({"category": c["name"]})
-    # Build tree
-    by_id = {c["id"]: {**c, "children": []} for c in all_cats}
-    roots = []
-    for c in all_cats:
-        pid = c.get("parent_id")
-        if pid and pid in by_id:
-            by_id[pid]["children"].append(by_id[c["id"]])
-        else:
-            roots.append(by_id[c["id"]])
-    roots.sort(key=lambda x: (x.get("order", 999), x["name"]))
-    for r in roots:
-        r["children"].sort(key=lambda x: (x.get("order", 999), x["name"]))
-    return clean(roots)
-
-@api.get("/categories/kpis")
-async def categories_kpis(user: dict = Depends(get_user)):
-    stored = await db.categories.find({}).to_list(500)
-    distinct = await db.products.distinct("category")
-    names = set([c["name"] for c in stored]) | set([n for n in distinct if n])
-    with_parent = sum(1 for c in stored if c.get("parent_id"))
-    # top category by sales 30d
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
-    orders = await db.orders.find({"created_at": {"$gte": cutoff}, "status":{"$ne":"annulee"}}).to_list(5000)
-    sales: Dict[str,int] = {}
-    for o in orders:
-        for it in o.get("items", []):
-            cat = it.get("category") or ""
-            if not cat and it.get("product_id"):
-                p = await db.products.find_one({"id": it["product_id"]})
-                cat = (p or {}).get("category","")
-            if cat: sales[cat] = sales.get(cat, 0) + int(it.get("qty",0)) * int(it.get("price",0))
-    top = max(sales.items(), key=lambda x:x[1])[0] if sales else ""
-    return {"total": len(names), "sub": with_parent, "top": top, "top_ca": sales.get(top, 0)}
-
-@api.patch("/categories/{cid}")
-async def update_category(cid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
-    body.pop("_id",None); body.pop("id",None)
-    body["updated_at"] = now_iso()
-    old = await db.categories.find_one({"id": cid})
-    if not old:
-        # upsert new record for a derived category
-        body["id"] = cid
-        await db.categories.insert_one(body)
-    else:
-        if body.get("name") and old.get("name") and old["name"] != body["name"]:
-            await db.products.update_many({"category": old["name"]}, {"$set": {"category": body["name"]}})
-        await db.categories.update_one({"id": cid}, {"$set": body})
-    return {"ok": True}
-
-# ---------- Pack 5: Collections ----------
-class CollectionIn(BaseModel):
-    name: str
-    kind: str = "manual"  # manual | auto
-    rules: Optional[Dict[str, Any]] = None  # for auto: {category, brand, price_max, tags}
-    product_ids: Optional[List[str]] = None  # for manual
-    banner: Optional[str] = None
-    description: Optional[str] = None
-    starts_at: Optional[str] = None
-    ends_at: Optional[str] = None
-    visible: bool = True
-
-@api.get("/collections")
-async def list_collections(user: dict = Depends(get_user)):
-    cols = await db.collections.find({}).to_list(200)
-    # Resolve products for each
-    for c in cols:
-        if c.get("kind") == "auto":
-            rules = c.get("rules") or {}
-            flt: Dict[str, Any] = {}
-            if rules.get("category"): flt["category"] = rules["category"]
-            if rules.get("brand"): flt["brand"] = rules["brand"]
-            if rules.get("price_max"): flt["price"] = {"$lte": int(rules["price_max"])}
-            c["product_count"] = await db.products.count_documents(flt) if flt else 0
-        else:
-            c["product_count"] = len(c.get("product_ids") or [])
-    return clean(cols)
-
-@api.post("/collections")
-async def create_collection(body: CollectionIn, user: dict = Depends(require_role("admin","manager"))):
-    doc = body.model_dump(); doc.update({"id": new_id(), "created_at": now_iso()})
-    await db.collections.insert_one(doc)
-    return clean(doc)
-
-@api.patch("/collections/{cid}")
-async def update_collection(cid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
-    body.pop("_id",None); body.pop("id",None)
-    body["updated_at"] = now_iso()
-    await db.collections.update_one({"id": cid}, {"$set": body})
-    return {"ok": True}
-
-@api.delete("/collections/{cid}")
-async def delete_collection(cid: str, user: dict = Depends(require_role("admin","manager"))):
-    await db.collections.delete_one({"id": cid})
-    return {"ok": True}
-
-@api.get("/collections/kpis")
-async def collections_kpis(user: dict = Depends(get_user)):
-    all_c = await db.collections.find({}).to_list(500)
-    actives = sum(1 for c in all_c if c.get("visible", True))
-    manual_products = sum(len(c.get("product_ids") or []) for c in all_c)
-    return {"total": len(all_c), "actives": actives, "products": manual_products}
+# ---------- Pack 5: Collections — moved to routers/catalog.py (incl. CollectionIn) — P5 Refactor Feb 2026 ----------
 
 # ---------- Cash sessions (open/close) ----------
 @api.get("/cash-sessions")
@@ -4650,13 +4368,7 @@ async def update_business(body: Dict[str,Any], user: dict = Depends(require_role
     return {"ok": True}
 
 # ---------- Public storefront ----------
-@api.get("/public/products")
-async def public_products(q: Optional[str] = None, category: Optional[str] = None):
-    f = {"visibility": {"$ne":"store"}}
-    if q: f["name"] = {"$regex": q, "$options": "i"}
-    if category and category != "all": f["category"] = category
-    return clean(await db.products.find(f).to_list(500))
-
+# public_products moved to routers/catalog.py — P5 Refactor Feb 2026
 @api.get("/public/product/{pid}")
 async def public_product(pid: str):
     p = await db.products.find_one({"id": pid})
@@ -6539,9 +6251,11 @@ app.include_router(api)
 from routers.meta import router as meta_router
 from routers.attendance import router as attendance_router
 from routers.auth import router as auth_router
+from routers.catalog import router as catalog_router
 app.include_router(meta_router)
 app.include_router(attendance_router)
 app.include_router(auth_router)
+app.include_router(catalog_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")
