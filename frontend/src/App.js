@@ -75,6 +75,12 @@ import Finances from "@/pages/console/Finances";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import ScanRedirect from "@/pages/public/ScanRedirect";
+import Nouveautes from "@/pages/storefront/Nouveautes";
+import Promotions from "@/pages/storefront/Promotions";
+import GuideTailles from "@/pages/storefront/GuideTailles";
+import LivraisonRetours from "@/pages/storefront/LivraisonRetours";
+import Suivi from "@/pages/storefront/Suivi";
+import Contact from "@/pages/storefront/Contact";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
@@ -129,6 +135,12 @@ export default function App() {
               <Route path="account" element={<Account />} />
               <Route path="compte/*" element={<AccountShell />} />
               <Route path="bons-plans" element={<BonsPlans />} />
+              <Route path="nouveautes" element={<Nouveautes />} />
+              <Route path="promotions" element={<Promotions />} />
+              <Route path="guide-tailles" element={<GuideTailles />} />
+              <Route path="livraison-retours" element={<LivraisonRetours />} />
+              <Route path="suivi-commande" element={<Suivi />} />
+              <Route path="contact" element={<Contact />} />
             </Route>
             <Route path="/console" element={<Protected><ConsoleLayout /></Protected>}>
               <Route index element={<ErrorBoundary><Dashboard /></ErrorBoundary>} />

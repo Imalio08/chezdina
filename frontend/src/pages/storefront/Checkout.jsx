@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
-import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalLink } from "lucide-react";
 
 const ZONES = {"Cocody":1500,"Riviera":2000,"Angré":2000,"Plateau":1000,"Marcory":1500,"Zone 4":1500,"Treichville":1500,"Koumassi":2000,"Yopougon":2500,"Abobo":3000,"Adjamé":1500,"Port-Bouët":2500,"Bingerville":3000,"Songon":3500,"Grand-Bassam":5000};
 const ABIDJAN = { lat: 5.3600, lng: -4.0083 };
@@ -20,9 +20,12 @@ export default function Checkout() {
   const [coords, setCoords] = useState(null);
   const [locating, setLocating] = useState(false);
   const [cartImages, setCartImages] = useState({});
+  const [paymentConfig, setPaymentConfig] = useState({ wave_link: "", deposit_policy: { mode: "none", value: 0, threshold: 0 } });
+  const [submitting, setSubmitting] = useState(false);
+  const [confirmedOrder, setConfirmedOrder] = useState(null);
   const nav = useNavigate();
 
-  // Fetch gallery for each cart item
+  useEffect(() => { api.get("/public/payment-config").then(r => setPaymentConfig(r.data)).catch(() => {}); }, []);
   useEffect(() => {
     const uniq = [...new Set(cart.map(x=>x.product_id))];
     uniq.forEach(pid => { if (!cartImages[pid]) api.get(`/public/product/${pid}`).then(r=>setCartImages(prev=>({...prev,[pid]:(r.data.images||[r.data.image]).filter(Boolean)}))).catch(()=>{}); });
@@ -32,6 +35,16 @@ export default function Checkout() {
   const sub = cart.reduce((s,x)=>s+x.qty*x.price,0);
   const fee = ZONES[zone] || 0;
   const total = sub + fee;
+
+  // Compute expected deposit for COD based on payment config
+  const pol = paymentConfig.deposit_policy || { mode: "none" };
+  const threshold = Number(pol.threshold || 0);
+  let expectedDeposit = 0;
+  if (method === "cod" && total >= threshold) {
+    if (pol.mode === "pct") expectedDeposit = Math.round(total * (Number(pol.value || 0) / 100));
+    else if (pol.mode === "fixed") expectedDeposit = Math.min(total, Number(pol.value || 0));
+  }
+  const remaining = total - expectedDeposit;
 
   const locate = () => {
     if (!navigator.geolocation) return toast.error("Géolocalisation non disponible");
@@ -51,15 +64,24 @@ export default function Checkout() {
   const checkout = async () => {
     if (!cart.length) return toast.error("Panier vide");
     if (!name || !phone) return toast.error("Nom et téléphone requis");
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const { data } = await api.post("/public/orders", {
         items: cart.map(x=>({product_id:x.product_id,name:x.name,size:x.size,color:x.color,qty:x.qty,price:x.price,image:x.image})),
         customer: { name, phone, address: addr, lat: coords?.lat, lng: coords?.lng },
         channel: "boutique", payment_method: method, delivery_zone: zone, delivery_fee: fee, mode: "delivery",
       });
-      clearCart(); toast.success("Commande confirmée !"); nav(`/suivi/${data.code}`);
-    } catch { toast.error("Erreur commande"); }
+      toast.success("Commande créée !");
+      if (data.status === "en_attente_acompte" && data.deposit_required > 0) {
+        setConfirmedOrder({ code: data.code, deposit: data.deposit_required, total });
+      } else {
+        clearCart(); nav(`/suivi/${data.code}`);
+      }
+    } catch { toast.error("Erreur commande"); } finally { setSubmitting(false); }
   };
+
+  const copyRef = (text) => { navigator.clipboard?.writeText(text); toast.success("Copié"); };
 
   const nextImg = (pid, len) => setImgIdx(p=>({...p, [pid]: ((p[pid]||0)+1) % len}));
   const prevImg = (pid, len) => setImgIdx(p=>({...p, [pid]: ((p[pid]||0)-1+len) % len}));
@@ -133,9 +155,41 @@ export default function Checkout() {
 
       <aside className="dina-card p-5 h-fit sticky top-24">
         <div className="font-semibold mb-3">Résumé</div>
-        <div className="text-sm space-y-1"><div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(sub)}</span></div><div className="flex justify-between"><span className="text-[#666]">Livraison · {zone}</span><span className="tabular">{fcfa(fee)}</span></div><div className="flex justify-between font-semibold text-base pt-2 border-t border-[#ececec]"><span>Total</span><span className="tabular">{fcfa(total)}</span></div></div>
-        <button onClick={checkout} disabled={!cart.length} className="dina-btn-primary w-full mt-4" data-testid="checkout-submit">Confirmer la commande</button>
+        <div className="text-sm space-y-1">
+          <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(sub)}</span></div>
+          <div className="flex justify-between"><span className="text-[#666]">Livraison · {zone}</span><span className="tabular">{fcfa(fee)}</span></div>
+          <div className="flex justify-between font-semibold text-base pt-2 border-t border-[#ececec]"><span>Total</span><span className="tabular">{fcfa(total)}</span></div>
+          {method === "cod" && expectedDeposit > 0 && (
+            <div className="mt-3 bg-[#fff5f5] p-3 rounded-lg text-xs" data-testid="checkout-deposit-info">
+              <div className="font-semibold text-[#b02a2a] mb-1">⚡ Acompte requis pour cette commande</div>
+              <div className="flex justify-between"><span>À payer maintenant (Wave)</span><span className="tabular font-bold">{fcfa(expectedDeposit)}</span></div>
+              <div className="flex justify-between"><span>À régler à la livraison</span><span className="tabular font-bold">{fcfa(remaining)}</span></div>
+              <div className="text-[10px] text-[#666] mt-1">{pol.mode === "pct" ? `${pol.value}% du total` : `Acompte fixe de ${fcfa(pol.value)}`}</div>
+            </div>
+          )}
+        </div>
+        <button onClick={checkout} disabled={!cart.length || submitting} className="dina-btn-primary w-full mt-4" data-testid="checkout-submit">{submitting ? "Envoi…" : expectedDeposit > 0 ? "Confirmer et payer l'acompte" : "Confirmer la commande"}</button>
       </aside>
+      </div>
+
+      {confirmedOrder && (
+        <div className="fixed inset-0 bg-black/60 z-50 grid place-items-center p-4" data-testid="deposit-modal">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+            <div className="text-center mb-4">
+              <div className="w-14 h-14 mx-auto rounded-full bg-[#fff5f5] grid place-items-center text-[#b02a2a] mb-2"><ExternalLink size={22}/></div>
+              <div className="font-serif text-xl">Commande {confirmedOrder.code} créée</div>
+              <div className="text-xs text-[#666]">Elle sera confirmée dès réception de votre acompte Wave.</div>
+            </div>
+            <div className="bg-[#fff5f5] p-4 rounded-lg mb-4">
+              <div className="flex items-center justify-between text-sm mb-2"><span className="text-[#666]">Montant acompte</span><span className="font-serif text-2xl text-[#b02a2a] tabular font-bold">{fcfa(confirmedOrder.deposit)}</span></div>
+              <div className="text-xs mb-2"><span className="text-[#666]">Référence à indiquer dans la note Wave</span><div className="font-mono font-bold text-[#1c1c1c] text-base flex items-center gap-2 mt-0.5">{confirmedOrder.code}<button onClick={() => copyRef(confirmedOrder.code)} className="text-[#5867fd]" data-testid="copy-ref"><Copy size={12}/></button></div></div>
+              <div className="text-xs text-[#c62828] italic">⚠️ N'oubliez pas de taper le montant exact et d'indiquer la référence dans la note du paiement Wave.</div>
+            </div>
+            <a href={paymentConfig.wave_link} target="_blank" rel="noreferrer" onClick={() => { setTimeout(() => { clearCart(); nav(`/suivi/${confirmedOrder.code}`); }, 500); }} className="dina-btn-primary w-full justify-center" data-testid="wave-pay-link"><ExternalLink size={14}/>Payer {fcfa(confirmedOrder.deposit)} avec Wave</a>
+            <button onClick={() => { clearCart(); nav(`/suivi/${confirmedOrder.code}`); }} className="dina-btn-secondary w-full mt-2 text-xs" data-testid="later-link">Je paierai plus tard — voir ma commande</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

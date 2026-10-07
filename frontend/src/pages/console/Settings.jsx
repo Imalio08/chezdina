@@ -26,6 +26,19 @@ export default function Settings() {
   const [tab, setTab] = useState(sp.get("tab") || "identite");
   useEffect(() => { setSp({ tab }, { replace: true }); }, [tab]);
 
+  // Paiements tab state
+  const [site, setSiteSettings] = useState({ wave_payment_link: "", deposit_policy: { mode: "none", value: 0, threshold: 0 }, social: {} });
+  const [savingPay, setSavingPay] = useState(false);
+  useEffect(() => { if (tab === "paiements" || tab === "coordonnees") api.get("/public/site").then(r => setSiteSettings(prev => ({ ...prev, ...(r.data || {}) }))).catch(() => {}); }, [tab]);
+  const savePay = async () => {
+    if (savingPay) return;
+    setSavingPay(true);
+    try {
+      await api.patch("/site", { wave_payment_link: site.wave_payment_link, deposit_policy: site.deposit_policy, social: site.social });
+      toast.success("Modifications enregistrées · appliquées sur la vitrine");
+    } catch { toast.error("Erreur enregistrement"); } finally { setSavingPay(false); }
+  };
+
   return (
     <div className="space-y-5">
       <div>
@@ -240,9 +253,23 @@ function LivraisonTab() {
 /* -------- Paiements -------- */
 function PaiementsTab() {
   const [s, setS] = useState({ methods: { cash: true, wave: true, orange: true, mtn: false, moov: false, card: false, cod: true }, wave_business: "", orange_money: "", mtn_money: "" });
-  useEffect(() => { api.get("/public/site").then(r => setS({...s, ...(r.data?.payments || {})})).catch(() => {}); /* eslint-disable-next-line */ }, []);
-  const save = async () => { try { await api.patch("/site", { payments: s }); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
+  const [extra, setExtra] = useState({ wave_payment_link: "", deposit_policy: { mode: "none", value: 0, threshold: 0 }, social: {} });
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    api.get("/public/site").then(r => {
+      const d = r.data || {};
+      setS(prev => ({ ...prev, ...(d.payments || {}) }));
+      setExtra({ wave_payment_link: d.wave_payment_link || "", deposit_policy: d.deposit_policy || { mode: "none", value: 0, threshold: 0 }, social: d.social || {} });
+    }).catch(() => {});
+  }, []);
+  const save = async () => {
+    if (busy) return;
+    setBusy(true);
+    try { await api.patch("/site", { payments: s, wave_payment_link: extra.wave_payment_link, deposit_policy: extra.deposit_policy, social: extra.social }); toast.success("Modifications enregistrées · propagées sur la vitrine"); }
+    catch { toast.error("Erreur enregistrement"); } finally { setBusy(false); }
+  };
   const methods = s.methods || {};
+  const pol = extra.deposit_policy || { mode: "none", value: 0, threshold: 0 };
   return (
     <div className="space-y-4" data-testid="tab-paiements">
       <div className="dina-card-white p-5 space-y-2">
@@ -254,13 +281,53 @@ function PaiementsTab() {
           </label>
         ))}
       </div>
+
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="font-serif text-xl">Lien de paiement Wave</div>
+        <div className="text-xs text-[#666]">Utilisé partout où un paiement Wave est demandé (checkout, POS, orders, rider app). Le montant n'est pas inclus — la cliente le tape elle-même.</div>
+        <input className="dina-input" placeholder="https://pay.wave.com/m/..." value={extra.wave_payment_link} onChange={e => setExtra({...extra, wave_payment_link: e.target.value})} data-testid="wave-payment-link"/>
+        <div className="text-[11px] text-[#5867fd]">💡 Affiché avec le montant exact + référence commande à chaque envoi.</div>
+      </div>
+
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="font-serif text-xl">Acompte « Paiement à la livraison »</div>
+        <div className="text-xs text-[#666]">La cliente paie une partie en Wave avant livraison, le reste en cash au livreur.</div>
+        <select className="dina-input" value={pol.mode} onChange={e => setExtra({...extra, deposit_policy: {...pol, mode: e.target.value}})} data-testid="deposit-mode">
+          <option value="none">Aucun acompte — tout à la livraison</option>
+          <option value="pct">Acompte en pourcentage</option>
+          <option value="fixed">Acompte montant fixe</option>
+        </select>
+        {pol.mode !== "none" && (
+          <div className="grid grid-cols-2 gap-2">
+            <label className="text-xs text-[#666]">{pol.mode === "pct" ? "Pourcentage (%)" : "Montant FCFA"}
+              <input type="number" className="dina-input tabular" value={pol.value || 0} onChange={e => setExtra({...extra, deposit_policy: {...pol, value: +e.target.value}})} data-testid="deposit-value"/>
+            </label>
+            <label className="text-xs text-[#666]">Seuil minimum commande (0 = tous)
+              <input type="number" className="dina-input tabular" value={pol.threshold || 0} onChange={e => setExtra({...extra, deposit_policy: {...pol, threshold: +e.target.value}})} data-testid="deposit-threshold"/>
+            </label>
+          </div>
+        )}
+      </div>
+
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="font-serif text-xl">Réseaux sociaux (footer vitrine)</div>
+        <div className="text-xs text-[#666]">💡 Affichés sur le site : pied de page. Icônes officielles, ouvrent dans un nouvel onglet.</div>
+        {[["whatsapp","WhatsApp","https://wa.me/message/VCECHRXKVQGTG1"],["tiktok","TikTok","https://www.tiktok.com/@dinoush04"],["facebook","Facebook","https://www.facebook.com/share/..."],["instagram","Instagram","https://www.instagram.com/dinoush_shop"]].map(([k, l, ph]) => (
+          <label key={k} className="block">
+            <div className="text-xs text-[#666] mb-1">{l}</div>
+            <input className="dina-input" placeholder={ph} value={extra.social?.[k] || ""} onChange={e => setExtra({...extra, social: {...extra.social, [k]: e.target.value}})} data-testid={`social-${k}`}/>
+          </label>
+        ))}
+      </div>
+
       <div className="dina-card-white p-5 space-y-2">
-        <div className="font-serif text-xl mb-2">Numéros & liens Mobile Money</div>
-        <input className="dina-input" placeholder="Lien Wave Business" value={s.wave_business} onChange={e => setS({...s, wave_business: e.target.value})} data-testid="wave-link"/>
+        <div className="font-serif text-xl mb-2">Numéros Mobile Money</div>
+        <input className="dina-input" placeholder="Lien Wave Business (ancien)" value={s.wave_business} onChange={e => setS({...s, wave_business: e.target.value})} data-testid="wave-link"/>
         <input className="dina-input" placeholder="Numéro Orange Money" value={s.orange_money} onChange={e => setS({...s, orange_money: e.target.value})}/>
         <input className="dina-input" placeholder="Numéro MTN Money" value={s.mtn_money} onChange={e => setS({...s, mtn_money: e.target.value})}/>
       </div>
-      <button onClick={save} className="dina-btn-primary" data-testid="paiements-save"><Save size={14}/> Enregistrer</button>
+
+      <button onClick={save} disabled={busy} className="dina-btn-primary" data-testid="paiements-save"><Save size={14}/> {busy ? "Enregistrement…" : "Enregistrer"}</button>
     </div>
   );
 }

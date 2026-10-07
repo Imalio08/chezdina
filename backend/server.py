@@ -4806,12 +4806,32 @@ async def public_create_order(body: OrderIn):
     sub = sum(it.qty * it.price for it in body.items)
     total = sub + body.delivery_fee - body.discount
     code = gen_code()
+
+    # Compute deposit if COD and policy set
+    deposit_amount = 0
+    initial_status = "nouvelle"
+    initial_payment = "en_attente"
+    if (body.payment_method or "").lower() == "cod":
+        s = await db.site_settings.find_one({"id": "main"}) or {}
+        pol = s.get("deposit_policy") or {}
+        mode = pol.get("mode", "none")
+        threshold = int(pol.get("threshold", 0) or 0)
+        if total >= threshold:
+            if mode == "pct":
+                deposit_amount = int(total * (int(pol.get("value", 0)) / 100))
+            elif mode == "fixed":
+                deposit_amount = min(total, int(pol.get("value", 0) or 0))
+        if deposit_amount > 0:
+            initial_status = "en_attente_acompte"
+            initial_payment = "acompte_requis"
+
     doc = {"id": new_id(), "code": code, "items": [it.model_dump() for it in body.items],
            "customer": body.customer, "channel": body.channel or "boutique", "payment_method": body.payment_method,
            "delivery_zone": body.delivery_zone, "delivery_fee": body.delivery_fee, "discount": body.discount,
            "note": body.note, "mode": body.mode or "delivery", "store_id":"store-cocody",
-           "subtotal": sub, "total": total, "status":"nouvelle", "payment_status":"en_attente",
-           "created_at": now_iso(), "timeline":[{"status":"nouvelle","at":now_iso(),"by":"boutique en ligne"}]}
+           "subtotal": sub, "total": total, "status": initial_status, "payment_status": initial_payment,
+           "deposit_required": deposit_amount, "deposit_paid": 0, "deposit_tx_ref": None, "deposit_paid_at": None,
+           "created_at": now_iso(), "timeline":[{"status": initial_status, "at":now_iso(),"by":"boutique en ligne"}]}
     for it in body.items:
         await db.products.update_one({"id": it.product_id}, {"$inc": {"stock": -it.qty}})
         if it.size:
@@ -4819,7 +4839,59 @@ async def public_create_order(body: OrderIn):
     if body.customer and body.customer.get("id"):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}, "$inc":{"loyalty_points": int(total/500)}})
     await db.orders.insert_one(doc)
-    return {"code": code, "id": doc["id"]}
+    return {"code": code, "id": doc["id"], "status": initial_status, "deposit_required": deposit_amount}
+
+@api.get("/public/payment-config")
+async def public_payment_config():
+    s = await db.site_settings.find_one({"id": "main"}) or {}
+    return {
+        "wave_link": s.get("wave_payment_link") or "https://pay.wave.com/m/M_ci_JFf9sWPuwent/c/ci/",
+        "deposit_policy": s.get("deposit_policy") or {"mode": "none", "value": 0, "threshold": 0},
+    }
+
+@api.post("/orders/{oid}/mark-deposit-paid")
+async def mark_deposit_paid(oid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):
+    o = await db.orders.find_one({"id": oid})
+    if not o: raise HTTPException(404)
+    tx_ref = (body.get("tx_ref") or "").strip()
+    if not tx_ref: raise HTTPException(400, "Référence Wave obligatoire")
+    amount = int(body.get("amount") or o.get("deposit_required") or 0)
+    await db.orders.update_one({"id": oid}, {"$set": {
+        "deposit_paid": amount, "deposit_tx_ref": tx_ref, "deposit_paid_at": now_iso(),
+        "status": "confirmee", "payment_status": "acompte_recu",
+    }, "$push": {"timeline": {"status": "confirmee", "at": now_iso(), "by": user.get("name"), "note": f"Acompte reçu · ref {tx_ref}"}}})
+    return {"ok": True, "status": "confirmee", "tx_ref": tx_ref, "amount": amount}
+
+@api.get("/public/orders/track")
+async def public_track_order(code: str, phone: str = ""):
+    o = await db.orders.find_one({"code": code.upper()})
+    if not o: raise HTTPException(404, "Commande introuvable")
+    if phone:
+        cust_phone = (o.get("customer") or {}).get("phone") or ""
+        if (cust_phone.replace(" ", "").replace("+", "")[-8:]) != (phone.replace(" ", "").replace("+", "")[-8:]):
+            raise HTTPException(403, "Numéro de téléphone ne correspond pas")
+    return {
+        "code": o.get("code"), "status": o.get("status"), "total": o.get("total"),
+        "deposit_required": o.get("deposit_required", 0), "deposit_paid": o.get("deposit_paid", 0),
+        "deposit_tx_ref": o.get("deposit_tx_ref"),
+        "created_at": o.get("created_at"), "timeline": o.get("timeline") or [],
+        "customer_name": (o.get("customer") or {}).get("name"),
+        "items_count": sum(it.get("qty", 1) for it in (o.get("items") or [])),
+        "payment_method": o.get("payment_method"), "delivery_zone": o.get("delivery_zone"),
+    }
+
+@api.post("/startup/clean-test-data")
+async def clean_test_data(user: dict = Depends(require_role("admin"))):
+    """One-shot cleanup: strip TEST_* prefixes from business + site_settings strings."""
+    b = await db.business.find_one({"id": "main"}) or {}
+    patched = {k: (v.replace("TEST_WaveD ", "").replace("TEST_", "") if isinstance(v, str) else v) for k, v in b.items()}
+    if patched != b:
+        await db.business.update_one({"id": "main"}, {"$set": patched})
+    s = await db.site_settings.find_one({"id": "main"}) or {}
+    s_patched = {k: (v.replace("TEST_WaveD ", "").replace("TEST_", "") if isinstance(v, str) else v) for k, v in s.items()}
+    if s_patched != s:
+        await db.site_settings.update_one({"id": "main"}, {"$set": s_patched})
+    return {"ok": True, "business_cleaned": patched != b, "site_cleaned": s_patched != s}
 
 @api.get("/public/order/{code}")
 async def public_order_fetch(code: str):

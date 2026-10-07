@@ -78,11 +78,14 @@ export default function StorefrontLayout() {
         <div className="max-w-6xl mx-auto px-4 h-20 flex items-center gap-3 md:gap-4">
           <Link to="/boutique" className="flex items-center gap-2 shrink-0" data-testid="storefront-logo">
             {site.logo ? (
-              <img src={site.logo} alt={brandName} className="h-11 max-w-[160px] object-contain" data-testid="storefront-logo-img"/>
+              <>
+                <img src={site.logo} alt={brandName} className="h-11 max-w-[120px] object-contain" data-testid="storefront-logo-img"/>
+                <div className="font-serif text-lg text-[#b02a2a] leading-tight">{brandName}</div>
+              </>
             ) : (
               <>
                 <div className="w-11 h-11 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{brandInitials}</div>
-                <div className="font-serif text-xl text-[#b02a2a] hidden sm:block">{brandName}</div>
+                <div className="font-serif text-xl text-[#b02a2a]">{brandName}</div>
               </>
             )}
           </Link>
@@ -166,8 +169,8 @@ export default function StorefrontLayout() {
             <p>{biz.tagline || "Mode féminine · Abidjan."}<br/>Livraison partout en Côte d'Ivoire.</p>
             <div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c]">{biz.whatsapp || "+225 07 77 92 61 79"}</strong></div>
           </div>
-          <div><div className="font-semibold text-[#1c1c1c] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li>Nouveautés</li><li>Promotions</li><li>Guide des tailles</li></ul></div>
-          <div><div className="font-semibold text-[#1c1c1c] mb-2">Aide</div><ul className="space-y-1"><li>Livraison & retours</li><li>Suivi de commande</li><li>Contact</li></ul></div>
+          <div><div className="font-semibold text-[#1c1c1c] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li><Link to="/boutique/nouveautes">Nouveautés</Link></li><li><Link to="/boutique/promotions">Promotions</Link></li><li><Link to="/boutique/guide-tailles">Guide des tailles</Link></li></ul></div>
+          <div><div className="font-semibold text-[#1c1c1c] mb-2">Aide</div><ul className="space-y-1"><li><Link to="/boutique/livraison-retours">Livraison & retours</Link></li><li><Link to="/boutique/suivi-commande">Suivi de commande</Link></li><li><Link to="/boutique/contact">Contact</Link></li></ul></div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Suivez-nous</div><ul className="space-y-1">
             {Object.entries(social).filter(([k,v])=>v).map(([k,v])=>{
               const Icon = SOCIAL_ICONS[k] || Share2;

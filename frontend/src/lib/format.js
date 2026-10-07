@@ -37,6 +37,7 @@ export const dateTimeFmt = (iso) => {
   return d.toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 };
 export const statusLabel = {
+  en_attente_acompte: "En attente d'acompte",
   nouvelle: "Nouvelle",
   confirmee: "Confirmée",
   en_preparation: "En préparation",
@@ -50,6 +51,7 @@ export const statusLabel = {
   annulee: "Annulée",
 };
 export const statusColor = {
+  en_attente_acompte: "#e4991e",
   nouvelle: "#0021cc",
   confirmee: "#3242e8",
   en_preparation: "#e4991e",

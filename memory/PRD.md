@@ -1,5 +1,33 @@
 # Chez Dina — PRD
 
+## Vague A — Wave acompte + Footer vitrine + Nettoyage TEST (Feb 2026) ✅
+
+### Wave + Acompte à la livraison
+- Backend `site_settings.wave_payment_link` + `deposit_policy: {mode: 'none'|'pct'|'fixed', value, threshold}`
+- Nouveau status commande `en_attente_acompte` (orange) avec champs `deposit_required`, `deposit_paid`, `deposit_tx_ref`, `deposit_paid_at`
+- `POST /public/orders` calcule l'acompte automatiquement si COD + total ≥ threshold ; status initial = `en_attente_acompte`
+- `GET /public/payment-config` expose wave_link + deposit_policy pour vitrine/POS/rider
+- `POST /orders/:id/mark-deposit-paid {tx_ref}` → bascule en « Confirmée » (admin+manager)
+- Checkout : panneau acompte dynamique (À payer / À régler livraison), modal post-commande avec bouton Wave + référence copiable + instructions
+- Settings > Paiements : lien Wave éditable + politique acompte (none/pct/fixed/threshold) avec hints
+- 💰 Testé : commande 30k FCFA en COD → acompte 9 450 FCFA (30%) automatique, mark-deposit-paid confirme en 1 clic
+
+### Footer vitrine fonctionnel
+- 6 nouvelles pages : `/boutique/nouveautes`, `/promotions`, `/guide-tailles`, `/livraison-retours`, `/suivi-commande`, `/contact`
+- Suivi commande : saisie code + téléphone OU listing commandes personnelles si cliente loguée + timeline + info acompte
+- Contact : WhatsApp, téléphone, adresse, horaires, carte, formulaire
+- Guide tailles & Livraison : contenu CMS-éditable avec fallback statique si non défini
+- Settings > Paiements : éditeur réseaux sociaux (whatsapp/tiktok/facebook/instagram) persisté dans `site.social`
+
+### Nettoyage TEST + propagation vitrine
+- `POST /startup/clean-test-data` purge les préfixes TEST_* de `business` et `site_settings`
+- `/public/business` déjà en place, retourne données réelles
+- Header vitrine affiche logo + « Chez Dina » à droite (desktop + mobile)
+- Footer utilise `site.social` dynamique avec icônes brand officielles
+
+### Logo header
+- `StorefrontLayout.jsx` : logo image + nom boutique toujours visibles côte à côte
+
 ## Messagerie interne enrichie (Feb 2026) ✅
 
 ### Formatage riche (markdown)

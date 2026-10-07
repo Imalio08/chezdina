@@ -4,7 +4,7 @@ import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt } from "lucide-react";
 
-const STATUSES = ["nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","retournee","annulee","echouee"];
+const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","retournee","annulee","echouee"];
 
 export default function Orders() {
   const [orders, setOrders] = useState([]);
