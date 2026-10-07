@@ -723,7 +723,6 @@ def _interp(a: float, b: float, t: float) -> float: return a + (b - a) * t
 
 async def _simulated_rider_position(order: Dict[str,Any]) -> Optional[Dict[str,Any]]:
     """Compute a plausible rider position based on order age and delivery zone."""
-    oid = order.get("id")
     # Start point: store Cocody
     start = (5.3765, -3.9915)
     # End point: zone centroids (fallback near Cocody)
@@ -1326,7 +1325,6 @@ async def rider_score(rid: str, user: dict = Depends(get_user)):
     avg = (sum(ratings)/len(ratings)) if ratings else 5
     rating_score = avg / 5 * 100
     # Cash accuracy: % of delivered COD orders without ecart
-    cod_delivered = [o for o in delivered if o.get("payment_method") == "cod"]
     sessions = await db.delivery_sessions.find({"rider_id": rid}).to_list(500)
     recs = [v for s in sessions for v in (s.get("reconciliations") or {}).values() if isinstance(v, dict)]
     with_gap = [r for r in recs if abs(r.get("ecart", 0)) > 100]
@@ -2315,7 +2313,6 @@ async def receive_po(pid: str, body: POReceiveIn, user: dict = Depends(require_r
     extra_costs = body.extra_costs or po.get("extra_costs", []) or []
     base_total = sum(float(it.get("qty",0)) * float(it.get("unit_cost",0)) for it in items)
     extras_total = sum(float(x.get("amount",0)) for x in extra_costs)
-    total_qty = sum(float(it.get("qty",0)) for it in items) or 1
     # Spread extras proportionally to each item's cost share → landed unit cost
     labels = []
     for it in items:
@@ -2726,7 +2723,6 @@ async def kpis(user: dict = Depends(get_user), period: str = "30d"):
             gross_margin_prev += int(it.get("qty",0)*it.get("price",0)) - int(p.get("cost",0))*int(it.get("qty",0))
 
     # Timeseries with status split
-    from datetime import datetime, timedelta, timezone
     days = (datetime.fromisoformat(e.replace("Z","+00:00")) - datetime.fromisoformat(s.replace("Z","+00:00"))).days or 1
     buckets = min(days, 30)
     step = max(1, days // buckets)
@@ -2858,7 +2854,6 @@ async def drill(kind: str, period: str = "30d", user: dict = Depends(get_user)):
 @api.get("/dashboard/action-items")
 async def dashboard_actions(user: dict = Depends(get_user)):
     """Row 1 'À traiter maintenant' — live counts of urgent actions, each clickable."""
-    from datetime import datetime, timedelta, timezone
     now = datetime.now(timezone.utc)
     nouvelles = await db.orders.count_documents({"status": "nouvelle"})
     preparation = await db.orders.count_documents({"status": {"$in":["confirmee","en_preparation"]}})
@@ -3582,7 +3577,6 @@ async def update_roles_permissions(body: RolesPermissionsIn, user: dict = Depend
 # ---------- Attendance (kiosk, legacy) ----------
 @api.get("/attendance/today-kiosk")
 async def attendance_today_kiosk(user: dict = Depends(get_user)):
-    from datetime import datetime, timezone, timedelta
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     rows = await db.attendance.find({"at": {"$gte": start}}).sort("at", -1).to_list(500)
     return clean(rows)
@@ -3974,7 +3968,7 @@ async def ai_parse_order(body: Dict[str, Any], user: dict = Depends(get_user)):
                   "{\"items\":[{\"product_id\":\"...\",\"name\":\"...\",\"size\":\"...\",\"color\":\"...\",\"qty\":1}], "
                   "\"customer_hint\":{\"name\":\"...\",\"phone\":\"...\",\"zone\":\"...\",\"address\":\"...\"}, \"confidence\":0.0}. "
                   "Fais correspondre chaque article à un product_id du catalogue ci-dessous. Si pas sûr, laisse product_id vide. "
-                  f"Catalogue:\n" + "\n".join(cat_lines[:150]))
+                  "Catalogue:\n" + "\n".join(cat_lines[:150]))
         chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-parse-{user['id']}", system_message=system).with_model("anthropic","claude-sonnet-4-5-20250929")
         reply = await chat.send_message(UserMessage(text=f"Message cliente :\n{text}\n\nRéponds UNIQUEMENT par le JSON, sans texte avant/après."))
         import json, re
@@ -3993,7 +3987,7 @@ async def ai_parse_order(body: Dict[str, Any], user: dict = Depends(get_user)):
                 it["image"] = p.get("image")
                 if not it.get("name"): it["name"] = p.get("name")
         return data
-    except Exception as e:
+    except Exception:
         logger.exception("parse_order")
         return {"items": [], "customer_hint": {}, "confidence": 0.0, "error": "AI indisponible"}
 
@@ -6441,7 +6435,7 @@ async def abandoned_relaunch(body: RelaunchOfferIn, user: dict = Depends(require
                .replace("{produits}", ", ".join(it.get("name","") for it in a.get("items",[])))
                .replace("{code}", code or "")
                .replace("{date_fin}", (body.ends_at or "")[:10])
-               .replace("{lien_panier}", f"https://chezdina.ci/boutique/panier"))
+               .replace("{lien_panier}", "https://chezdina.ci/boutique/panier"))
         if "whatsapp" in body.channels or "both" in body.channels:
             await db.whatsapp_outbox.insert_one({"id":new_id(),"phone":phone,"phone_digits":pd,"message":msg,
                 "link":f"https://wa.me/{pd}?text={_url_quote(msg)}","kind":"cart_relaunch","cart_id":a["id"],
