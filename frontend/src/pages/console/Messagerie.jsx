@@ -1,17 +1,26 @@
 import React, { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Search, Send, MessageSquare, Users, Megaphone, X } from "lucide-react";
 
 export default function Messagerie() {
+  const [sp] = useSearchParams();
   const [convs, setConvs] = useState([]);
   const [active, setActive] = useState(null);
   const [text, setText] = useState("");
   const [filter, setFilter] = useState("all");
   const [q, setQ] = useState("");
   const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastSegment, setBroadcastSegment] = useState(sp.get("segment_id") || null);
   const bottomRef = useRef();
+
+  useEffect(() => {
+    // Open broadcast with preselected segment if ?segment_id=
+    if (sp.get("segment_id")) { setBroadcastSegment(sp.get("segment_id")); setBroadcastOpen(true); }
+    // Open conv with rider if ?rider_id=
+  }, [sp]);
 
   const load = async () => {
     const r = await api.get("/messages/conversations");
@@ -110,16 +119,19 @@ export default function Messagerie() {
         </div>
       </div>
 
-      {broadcastOpen && <BroadcastModal onClose={() => setBroadcastOpen(false)} onDone={() => { setBroadcastOpen(false); load(); }} />}
+      {broadcastOpen && <BroadcastModal preselectedSegment={broadcastSegment} onClose={() => { setBroadcastOpen(false); setBroadcastSegment(null); }} onDone={() => { setBroadcastOpen(false); setBroadcastSegment(null); load(); }} />}
     </div>
   );
 }
 
-function BroadcastModal({ onClose, onDone }) {
-  const [target, setTarget] = useState("all");
+function BroadcastModal({ preselectedSegment, onClose, onDone }) {
+  const [target, setTarget] = useState(preselectedSegment ? `segment:${preselectedSegment}` : "all");
   const [text, setText] = useState("");
   const [validUntil, setValidUntil] = useState("");
   const [sending, setSending] = useState(false);
+  const [segments, setSegments] = useState([]);
+
+  useEffect(() => { api.get("/segments").then(r => setSegments(r.data || [])).catch(() => {}); }, []);
 
   const send = async () => {
     if (!text.trim()) return toast.error("Message requis");
@@ -132,9 +144,17 @@ function BroadcastModal({ onClose, onDone }) {
     <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="broadcast-modal">
         <div className="flex items-center justify-between mb-4"><div className="font-serif text-xl">Diffusion in-app</div><button onClick={onClose}><X size={18} /></button></div>
-        <select className="dina-input mb-3" value={target} onChange={e => setTarget(e.target.value)} data-testid="broadcast-target"><option value="all">Toutes les clientes actives</option></select>
-        <textarea className="dina-input mb-3" rows={5} placeholder="Message..." value={text} onChange={e => setText(e.target.value)} data-testid="broadcast-text" />
-        <input type="date" className="dina-input mb-3" value={validUntil} onChange={e => setValidUntil(e.target.value)} placeholder="Valide jusqu'au..." />
+        <label className="text-[10px] uppercase text-[#666] font-semibold">Cible</label>
+        <select className="dina-input mb-3 mt-1" value={target} onChange={e => setTarget(e.target.value)} data-testid="broadcast-target">
+          <option value="all">Toutes les clientes actives</option>
+          {segments.length > 0 && <optgroup label="Segments définis">
+            {segments.map(s => <option key={s.id} value={`segment:${s.id}`}>{s.name} ({s.count || 0} cliente{(s.count || 0) > 1 ? "s" : ""})</option>)}
+          </optgroup>}
+        </select>
+        <label className="text-[10px] uppercase text-[#666] font-semibold">Message</label>
+        <textarea className="dina-input mb-3 mt-1" rows={5} placeholder="Message..." value={text} onChange={e => setText(e.target.value)} data-testid="broadcast-text" />
+        <label className="text-[10px] uppercase text-[#666] font-semibold">Valide jusqu'au</label>
+        <input type="date" className="dina-input mb-3 mt-1" value={validUntil} onChange={e => setValidUntil(e.target.value)} />
         <div className="flex gap-2"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={send} disabled={sending} className="dina-btn-primary flex-1" data-testid="broadcast-send">{sending ? "Envoi…" : "Diffuser"}</button></div>
       </div>
     </div>

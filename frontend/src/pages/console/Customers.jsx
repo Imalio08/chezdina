@@ -3,17 +3,19 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
-import { Plus, Pencil, Trash2, MessageSquare, X, Search, Copy, Phone, Ban, Check, Users } from "lucide-react";
+import { Plus, Pencil, Trash2, MessageSquare, X, Search, Copy, Phone, Ban, Check, Users, Trophy } from "lucide-react";
 import ImageUpload from "@/components/shared/ImageUpload";
 import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
+import { useConfirm } from "@/components/shared/ConfirmDialog";
 
 const TABS = [
   { k: "all", label: "Toutes" }, { k: "active", label: "Actives" }, { k: "inactive", label: "Inactives" },
-  { k: "new", label: "Nouvelles" }, { k: "vip", label: "VIP" }, { k: "risk", label: "À risque" }, { k: "blacklist", label: "Liste noire" },
+  { k: "new", label: "Nouvelles" }, { k: "vip", label: "VIP" }, { k: "risk", label: "À risque" }, { k: "blacklist", label: "Liste noire" }, { k: "top", label: "Top clientes" },
 ];
 
 export default function Customers() {
   const nav = useNavigate();
+  const confirm = useConfirm();
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
   const [tab, setTab] = useState("all");
@@ -21,12 +23,14 @@ export default function Customers() {
   const [edit, setEdit] = useState(null);
   const [open, setOpen] = useState(false);
   const [newCode, setNewCode] = useState(null); // { code, phone, name }
+  const [topList, setTopList] = useState([]);
 
   const load = async () => {
     const r = await api.get(`/customers${q ? `?q=${encodeURIComponent(q)}` : ""}`);
     setList(r.data || []);
   };
   useEffect(() => { load(); }, [q]);
+  useEffect(() => { if (tab === "top") api.get("/customers/top?limit=20").then(r => setTopList(r.data || [])).catch(() => {}); }, [tab]);
 
   const filtered = useMemo(() => {
     const cutoffNew = Date.now() - 7 * 24 * 3600 * 1000;
@@ -55,7 +59,8 @@ export default function Customers() {
   };
 
   const regenCode = async (c) => {
-    if (!window.confirm(`Régénérer le code d'accès de ${c.name} ?\n\nL'ancien code sera invalidé immédiatement.`)) return;
+    const ok = await confirm({ title: `Régénérer le code de ${c.name} ?`, message: "L'ancien code sera invalidé immédiatement.", confirmLabel: "Régénérer", danger: true });
+    if (!ok) return;
     try {
       const r = await api.post(`/customers/${c.id}/regen-access-code`);
       setNewCode({ code: r.data.access_code, phone: r.data.phone || c.phone, name: r.data.name || c.name });
@@ -69,9 +74,16 @@ export default function Customers() {
   };
 
   const toggleBlacklist = async (c) => {
-    const next = c.status === "blacklist" ? "active" : "blacklist";
-    await api.patch(`/customers/${c.id}`, { status: next });
-    toast.success(next === "blacklist" ? "Mise en liste noire" : "Réactivée"); load();
+    const target = c.status === "blacklist" ? "active" : "blacklist";
+    const ok = await confirm({
+      title: target === "blacklist" ? `Mettre ${c.name} en liste noire ?` : `Réactiver ${c.name} ?`,
+      message: target === "blacklist" ? "Elle ne pourra plus se connecter ni passer commande tant qu'elle ne sera pas réactivée." : "Elle pourra à nouveau se connecter et commander.",
+      confirmLabel: target === "blacklist" ? "Mettre en liste noire" : "Réactiver",
+      danger: target === "blacklist",
+    });
+    if (!ok) return;
+    await api.patch(`/customers/${c.id}`, { status: target });
+    toast.success(target === "blacklist" ? "Mise en liste noire" : "Réactivée"); load();
   };
 
   return (
@@ -92,7 +104,31 @@ export default function Customers() {
         <ViewToggle value={view} onChange={setView} options={["table", "grid"]} tabKey="customers" />
       </div>
 
-      {view === "table" ? (
+      {tab === "top" && (
+        <div className="dina-card-white p-5" data-testid="cust-top-ranking">
+          <div className="flex items-center gap-2 mb-4"><Trophy size={18} className="text-[#f4b12c]"/><div className="font-serif text-xl">Top 20 clientes</div><span className="text-xs text-[#666]">· basé sur dépenses totales + points fidélité ×10</span></div>
+          {topList.length === 0 ? <div className="text-sm text-[#666] text-center py-6">Aucune cliente classée</div> : (
+            <div className="space-y-1">
+              {topList.map(t => (
+                <div key={t.id} className="flex items-center gap-3 p-2 rounded hover:bg-[#fafafa] dark:hover:bg-[#141414]" data-testid={`top-row-${t.rank}`}>
+                  <div className={`w-9 h-9 rounded-full grid place-items-center font-bold text-sm shrink-0 ${t.rank === 1 ? "bg-[#f4b12c] text-white" : t.rank === 2 ? "bg-[#c0c0c0] text-white" : t.rank === 3 ? "bg-[#cd7f32] text-white" : "bg-[#fff5f5] text-[#b02a2a]"}`}>#{t.rank}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold truncate">{t.name}</div>
+                    <div className="text-xs text-[#666]">{t.phone} · {t.orders_count || 0} commandes · {t.tier || "Bronze"}</div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-serif tabular text-[#b02a2a] font-semibold">{fcfa(t.total_spent || 0)}</div>
+                    <div className="text-[11px] text-[#666] tabular">{t.loyalty_points || 0} pts</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="mt-4 text-xs text-[#666] italic">Le classement est aussi affiché aux clientes dans leur espace sur le site vitrine — anonymisé (prénom + initiale).</div>
+        </div>
+      )}
+
+      {tab !== "top" && view === "table" ? (
         <div className="dina-card-white overflow-x-auto">
           <table className="dina-table">
             <thead><tr><th>Cliente</th><th>Téléphone</th><th>Zone</th><th className="text-right">Points</th><th className="text-right">Dépensé</th><th>Statut</th><th></th></tr></thead>

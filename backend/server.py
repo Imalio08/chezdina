@@ -501,6 +501,22 @@ async def delete_customer(cid: str, user: dict = Depends(require_role("admin","m
     await db.customers.delete_one({"id": cid})
     return {"ok": True}
 
+@api.get("/customers/top")
+async def customers_top(user: dict = Depends(get_user), limit: int = 20):
+    """Top customers ranking by total_spent + loyalty_points. Public-friendly fields only."""
+    rows = await db.customers.find({"status": {"$ne": "blacklist"}}, {"password_hash": 0}).to_list(5000)
+    for r in rows:
+        r["rank_score"] = (r.get("total_spent", 0) or 0) + (r.get("loyalty_points", 0) or 0) * 10
+    rows.sort(key=lambda x: -x.get("rank_score", 0))
+    top = []
+    for i, r in enumerate(rows[:limit]):
+        top.append({
+            "rank": i + 1, "id": r.get("id"), "name": r.get("name"), "phone": r.get("phone"),
+            "tier": r.get("tier"), "loyalty_points": r.get("loyalty_points", 0),
+            "total_spent": r.get("total_spent", 0), "orders_count": r.get("orders_count", 0),
+        })
+    return top
+
 @api.get("/customers/{cid}")
 async def get_customer_detail(cid: str, user: dict = Depends(get_user)):
     c = await db.customers.find_one({"id": cid}, {"password_hash":0})
@@ -873,6 +889,93 @@ async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
            "text": body.get("text",""), "image": body.get("image"), "read_by": [c["id"]]}
     await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso()}})
     return {"ok": True, "message": msg}
+
+@api.get("/customers/top")
+async def customers_top(user: dict = Depends(get_user), limit: int = 20):
+    """Top customers ranking by total_spent + loyalty_points. Public-friendly fields only."""
+    rows = await db.customers.find({"status": {"$ne": "blacklist"}}, {"password_hash": 0}).to_list(5000)
+    for r in rows:
+        r["rank_score"] = (r.get("total_spent", 0) or 0) + (r.get("loyalty_points", 0) or 0) * 10
+    rows.sort(key=lambda x: -x.get("rank_score", 0))
+    top = []
+    for i, r in enumerate(rows[:limit]):
+        top.append({
+            "rank": i + 1,
+            "id": r.get("id"),
+            "name": r.get("name"),
+            "phone": r.get("phone"),
+            "tier": r.get("tier"),
+            "loyalty_points": r.get("loyalty_points", 0),
+            "total_spent": r.get("total_spent", 0),
+            "orders_count": r.get("orders_count", 0),
+        })
+    return top
+
+@api.get("/public/account/top-customers")
+async def public_top_customers(limit: int = 10):
+    """Public ranking for customer space — masks phone, keeps first name + rank."""
+    rows = await db.customers.find({"status": {"$ne": "blacklist"}}, {"password_hash": 0}).to_list(5000)
+    for r in rows:
+        r["rank_score"] = (r.get("total_spent", 0) or 0) + (r.get("loyalty_points", 0) or 0) * 10
+    rows.sort(key=lambda x: -x.get("rank_score", 0))
+    out = []
+    for i, r in enumerate(rows[:limit]):
+        name = r.get("name", "")
+        parts = name.split(" ")
+        shown = parts[0] + (" " + parts[-1][0] + "." if len(parts) > 1 else "")
+        out.append({
+            "rank": i + 1,
+            "name": shown,
+            "tier": r.get("tier", "Bronze"),
+            "loyalty_points": r.get("loyalty_points", 0),
+        })
+    return out
+
+class SegmentAIIn(BaseModel):
+    prompt: str
+    name: Optional[str] = None
+
+@api.post("/segments/ai")
+async def segments_from_ai(body: SegmentAIIn, user: dict = Depends(require_role("admin","manager"))):
+    """Build an auto-segment from a natural-language description using Claude Sonnet (Emergent LLM)."""
+    import json as _json
+    system = (
+        "Tu es un assistant qui transforme une description française en règles de segment client pour la boutique Chez Dina.\n"
+        "Renvoie UNIQUEMENT un JSON valide, sans texte, aucune explication, avec ces clés optionnelles :\n"
+        "{\"name\":string, \"description\":string, \"rules\":{\"zone\":string?, \"tier\":\"Bronze|Silver|Gold|Platine\"?, "
+        "\"total_spent_min\":int?, \"last_order_days_max\":int?, \"category\":string?, \"size\":string?, "
+        "\"source\":string?, \"status\":string?, \"orders_min\":int?}}.\n"
+        "Les règles sont CUMULATIVES (ET logique). Ignore les critères inconnus. Si demande vide ou impossible : {\"error\":\"...\"}."
+    )
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-seg-ai-{user['id']}-{new_id()[:6]}", system_message=system).with_model("anthropic","claude-sonnet-4-5-20250929")
+        resp = await chat.send_message(UserMessage(text=body.prompt))
+        txt = (resp or "").strip()
+        if txt.startswith("```"):
+            txt = txt.strip("`").replace("json\n","",1).strip()
+        parsed = _json.loads(txt)
+    except Exception as e:
+        raise HTTPException(400, f"Analyse IA impossible : {str(e)[:140]}")
+    if "error" in parsed:
+        raise HTTPException(400, parsed["error"])
+    rules = parsed.get("rules") or {}
+    doc = {
+        "id": new_id(),
+        "name": body.name or parsed.get("name") or "Segment IA",
+        "description": parsed.get("description") or body.prompt[:120],
+        "kind": "auto",
+        "rules": rules,
+        "customer_ids": [],
+        "excluded_ids": [],
+        "created_at": now_iso(),
+        "created_by": user.get("name"),
+        "source": "ai",
+        "ai_prompt": body.prompt,
+    }
+    await db.customer_segments_v2.insert_one(doc)
+    doc["count"] = len(await _resolve_segment_ids(doc))
+    return clean(doc)
 
 @api.post("/messages/broadcast")
 async def broadcast(body: Dict[str, Any], user: dict = Depends(require_role("admin","manager"))):

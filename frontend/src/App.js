@@ -75,6 +75,7 @@ import Finances from "@/pages/console/Finances";
 import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import ScanRedirect from "@/pages/public/ScanRedirect";
+import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
 import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
 import OpeningHoursBanner from "@/components/storefront/OpeningHoursBanner";
@@ -103,6 +104,7 @@ function ProtectedRider({ children }) {
 export default function App() {
   return (
     <AuthProvider>
+      <ConfirmProvider>
       <AppProvider>
         <CustomerProvider>
         <BrowserRouter>
@@ -198,6 +200,7 @@ export default function App() {
         </BrowserRouter>
         </CustomerProvider>
       </AppProvider>
+      </ConfirmProvider>
     </AuthProvider>
   );
 }

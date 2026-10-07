@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
-import { Users, TrendingUp, Star, Wallet, Package, X, Phone, MessageCircle } from "lucide-react";
+import { Users, TrendingUp, Star, Wallet, Package, X, Phone, MessageCircle, MessageSquare } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
 import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
 
@@ -99,6 +100,7 @@ export default function Riders() {
 }
 
 function RiderProfile({ rider, score, onBack }) {
+  const nav = useNavigate();
   const [history, setHistory] = useState([]);
   const [from, setFrom] = useState(() => { const d = new Date(); d.setDate(d.getDate()-14); return d.toISOString().slice(0,10); });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0,10));
@@ -131,6 +133,7 @@ function RiderProfile({ rider, score, onBack }) {
           <div className="text-sm text-[#666] flex items-center gap-3">{rider.phone && <><Phone size={11}/>{rider.phone}</>}{rider.email && <>· {rider.email}</>}</div>
         </div>
         <a href={`https://wa.me/${(rider.phone||"").replace(/\D/g,"")}`} target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[36px] text-xs"><MessageCircle size={13}/>WhatsApp</a>
+        <button onClick={() => nav(`/console/messagerie?rider_id=${rider.id}`)} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="rider-internal-msg"><MessageSquare size={13}/>Messagerie interne</button>
       </div>
 
       {score && (

@@ -55,29 +55,29 @@ export default function KPICard({
   const sparkData = (sparkline || []).map((v,i)=>({ x: i, y: v }));
 
   return (
-    <div className={`dina-card-white p-5 relative ${hero?"lg:col-span-2":""}`} data-testid={testid || `kpi-${label.toLowerCase().replace(/\s+/g,"-")}`}>
-      <div className="flex items-start justify-between gap-2 mb-2">
+    <div className={`dina-card-white p-4 relative ${hero?"lg:col-span-2":""}`} data-testid={testid || `kpi-${label.toLowerCase().replace(/\s+/g,"-")}`}>
+      <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="flex items-center gap-2 min-w-0">
-          {Icon && <div className="w-8 h-8 rounded-lg grid place-items-center shrink-0" style={{background:`${color}1a`,color}}><Icon size={15}/></div>}
-          <div className="text-xs uppercase tracking-wide text-[#666] font-semibold truncate">{label}</div>
+          {Icon && <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0" style={{background:`${color}1a`,color}}><Icon size={13}/></div>}
+          <div className="text-[10px] uppercase tracking-wide text-[#666] font-semibold truncate">{label}</div>
           {info && (
             <button onMouseEnter={()=>setTipOpen(true)} onMouseLeave={()=>setTipOpen(false)} onClick={()=>setTipOpen(!tipOpen)} className="text-[#999] hover:text-[#1c1c1c] shrink-0" data-testid={`${testid||label}-info`}>
-              <Info size={12}/>
+              <Info size={11}/>
             </button>
           )}
         </div>
-        {detailLink && <Link to={detailLink} className="text-[11px] text-[#666] hover:text-[#b02a2a] shrink-0" data-testid={`${testid||label}-detail`}>Rapport ›</Link>}
+        {detailLink && <Link to={detailLink} className="text-[10px] text-[#666] hover:text-[#b02a2a] shrink-0" data-testid={`${testid||label}-detail`}>Rapport ›</Link>}
       </div>
 
       {tipOpen && info && (
-        <div className="absolute top-12 left-5 right-5 bg-[#1c1c1c] text-white text-xs rounded-lg p-2.5 z-20 shadow-lg pointer-events-none" data-testid={`${testid||label}-tooltip`}>{info}</div>
+        <div className="absolute top-10 left-4 right-4 bg-[#1c1c1c] text-white text-[11px] rounded-lg p-2 z-20 shadow-lg pointer-events-none" data-testid={`${testid||label}-tooltip`}>{info}</div>
       )}
 
-      <div className={`font-serif tabular leading-none ${hero?"text-5xl":"text-3xl"} mb-2 break-words`} title={valueFull || undefined}>{value}{unit && <span className="text-base ml-1 text-[#666]">{unit}</span>}</div>
+      <div className={`font-serif tabular leading-tight ${hero?"text-3xl":"text-xl"} mb-1 break-words`} title={valueFull || undefined}>{value}{unit && <span className="text-xs ml-1 text-[#666]">{unit}</span>}</div>
 
       {dir && dir !== "flat" && (
-        <div className="flex items-center gap-1 text-sm" style={{color: deltaColor}}>
-          <Arrow size={13}/>
+        <div className="flex items-center gap-1 text-xs" style={{color: deltaColor}}>
+          <Arrow size={11}/>
           <span className="font-semibold tabular">
             {pct !== null && Number.isFinite(pct)
               ? `${pct>0?"+":""}${pct.toFixed(1)}%`
@@ -85,13 +85,13 @@ export default function KPICard({
                   ? `${abs>0?"+":""}${Math.round(abs).toLocaleString("fr-FR").replace(/,/g," ")}`
                   : (deltaLabel || ""))}
           </span>
-          {abs !== null && Number.isFinite(abs) && pct !== null && Number.isFinite(pct) && <span className="text-xs text-[#666] ml-1">· {abs>0?"+":""}{Math.round(abs).toLocaleString("fr-FR").replace(/,/g," ")}</span>}
+          {abs !== null && Number.isFinite(abs) && pct !== null && Number.isFinite(pct) && <span className="text-[10px] text-[#666] ml-1">· {abs>0?"+":""}{Math.round(abs).toLocaleString("fr-FR").replace(/,/g," ")}</span>}
         </div>
       )}
-      {deltaLabel && dir === "flat" && <div className="text-sm text-[#666]">{deltaLabel}</div>}
+      {deltaLabel && dir === "flat" && <div className="text-xs text-[#666]">{deltaLabel}</div>}
 
       {sparkData.length > 2 && (
-        <div className="h-10 mt-2 -mx-2 opacity-80">
+        <div className="h-8 mt-2 -mx-2 opacity-80">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={sparkData}>
               <defs><linearGradient id={`spk-${testid||label}`} x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={color} stopOpacity={0.4}/><stop offset="100%" stopColor={color} stopOpacity={0}/></linearGradient></defs>
@@ -103,7 +103,7 @@ export default function KPICard({
       )}
 
       {detailLink && !sparkData.length && (
-        <Link to={detailLink} className="inline-flex items-center gap-1 mt-2 text-xs text-[#b02a2a] hover:underline" data-testid={`${testid||label}-view`}>Voir détails →</Link>
+        <Link to={detailLink} className="inline-flex items-center gap-1 mt-1.5 text-[11px] text-[#b02a2a] hover:underline" data-testid={`${testid||label}-view`}>Voir détails →</Link>
       )}
     </div>
   );
