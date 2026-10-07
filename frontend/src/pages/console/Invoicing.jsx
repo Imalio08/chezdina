@@ -7,17 +7,23 @@ import { Download, MessageCircle, Eye, FileText } from "lucide-react";
 export default function Invoicing() {
   const [i, setI] = useState([]);
   const [preview, setPreview] = useState(null);
+  const [brand, setBrand] = useState({ logo: "", name: "Chez Dina", phone: "+225 07 77 92 61 79", address: "", email: "", tiktok: "@dinoush04" });
   const load = async () => { try { const r = await api.get("/invoices"); setI(r.data); } catch { toast.error("Erreur"); } };
   useEffect(() => { load(); }, []);
+  useEffect(() => {
+    api.get("/public/site").then(r => { const s = r.data || {}; setBrand(b => ({ ...b, logo: s.logo || "", name: s.name || b.name })); }).catch(() => {});
+    api.get("/public/business").then(r => { const d = r.data || {}; setBrand(b => ({ ...b, phone: d.phone || b.phone, address: d.address || b.address, email: d.email || b.email, tiktok: d.tiktok || b.tiktok })); }).catch(() => {});
+  }, []);
 
   const shareWA = (inv) => {
-    const text = `Facture ${inv.number} - ${fcfa(inv.total)} - Chez Dina`;
+    const text = `Facture ${inv.number} - ${fcfa(inv.total)} - ${brand.name}`;
     const phone = inv.customer?.phone?.replace(/\D/g,"") || "";
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, "_blank");
   };
   const downloadPdf = (inv) => {
+    const logoHtml = brand.logo ? `<img src="${brand.logo}" alt="${brand.name}" style="height:48px;object-fit:contain"/>` : "";
     const w = window.open("", "_blank");
-    w.document.write(`<html><head><title>${inv.number}</title><style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:30px} h1{color:#b02a2a} table{width:100%;border-collapse:collapse;margin:20px 0} td{padding:8px;border-bottom:1px solid #eee}</style></head><body><h1>Chez Dina</h1><p>Facture <b>${inv.number}</b><br>Date: ${dateFmt(inv.created_at)}<br>Cliente: ${inv.customer?.name||"—"}</p><table><tr><td colspan="2"><b>Articles</b></td></tr>${(inv.items||[]).map(it=>`<tr><td>${it.qty}× ${it.name}</td><td style="text-align:right">${fcfa(it.qty*it.price)}</td></tr>`).join("")}<tr><td><b>TOTAL</b></td><td style="text-align:right"><b>${fcfa(inv.total)}</b></td></tr></table><p style="color:#666;font-size:12px">Merci de votre confiance.<br>+225 07 77 92 61 79 · TikTok @dinoush04</p><script>setTimeout(()=>window.print(),500)</script></body></html>`);
+    w.document.write(`<html><head><title>${inv.number}</title><style>body{font-family:sans-serif;max-width:700px;margin:40px auto;padding:30px;color:#1c1c1c} .hdr{display:flex;align-items:center;gap:14px;border-bottom:2px solid #b02a2a;padding-bottom:14px;margin-bottom:14px} h1{color:#b02a2a;margin:0} .biz{font-size:11px;color:#666} table{width:100%;border-collapse:collapse;margin:20px 0} td{padding:8px;border-bottom:1px solid #eee}</style></head><body><div class="hdr">${logoHtml}<div><h1>${brand.name}</h1><div class="biz">${brand.address || ""}${brand.phone?` · ${brand.phone}`:""}${brand.email?` · ${brand.email}`:""}</div></div></div><p>Facture <b>${inv.number}</b><br>Date: ${dateFmt(inv.created_at)}<br>Cliente: ${inv.customer?.name||"—"}</p><table><tr><td colspan="2"><b>Articles</b></td></tr>${(inv.items||[]).map(it=>`<tr><td>${it.qty}× ${it.name}</td><td style="text-align:right">${fcfa(it.qty*it.price)}</td></tr>`).join("")}<tr><td><b>TOTAL</b></td><td style="text-align:right"><b>${fcfa(inv.total)}</b></td></tr></table><p style="color:#666;font-size:12px">Merci de votre confiance.<br>${brand.phone} · TikTok ${brand.tiktok}</p><script>setTimeout(()=>window.print(),500)</script></body></html>`);
   };
 
   return (

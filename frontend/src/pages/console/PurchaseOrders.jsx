@@ -29,6 +29,7 @@ export default function PurchaseOrders() {
   const [sups, setSups] = useState([]);
   const [products, setProducts] = useState([]);
   const [kpis, setKpis] = useState(null);
+  const [brand, setBrand] = useState({ logo: "", name: "Chez Dina" });
   const [view, setView] = useStoredView("po", "kanban");
   const [edit, setEdit] = useState(null);
   const [open, setOpen] = useState(false);
@@ -44,6 +45,7 @@ export default function PurchaseOrders() {
     setPos(a.data); setSups(b.data); setProducts(c.data); setKpis(k.data);
   };
   useEffect(() => { load(); }, []);
+  useEffect(() => { api.get("/public/site").then(r => setBrand({ logo: r.data?.logo || "", name: r.data?.name || "Chez Dina" })).catch(() => {}); }, []);
 
   const save = async (f) => {
     try {
@@ -56,13 +58,24 @@ export default function PurchaseOrders() {
 
   const printPdf = (po, kind = "bon_commande") => {
     const doc = new jsPDF();
-    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-    doc.text(kind === "bon_commande" ? "Bon de commande" : "Bon de réception", 15, 20);
+    let hy = 18;
+    if (brand.logo) {
+      try { doc.addImage(brand.logo, "PNG", 15, 10, 14, 14); } catch { /* ignore */ }
+      doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+      doc.text(brand.name || "Chez Dina", 33, 18);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(11);
+      doc.text(kind === "bon_commande" ? "Bon de commande" : "Bon de réception", 33, 24);
+      hy = 32;
+    } else {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+      doc.text(`${brand.name || "Chez Dina"} — ${kind === "bon_commande" ? "Bon de commande" : "Bon de réception"}`, 15, 20);
+      hy = 28;
+    }
     doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-    doc.text(`N° ${po.number} · ${dateFmt(po.created_at)}`, 15, 28);
-    doc.text(`Fournisseur : ${po.supplier_name}`, 15, 34);
-    doc.text(`Statut : ${STATUS_LABEL[po.status] || po.status}`, 15, 40);
-    let y = 50;
+    doc.text(`N° ${po.number} · ${dateFmt(po.created_at)}`, 15, hy); hy += 6;
+    doc.text(`Fournisseur : ${po.supplier_name}`, 15, hy); hy += 6;
+    doc.text(`Statut : ${STATUS_LABEL[po.status] || po.status}`, 15, hy); hy += 10;
+    let y = hy;
     doc.setFont("helvetica", "bold");
     doc.text("Produit", 15, y); doc.text("Taille", 90, y); doc.text("Qté", 115, y, { align: "right" }); doc.text("Coût u.", 145, y, { align: "right" }); doc.text("Total", 185, y, { align: "right" });
     y += 2; doc.line(15, y, 195, y); y += 6;

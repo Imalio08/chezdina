@@ -50,6 +50,8 @@ export default function StorefrontLayout() {
       const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
       if (prefersDark) setTheme("dark");
     }
+    // First-party analytics: auto-opt-in anonymous events on first visit (no cookies, no 3rd party)
+    if (!localStorage.getItem("dina_consent")) localStorage.setItem("dina_consent", "yes");
   }, [setTheme]);
 
   const brandName = biz.name || site.name || "Chez Dina";

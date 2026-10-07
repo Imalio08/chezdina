@@ -15,6 +15,7 @@ const TABS = [
   { k: "sales", label: "Ventes", icon: TrendingUp },
   { k: "products", label: "Produits", icon: Package },
   { k: "categories", label: "Catégories", icon: LayoutGrid },
+  { k: "funnel", label: "Entonnoir vitrine", icon: Globe },
   { k: "stock-purchases", label: "Stock & achats", icon: ShoppingBag },
   { k: "orders-delivery", label: "Commandes & livraison", icon: AlertTriangle },
   { k: "zones", label: "Zones", icon: MapPin },
@@ -49,6 +50,11 @@ export default function Statistiques() {
   useEffect(() => { setParams({ tab }); }, [tab]); // eslint-disable-line
 
   useEffect(() => {
+    if (tab === "funnel") {
+      setLoading(true);
+      api.get(`/analytics/funnel?days=${period === "d7" ? 7 : period === "d30" ? 30 : 7}`).then(r => setData({ funnel_data: r.data })).catch(() => toast.error("Erreur chargement")).finally(() => setLoading(false));
+      return;
+    }
     setLoading(true);
     api.get(`/stats/${tab}?period=${period}`).then(r => setData(r.data)).catch(() => toast.error("Erreur chargement")).finally(() => setLoading(false));
   }, [tab, period]);
@@ -74,6 +80,7 @@ export default function Statistiques() {
           {tab === "sales" && <SalesTab d={data} />}
           {tab === "products" && <ProductsTab d={data} period={period} />}
           {tab === "categories" && <CategoriesTab d={data} />}
+          {tab === "funnel" && <FunnelTab d={data?.funnel_data} />}
           {tab === "stock-purchases" && <StockPurchasesTab d={data} />}
           {tab === "orders-delivery" && <OrdersDeliveryTab d={data} />}
           {tab === "zones" && <ZonesTab period={period} />}
@@ -342,6 +349,44 @@ function TeamTab({ d }) {
     <div className="space-y-4">
       <div className="dina-card-white p-4"><div className="font-semibold mb-2">Ventes par vendeuse</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Commandes</th><th className="text-right">CA</th></tr></thead><tbody>{(d.sellers || []).map((s,i)=>(<tr key={i}><td>{s.name}</td><td className="text-right">{s.orders}</td><td className="text-right tabular font-semibold">{fcfa(s.revenue)}</td></tr>))}</tbody></table></div>
       <div className="dina-card-white p-4"><div className="font-semibold mb-2">Ponctualité</div><table className="dina-table"><thead><tr><th>Nom</th><th className="text-right">Présent</th><th className="text-right">Retards</th><th className="text-right">Absents</th></tr></thead><tbody>{(d.attendance || []).map((a,i)=>(<tr key={i}><td>{a.name}</td><td className="text-right text-[#1f8a4c]">{a.present}</td><td className="text-right text-[#e4991e]">{a.late}</td><td className="text-right text-[#c62828]">{a.absent}</td></tr>))}</tbody></table></div>
+    </div>
+  );
+}
+
+function FunnelTab({ d }) {
+  if (!d) return <div className="text-sm text-[#666] text-center py-8">Aucun événement capturé pour la période · ouvrez la vitrine pour générer du trafic</div>;
+  const steps = d.funnel || [];
+  const max = Math.max(...steps.map(s => s.value), 1);
+  return (
+    <div className="space-y-4" data-testid="funnel-tab">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Visiteurs uniques</div><div className="font-serif text-2xl tabular">{d.visitors || 0}</div></div>
+        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Pages vues</div><div className="font-serif text-2xl tabular">{d.page_views || 0}</div></div>
+        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Ajouts panier</div><div className="font-serif text-2xl tabular text-[#e4991e]">{d.add_to_cart || 0}</div></div>
+        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Commandes</div><div className="font-serif text-2xl tabular text-[#1f8a4c]">{d.order_placed || 0}</div></div>
+        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Conversion</div><div className="font-serif text-2xl tabular text-[#b02a2a]">{d.conversion_rate || 0}%</div></div>
+      </div>
+      <div className="dina-card-white p-5">
+        <div className="font-semibold mb-4">Entonnoir sur {d.days || 7} jours</div>
+        <div className="space-y-2">
+          {steps.map((s, i) => {
+            const pct = Math.round((s.value / max) * 100);
+            const dropPct = i > 0 && steps[i-1].value > 0 ? Math.round(100 - (s.value / steps[i-1].value) * 100) : 0;
+            return (
+              <div key={s.step} data-testid={`funnel-step-${i}`}>
+                <div className="flex justify-between items-end text-xs mb-1">
+                  <span className="font-medium">{s.step}</span>
+                  <span className="tabular"><strong className="text-base">{s.value}</strong>{i > 0 && dropPct > 0 && <span className="text-[#c62828] ml-2">-{dropPct}%</span>}</span>
+                </div>
+                <div className="h-7 bg-[#f5f5f5] dark:bg-[#1a1a1a] rounded-lg overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-[#b02a2a] to-[#e4991e] rounded-lg transition-all" style={{ width: `${pct}%` }}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="text-[11px] text-[#999]">Événements collectés en interne (sans cookie tiers) · session anonyme par visiteur · consentement implicite activable depuis le footer de la vitrine</div>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { SlidersHorizontal, X, Search as SearchIcon, Send } from "lucide-react";
+import { track } from "@/lib/analytics";
 import { toast } from "sonner";
 import FiltersSheet from "@/components/storefront/FiltersSheet";
 import ProductCardV2 from "@/components/storefront/ProductCardV2";
@@ -22,9 +23,10 @@ export default function Catalog() {
 
   useEffect(() => { setQ(sp.get("q") || ""); setOocSent(false); }, [sp]);
   useEffect(() => {
+    track("page_view", { page_type: "catalog", category: cat, q: sp.get("q") || "" });
     api.get(`/public/products?category=${cat}`).then(r => setProducts(r.data));
     api.get("/brands").then(r => setBrands(r.data || [])).catch(() => {});
-  }, [cat]);
+  }, [cat]); // eslint-disable-line
 
   const cats = useMemo(() => ["all", ...Array.from(new Set(products.map(p => p.category)))], [products]);
 

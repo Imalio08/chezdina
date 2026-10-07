@@ -9,18 +9,30 @@ import LiveDeliveryMap from "@/components/delivery/LiveDeliveryMap";
 import jsPDF from "jspdf";
 
 /** Build a printable route-sheet PDF for a rider's day: list of orders with addresses, phones, amounts. */
-function printRouteSheetPDF(session, assigned) {
+function printRouteSheetPDF(session, assigned, brand = {}) {
   const doc = new jsPDF();
   const pad = 15;
-  doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-  doc.text("Feuille de route livreur", pad, 18);
+  // Header: logo + brand
+  let hy = 18;
+  if (brand.logo) {
+    try { doc.addImage(brand.logo, "PNG", pad, 10, 14, 14); } catch { /* ignore malformed logo */ }
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+    doc.text(brand.name || "Chez Dina", pad + 18, 18);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    doc.text("Feuille de route livreur", pad + 18, 24);
+    hy = 30;
+  } else {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+    doc.text(`${brand.name || "Chez Dina"} — Feuille de route livreur`, pad, 18);
+    hy = 24;
+  }
   doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-  doc.text(`Livreur : ${session.rider_name || "—"}`, pad, 26);
-  doc.text(`Journée : ${session.date || (session.created_at || "").slice(0,10)}`, pad, 32);
-  doc.text(`Commandes affectées : ${assigned.length}`, pad, 38);
+  doc.text(`Livreur : ${session.rider_name || "—"}`, pad, hy + 2);
+  doc.text(`Journée : ${session.date || (session.created_at || "").slice(0,10)}`, pad, hy + 8);
+  doc.text(`Commandes affectées : ${assigned.length}`, pad, hy + 14);
   const totalToCollect = assigned.reduce((s,o) => s + (o.payment_method === "cod" ? (o.total || 0) : 0), 0);
-  doc.text(`Total à encaisser (COD) : ${fcfa(totalToCollect)}`, pad, 44);
-  let y = 56;
+  doc.text(`Total à encaisser (COD) : ${fcfa(totalToCollect)}`, pad, hy + 20);
+  let y = hy + 32;
   doc.setFont("helvetica", "bold");
   doc.text("#", pad, y);
   doc.text("Code", pad + 10, y);
@@ -149,6 +161,8 @@ function CreateDayModal({ riders, onClose, onDone }) {
 }
 
 function DayDetail({ session, orders, riders, onBack, onReload }) {
+  const [brand, setBrand] = useState({ logo: "", name: "Chez Dina" });
+  useEffect(() => { api.get("/public/site").then(r => setBrand({ logo: r.data?.logo || "", name: r.data?.name || "Chez Dina" })).catch(() => {}); }, []);
   const nav = useNavigate();
   const [tab, setTab] = useState("affectation");
   const [selected, setSelected] = useState([]);
@@ -334,7 +348,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
             <button
               onClick={() => {
                 if (!assigned.length) return toast.error("Aucune commande affectée");
-                printRouteSheetPDF(session, assigned);
+                printRouteSheetPDF(session, assigned, brand);
                 toast.success("Feuille de route générée");
               }}
               className="dina-btn-primary" data-testid="dd-print-routesheet"

@@ -1,5 +1,22 @@
 # Chez Dina — PRD
 
+## Vague D — Logo partout + Analytics first-party (Feb 2026) ✅
+
+### Logo centralisé
+- `Invoicing.jsx` : facture PDF (window.open HTML) avec logo + nom boutique + téléphone/email/adresse en header, infos tirées de `/public/site` + `/public/business`
+- `FichesColis.jsx` : étiquette colis affiche logo + nom boutique à côté (fallback texte si pas de logo)
+- `DeliveryDays.jsx` : feuille de route livreur PDF avec logo + nom boutique en en-tête
+- `PurchaseOrders.jsx` : bon de commande / bon de réception PDF avec logo + nom boutique
+- `pdfReceipt.js` + `POS.jsx` : déjà en place
+- `RiderShell.jsx` : déjà en place
+
+### Analytics first-party
+- Backend `/api/analytics/events` (POST) + `/api/analytics/funnel` (GET) déjà en place dans `server.py` lignes 5888-5938
+- `lib/analytics.js` helper `track(name, extra)` : visitor_id (localStorage), session_id (sessionStorage), UTM, device, consentement
+- Événements trackés : `page_view` (Home + Catalog), `product_view` (ProductPage), `add_to_cart` (bouton Ajouter), `checkout_started` (Checkout mount), `order_placed` (après POST /public/orders)
+- Consentement implicite activé automatiquement au premier chargement de la vitrine (`dina_consent=yes` dans localStorage)
+- Vue console `Statistiques > Entonnoir vitrine` : KPIs visiteurs/pages/ajouts/commandes/conversion + graphique entonnoir en 5 étapes avec taux de drop-off entre étapes
+
 ## Vague C — Polish & footer (Feb 2026) ✅
 - `StorefrontLayout.jsx` footer : logo + nom « Chez Dina » affichés côte à côte (data-testid `footer-brand-name`)
 - `SaveButton` component (`/components/shared/SaveButton.jsx`) : loading spinner + anti-double-clic, utilisé sur Settings (identite/coordonnees/ventes/livraison/documents/notifications/securite/paiements), SiteAppearance (hero/popup/announcement/lookbook/trust), SectionBuilder, SiteVitrine (apparence), CmsPages, Loyalty, RolesPermissions, Integrations

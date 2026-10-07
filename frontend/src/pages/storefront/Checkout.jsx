@@ -5,6 +5,7 @@ import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
 import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalLink } from "lucide-react";
+import { track } from "@/lib/analytics";
 
 const ZONES = {"Cocody":1500,"Riviera":2000,"Angré":2000,"Plateau":1000,"Marcory":1500,"Zone 4":1500,"Treichville":1500,"Koumassi":2000,"Yopougon":2500,"Abobo":3000,"Adjamé":1500,"Port-Bouët":2500,"Bingerville":3000,"Songon":3500,"Grand-Bassam":5000};
 const ABIDJAN = { lat: 5.3600, lng: -4.0083 };
@@ -25,7 +26,7 @@ export default function Checkout() {
   const [confirmedOrder, setConfirmedOrder] = useState(null);
   const nav = useNavigate();
 
-  useEffect(() => { api.get("/public/payment-config").then(r => setPaymentConfig(r.data)).catch(() => {}); }, []);
+  useEffect(() => { api.get("/public/payment-config").then(r => setPaymentConfig(r.data)).catch(() => {}); track("checkout_started", { value: 0 }); }, []);
   useEffect(() => {
     const uniq = [...new Set(cart.map(x=>x.product_id))];
     uniq.forEach(pid => { if (!cartImages[pid]) api.get(`/public/product/${pid}`).then(r=>setCartImages(prev=>({...prev,[pid]:(r.data.images||[r.data.image]).filter(Boolean)}))).catch(()=>{}); });
@@ -73,6 +74,7 @@ export default function Checkout() {
         channel: "boutique", payment_method: method, delivery_zone: zone, delivery_fee: fee, mode: "delivery",
       });
       toast.success("Commande créée !");
+      track("order_placed", { order_code: data.code, value: total });
       if (data.status === "en_attente_acompte" && data.deposit_required > 0) {
         setConfirmedOrder({ code: data.code, deposit: data.deposit_required, total });
       } else {

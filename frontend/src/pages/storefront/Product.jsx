@@ -6,6 +6,7 @@ import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 import { MessageCircle, ShoppingBag, ChevronLeft, ChevronRight, Star, Check, Bell, Play } from "lucide-react";
 import { hasRealVariants, availableColorsForSize, availableSizesForColor, stockFor, comboExists } from "@/lib/variants";
+import { track } from "@/lib/analytics";
 
 function Stars({ value = 0, size = 14, onPick }) {
   return (
@@ -36,6 +37,7 @@ export default function ProductPage() {
     api.get(`/public/product/${id}`).then(r => {
       const prod = r.data;
       setP(prod);
+      track("product_view", { product_id: id, value: prod.price });
       // Preselect from first enabled variant (if any) to ensure a valid combo
       const firstVariant = (prod.variants || []).find(v => v.enabled && (v.stock ?? 0) > 0) || (prod.variants || []).find(v => v.enabled);
       if (firstVariant) {
@@ -72,7 +74,7 @@ export default function ProductPage() {
     ? Array.from(new Set((p.colors || []).filter(c => (size ? availableColorsForSize(p, size).includes(c) : (p.variants || []).some(v => v.enabled && v.color === c)))))
     : (p.colors || []);
 
-  const add = () => { if(!canAdd) return toast.error("Rupture pour cette taille"); addToCart(p,1,size,color); toast.success("Ajouté au panier"); };
+  const add = () => { if(!canAdd) return toast.error("Rupture pour cette taille"); addToCart(p,1,size,color); track("add_to_cart", { product_id: p.id, value: p.price, size, color }); toast.success("Ajouté au panier"); };
   const wa = () => {
     const msg = `Bonjour Chez Dina 💕 Je souhaite commander :\n• ${p.name}\n• Taille : ${size||"à préciser"}\n• Couleur : ${color||"à préciser"}\n• Prix : ${fcfa(p.price)}\n\nMerci de me confirmer la disponibilité et les frais de livraison vers ${deliveryZone}.`;
     window.open(`https://wa.me/2250777926179?text=${encodeURIComponent(msg)}`,"_blank");

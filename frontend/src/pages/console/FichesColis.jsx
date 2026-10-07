@@ -13,6 +13,7 @@ export default function FichesColis() {
   const [orders, setOrders] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [format, setFormat] = useState("a4"); // 80mm | a6 | a4
+  const [brand, setBrand] = useState({ logo: "", name: "Chez Dina", phone: "+225 07 77 92 61 79", tiktok: "@dinoush04" });
   useEffect(() => {
     api.get("/orders").then(r => {
       const ready = r.data.filter(o => ["prete","assignee","en_livraison"].includes(o.status));
@@ -24,6 +25,8 @@ export default function FichesColis() {
         setSelected(new Set(ids.filter(id => ready.some(o => o.id === id))));
       }
     });
+    api.get("/public/site").then(r => setBrand(b => ({ ...b, logo: r.data?.logo || "", name: r.data?.name || b.name }))).catch(() => {});
+    api.get("/public/business").then(r => setBrand(b => ({ ...b, phone: r.data?.phone || b.phone, tiktok: r.data?.tiktok || b.tiktok }))).catch(() => {});
   }, []); // eslint-disable-line
 
   const toggle = (id) => { const n = new Set(selected); n.has(id)?n.delete(id):n.add(id); setSelected(n); };
@@ -68,7 +71,7 @@ export default function FichesColis() {
 
       {/* Printable labels */}
       <div className={`labels-area labels-${format}`}>
-        {list.map(o => <Label key={o.id} order={o} format={format}/>)}
+        {list.map(o => <Label key={o.id} order={o} format={format} brand={brand}/>)}
       </div>
 
       <style>{`
@@ -84,7 +87,7 @@ export default function FichesColis() {
   );
 }
 
-function Label({ order, format }) {
+function Label({ order, format, brand = {} }) {
   const total = order.total || 0;
   const paid = order.payment_method === "cod" ? 0 : total;
   const toCollect = total - paid;
@@ -93,7 +96,10 @@ function Label({ order, format }) {
   return (
     <div className="fiche" data-testid={`label-${order.code}`}>
       <div className="flex justify-between items-start mb-2">
-        <div><div className="font-serif text-base font-bold">Chez Dina</div><div className="text-[9px] text-[#666]">+225 07 77 92 61 79 · @dinoush04</div></div>
+        <div className="flex items-center gap-2">
+          {brand.logo && <img src={brand.logo} alt="" className="w-8 h-8 object-contain rounded"/>}
+          <div><div className="font-serif text-base font-bold">{brand.name || "Chez Dina"}</div><div className="text-[9px] text-[#666]">{brand.phone || "+225 07 77 92 61 79"} · {brand.tiktok || "@dinoush04"}</div></div>
+        </div>
         <img alt="QR" src={QR_URL(order.code, 70)} className="w-16 h-16"/>
       </div>
       <div className="font-serif text-xl font-bold tracking-wider mb-1">{order.code}</div>

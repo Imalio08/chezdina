@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import ProductCardV2 from "@/components/storefront/ProductCardV2";
+import { track } from "@/lib/analytics";
 import WelcomePopup from "@/components/storefront/WelcomePopup";
 import MosaicSection from "@/components/storefront/MosaicSection";
 import { Truck, Shield, MessageCircle, ChevronRight, Clock, Sparkles, Flame } from "lucide-react";
@@ -43,6 +44,7 @@ export default function Home() {
   const [heroIdx, setHeroIdx] = useState(0);
 
   useEffect(() => {
+    track("page_view", { page_type: "home" });
     api.get("/public/products").then(r => setProducts(r.data));
     api.get("/public/storefront/sections").then(r => setSections(r.data || []));
     api.get("/public/promotions").then(r => { const f = (r.data || []).find(p => p.flash && p.ends_at && new Date(p.ends_at) > new Date()); if (f) setFlash(f); });
