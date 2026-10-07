@@ -1,5 +1,32 @@
 # Chez Dina — PRD
 
+### Vague F — Multi-domaines + Branding + GPS Heading + Wave Webhook (Feb 2026) ✅
+
+**Multi-domaines SPA**
+- `SubdomainRouter.jsx` : détecte l'hôte au premier mount, redirige automatiquement :
+  - `console.chezdina.net` → `/console`
+  - `livreur.chezdina.net` (ou `rider.chezdina.net`) → `/rider`
+  - `www.chezdina.net` / `chezdina.net` → `/boutique`
+- Fonctionne également pour les TLD `.ci` et `.com`
+- **Configuration DNS requise** : ajouter 3 CNAME chez le registrar vers le même déploiement — toute la logique est côté frontend, aucun routing serveur à toucher
+
+**Logos de marque**
+- `BrandIcons.jsx` : composants React SVG fidèles pour Facebook (bleu #1877F2), WhatsApp Business (vert #25D366), TikTok (noir + cyan #25F4EE + rose #FE2C55)
+- Footer vitrine : 3 logos de marque remplacent les icônes Lucide génériques
+- **Bouton WhatsApp flottant** vitrine : utilise désormais le logo WhatsApp Business (sur fond blanc, plus pro) au lieu de l'icône `MessageCircle`
+
+**Rider GPS Heading + Battery mode**
+- `RiderShell.jsx` écoute `deviceorientation` (iOS `webkitCompassHeading` + Android `alpha`), envoie le cap compas (0-359°) avec chaque ping
+- Lit `navigator.getBattery()` : passe automatiquement de 30s à 60s de ping quand batterie < 20% et pas en charge · badge « GPS live ⚡ » dans la topbar
+- Backend `RiderLocationIn` étendu avec `heading`, `speed`, `battery_level`, `battery_charging`
+- `/public/order/.../rider-position` retourne maintenant `heading` et `speed` pour que la flèche sur la carte client pointe la bonne direction
+
+**Wave Webhook**
+- `POST /api/public/wave/webhook` : confirme automatiquement la commande dès réception du callback de paiement Wave
+- Vérification signature HMAC-SHA256 avec `wave_webhook_secret` (configurable dans Paramètres → Paiements ou via env `WAVE_WEBHOOK_SECRET`)
+- Idempotent : skip si `transaction_id` déjà traité
+- Détecte paiement total vs acompte selon montant · met à jour `status` (`payee` ou `confirmee`), `payment_status`, timeline
+
 ### Vague E.3 — Code quality cleanup (Feb 2026) ✅
 Appliqué à partir du rapport de revue de code (deployment-ready) :
 - **9 vrais correctifs** dans `server.py` : 3 variables locales inutilisées supprimées (`oid` dans `_simulated_rider_position`, `cod_delivered` dans `rider_score`, `total_qty` dans `receive_po`), 3 imports datetime dupliqués retirés (déjà présents au niveau module), 2 f-strings sans placeholders corrigées, 1 variable d'exception inutilisée (`as e`)

@@ -184,7 +184,7 @@ class RiderLocationIn(BaseModel):
     accuracy: Optional[float] = None
     heading: Optional[float] = None
     speed: Optional[float] = None
-    battery_level: Optional[int] = None
+    battery_level: Optional[int] = Field(default=None, ge=0, le=100)
     battery_charging: Optional[bool] = None
 class POReceiveIn(BaseModel):
     received_at: Optional[str] = None
@@ -4878,20 +4878,22 @@ async def wave_webhook(body: Dict[str, Any], request: Request):
     For security, Wave signs webhooks with HMAC-SHA256 using WAVE_WEBHOOK_SECRET (stored in site settings).
     Set `wave_webhook_secret` in Paramètres → Paiements and configure the same secret in your Wave dashboard."""
     try:
-        # Signature verification (if secret is configured)
+        # Signature verification (if secret is configured) — reject any unsigned request when secret is set
         site = await db.site_settings.find_one({"id": "main"}) or {}
         secret = site.get("wave_webhook_secret") or os.environ.get("WAVE_WEBHOOK_SECRET", "")
         if secret:
             signature = request.headers.get("Wave-Signature") or request.headers.get("X-Wave-Signature") or ""
-            if signature:
-                import hmac as _hmac, hashlib as _h
-                raw = await request.body()
-                expected = _hmac.new(secret.encode(), raw, _h.sha256).hexdigest()
-                # Wave signature format "t=...,v1=..." — tolerate both
-                sig_val = signature.split("v1=")[-1] if "v1=" in signature else signature
-                if not _hmac.compare_digest(expected, sig_val.strip()):
-                    logger.warning("Wave webhook signature mismatch")
-                    raise HTTPException(401, "Invalid signature")
+            if not signature:
+                logger.warning("Wave webhook: missing signature header while secret is configured")
+                raise HTTPException(401, "Missing signature")
+            import hmac as _hmac, hashlib as _h
+            raw = await request.body()
+            expected = _hmac.new(secret.encode(), raw, _h.sha256).hexdigest()
+            # Wave signature format "t=...,v1=..." — tolerate both
+            sig_val = signature.split("v1=")[-1] if "v1=" in signature else signature
+            if not _hmac.compare_digest(expected, sig_val.strip()):
+                logger.warning("Wave webhook signature mismatch")
+                raise HTTPException(401, "Invalid signature")
 
         event_type = body.get("type") or body.get("event_type") or ""
         data = body.get("data") or body
