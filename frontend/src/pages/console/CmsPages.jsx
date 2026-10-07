@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import { FileText, Save, Plus, Trash2, Eye } from "lucide-react";
 import { Link } from "react-router-dom";
+import SaveButton from "@/components/shared/SaveButton";
 
 const PRESETS = [
   { slug: "about", title: "À propos" },
@@ -67,7 +68,7 @@ export default function CmsPages() {
               <div className="flex gap-2">
                 <Link to={`/boutique/page/${editing.slug}`} target="_blank" className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="pages-preview"><Eye size={12} />Voir</Link>
                 <button onClick={() => del(editing.slug)} className="text-[#c62828] p-2"><Trash2 size={14} /></button>
-                <button onClick={save} disabled={saving} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="pages-save"><Save size={12} />{saving ? "…" : "Enregistrer"}</button>
+                <SaveButton loading={saving} onClick={save} testid="pages-save" size="sm"/>
               </div>
             </div>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={editing.enabled !== false} onChange={e => setEditing({ ...editing, enabled: e.target.checked })} className="accent-[#b02a2a]" />Page visible sur la vitrine</label>

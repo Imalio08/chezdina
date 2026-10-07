@@ -8,6 +8,7 @@ import {
   Globe, Menu as MenuIcon, GripVertical, X, Check, Hash,
 } from "lucide-react";
 import SectionBuilder from "./SectionBuilder";
+import SaveButton from "@/components/shared/SaveButton";
 
 const TABS = [
   { id: "apparence", label: "Apparence", icon: Palette },
@@ -159,7 +160,7 @@ function ApparenceTab() {
       </div>
 
       <div className="flex justify-end">
-        <button onClick={save} disabled={saving} className="dina-btn-primary" data-testid="apparence-save"><Save size={14}/>{saving ? "Enregistrement…" : "Enregistrer l'apparence"}</button>
+        <SaveButton loading={saving} onClick={save} testid="apparence-save">Enregistrer l'apparence</SaveButton>
       </div>
     </div>
   );

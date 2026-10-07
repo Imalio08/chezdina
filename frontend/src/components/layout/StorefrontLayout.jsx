@@ -182,7 +182,14 @@ export default function StorefrontLayout() {
       <footer className="border-t border-[#ececec] dark:border-[#2a2a2a] mt-20 py-10 text-sm text-[#666] dark:text-[#aaa] bg-[#fff5f5] dark:bg-[#141414]">
         <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-4 gap-6">
           <div>
-            {site.logo ? <img src={site.logo} alt={brandName} className="h-10 object-contain mb-2"/> : <div className="font-serif text-xl text-[#b02a2a] mb-2">{brandName}</div>}
+            {site.logo ? (
+              <div className="flex items-center gap-2 mb-2">
+                <img src={site.logo} alt={brandName} className="h-10 object-contain"/>
+                <span className="font-serif text-xl text-[#b02a2a]" data-testid="footer-brand-name">{brandName}</span>
+              </div>
+            ) : (
+              <div className="font-serif text-xl text-[#b02a2a] mb-2" data-testid="footer-brand-name">{brandName}</div>
+            )}
             <p>{biz.tagline || "Mode féminine · Abidjan."}<br/>Livraison partout en Côte d'Ivoire.</p>
             <div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c] dark:text-[#f0f0f0]">{biz.whatsapp || "+225 07 77 92 61 79"}</strong></div>
           </div>

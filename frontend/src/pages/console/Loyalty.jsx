@@ -38,7 +38,7 @@ export default function Loyalty() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Fidélité</h1><p className="text-sm text-[#666]">Points, paliers et avantages personnalisables</p></div>
-        <button onClick={save} disabled={saving} className="dina-btn-primary !min-h-[40px]" data-testid="loyalty-save"><Save size={14} />{saving ? "Enregistrement…" : "Enregistrer"}</button>
+        <SaveButton loading={saving} onClick={save} testid="loyalty-save" className="!min-h-[40px]"/>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

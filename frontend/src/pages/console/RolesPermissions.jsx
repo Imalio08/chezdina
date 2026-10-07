@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Save, Shield, Plus, Trash2 } from "lucide-react";
+import SaveButton from "@/components/shared/SaveButton";
 
 /* 4 niveaux par cellule : none / read / write / full
    Compat descendante : true → "full", false/absent → "none". */
@@ -166,7 +167,7 @@ export default function RolesPermissions() {
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setShowNewRole(true)} className="dina-btn-secondary !min-h-[40px]" data-testid="roles-add"><Plus size={14}/>Nouveau rôle</button>
-          <button onClick={save} disabled={saving} className="dina-btn-primary !min-h-[40px]" data-testid="roles-save"><Save size={14}/>{saving ? "…" : "Enregistrer"}</button>
+          <SaveButton loading={saving} onClick={save} testid="roles-save" className="!min-h-[40px]"/>
         </div>
       </div>
 

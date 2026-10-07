@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Save, Zap, Image as ImageIcon, Printer } from "lucide-react";
+import SaveButton from "@/components/shared/SaveButton";
 
 export default function Integrations() {
   const [f, setF] = useState({});
@@ -27,7 +28,7 @@ export default function Integrations() {
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Intégrations</h1><p className="text-sm text-[#666]">WhatsApp Meta, Pixels, imprimante Wi-Fi</p></div>
-        <button onClick={save} disabled={saving} className="dina-btn-primary !min-h-[40px]" data-testid="integ-save"><Save size={14} />{saving ? "…" : "Enregistrer"}</button>
+        <SaveButton loading={saving} onClick={save} testid="integ-save" className="!min-h-[40px]"/>
       </div>
       <div className="grid lg:grid-cols-2 gap-4">
         <S icon={Zap} title="WhatsApp Business">
