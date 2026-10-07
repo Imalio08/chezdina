@@ -20,15 +20,16 @@ from deps import (
     client, db, JWT_SECRET, JWT_ALG,
     hash_pw, verify_pw, make_token, make_customer_token,
     new_id, now_iso, gen_access_code, clean,
-    get_user, require_role,
+    get_user, require_role, get_customer, norm_phone,
 )
+# Shared Pydantic models (moved to models.py — P5 Refactor Feb 2026)
+from models import LoginIn, PinIn, UserIn, CustomerIn, CustomerLoginIn, CustomerLoginCodeIn
 
 app = FastAPI(title="Chez Dina API")
 api = APIRouter(prefix="/api")
 
 # ---------- Pydantic models ----------
-class LoginIn(BaseModel): email: str; password: str
-class PinIn(BaseModel): pin: str
+# LoginIn, PinIn moved to models.py
 class ProductIn(BaseModel):
     name: str; category: str; brand: str = "Dina"; price: int; cost: int = 0
     description: str = ""; image: str = ""; images: List[str] = []
@@ -66,12 +67,7 @@ class OrderIn(BaseModel):
     delivery_zone: Optional[str] = None; delivery_fee: int = 0
     discount: int = 0; note: str = ""; mode: str = "store"
     store_id: Optional[str] = None
-class CustomerIn(BaseModel):
-    name: str; phone: str; email: Optional[str] = None; address: Optional[str] = None
-    birthday: Optional[str] = None; shoe_size: Optional[str] = None
-    clothing_size: Optional[str] = None; notes: Optional[str] = None
-    status: str = "active"; photo: Optional[str] = None; password: Optional[str] = None
-class CustomerLoginIn(BaseModel): identifier: str; password: str
+# CustomerIn, CustomerLoginIn moved to models.py
 class ExpenseIn(BaseModel):
     category: str; amount: int; note: str = ""; payment_method: str = "cash"
     label: str = ""
@@ -158,8 +154,7 @@ class POReceiveIn(BaseModel):
     extra_costs: List[Dict[str, Any]] = []  # [{label, amount}]
     note: Optional[str] = None
 class StockAlertIn(BaseModel): product_id: str; size: Optional[str] = None; phone: str
-class UserIn(BaseModel):
-    name: str; email: str; password: str; role: str; phone: str = ""; pin: str = ""
+# UserIn moved to models.py
 class PinAuthIn(BaseModel):
     pin: str
     action: str  # "discount_over_limit", "void", "refund"
@@ -197,9 +192,7 @@ class AttendancePunchIn(BaseModel):
     code: str
     kind: str = "in"  # in | out
     selfie: Optional[str] = None  # base64 data URL, captured on kiosk tablet
-class CustomerLoginCodeIn(BaseModel):
-    phone: str
-    code: str
+# CustomerLoginCodeIn moved to models.py
 class StorefrontSectionsIn(BaseModel):
     sections: List[Dict[str, Any]]  # ordered list: {id, type, enabled, props}
 class CmsPageIn(BaseModel):
@@ -255,110 +248,7 @@ class ReviewModerateIn(BaseModel):
     hidden: bool
     reason: Optional[str] = None
 
-# ---------- Auth ----------
-@api.post("/auth/login")
-async def login(body: LoginIn, response: Response):
-    u = await db.users.find_one({"email": body.email.lower().strip()})
-    if not u or not verify_pw(body.password, u.get("password_hash","")):
-        raise HTTPException(401, "Identifiants incorrects")
-    token = make_token(u["id"], u["role"])
-    response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60*60*24*7, path="/")
-    for k in ("_id","password_hash","pin_hash"): u.pop(k, None)
-    return {"user": u, "token": token}
-
-@api.post("/auth/login-pin")
-async def login_pin(body: PinIn, response: Response):
-    async for u in db.users.find({}):
-        if verify_pw(body.pin.strip(), u.get("pin_hash","")):
-            token = make_token(u["id"], u["role"])
-            response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60*60*24*7, path="/")
-            for k in ("_id","password_hash","pin_hash"): u.pop(k, None)
-            return {"user": u, "token": token}
-    raise HTTPException(401, "PIN invalide")
-
-@api.get("/auth/me")
-async def me(user: dict = Depends(get_user)): return user
-
-@api.post("/auth/logout")
-async def logout(response: Response):
-    response.delete_cookie("access_token", path="/")
-    return {"ok": True}
-
-# ---------- Customer auth (phone/email + password) ----------
-async def get_customer(request: Request):
-    token = request.cookies.get("customer_token")
-    if not token:
-        h = request.headers.get("Authorization", "")
-        if h.startswith("Bearer "): token = h[7:]
-    if not token: raise HTTPException(401, "Non authentifié")
-    try: payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-    except Exception: raise HTTPException(401, "Session expirée")
-    if payload.get("kind") != "customer": raise HTTPException(401, "Token invalide")
-    c = await db.customers.find_one({"id": payload["sub"]})
-    if not c: raise HTTPException(401, "Compte introuvable")
-    for k in ("_id","password_hash"): c.pop(k, None)
-    return c
-
-@api.post("/public/customer-register")
-async def cust_register(body: CustomerIn):
-    if not body.password: raise HTTPException(400, "Mot de passe requis")
-    existing = await db.customers.find_one({"$or":[{"phone": body.phone},{"email": body.email}]})
-    if existing: raise HTTPException(400, "Compte existant")
-    doc = body.model_dump(exclude={"password"})
-    doc.update({"id": new_id(), "created_at": now_iso(), "wallet": 0, "loyalty_points": 0,
-                "referral_code": f"DINA-{random.randint(1000,9999)}", "tier": "Bronze",
-                "access_code": gen_access_code(),
-                "password_hash": hash_pw(body.password), "status": "active"})
-    await db.customers.insert_one(doc)
-    doc.pop("password_hash", None); doc.pop("_id", None)
-    return clean(doc)
-
-@api.post("/public/customer-login")
-async def cust_login(body: CustomerLoginIn):
-    c = await db.customers.find_one({"$or":[{"phone": body.identifier},{"email": body.identifier.lower().strip()}]})
-    if not c or not verify_pw(body.password, c.get("password_hash","")):
-        raise HTTPException(401, "Identifiants incorrects")
-    c.pop("password_hash", None); c.pop("_id", None)
-    return clean(c)
-
-def _norm_phone(p: str) -> str:
-    return "".join(ch for ch in (p or "") if ch.isdigit())
-
-@api.post("/public/customer-login-code")
-async def cust_login_code(body: CustomerLoginCodeIn, response: Response):
-    """Phone + 6-digit secret access code login — no SMS OTP, no password."""
-    digits = _norm_phone(body.phone)
-    if not digits: raise HTTPException(400, "Numéro invalide")
-    # Match on phone (loose: last 8 digits)
-    tail = digits[-8:]
-    c = None
-    async for row in db.customers.find({"status": {"$ne": "blacklist"}}):
-        if _norm_phone(row.get("phone",""))[-8:] == tail:
-            c = row; break
-    if not c:
-        raise HTTPException(404, "Aucun compte trouvé avec ce numéro")
-    if (c.get("access_code") or "").strip() != body.code.strip():
-        raise HTTPException(401, "Code secret invalide")
-    token = make_customer_token(c["id"])
-    response.set_cookie("customer_token", token, httponly=True, secure=True, samesite="none", max_age=60*60*24*30, path="/")
-    for k in ("_id","password_hash"): c.pop(k, None)
-    return {"customer": clean(c), "token": token}
-
-@api.post("/public/customer-logout")
-async def cust_logout(response: Response):
-    response.delete_cookie("customer_token", path="/")
-    return {"ok": True}
-
-@api.get("/public/account/me")
-async def account_me(c: dict = Depends(get_customer)):
-    orders = await db.orders.find({"customer.id": c["id"]}).sort("created_at", -1).to_list(100)
-    total_spent = sum(o.get("total", 0) for o in orders)
-    referrals = await db.referrals.count_documents({"parrain_id": c["id"]})
-    return {
-        "customer": clean(c),
-        "orders": clean(orders),
-        "metrics": {"total_orders": len(orders), "total_spent": total_spent, "referrals": referrals},
-    }
+# ---------- Auth: endpoints moved to routers/auth.py — P5 Refactor Feb 2026 ----------
 
 # ---------- Stores / Users ----------
 @api.get("/stores")
@@ -6648,8 +6538,10 @@ app.include_router(api)
 # P5 Refactor scaffold — modular routers go here as domains get extracted from server.py.
 from routers.meta import router as meta_router
 from routers.attendance import router as attendance_router
+from routers.auth import router as auth_router
 app.include_router(meta_router)
 app.include_router(attendance_router)
+app.include_router(auth_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")

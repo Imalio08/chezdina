@@ -89,3 +89,30 @@ def require_role(*roles):
             raise HTTPException(403, "Accès refusé")
         return user
     return dep
+
+
+async def get_customer(request: Request):
+    token = request.cookies.get("customer_token")
+    if not token:
+        h = request.headers.get("Authorization", "")
+        if h.startswith("Bearer "):
+            token = h[7:]
+    if not token:
+        raise HTTPException(401, "Non authentifié")
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
+    except Exception:
+        raise HTTPException(401, "Session expirée")
+    if payload.get("kind") != "customer":
+        raise HTTPException(401, "Token invalide")
+    c = await db.customers.find_one({"id": payload["sub"]})
+    if not c:
+        raise HTTPException(401, "Compte introuvable")
+    for k in ("_id", "password_hash"):
+        c.pop(k, None)
+    return c
+
+
+def norm_phone(p: str) -> str:
+    """Keep only digits — used for loose phone matching (last 8 digits)."""
+    return "".join(ch for ch in (p or "") if ch.isdigit())
