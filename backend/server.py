@@ -4681,6 +4681,19 @@ async def get_business(user: dict = Depends(get_user)):
     b = await db.business.find_one({"id":"main"})
     return clean(b or {"name":"Chez Dina","phone":"+225 07 77 92 61 79","address":"Cocody, Abidjan","tiktok":"@dinoush04","whatsapp":"2250777926179","currency":"XOF"})
 
+@api.get("/public/business")
+async def get_public_business():
+    """Public business info (name, tagline, whatsapp, address) used by the storefront footer."""
+    b = await db.business.find_one({"id":"main"}) or {}
+    return {
+        "name": b.get("name") or "Chez Dina",
+        "tagline": b.get("tagline") or "Mode féminine · Abidjan.",
+        "whatsapp": b.get("whatsapp") or "+225 07 77 92 61 79",
+        "phone": b.get("phone"),
+        "address": b.get("address"),
+        "tiktok": b.get("tiktok"),
+    }
+
 @api.patch("/business")
 async def update_business(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
     body.pop("_id",None)

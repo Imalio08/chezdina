@@ -22,14 +22,30 @@ export default function StorefrontLayout() {
   const [open, setOpen] = useState(false);
   const [userMenu, setUserMenu] = useState(false);
   const [social, setSocial] = useState({});
+  const [site, setSite] = useState({});
+  const [biz, setBiz] = useState({});
   const umRef = useRef(null);
 
   useEffect(() => {
     const onClick = (e) => { if (umRef.current && !umRef.current.contains(e.target)) setUserMenu(false); };
     window.addEventListener("click", onClick);
-    api.get("/public/site").then(r => setSocial(r.data?.social || {})).catch(() => {});
+    api.get("/public/site").then(r => {
+      const d = r.data || {};
+      setSocial(d.social || {});
+      setSite(d);
+      // Inject favicon if provided
+      if (d.favicon) {
+        let link = document.querySelector("link[rel~='icon']");
+        if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+        link.href = d.favicon;
+      }
+    }).catch(() => {});
+    api.get("/public/business").then(r => setBiz(r.data || {})).catch(() => {});
     return () => window.removeEventListener("click", onClick);
   }, []);
+
+  const brandName = biz.name || site.name || "Chez Dina";
+  const brandInitials = (brandName.split(" ").map(w => w[0]).join("").slice(0, 2) || "CD").toUpperCase();
 
   useEffect(() => {
     if (!q.trim() || q.trim().length < 2) { setSugg([]); return; }
@@ -61,8 +77,14 @@ export default function StorefrontLayout() {
       <header className="sticky top-0 z-30 bg-white border-b border-[#ececec]">
         <div className="max-w-6xl mx-auto px-4 h-20 flex items-center gap-3 md:gap-4">
           <Link to="/boutique" className="flex items-center gap-2 shrink-0" data-testid="storefront-logo">
-            <div className="w-11 h-11 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">CD</div>
-            <div className="font-serif text-xl text-[#b02a2a] hidden sm:block">Chez Dina</div>
+            {site.logo ? (
+              <img src={site.logo} alt={brandName} className="h-11 max-w-[160px] object-contain" data-testid="storefront-logo-img"/>
+            ) : (
+              <>
+                <div className="w-11 h-11 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{brandInitials}</div>
+                <div className="font-serif text-xl text-[#b02a2a] hidden sm:block">{brandName}</div>
+              </>
+            )}
           </Link>
           <nav className="hidden lg:flex items-center gap-5 text-sm text-[#1c1c1c] ml-2">
             <Link to="/boutique/catalog" data-testid="nav-catalog">Catalogue</Link>
@@ -139,7 +161,11 @@ export default function StorefrontLayout() {
       <a href="https://wa.me/2250777926179" target="_blank" rel="noreferrer" className="fixed bottom-5 right-5 bg-[#1f8a4c] text-white rounded-full w-14 h-14 grid place-items-center shadow-lg" data-testid="storefront-whatsapp"><MessageCircle size={22}/></a>
       <footer className="border-t border-[#ececec] mt-20 py-10 text-sm text-[#666] bg-[#fff5f5]">
         <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-4 gap-6">
-          <div><div className="font-serif text-xl text-[#b02a2a] mb-2">Chez Dina</div><p>Mode féminine · Abidjan.<br/>Livraison partout en Côte d'Ivoire.</p><div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c]">+225 07 77 92 61 79</strong></div></div>
+          <div>
+            {site.logo ? <img src={site.logo} alt={brandName} className="h-10 object-contain mb-2"/> : <div className="font-serif text-xl text-[#b02a2a] mb-2">{brandName}</div>}
+            <p>{biz.tagline || "Mode féminine · Abidjan."}<br/>Livraison partout en Côte d'Ivoire.</p>
+            <div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c]">{biz.whatsapp || "+225 07 77 92 61 79"}</strong></div>
+          </div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li>Nouveautés</li><li>Promotions</li><li>Guide des tailles</li></ul></div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Aide</div><ul className="space-y-1"><li>Livraison & retours</li><li>Suivi de commande</li><li>Contact</li></ul></div>
           <div><div className="font-semibold text-[#1c1c1c] mb-2">Suivez-nous</div><ul className="space-y-1">
