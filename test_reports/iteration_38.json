@@ -1,0 +1,32 @@
+{
+  "summary": "Pack 6 - Messagerie interne entièrement enrichie testée end-to-end. Backend: 5/5 pytest PASS sur /api/messages (open idempotent, send + attachments persisté, react toggle, pin toggle, archive toggle + filtre list). Frontend: toutes les flows demandées PASS — header 'Messagerie interne', bouton 'Archives (N)' + 'Diffusion' présents, toolbar à 6 boutons (fmt-bold/italic/strike/list/attach/emoji), insertion markdown **texte** (sélection ou placeholder), EmojiPicker avec 5 catégories (Visages/Gestes/Cœurs/Mode/Objets) qui insère un emoji dans l'input, upload d'image via file-input affiche attachment-preview puis bulle avec image rendue, hover message révèle react-btn, 6 quick-react emojis cliquables, reaction-❤️ affiché sous la bulle, msg-pin-<id> épingle (toast 'Épinglée en haut' + icône Pin), msg-archive-<id> archive (conv disparaît + apparaît dans Archives), désarchivage fonctionnel, deep-link depuis /console/livreurs → rider-internal-msg redirige vers /console/messagerie et ouvre la conversation existante.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard /console", "issues": ["(Pré-existant) PeriodSelector <span> dans <option> → warning d'hydratation React, non lié au Pack 6."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_messaging.py",
+    "/app/test_reports/pytest/messaging_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Messagerie.jsx est à 428 lignes, OK sous le seuil 700. Les sous-composants (EmojiPicker, AttachmentPreview, MessageBubble, BroadcastModal) sont inline — raisonnable mais pourraient être extraits dans /components/messagerie/ si on ajoute d'autres features.",
+    "renderMarkdown() utilise dangerouslySetInnerHTML. L'échappement HTML est bien fait AVANT la substitution regex, et la regex de lien restreint à https?://, donc l'XSS surface est faible. Toutefois, les attributs d'image/vidéo (m.image, a.url) ne sont PAS validés — un attaquant qui pousse un message via l'API peut injecter `javascript:` dans a.url pour les attachments de type 'file' (balise <a href>). Recommandation: valider côté backend que a.url commence par 'http(s)://' ou 'data:image/' avant persistance dans /api/messages/send.",
+    "server.py /api/messages/send: aucune validation du schéma des attachments (type, taille, mime). Un client malveillant peut persister des types arbitraires. Ajouter un Pydantic model Attachment(type: Literal['image','video','audio','file'], url: HttpUrl|constr, name: str, size: int<=10_000_000, mime: str).",
+    "server.py react_message: pas de garde-fou sur la longueur de l'emoji (strip() seul). Un gros 'emoji' texte peut polluer le dict reactions. Limiter à len<=16.",
+    "Messagerie.jsx addAttachment lit le fichier en base64 (data URL) côté client et l'envoie dans le payload JSON — un fichier de 10 Mo devient ~13 Mo en base64, et chaque GET /messages/conversations renvoie TOUS les messages. Prévoir une route /api/uploads qui stocke sur disque/CDN et renvoie une URL courte, sinon la messagerie va exploser en taille après quelques jours.",
+    "Messagerie.jsx: le polling 6s (setInterval(load, 6000)) recharge TOUTE la liste des conversations ET les archivées. Avec N conversations contenant M messages chacune, ça devient O(N*M) toutes les 6s pour chaque admin connecté. Prévoir /api/messages/conversations/summary (sans messages) + fetch complet uniquement sur la conv active, ou passer à SSE/WebSocket.",
+    "EmojiPicker: les data-testid sont basés sur le caractère emoji lui-même (ex: emoji-😀), peu robuste si on change l'ordre; OK pour tests mais fragile."
+  ],
+  "updated_files": ["/app/backend/tests/test_messaging.py (new)"],
+  "success_rate": {"backend": "100% (5/5 pytest)", "frontend": "100% sur toutes les flows demandées"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123!",
+  "seed_data_creation": "Les tests créent des messages/réactions/pin/archive sur une conversation réelle (rider existant). Nettoyage partiel: le toggle pin revient à l'état initial, archive est désarchivé en fin de test. Les messages envoyés par les tests restent dans la conv.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Routes Pack 6: GET/POST/PATCH /api/messages/* OK. UI selectors tous présents et stables: msg-toggle-archive, msg-broadcast, msg-conv-<id>, msg-pin-<id>, msg-archive-<id>, thread-pin, thread-archive, msg-thread, msg-thread-search, msg-input, msg-send, msg-search, msg-filter-<all|clientes|livreurs|unread>, fmt-bold/italic/strike/list/attach/emoji, file-input, emoji-picker, emoji-tab-<nom> (5 catégories: Visages, Gestes, Cœurs, Mode, Objets), emoji-<char>, attachment-preview, attachment-remove, msg-<msg_id>, react-btn-<msg_id>, quick-react-<emoji>, reaction-<emoji>. Deep-links: ?rider_id=X ou ?customer_id=X ouvre/crée la conv; ?segment_id=X ouvre la BroadcastModal avec préselection. Login: 'aouattaraesca@gmail.com' / 'Admin123!' sur /connexion."
+}

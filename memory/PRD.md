@@ -1,5 +1,39 @@
 # Chez Dina — PRD
 
+## Messagerie interne enrichie (Feb 2026) ✅
+
+### Formatage riche (markdown)
+- Barre d'outils : **Gras** (`fmt-bold`), *Italique* (`fmt-italic`), ~~Barré~~ (`fmt-strike`), listes (`fmt-list`)
+- Rendu markdown côté client : `**gras**`, `*italique*`, `__souligné__`, `~~barré~~`, `` `code` ``, `[lien](url)`, URLs auto-liées, retours ligne, listes `-`/`•`
+- Textarea avec insertion intelligente autour de la sélection
+
+### Emojis
+- Picker custom avec 5 catégories (Visages, Gestes, Cœurs, Mode, Objets)
+- Barre de réactions rapides au survol (❤️ 👍 👏 😂 🔥 💯)
+- Toggle réaction via `POST /messages/conversations/:id/react`
+
+### Pièces jointes
+- Upload image / vidéo / audio / PDF / docs (10 Mo max) via `fmt-attach`
+- Preview inline avec icône, nom et taille, bouton retrait
+- Rendu dans la bulle : image responsive, vidéo contrôlée, audio player, lien téléchargement pour fichiers
+- Backend `/messages/send` étendu avec `attachments: [{type, url, name, size, mime}]` + validation stricte URL (data:image|video|audio|pdf ou http(s)), cap 10 pièces, nom <= 200 car.
+
+### Archivage & épinglage
+- `PATCH /messages/conversations/:id/archive` et `/pin` (toggle)
+- Les conversations épinglées remontent en tête (tri `pinned desc, updated_at desc`)
+- Bouton bascule « Voir actives / Archives (N) » dans l'en-tête
+- Icônes au survol (épingler, archiver) + boutons dédiés dans l'en-tête du thread
+
+### Deep-link & recherche
+- `/console/messagerie?rider_id=X` ou `?customer_id=X` → crée/réveille via `POST /messages/open`
+- `/console/messagerie?segment_id=X` → ouvre la diffusion pré-ciblée
+- Recherche dans la liste (noms + contenu messages)
+- Recherche dans le fil ouvert (`thread-search`)
+
+### Testing
+- `/app/backend/tests/test_messaging.py` : 5/5 pytest green (open idempotent, send+attachments, react toggle, pin toggle, archive toggle)
+- Testing agent frontend : 100% des data-testid validés
+
 ## Vague 4 — Clients, messagerie & UX globale (Feb 2026) ✅
 
 ### KPI cards compactes

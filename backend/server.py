@@ -881,7 +881,7 @@ async def toggle_pin(conv_id: str, body: Dict[str, Any] = None, user: dict = Dep
 async def react_message(conv_id: str, body: Dict[str, Any], user: dict = Depends(get_user)):
     """Toggle an emoji reaction from `user` on message `message_id`."""
     msg_id = body.get("message_id")
-    emoji = (body.get("emoji") or "").strip()
+    emoji = (body.get("emoji") or "").strip()[:16]  # cap to avoid dict pollution
     if not msg_id or not emoji: raise HTTPException(400, "message_id et emoji requis")
     c = await db.conversations.find_one({"id": conv_id})
     if not c: raise HTTPException(404)
@@ -930,9 +930,21 @@ async def send_message(body: Dict[str, Any], user: dict = Depends(get_user)):
     parts.append(f"s:{user['id']}")
     key = await _conv_key(parts)
     conv = await db.conversations.find_one({"key": key})
+    # Validate attachments to prevent javascript: URL injection in rendered <a href>/<img src>
+    allowed_types = {"image", "video", "audio", "file"}
+    safe_attachments = []
+    for a in (body.get("attachments") or [])[:10]:  # cap at 10 attachments
+        if not isinstance(a, dict): continue
+        t = a.get("type")
+        u = str(a.get("url") or "")
+        if t not in allowed_types: continue
+        if not (u.startswith("http://") or u.startswith("https://") or u.startswith("data:image/") or u.startswith("data:video/") or u.startswith("data:audio/") or u.startswith("data:application/pdf")):
+            continue
+        safe_attachments.append({"type": t, "url": u, "name": str(a.get("name") or "fichier")[:200],
+                                 "size": int(a.get("size") or 0), "mime": str(a.get("mime") or "")[:80]})
     msg = {"id": new_id(), "at": now_iso(), "from_id": user["id"], "from_name": user.get("name"),
-           "from_kind": "store", "text": body.get("text",""), "image": body.get("image"),
-           "attachments": body.get("attachments") or [], "reactions": {}, "read_by": [user["id"]]}
+           "from_kind": "store", "text": str(body.get("text","") or "")[:5000], "image": body.get("image"),
+           "attachments": safe_attachments, "reactions": {}, "read_by": [user["id"]]}
     if not conv:
         participants = [{"kind": "store", "id": user["id"], "name": user.get("name")}]
         if cust_id:
