@@ -242,7 +242,7 @@ export default function ConsoleLayout() {
                     end={end}
                     title={collapsed ? label : undefined}
                     className={({isActive}) => `dina-sidebar-link ${isActive?"active":""} ${collapsed ? "!justify-center !px-2" : ""}`}
-                    data-testid={`nav-${label.toLowerCase().replace(/\s+/g,"-").replace(/é/g,"e").replace(/è/g,"e").replace(/&/g,"et").replace(/[^\w-]/g,"")}`}
+                    data-testid={`nav-${label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/&/g,"et").replace(/\s+/g,"-").replace(/[^\w-]/g,"")}`}
                   >
                     <Icon size={14}/>
                     {!collapsed && <span className="truncate">{label}</span>}

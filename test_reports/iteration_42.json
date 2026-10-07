@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 42 — Selfie-only attendance + community_manager role + RBAC. Backend 14/14 PASS. Frontend RBAC enforcement is COMPLETELY BROKEN due to a logic bug in rbac.js (prefix match on /console matches every /console/* path). All roles see the full admin sidebar and can reach forbidden pages via direct URL. Rider UI shell is correctly stripped of the blocking CheckInGate; topbar/bottom-nav/punch button all present. New community_manager user is seeded and authenticates with role=community_manager. Attendance check-in works selfie-only (no GPS).",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ConsoleLayout sidebar (RBAC filter)", "issue": "canAccess returns true for ALL /console/* paths because the first PATH_ROLES key '/console' matches via startsWith('/console/'). Result: sales, community_manager, stock_keeper all see the full admin sidebar (Finances, Livreurs, Zones, Produits, Stock, Statistiques, Historique pointages, etc).", "selector": "[data-testid^=\"nav-\"]", "priority": "CRITICAL"},
+      {"component": "ConsoleLayout useEffect redirect guard", "issue": "Same rbac.js bug: direct nav to /console/finances or /console/produits as sales user is NOT redirected to /console — the forbidden page loads normally. canAccess('sales','/console/finances') returns true because of the /console prefix bug.", "selector": "window.location.pathname", "priority": "CRITICAL"},
+      {"component": "ConsoleLayout topbar-punch", "issue": "After login, the on-boarding tour modal 'Visite guidée' (backdrop + card) appears at page center and prevents interaction with the topbar 'Pointer' button. Clicking topbar-punch via Playwright (even with force=True) does not open the AttendancePunchModal because the tour overlay captures focus. The modal does open after tour dismissal (not re-verified end-to-end here).", "selector": "[data-testid=\"topbar-punch\"]", "priority": "MEDIUM"},
+      {"component": "RiderShell punch button", "issue": "Clicking data-testid='rider-punch-btn' did not reveal a punch-modal element in DOM in the automated run (possibly conditional on camera stream / state). Rider shell itself is correct: topbar, bottom-nav, 5 tabs (Courses/Carte/Historique/Performance/Profil), no blocking CheckInGate.", "selector": "[data-testid=\"rider-punch-btn\"]", "priority": "MEDIUM"},
+      {"component": "PeriodSelector (option children)", "issue": "React hydration warning: <span> cannot be a child of <option> in PeriodSelector.jsx line 96. Not blocking but noisy in console.", "selector": "select option", "priority": "LOW"},
+      {"component": "Sidebar nav-testid naming", "issue": "The data-testid slug normalisation strips accents incorrectly: 'Rôles & permissions' -> 'nav-rles-et-permissions' (lost 'o'), 'À approuver' -> 'nav--approuver' (double dash), 'Aperçu' -> 'nav-aperu'. The replace(/é/g,'e').replace(/è/g,'e') does not cover ô/à/ç/É.", "selector": "data-testid pattern", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "RBAC sidebar + URL guard for sales/stock_keeper/community_manager", "issue": "Not enforced because of rbac.js prefix matching bug. See ui_bugs #1 and #2.", "affected_selectors": ["[data-testid^=\"nav-\"]"]}
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter42_rbac_attendance.py",
+    "/app/test_reports/pytest/iter42.xml"
+  ],
+  "action_items": [
+    "FIX /app/frontend/src/lib/rbac.js canAccess(): iterate PATH_ROLES keys sorted by length DESC (longest-prefix wins) OR require exact match (recommended). Current implementation: `for (const key of Object.keys(PATH_ROLES)) { if (path === key || path.startsWith(key + '/')) return ... }` — the '/console' entry at the top of the map always wins for any '/console/xxx' path. Suggested fix: `const keys = Object.keys(PATH_ROLES).sort((a,b)=>b.length-a.length); for (const key of keys) { if (path === key || path.startsWith(key + '/')) return PATH_ROLES[key].includes(role); }` and/or just use exact match for leaf routes.",
+    "After rbac fix, re-verify: sales must NOT see Finances/Livreurs/Produits/Zones/Statistiques; CM must NOT see Caisse/Livreurs/Produits/Stock/Finances/Sessions-caisse; direct URL /console/finances for sales must redirect to /console.",
+    "Investigate rider-punch-btn click → AttendancePunchModal not rendering in DOM (may be a conditional on getUserMedia availability — ensure modal element is present regardless of camera stream so test can detect it).",
+    "Fix on-boarding Visite guidée so it doesn't block the topbar Pointer button on first visit (either lower z-index or allow interactions with the topbar).",
+    "Fix <span> inside <option> hydration warning in /app/frontend/src/components/shared/PeriodSelector.jsx line 96.",
+    "Normalise sidebar nav-testid slugs to handle ô, à, ç, É (not just é/è)."
+  ],
+  "critical_code_review_comments": [
+    "rbac.js canAccess uses first-match-with-prefix on a dict without sort → always matches '/console' umbrella entry → RBAC is effectively disabled for sub-paths. Must switch to exact or longest-prefix match.",
+    "ConsoleLayout.jsx 'adminOnly' sections are gated by `isAdmin` only, but community_manager still sees the Site vitrine section (Apparence/Accueil/Pages/SEO/Aperçu) — looks correct, but admin-only items like 'Rôles & permissions', 'À approuver', 'Journal d'audit', 'Paramètres' are correctly hidden for manager/sales/CM. OK.",
+    "ConsoleLayout.jsx line 142: /attendance/me is called every 60s without checking auth; harmless but noisy if token expires."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter42_rbac_attendance.py (new pytest file for this iteration)"
+  ],
+  "success_rate": {"backend": "100%", "frontend": "25%"},
+  "test_credentials": "admin=aouattaraesca@gmail.com/Admin123! · manager=manager.cocody@dinastore.ci/Manager123! · sales=agent1@dinastore.ci/Agent123! · stock=stock@dinastore.ci/Stock123! · cm=cm@dinastore.ci/Cm123! · rider=rider1@dinastore.ci/Rider123!",
+  "seed_data_creation": "None — relied on existing seed_if_empty (community_manager cm@dinastore.ci is seeded idempotently and confirmed via /auth/me).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": false,
+  "context_for_next_testing_agent": "Backend attendance + logins + /attendance/today RBAC all PASS (14/14 pytest). The ONE big remaining issue is rbac.js prefix matching: '/console' key in PATH_ROLES is matched for every /console/* path, so the sidebar and URL guard are not filtered. Verified via UI: sales user sees Finances/Livreurs/Produits in sidebar and can load /console/finances directly. Fix is a 1-line change (sort keys by length DESC in canAccess). After fix, re-run the Playwright script in /app/test_reports/pytest or the inline snippet checking nav-* testids per role and testing direct URL /console/finances as sales.",
+  "rca_of_the_issue": "File: /app/frontend/src/lib/rbac.js, function canAccess (lines 65-78). Bug: `Object.keys(PATH_ROLES)` returns keys in insertion order; the first key is '/console' with roles [manager, sales, stock_keeper, community_manager]. The loop uses `path.startsWith(key + '/')` which matches every '/console/<x>' path against the '/console' entry FIRST, returning that permissive list before any specific entry (e.g. '/console/finances':[manager]) is ever tested. Reproduction: login as sales (agent1@dinastore.ci/Agent123!), observe sidebar contains nav-finances/livreurs/produits/zones/statistiques; navigate browser to /console/finances → page loads instead of redirecting. Mitigation: `const keys = Object.keys(PATH_ROLES).sort((a,b)=>b.length-a.length);` before the for-loop, OR change to exact-match: `if (path in PATH_ROLES) return PATH_ROLES[path].includes(role); return false;` (plus a special case for '/console/clients/:id' prefix routes)."
+}

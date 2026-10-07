@@ -68,8 +68,9 @@ export function canAccess(role, pathname) {
   if (!pathname) return false;
   // Strip query string
   const path = pathname.split("?")[0];
-  // Exact match or prefix match (e.g. /console/clients/:id)
-  for (const key of Object.keys(PATH_ROLES)) {
+  // Longest-prefix wins so '/console/finances' beats the umbrella '/console' entry
+  const keys = Object.keys(PATH_ROLES).sort((a, b) => b.length - a.length);
+  for (const key of keys) {
     if (path === key || path.startsWith(key + "/")) {
       return PATH_ROLES[key].includes(role);
     }
