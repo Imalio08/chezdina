@@ -1,5 +1,27 @@
 # Chez Dina — PRD
 
+### Vague G — Pointage selfie-only + RBAC par rôle (Feb 2026) ✅
+**Pointage simplifié**
+- `/api/attendance/check-in` ne demande plus de GPS/géofence : seul le selfie est requis (`method=phone`). Les champs `lat/lng/distance_m/outside` sont enregistrés à `null`.
+- Nouveau composant partagé `AttendancePunchModal.jsx` : selfie seul, boutons Arrivée/Départ (désactivés selon statut du jour via `GET /attendance/me`).
+- Bouton `topbar-punch` ajouté dans `ConsoleLayout` (visible pour tous les rôles authentifiés), avec badge "Pointer" / "Pointé" / "Terminé" selon statut.
+- Bouton `rider-punch-btn` dans `RiderShell` ; **plus de `CheckInGate` bloquant** : le livreur accède à l'app immédiatement et pointe quand il veut.
+- Le tracking GPS live des livreurs reste actif (séparé du pointage).
+- Historique pointages : page `/console/presence` renommée "Historique pointages" (accès admin + manager).
+
+**RBAC**
+- Nouveau rôle `community_manager` seedé idempotemment (compte `cm@dinastore.ci / Cm123!`, PIN `6666`).
+- Nouveau module `/app/frontend/src/lib/rbac.js` : map `PATH_ROLES` (path → rôles autorisés) + `canAccess(role, pathname)` (longest-prefix match) + `landingFor(role)`.
+- `ConsoleLayout` filtre la sidebar via `canAccess` ET redirige par `useEffect` quand l'utilisateur essaie un path interdit (direct URL).
+- Matrice livrée :
+  - **admin** : accès total (bypass dans `canAccess`)
+  - **manager** : POS, catalogue complet, livraisons, clients, marketing, finances, statistiques, pointage équipe
+  - **sales** : POS, commandes, préparation, clients, messagerie, pointage perso
+  - **stock_keeper** : produits, marques, catégories, fournisseurs, achats, stock, pointage perso
+  - **community_manager** : site vitrine, messagerie, segments/campagnes, promotions, fidélité, parrainage, avis, statistiques, pointage perso
+  - **rider** : app livreur uniquement (route `/rider`)
+- Testing agent iter 42 → bug prefix-match détecté → iter 43 : fix (sort keys longest-first) + NFD unicode slug → **100% PASS** sur toute la matrice (sidebar filtrée, direct-URL guard, punch modals Rider+Console).
+
 ### Vague F — Multi-domaines + Branding + GPS Heading + Wave Webhook (Feb 2026) ✅
 
 **Multi-domaines SPA**

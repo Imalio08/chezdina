@@ -1,0 +1,24 @@
+{
+  "summary": "Iteration 43 — Re-tested RBAC after rbac.js longest-prefix-match fix and NFD unicode slug normalization. ALL frontend RBAC checks PASS. Sales/community_manager/manager sidebars are correctly filtered. Direct URL guards redirect sales/CM from forbidden routes back to /console. Topbar 'Pointer' opens AttendancePunchModal for sales and manager (after dismissing on-boarding tour). Rider punch-btn opens punch-modal successfully. Backend attendance check-in regression not re-tested (was 14/14 PASS in iter 42, no backend changes requested). Overall frontend: 100%.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter42_rbac_attendance.py"],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "rbac.js canAccess now correctly sorts PATH_ROLES keys by length DESC so '/console/finances' beats umbrella '/console'. Verified in UI for sales, cm, manager roles.",
+    "ConsoleLayout nav-testid slug now uses NFD unicode decomposition; all accents (ô/à/ç/é/É) are stripped properly: nav-roles-et-permissions, nav-a-approuver, nav-apercu, nav-apparence all correct for admin."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (not re-tested, was 100% in iter42)", "frontend": "100%"},
+  "test_credentials": "admin=aouattaraesca@gmail.com/Admin123! · manager=manager.cocody@dinastore.ci/Manager123! · sales=agent1@dinastore.ci/Agent123! · cm=cm@dinastore.ci/Cm123! · rider=rider1@dinastore.ci/Rider123!",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "RBAC verified across sales/cm/manager roles. Sales sidebar: nav-tableau-de-bord, nav-caisse, nav-commandes, nav-preparation, nav-sessions-de-caisse, nav-liste-dattente, nav-clients, nav-messagerie, nav-pointage-kiosk, nav-manuel-dutilisation (no finances/livreurs/produits/zones/stock/statistiques). CM sidebar: dashboard, paniers-abandonnes, clients, messagerie, segments-et-campagnes, promotions, fidelite, parrainage, avis-clients, pointage-kiosk, apparence+accueil+pages-et-navigation+seo-et-partage+apercu (Site vitrine), statistiques, manuel-dutilisation (no caisse/livreurs/produits/stock/finances/sessions-caisse). Direct URL redirects: sales→/console/{finances,produits,livreurs} all redirect to /console; CM→/console/{finances,produits,pos} all redirect to /console. Topbar punch button opens punch-modal successfully (after dismissing on-boarding tour via data-testid='tour-close'). Rider punch-btn opens punch-modal.",
+  "rca_of_the_issue": "No new issues. Previous iter42 RBAC bug (first-prefix-match on insertion order) has been correctly fixed by sorting PATH_ROLES keys by length DESC in /app/frontend/src/lib/rbac.js canAccess. NFD normalization fix in ConsoleLayout.jsx handles all accents properly."
+}
