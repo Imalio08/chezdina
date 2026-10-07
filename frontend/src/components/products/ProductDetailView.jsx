@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Pencil, Copy, Printer, Share2, Tag, Archive, Clock, Package, History, BarChart3, Users, Star, Image as ImageIcon } from "lucide-react";
+import SmartImage from "@/components/shared/SmartImage";
 
 const STATUS_LABEL = { actif:"Actif", inactif:"Inactif", brouillon:"Brouillon", liste_attente:"Liste d'attente", archive:"Archivé" };
 const STATUS_COLOR = { actif:"#1f8a4c", inactif:"#999", brouillon:"#5867fd", liste_attente:"#e4991e", archive:"#666" };
@@ -57,11 +58,11 @@ export default function ProductDetailView({ productId, onBack, onEdit }) {
         {/* Gallery */}
         <div>
           <div className="aspect-square bg-[#fff5f5] rounded-xl overflow-hidden">
-            {gallery.length ? <img src={gallery[imgIdx]} alt="" className="w-full h-full object-cover" data-testid="pdv-main-img"/> : <div className="w-full h-full grid place-items-center text-[#999]"><ImageIcon size={32}/></div>}
+            {gallery.length ? <SmartImage src={gallery[imgIdx]} alt={p.name} fallbackText={p.name} className="w-full h-full object-cover" data-testid="pdv-main-img"/> : <div className="w-full h-full grid place-items-center text-[#999]"><ImageIcon size={32}/></div>}
           </div>
           {gallery.length > 1 && (
             <div className="grid grid-cols-5 gap-1.5 mt-2">
-              {gallery.map((src,i)=><button key={i} onClick={()=>setImgIdx(i)} className={`aspect-square rounded-md overflow-hidden border-2 ${imgIdx===i?"border-[#b02a2a]":"border-transparent"}`} data-testid={`pdv-thumb-${i}`}><img src={src} className="w-full h-full object-cover"/></button>)}
+              {gallery.map((src,i)=><button key={i} onClick={()=>setImgIdx(i)} className={`aspect-square rounded-md overflow-hidden border-2 ${imgIdx===i?"border-[#b02a2a]":"border-transparent"}`} data-testid={`pdv-thumb-${i}`}><SmartImage src={src} alt={`${p.name} ${i+1}`} fallbackText={p.name} className="w-full h-full object-cover"/></button>)}
             </div>
           )}
         </div>

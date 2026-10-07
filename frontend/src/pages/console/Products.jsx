@@ -9,6 +9,7 @@ import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
 import FiltersPanel from "@/components/shared/FiltersPanel";
 import ProductDetailView from "@/components/products/ProductDetailView";
 import ProductFormV3 from "@/components/products/ProductFormV3";
+import SmartImage from "@/components/shared/SmartImage";
 
 const STATUS_LABEL = { actif:"Actif", inactif:"Inactif", brouillon:"Brouillon", liste_attente:"Liste d'attente", archive:"Archivé" };
 const STATUS_COLOR = { actif:"#1f8a4c", inactif:"#999", brouillon:"#5867fd", liste_attente:"#e4991e", archive:"#666" };
@@ -175,7 +176,7 @@ export default function Products() {
               return (
                 <tr key={p.id} data-testid={`product-row-${p.sku}`} className={selected.includes(p.id)?"bg-[#fff5f5] dark:bg-[#2a1818]":""}>
                   <td><input type="checkbox" checked={selected.includes(p.id)} onChange={()=>toggleSel(p.id)} className="accent-[#b02a2a]"/></td>
-                  <td><button onClick={()=>setDetailId(p.id)} className="flex items-center gap-2 hover:text-[#b02a2a] text-left"><div className="w-9 h-9 rounded bg-[#f5f5f5] overflow-hidden shrink-0"><img src={p.image || p.images?.[0]} alt="" className="w-full h-full object-cover"/></div><span className="font-medium">{p.name}</span></button></td>
+                  <td><button onClick={()=>setDetailId(p.id)} className="flex items-center gap-2 hover:text-[#b02a2a] text-left"><div className="w-9 h-9 rounded bg-[#f5f5f5] overflow-hidden shrink-0"><SmartImage src={p.image || p.images?.[0]} alt={p.name} fallbackText={p.name} className="w-full h-full object-cover"/></div><span className="font-medium">{p.name}</span></button></td>
                   <td className="text-[#666]">{p.brand}</td>
                   <td className="text-[#666]">{p.category}</td>
                   <td className="font-mono text-xs">{p.sku}</td>
@@ -211,7 +212,7 @@ function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap }) {
       <input type="checkbox" checked={selected} onChange={()=>onToggle(p.id)} className="absolute top-2 left-2 z-10 accent-[#b02a2a] w-4 h-4"/>
       <button onClick={onOpen} className="block w-full text-left">
         <div className="aspect-square bg-[#fff5f5] relative overflow-hidden">
-          <img src={p.image || p.images?.[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy"/>
+          <SmartImage src={p.image || p.images?.[0]} alt={p.name} fallbackText={p.name} className="w-full h-full object-cover group-hover:scale-105 transition"/>
           {promo && <span className="absolute top-2 right-2 bg-[#b02a2a] text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">-{p.promo_pct || Math.round((p.price_old-p.price)/p.price_old*100)}%</span>}
           {status !== "actif" && <span className="absolute bottom-2 left-2 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded-full font-semibold" style={{background:STATUS_COLOR[status]}}>{STATUS_LABEL[status]}</span>}
           {status === "actif" && stk === 0 && <div className="absolute inset-0 bg-black/40 grid place-items-center text-white text-xs font-bold">RUPTURE</div>}

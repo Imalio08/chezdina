@@ -7,6 +7,7 @@ import { Plus, Pencil, Trash2, MessageSquare, X, Search, Copy, Phone, Ban, Check
 import ImageUpload from "@/components/shared/ImageUpload";
 import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
 import { useConfirm } from "@/components/shared/ConfirmDialog";
+import SmartImage from "@/components/shared/SmartImage";
 
 const TABS = [
   { k: "all", label: "Toutes" }, { k: "active", label: "Actives" }, { k: "inactive", label: "Inactives" },
@@ -135,7 +136,7 @@ export default function Customers() {
             <tbody>{filtered.map(c => (
               <tr key={c.id} data-testid={`cust-row-${c.phone}`}>
                 <td><button onClick={() => nav(`/console/clients/${c.id}`)} className="flex items-center gap-2 hover:text-[#b02a2a]">
-                  {c.photo ? <img src={c.photo} className="w-8 h-8 rounded-full object-cover" alt="" /> : <div className="w-8 h-8 rounded-full bg-[#fff5f5] text-[#b02a2a] grid place-items-center text-xs font-bold">{c.name?.[0]}</div>}
+                  {c.photo ? <SmartImage src={c.photo} alt={c.name} fallbackText={c.name} className="w-8 h-8 rounded-full object-cover" /> : <div className="w-8 h-8 rounded-full bg-[#fff5f5] text-[#b02a2a] grid place-items-center text-xs font-bold">{c.name?.[0]}</div>}
                   <div className="text-left"><div className="font-medium">{c.name}</div><div className="text-[10px] text-[#999]">{c.email || "—"}</div></div>
                 </button></td>
                 <td className="text-xs">{c.phone}</td>
@@ -159,7 +160,7 @@ export default function Customers() {
           {filtered.map(c => (
             <div key={c.id} className="dina-card-white p-4" data-testid={`cust-card-${c.phone}`}>
               <div className="flex items-start gap-3">
-                <button onClick={() => nav(`/console/clients/${c.id}`)}>{c.photo ? <img src={c.photo} className="w-12 h-12 rounded-full object-cover" alt="" /> : <div className="w-12 h-12 rounded-full bg-[#fff5f5] text-[#b02a2a] grid place-items-center font-serif font-bold">{c.name?.[0]}</div>}</button>
+                <button onClick={() => nav(`/console/clients/${c.id}`)}>{c.photo ? <SmartImage src={c.photo} alt={c.name} fallbackText={c.name} className="w-12 h-12 rounded-full object-cover" /> : <div className="w-12 h-12 rounded-full bg-[#fff5f5] text-[#b02a2a] grid place-items-center font-serif font-bold">{c.name?.[0]}</div>}</button>
                 <div className="flex-1 min-w-0">
                   <button onClick={() => nav(`/console/clients/${c.id}`)} className="font-semibold truncate hover:text-[#b02a2a]">{c.name}</button>
                   <div className="text-[11px] text-[#666] truncate">{c.phone}</div>

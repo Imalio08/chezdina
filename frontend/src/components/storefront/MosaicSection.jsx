@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import SmartImage from "@/components/shared/SmartImage";
 
 /**
  * Masonry mosaic with continuously scrolling columns at alternating speeds.
@@ -140,11 +141,10 @@ function Tile({ img }) {
   const aspect = img.size === "lg" ? "aspect-[3/4]" : img.size === "sm" ? "aspect-square" : "aspect-[4/5]";
   const inner = (
     <div className={`${aspect} w-full overflow-hidden rounded-xl mb-3 bg-[#eee] dark:bg-[#222] group`}>
-      <img
+      <SmartImage
         src={img.src}
         alt={img.alt || ""}
-        loading="lazy"
-        decoding="async"
+        fallbackIcon
         className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
       />
     </div>

@@ -7,6 +7,7 @@ import { track } from "@/lib/analytics";
 import WelcomePopup from "@/components/storefront/WelcomePopup";
 import MosaicSection from "@/components/storefront/MosaicSection";
 import { Truck, Shield, MessageCircle, ChevronRight, Clock, Sparkles, Flame } from "lucide-react";
+import SmartImage from "@/components/shared/SmartImage";
 
 function Countdown({ ends }) {
   const [, setT] = useState(0);
@@ -90,7 +91,7 @@ export default function Home() {
           {categories.slice(0, 6).map(c => {
             const img = products.find(p => p.category === c)?.image;
             return <Link key={c} to={`/boutique/catalog?cat=${encodeURIComponent(c)}`} className="group">
-              <div className="aspect-square bg-[#fff5f5] dark:bg-[#2a1818] rounded-xl overflow-hidden"><img src={img} alt={c} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition" /></div>
+              <div className="aspect-square bg-[#fff5f5] dark:bg-[#2a1818] rounded-xl overflow-hidden"><SmartImage src={img} alt={c} fallbackText={c} className="w-full h-full object-cover group-hover:scale-105 transition" /></div>
               <div className="text-center text-xs mt-1.5 font-semibold">{c}</div>
             </Link>;
           })}
@@ -107,7 +108,7 @@ export default function Home() {
           <div className="text-[10px] uppercase tracking-widest text-[#b02a2a]">Lookbook</div>
           <h2 className="font-serif text-2xl md:text-3xl mt-0.5 mb-6">Complétez le look</h2>
           <div className="grid md:grid-cols-[1.3fr_1fr] gap-6 items-center">
-            <div className="aspect-[4/5] md:aspect-[3/4] rounded-2xl overflow-hidden"><img src={lookbook[0].image} alt="" className="w-full h-full object-cover" /></div>
+            <div className="aspect-[4/5] md:aspect-[3/4] rounded-2xl overflow-hidden"><SmartImage src={lookbook[0].image} alt="Lookbook" fallbackText="Lookbook" className="w-full h-full object-cover" /></div>
             <div className="grid grid-cols-2 gap-3">
               {lookbook[0].product_ids.map(pid => { const p = products.find(x => x.id === pid); return p ? <ProductCardV2 key={pid} product={p} /> : null; })}
             </div>
@@ -186,7 +187,7 @@ function HeroColumn({ images, speed = 20, offset = false }) {
           <div key={dup}>
             {images.map((src, i) => (
               <div key={`${dup}-${i}`} className={`${i % 3 === 0 ? "aspect-[3/4]" : i % 3 === 1 ? "aspect-[4/5]" : "aspect-square"} rounded-2xl overflow-hidden mb-3 bg-[#eee]`}>
-                <img src={src} alt="" loading="lazy" className="w-full h-full object-cover" />
+                <SmartImage src={src} alt="" fallbackIcon className="w-full h-full object-cover" />
               </div>
             ))}
           </div>

@@ -6371,6 +6371,44 @@ async def update_working_hours(body: Dict[str,Any], user: dict = Depends(require
     await db.business.update_one({"id":"main"}, {"$set": {"working_hours": body.get("working_hours") or {}}}, upsert=True)
     return {"ok": True}
 
+@api.patch("/business/attendance-config")
+async def update_attendance_config(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
+    """Who can punch? body: {enabled: bool, enabled_roles: [role_keys...]}"""
+    cfg = {
+        "enabled": bool(body.get("enabled", True)),
+        "enabled_roles": list(body.get("enabled_roles") or ["manager","sales","stock_keeper","community_manager","rider"]),
+    }
+    await db.business.update_one({"id":"main"}, {"$set": {"attendance_config": cfg}}, upsert=True)
+    return {"ok": True, "attendance_config": cfg}
+
+@api.get("/attendance/all-stats")
+async def attendance_all_stats(days: int = 30, user: dict = Depends(require_role("admin","manager"))):
+    """Bulk ponctualité/retards/absences per employee for CSV/PDF export."""
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
+    employees = await db.users.find({"role": {"$in": ["manager","sales","stock_keeper","community_manager","rider"]}, "active": True}, {"id":1,"name":1,"role":1}).to_list(500)
+    out = []
+    for u in employees:
+        rows = await db.attendance.find({"user_id": u["id"], "day": {"$gte": cutoff}}).to_list(1000)
+        arr_rows = [r for r in rows if r.get("kind") == "arrival"]
+        worked_days = len({r["day"] for r in arr_rows})
+        late_count = sum(1 for r in arr_rows if r.get("late"))
+        late_min_total = sum(r.get("late_min", 0) for r in arr_rows)
+        absences = max(0, days - worked_days)
+        avg_arrival_h = None
+        if arr_rows:
+            total_min = sum((datetime.fromisoformat(r["at"].replace("Z","+00:00")).hour*60 + datetime.fromisoformat(r["at"].replace("Z","+00:00")).minute) for r in arr_rows if r.get("at"))
+            if total_min:
+                avg = total_min // len(arr_rows)
+                avg_arrival_h = f"{avg//60:02d}:{avg%60:02d}"
+        out.append({
+            "user_id": u["id"], "name": u.get("name"), "role": u.get("role"),
+            "worked_days": worked_days, "absences": absences,
+            "late_count": late_count, "late_min_total": late_min_total,
+            "avg_arrival": avg_arrival_h,
+            "punctuality_pct": round((worked_days - late_count) / max(1, worked_days) * 100, 1),
+        })
+    return {"period_days": days, "rows": out}
+
 # -------- Stock adjustment with approval --------
 @api.post("/stock/adjustments")
 async def stock_adjust(body: Dict[str,Any], user: dict = Depends(get_user)):

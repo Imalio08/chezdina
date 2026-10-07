@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { fcfa, dateFmt, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Phone, MessageSquare, Copy, Send, X } from "lucide-react";
+import SmartImage from "@/components/shared/SmartImage";
 
 const TABS = [
   { k: "overview", label: "Aperçu" }, { k: "orders", label: "Commandes" }, { k: "payments", label: "Paiements" },
@@ -35,7 +36,7 @@ export default function CustomerDetail() {
       <button onClick={() => nav("/console/clients")} className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13} />Retour</button>
 
       <div className="dina-card-white p-5 flex items-start gap-4 flex-wrap">
-        {c.photo ? <img src={c.photo} alt="" className="w-20 h-20 rounded-full object-cover" /> : <div className="w-20 h-20 rounded-full bg-[#fff5f5] text-[#b02a2a] grid place-items-center font-serif text-3xl font-bold">{c.name?.[0]}</div>}
+        {c.photo ? <SmartImage src={c.photo} alt={c.name} fallbackText={c.name} className="w-20 h-20 rounded-full object-cover" /> : <div className="w-20 h-20 rounded-full bg-[#fff5f5] text-[#b02a2a] grid place-items-center font-serif text-3xl font-bold">{c.name?.[0]}</div>}
         <div className="flex-1 min-w-0">
           <h1 className="font-serif text-2xl">{c.name}</h1>
           <div className="text-sm text-[#666]">{c.phone} · {c.email || "—"}</div>
@@ -89,7 +90,7 @@ function Kpi({ label, v, c }) { return <div className="dina-card-white p-3"><div
 function Overview({ c, orders, metrics }) {
   return (
     <div className="grid lg:grid-cols-2 gap-4">
-      <div className="dina-card-white p-4"><div className="font-semibold mb-3">Produits préférés</div>{(metrics.top_products || []).length === 0 ? <div className="text-sm text-[#666]">Aucune donnée</div> : metrics.top_products.map((p, i) => (<div key={i} className="flex items-center gap-2 mb-2"><img src={p.image} alt="" className="w-10 h-10 rounded object-cover" /><div className="flex-1 min-w-0"><div className="font-medium truncate">{p.name}</div><div className="text-[11px] text-[#666]">{p.qty} achetés · {fcfa(p.spent)}</div></div></div>))}</div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-3">Produits préférés</div>{(metrics.top_products || []).length === 0 ? <div className="text-sm text-[#666]">Aucune donnée</div> : metrics.top_products.map((p, i) => (<div key={i} className="flex items-center gap-2 mb-2"><SmartImage src={p.image} alt={p.name} fallbackText={p.name} className="w-10 h-10 rounded object-cover" /><div className="flex-1 min-w-0"><div className="font-medium truncate">{p.name}</div><div className="text-[11px] text-[#666]">{p.qty} achetés · {fcfa(p.spent)}</div></div></div>))}</div>
       <div className="dina-card-white p-4"><div className="font-semibold mb-3">Préférences</div>
         <div className="text-xs space-y-1"><div>Pointure : <b>{c.shoe_size || "—"}</b></div><div>Taille haut : <b>{c.top_size || "—"}</b></div><div>Taille bas : <b>{c.bottom_size || "—"}</b></div><div>Couleurs/styles : <b>{c.preferences || "—"}</b></div><div>Marques préférées : <b>{c.favorite_brands || "—"}</b></div><div>Source : <b>{c.source || "—"}</b></div></div>
       </div>
@@ -115,7 +116,7 @@ function Payments({ c, orders }) {
 }
 
 function SimpleList({ title, items, empty = "Aucun élément" }) {
-  return <div className="dina-card-white p-4"><div className="font-semibold mb-3">{title}</div>{items.length === 0 ? <div className="text-sm text-[#666]">{empty}</div> : <div className="grid grid-cols-2 md:grid-cols-4 gap-2">{items.map((p, i) => <div key={i} className="text-xs"><img src={p.image} alt="" className="aspect-square object-cover rounded" /><div className="line-clamp-1 mt-1">{p.name}</div></div>)}</div>}</div>;
+  return <div className="dina-card-white p-4"><div className="font-semibold mb-3">{title}</div>{items.length === 0 ? <div className="text-sm text-[#666]">{empty}</div> : <div className="grid grid-cols-2 md:grid-cols-4 gap-2">{items.map((p, i) => <div key={i} className="text-xs"><SmartImage src={p.image} alt={p.name} fallbackText={p.name} className="aspect-square object-cover rounded" /><div className="line-clamp-1 mt-1">{p.name}</div></div>)}</div>}</div>;
 }
 
 function Loyalty({ c }) {
@@ -177,7 +178,7 @@ function Messages({ customerId, customerName }) {
               <div className={`max-w-[70%] p-2.5 rounded-lg text-sm ${m.from_kind === "store" ? "bg-[#b02a2a] text-white" : "bg-white dark:bg-[#2a2a2a]"}`}>
                 <div className="text-[10px] opacity-70 mb-0.5">{m.from_name} · {dateTimeFmt(m.at)}</div>
                 <div>{m.text}</div>
-                {m.image && <img src={m.image} alt="" className="mt-1 rounded max-w-full" />}
+                {m.image && <SmartImage src={m.image} alt="" fallbackIcon className="mt-1 rounded max-w-full" />}
               </div>
             </div>
           ))}

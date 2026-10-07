@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { MessageCircle, ShoppingBag, ChevronLeft, ChevronRight, Star, Check, Bell, Play } from "lucide-react";
 import { hasRealVariants, availableColorsForSize, availableSizesForColor, stockFor, comboExists } from "@/lib/variants";
 import { track } from "@/lib/analytics";
+import SmartImage from "@/components/shared/SmartImage";
 
 function Stars({ value = 0, size = 14, onPick }) {
   return (
@@ -88,7 +89,7 @@ export default function ProductPage() {
       <div className="grid md:grid-cols-2 gap-10">
         <div>
           <div className="relative aspect-[4/5] bg-[#fff5f5] rounded-2xl overflow-hidden group">
-            <img src={current} alt="" className="w-full h-full object-cover" data-testid="product-main-image"/>
+            <SmartImage src={current} alt={p.name} fallbackText={p.name} className="w-full h-full object-cover" data-testid="product-main-image"/>
             {gallery.length > 1 && (
               <>
                 <button onClick={prev} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 grid place-items-center shadow" data-testid="product-prev"><ChevronLeft size={16}/></button>
@@ -100,7 +101,7 @@ export default function ProductPage() {
           {gallery.length > 1 && (
             <div className="grid grid-cols-5 gap-2 mt-3">{gallery.map((src,i)=>(
               <button key={i} onClick={()=>setImgIdx(i)} className={`aspect-square rounded-lg overflow-hidden border-2 transition ${imgIdx===i?"border-[#b02a2a]":"border-transparent"}`} data-testid={`product-thumb-${i}`}>
-                <img src={src} alt="" className="w-full h-full object-cover"/>
+                <SmartImage src={src} alt={`${p.name} ${i+1}`} fallbackText={p.name} className="w-full h-full object-cover"/>
               </button>
             ))}</div>
           )}

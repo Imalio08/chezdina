@@ -4,6 +4,7 @@ import { Heart, Zap } from "lucide-react";
 import { fcfa } from "@/lib/format";
 import api from "@/lib/api";
 import { toast } from "sonner";
+import SmartImage from "@/components/shared/SmartImage";
 
 const KEY = "dina_favs";
 const getFavs = () => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } };
@@ -46,8 +47,8 @@ export default function ProductCardV2({ product, flashEndsAt }) {
     <div className="group relative" data-testid={`card-${product.id}`}>
       <Link to={`/boutique/product/${product.id}`} className="block">
         <div className="relative aspect-[3/4] bg-[#fff5f5] dark:bg-[#2a1818] rounded-xl overflow-hidden">
-          <img src={product.image} alt={product.name} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-          {product.images?.[1] && <img src={product.images[1]} alt="" loading="lazy" className="hidden md:block absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition" />}
+          <SmartImage src={product.image} alt={product.name} fallbackText={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+          {product.images?.[1] && <SmartImage src={product.images[1]} alt="" fallbackText={product.name} className="hidden md:block absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition" />}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
             {shown.map(b => <span key={b.k} className="text-[10px] font-semibold text-white px-1.5 py-0.5 rounded" style={{ background: b.c }}>{b.t}</span>)}
           </div>

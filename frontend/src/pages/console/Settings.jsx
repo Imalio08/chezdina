@@ -4,7 +4,7 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import {
   Save, Upload, Store, Phone, ShoppingCart, Truck, CreditCard, FileText,
-  Bell, Plug, Users, Shield, Database, Trash2, Image as ImageIcon,
+  Bell, Plug, Users, Shield, Database, Trash2, Image as ImageIcon, Clock,
 } from "lucide-react";
 import SaveButton from "@/components/shared/SaveButton";
 
@@ -21,6 +21,7 @@ const TABS = [
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "integrations", label: "Intégrations", icon: Plug },
   { id: "equipe", label: "Équipe & horaires", icon: Users },
+  { id: "pointage", label: "Pointage", icon: Clock },
   { id: "securite", label: "Sécurité", icon: Shield },
   { id: "donnees", label: "Données", icon: Database },
 ];
@@ -74,6 +75,7 @@ export default function Settings() {
           {tab === "notifications" && <NotificationsTab />}
           {tab === "integrations" && <IntegrationsTab />}
           {tab === "equipe" && <EquipeTab />}
+          {tab === "pointage" && <PointageTab />}
           {tab === "securite" && <SecuriteTab />}
           {tab === "donnees" && <DonneesTab />}
         </main>
@@ -408,6 +410,109 @@ function EquipeTab() {
         <Link to="/console/roles" className="dina-btn-secondary">Rôles & permissions</Link>
         <Link to="/console/pointage" className="dina-btn-secondary">Pointage</Link>
       </div>
+    </div>
+  );
+}
+
+/* -------- Pointage (nouveau) -------- */
+const ROLE_OPTS = [
+  { key: "manager", label: "Gérante" },
+  { key: "sales", label: "Vendeuse" },
+  { key: "stock_keeper", label: "Stock" },
+  { key: "community_manager", label: "Community Manager" },
+  { key: "rider", label: "Livreur" },
+];
+
+function PointageTab() {
+  const [cfg, setCfg] = useState({ enabled: true, enabled_roles: ROLE_OPTS.map(r => r.key) });
+  const [hours, setHours] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    api.get("/business").then(r => {
+      const b = r.data || {};
+      setCfg({ enabled: b.attendance_config?.enabled ?? true, enabled_roles: b.attendance_config?.enabled_roles || ROLE_OPTS.map(x => x.key) });
+      setHours(b.working_hours || {});
+    }).catch(() => {});
+  }, []);
+
+  const toggleRole = (key) => {
+    setCfg(c => ({
+      ...c,
+      enabled_roles: c.enabled_roles.includes(key)
+        ? c.enabled_roles.filter(x => x !== key)
+        : [...c.enabled_roles, key],
+    }));
+  };
+
+  const setHour = (role, k, v) => {
+    setHours(h => ({ ...h, [role]: { ...(h[role] || {}), [k]: v } }));
+  };
+
+  const save = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await Promise.all([
+        api.patch("/business/attendance-config", cfg),
+        api.patch("/business/working-hours", { working_hours: hours }),
+      ]);
+      toast.success(SAVED_MSG);
+    } catch { toast.error(ERROR_MSG); } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="space-y-4" data-testid="tab-pointage">
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <div className="font-serif text-xl">Activation du pointage</div>
+            <p className="text-xs text-[#666] mt-1">Si désactivé, le bouton « Pointer » disparaît pour tout le monde.</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" checked={cfg.enabled} onChange={e => setCfg({ ...cfg, enabled: e.target.checked })} className="sr-only peer" data-testid="attendance-enabled"/>
+            <div className="w-11 h-6 bg-[#ddd] rounded-full peer peer-checked:bg-[#1f8a4c] after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition peer-checked:after:translate-x-5"/>
+          </label>
+        </div>
+      </div>
+
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="font-serif text-xl">Qui peut pointer et horaires de travail</div>
+        <p className="text-xs text-[#666]">Activez les rôles autorisés et définissez leurs horaires + tolérance de retard.</p>
+
+        <div className="space-y-2 mt-3">
+          {ROLE_OPTS.map(r => {
+            const on = cfg.enabled_roles.includes(r.key);
+            const h = hours[r.key] || { open: "08:00", close: "19:00", tolerance_min: 10 };
+            return (
+              <div key={r.key} className={`border rounded-xl p-3 ${on ? "border-[#1f8a4c]/40 bg-[#f0f9f4]/30 dark:bg-[#1a2a1f]/30" : "border-[#ececec] dark:border-[#2a2a2a] opacity-60"}`} data-testid={`role-row-${r.key}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={on} onChange={() => toggleRole(r.key)} className="accent-[#1f8a4c] w-4 h-4" data-testid={`role-toggle-${r.key}`}/>
+                    <span className="font-semibold text-sm">{r.label}</span>
+                  </label>
+                  {on && <span className="text-[10px] text-[#1f8a4c] uppercase font-semibold">Autorisé</span>}
+                </div>
+                {on && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <label className="text-xs text-[#666]">Ouverture
+                      <input type="time" className="dina-input" value={h.open || "08:00"} onChange={e => setHour(r.key, "open", e.target.value)} data-testid={`role-open-${r.key}`}/>
+                    </label>
+                    <label className="text-xs text-[#666]">Fermeture
+                      <input type="time" className="dina-input" value={h.close || "19:00"} onChange={e => setHour(r.key, "close", e.target.value)} data-testid={`role-close-${r.key}`}/>
+                    </label>
+                    <label className="text-xs text-[#666]">Tolérance (min)
+                      <input type="number" min="0" max="120" className="dina-input tabular" value={h.tolerance_min ?? 10} onChange={e => setHour(r.key, "tolerance_min", +e.target.value || 0)} data-testid={`role-tol-${r.key}`}/>
+                    </label>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <SaveButton loading={saving} onClick={save} testid="pointage-save">Enregistrer la configuration</SaveButton>
     </div>
   );
 }
