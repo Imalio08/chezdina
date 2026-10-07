@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket, Facebook, Hash, Sun, Moon } from "lucide-react";
+import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket, Sun, Moon } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useCustomer } from "@/context/CustomerContext";
 import useSiteTheme from "@/hooks/useSiteTheme";
 import api from "@/lib/api";
+import { FacebookLogo, WhatsappLogo, TiktokLogo } from "@/components/shared/BrandIcons";
 
 const SOCIAL_ICONS = {
-  facebook: Facebook, tiktok: Hash, whatsapp: MessageCircle,
+  facebook: FacebookLogo, tiktok: TiktokLogo, whatsapp: WhatsappLogo,
 };
 
 export default function StorefrontLayout() {
@@ -179,7 +180,7 @@ export default function StorefrontLayout() {
         </div>
       </header>
       <Outlet />
-      <a href="https://wa.me/2250777926179" target="_blank" rel="noreferrer" className="fixed bottom-5 right-5 bg-[#1f8a4c] text-white rounded-full w-14 h-14 grid place-items-center shadow-lg" data-testid="storefront-whatsapp"><MessageCircle size={22}/></a>
+      <a href={`https://wa.me/${(biz.whatsapp || "+2250777926179").replace(/\D/g,"")}`} target="_blank" rel="noreferrer" className="fixed bottom-5 right-5 bg-white rounded-full w-14 h-14 grid place-items-center shadow-xl hover:shadow-2xl transition hover:scale-105" data-testid="storefront-whatsapp" aria-label="Nous écrire sur WhatsApp Business"><WhatsappLogo size={30}/></a>
       <footer className="border-t border-[#ececec] dark:border-[#2a2a2a] mt-20 py-10 text-sm text-[#666] dark:text-[#aaa] bg-[#fff5f5] dark:bg-[#141414]">
         <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-4 gap-6">
           <div>
@@ -198,10 +199,10 @@ export default function StorefrontLayout() {
           <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Aide</div><ul className="space-y-1"><li><Link to="/boutique/livraison-retours">Livraison & retours</Link></li><li><Link to="/boutique/suivi-commande">Suivi de commande</Link></li><li><Link to="/boutique/contact">Contact</Link></li></ul></div>
           <div>
             <div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Suivez-nous</div>
-            <ul className="space-y-1">
-              <li><a href={social.facebook || "https://www.facebook.com/chezdina"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid="footer-social-facebook"><Facebook size={12}/>Facebook</a></li>
-              <li><a href={`https://wa.me/${(biz.whatsapp || "+2250777926179").replace(/\D/g,"")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid="footer-social-whatsapp"><MessageCircle size={12}/>WhatsApp</a></li>
-              <li><a href={social.tiktok || "https://www.tiktok.com/@dinoush04"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid="footer-social-tiktok"><Hash size={12}/>TikTok</a></li>
+            <ul className="space-y-2">
+              <li><a href={social.facebook || "https://www.facebook.com/chezdina"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:text-[#b02a2a]" data-testid="footer-social-facebook"><FacebookLogo size={18}/><span>Facebook</span></a></li>
+              <li><a href={`https://wa.me/${(biz.whatsapp || "+2250777926179").replace(/\D/g,"")}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:text-[#b02a2a]" data-testid="footer-social-whatsapp"><WhatsappLogo size={18}/><span>WhatsApp Business</span></a></li>
+              <li><a href={social.tiktok || "https://www.tiktok.com/@dinoush04"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 hover:text-[#b02a2a]" data-testid="footer-social-tiktok"><TiktokLogo size={18}/><span>TikTok</span></a></li>
             </ul>
           </div>
         </div>

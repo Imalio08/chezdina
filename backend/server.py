@@ -182,6 +182,10 @@ class RiderLocationIn(BaseModel):
     lat: float
     lng: float
     accuracy: Optional[float] = None
+    heading: Optional[float] = None
+    speed: Optional[float] = None
+    battery_level: Optional[int] = None
+    battery_charging: Optional[bool] = None
 class POReceiveIn(BaseModel):
     received_at: Optional[str] = None
     items: List[Dict[str, Any]] = []  # [{product_id, product_name, sku, size, color, qty, unit_cost}]
@@ -767,7 +771,7 @@ async def public_rider_position(code: str):
             except Exception:
                 age = 999
             if age < 90:
-                pos = {"lat": p["lat"], "lng": p["lng"], "simulated": False, "at": p.get("at")}
+                pos = {"lat": p["lat"], "lng": p["lng"], "simulated": False, "at": p.get("at"), "heading": p.get("heading"), "speed": p.get("speed")}
     if not pos:
         pos = await _simulated_rider_position(o)
     if not pos:
@@ -1504,17 +1508,18 @@ async def reconcile(sid: str, body: ReconcileIn, user: dict = Depends(require_ro
 # ---------- Rider live GPS ----------
 @api.post("/riders/location")
 async def push_rider_location(body: RiderLocationIn, user: dict = Depends(get_user)):
-    """Push rider GPS position (every ~30s from the rider app). Writes to both
-    `rider_locations` (admin map) and `rider_positions` (public order tracking)."""
+    """Push rider GPS position (every ~30s from the rider app, or ~60s in battery-saver mode).
+    Writes to both `rider_locations` (admin map) and `rider_positions` (public order tracking)."""
     at = now_iso()
     base = {
         "rider_id": user.get("id"),
         "rider_name": user.get("name"),
         "lat": body.lat, "lng": body.lng,
+        "heading": body.heading, "speed": body.speed,
     }
     await db.rider_locations.update_one(
         {"rider_id": user.get("id")},
-        {"$set": {**base, "accuracy": body.accuracy or 0, "updated_at": at}},
+        {"$set": {**base, "accuracy": body.accuracy or 0, "battery_level": body.battery_level, "battery_charging": body.battery_charging, "updated_at": at}},
         upsert=True,
     )
     await db.rider_positions.update_one(
@@ -4862,6 +4867,80 @@ async def mark_deposit_paid(oid: str, body: Dict[str, Any], user: dict = Depends
         "status": "confirmee", "payment_status": "acompte_recu",
     }, "$push": {"timeline": {"status": "confirmee", "at": now_iso(), "by": user.get("name"), "note": f"Acompte reçu · ref {tx_ref}"}}})
     return {"ok": True, "status": "confirmee", "tx_ref": tx_ref, "amount": amount}
+
+
+@api.post("/public/wave/webhook")
+async def wave_webhook(body: Dict[str, Any], request: Request):
+    """Wave payment webhook — confirms orders automatically on successful payment.
+    Expected payload (Wave Business API): { type: 'checkout.session.completed',
+    data: { id, client_reference, transaction_id, amount, currency, when_completed, status } }.
+    `client_reference` must contain the order code (we put the order code there when generating the Wave link).
+    For security, Wave signs webhooks with HMAC-SHA256 using WAVE_WEBHOOK_SECRET (stored in site settings).
+    Set `wave_webhook_secret` in Paramètres → Paiements and configure the same secret in your Wave dashboard."""
+    try:
+        # Signature verification (if secret is configured)
+        site = await db.site_settings.find_one({"id": "main"}) or {}
+        secret = site.get("wave_webhook_secret") or os.environ.get("WAVE_WEBHOOK_SECRET", "")
+        if secret:
+            signature = request.headers.get("Wave-Signature") or request.headers.get("X-Wave-Signature") or ""
+            if signature:
+                import hmac as _hmac, hashlib as _h
+                raw = await request.body()
+                expected = _hmac.new(secret.encode(), raw, _h.sha256).hexdigest()
+                # Wave signature format "t=...,v1=..." — tolerate both
+                sig_val = signature.split("v1=")[-1] if "v1=" in signature else signature
+                if not _hmac.compare_digest(expected, sig_val.strip()):
+                    logger.warning("Wave webhook signature mismatch")
+                    raise HTTPException(401, "Invalid signature")
+
+        event_type = body.get("type") or body.get("event_type") or ""
+        data = body.get("data") or body
+        status = (data.get("status") or data.get("payment_status") or "").lower()
+        ref = (data.get("client_reference") or data.get("reference") or data.get("order_code") or "").strip().upper()
+        if not ref:
+            return {"ok": False, "error": "client_reference missing"}
+        amount = int(data.get("amount") or 0)
+        tx_id = data.get("transaction_id") or data.get("id") or ""
+        order = await db.orders.find_one({"code": ref})
+        if not order:
+            logger.warning(f"Wave webhook: order {ref} not found")
+            return {"ok": False, "error": "order not found"}
+
+        is_paid = any(k in event_type.lower() for k in ("succeeded", "completed", "paid")) or status in ("succeeded", "completed", "paid", "success")
+        if not is_paid:
+            return {"ok": True, "ignored": True, "status": status}
+
+        # Idempotency: skip if already paid with same tx_id
+        if order.get("deposit_tx_ref") == tx_id:
+            return {"ok": True, "already_processed": True}
+
+        # Determine if this is a full payment or a deposit
+        total = int(order.get("total") or 0)
+        deposit_required = int(order.get("deposit_required") or 0)
+        is_full_payment = amount >= total
+
+        new_status = "payee" if is_full_payment else "confirmee"
+        payment_status = "paye" if is_full_payment else "acompte_recu"
+        update = {
+            "deposit_paid": amount,
+            "deposit_tx_ref": tx_id,
+            "deposit_paid_at": now_iso(),
+            "status": new_status,
+            "payment_status": payment_status,
+        }
+        if is_full_payment:
+            update["amount_paid"] = amount
+        await db.orders.update_one({"id": order["id"]}, {
+            "$set": update,
+            "$push": {"timeline": {"status": new_status, "at": now_iso(), "by": "Wave Webhook", "note": f"{'Paiement total' if is_full_payment else 'Acompte'} reçu · ref {tx_id} · {amount} FCFA"}},
+        })
+        logger.info(f"Wave webhook: order {ref} confirmed ({amount} FCFA, tx {tx_id})")
+        return {"ok": True, "status": new_status, "amount": amount, "tx_ref": tx_id}
+    except HTTPException:
+        raise
+    except Exception as ex:
+        logger.exception("wave_webhook failed")
+        return {"ok": False, "error": str(ex)}
 
 @api.get("/public/orders/track")
 async def public_track_order(code: str, phone: str = ""):

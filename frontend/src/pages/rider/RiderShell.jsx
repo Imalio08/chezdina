@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { Package, Map, History, Trophy, User, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -21,7 +21,8 @@ export default function RiderShell() {
   useEffect(() => { api.get("/public/site").then(r => setSite(r.data || {})).catch(() => {}); }, []);
   const logo = site.logo;
   const [checkedIn, setCheckedIn] = useState(null); // null = loading, true/false
-  const [gpsState, setGpsState] = useState({ live: false, last_sent: null, denied: false, accuracy: null });
+  const [gpsState, setGpsState] = useState({ live: false, last_sent: null, denied: false, accuracy: null, heading: null, battery_saver: false });
+  const tickRef = useRef(null);
   useEffect(() => {
     const root = document.documentElement;
     const t = theme === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : theme;
@@ -34,11 +35,45 @@ export default function RiderShell() {
   useEffect(() => {
     if (!checkedIn) return; // Don't track location before check-in
     if (!navigator.geolocation) { setGpsState(s => ({ ...s, denied: true })); return; }
-    const latest = { current: null };
+    const latest = { current: null, heading: null };
+    // Compass heading from device orientation (if available & permission granted)
+    const onOrient = (e) => {
+      // alpha = compass heading, 0 = north, iOS uses webkitCompassHeading
+      const h = e.webkitCompassHeading != null ? e.webkitCompassHeading : (e.alpha != null ? 360 - e.alpha : null);
+      if (h != null && !Number.isNaN(h)) latest.heading = Math.round(h);
+    };
+    window.addEventListener("deviceorientationabsolute", onOrient, true);
+    window.addEventListener("deviceorientation", onOrient, true);
+    // Battery awareness: slow to 60s pings when < 20% (and not charging)
+    let interval = 30000;
+    let battery = null;
+    const applyInterval = () => {
+      const next = (battery && battery.level < 0.2 && !battery.charging) ? 60000 : 30000;
+      if (next !== interval) {
+        interval = next;
+        setGpsState(s => ({ ...s, battery_saver: next === 60000 }));
+        if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = setInterval(doTick, interval); }
+      }
+    };
+    if (navigator.getBattery) {
+      navigator.getBattery().then(b => {
+        battery = b;
+        b.addEventListener("levelchange", applyInterval);
+        b.addEventListener("chargingchange", applyInterval);
+        applyInterval();
+      }).catch(() => {});
+    }
     const push = async (coords) => {
       try {
-        await api.post("/riders/location", { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy });
-        setGpsState({ live: true, last_sent: new Date(), denied: false, accuracy: coords.accuracy });
+        await api.post("/riders/location", {
+          lat: coords.latitude, lng: coords.longitude,
+          accuracy: coords.accuracy,
+          heading: latest.heading != null ? latest.heading : (coords.heading != null && !Number.isNaN(coords.heading) ? coords.heading : null),
+          speed: coords.speed != null && !Number.isNaN(coords.speed) ? coords.speed : null,
+          battery_level: battery ? Math.round(battery.level * 100) : null,
+          battery_charging: battery ? battery.charging : null,
+        });
+        setGpsState(s => ({ ...s, live: true, last_sent: new Date(), denied: false, accuracy: coords.accuracy, heading: latest.heading }));
       } catch { /* ignore transient errors */ }
     };
     // Live watch: keep latest position in memory as it changes
@@ -47,17 +82,21 @@ export default function RiderShell() {
       e => { if (e.code === e.PERMISSION_DENIED) setGpsState(s => ({ ...s, denied: true })); },
       { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
     );
-    // Heartbeat every 30s so backend always has a <90s-old position even when rider is stationary
-    const tick = setInterval(() => {
+    const doTick = () => {
       if (latest.current) { push(latest.current); return; }
-      // No cached position yet — try a one-shot fix
       navigator.geolocation.getCurrentPosition(
         p => { latest.current = p.coords; push(p.coords); },
         () => {},
         { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
       );
-    }, 30000);
-    return () => { navigator.geolocation.clearWatch(wid); clearInterval(tick); };
+    };
+    tickRef.current = setInterval(doTick, interval);
+    return () => {
+      navigator.geolocation.clearWatch(wid);
+      if (tickRef.current) clearInterval(tickRef.current);
+      window.removeEventListener("deviceorientationabsolute", onOrient, true);
+      window.removeEventListener("deviceorientation", onOrient, true);
+    };
   }, [checkedIn]);
   useEffect(() => {
     import("@/lib/offlineQueue").then(m => { const stop = m.startAutoSync(); return () => stop && stop(); });
@@ -78,7 +117,7 @@ export default function RiderShell() {
               {gpsState.denied ? (
                 <span className="text-[#c62828]" title="Autorisez la géolocalisation pour un suivi en direct">· ⚠ GPS refusé</span>
               ) : gpsState.live ? (
-                <span className="text-[#1f8a4c]" title={gpsState.last_sent ? `Dernière position envoyée à ${gpsState.last_sent.toLocaleTimeString("fr-FR")}` : ""}>· GPS live</span>
+                <span className="text-[#1f8a4c]" title={gpsState.last_sent ? `Dernière position envoyée à ${gpsState.last_sent.toLocaleTimeString("fr-FR")}${gpsState.heading != null ? ` · cap ${gpsState.heading}°` : ""}` : ""}>· GPS live{gpsState.battery_saver ? " ⚡" : ""}</span>
               ) : (
                 <span className="text-[#e4991e]">· GPS en attente…</span>
               )}

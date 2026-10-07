@@ -93,6 +93,8 @@ import Account from "@/pages/storefront/Account";
 import AccountShell from "@/pages/storefront/AccountShell";
 import SharedCart from "@/pages/storefront/SharedCart";
 
+import SubdomainRouter from "@/components/SubdomainRouter";
+
 function Protected({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
@@ -115,6 +117,7 @@ export default function App() {
         <CustomerProvider>
         <BrowserRouter>
           <Toaster position="top-right" richColors />
+          <SubdomainRouter />
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/scan" element={<ScanRedirect />} />
