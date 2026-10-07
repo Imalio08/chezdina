@@ -1,5 +1,27 @@
 # Chez Dina — PRD
 
+### Vague N — Logo + Favicon + PWA + WhatsApp + Catalog femme (Feb 2026) ✅
+**Branding & icônes PWA**
+- Création `/app/frontend/public/manifest.json` (short_name, icons 192/512/512-maskable, theme_color #b02a2a, start_url /boutique, display standalone)
+- Création des 3 icônes PNG (`/public/icons/icon-192.png`, `icon-512.png`, `icon-512-maskable.png`) + favicon.ico — fond rouge Dina avec "CD" centré, générées en Python stdlib (sans dépendance externe)
+- `/public/index.html` : theme_color #b02a2a, meta description FR, `<link rel="icon" id="dynamic-favicon">`, `<link rel="apple-touch-icon" id="dynamic-apple-icon">`, `<link rel="manifest">`, titre "Chez Dina — Boutique femme à Abidjan"
+- Nouveau composant `/app/frontend/src/components/BrandingBootstrapper.jsx` : fetch `/api/public/site`, puis bascule `favicon.href` et `apple-touch-icon.href` sur le vrai logo marchand. Mis à jour aussi le `document.title`. Monté dans `App.js` au-dessus de `SubdomainRouter`.
+- `Login.jsx` : affiche désormais `site.logo` fetched depuis `/public/site` (deux emplacements : hero gauche desktop + header mobile), avec fallback CD stylé si pas de logo
+
+**WhatsApp**
+- Confirmé que le footer storefront + bouton flottant utilisent déjà `+225 07 77 92 61 79` → `https://wa.me/2250777926179` (fallback dur dans `StorefrontLayout.jsx` + override via `site_settings.whatsapp`)
+
+**Catalog femme (reseed)**
+- Création `/app/backend/routers/admin.py` (180 lignes) : endpoint `POST /api/admin/reseed-women-fashion`
+- Catalogue curé 40 produits avec **40 photos Unsplash uniques** (1 par SKU, zéro overlap) :
+  - 15 chaussures femme (talons, sandales, mules, ballerines, baskets, bottes, mocassins, espadrilles)
+  - 12 sacs femme (sacs à main, pochettes, cabas pagne, mini sacs, sacs à dos)
+  - 13 vêtements femme (robes, blazers, chemisiers, pantalons, jupes, pagne wax moderne, boubou brodé)
+- Marques dédiées : Dina Soles / Dina Carry / Dina Dress. Tailles cohérentes par catégorie (36-41, Unique, XS-XL). Mélange de promos aléatoires 0/10/15/20%.
+- Vérifié : 40 images principales uniques sur 40 produits (100% distinctes).
+
+**Refactor P5 : total à date — server.py 6827 → 5791 (-15,2%), 6 routers (meta/attendance/auth/catalog/orders/riders/admin), 21 modèles mutualisés dans models.py.**
+
 ### Vague M — Refactor P5 : extraction riders / deliveries / GPS / scoring (Feb 2026) ✅
 **Tranche 5 du refactor du monolithe server.py (6076 → 5791 lignes, -285).**
 

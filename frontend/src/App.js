@@ -94,6 +94,7 @@ import AccountShell from "@/pages/storefront/AccountShell";
 import SharedCart from "@/pages/storefront/SharedCart";
 
 import SubdomainRouter from "@/components/SubdomainRouter";
+import BrandingBootstrapper from "@/components/BrandingBootstrapper";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -117,6 +118,7 @@ export default function App() {
         <CustomerProvider>
         <BrowserRouter>
           <Toaster position="top-right" richColors />
+          <BrandingBootstrapper />
           <SubdomainRouter />
           <Routes>
             <Route path="/login" element={<Login />} />
