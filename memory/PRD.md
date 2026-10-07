@@ -1,5 +1,23 @@
 # Chez Dina — PRD
 
+### Vague K — Refactor P5 : extraction catalog (Feb 2026) ✅
+**Tranche 3 du refactor du monolithe server.py (6548 → 6262 lignes, -286).**
+
+- `/app/backend/models.py` étendu (117 lignes) : ajout de `SimpleNameIn`, `ProductIn`, `CategoryIn`, `CollectionIn`
+- Création `/app/backend/routers/catalog.py` (300 lignes, 16 endpoints) :
+  - Produits : `GET /products`, `POST /products`, `PATCH /products/{pid}`, `DELETE /products/{pid}`, `GET /public/products`
+  - Marques : `GET /brands`, `POST /brands`, `PATCH /brands/{bid}` (renomme en cascade dans products), `DELETE /brands/{bid}`, `GET /brands/full` (CA 30j + marge), `GET /brands/{bid}` (détail + produits)
+  - Catégories : `GET /categories`, `POST /categories`, `DELETE /categories/{cid}`, `GET /categories/tree`, `GET /categories/kpis`, `PATCH /categories/{cid}`
+  - Collections : `GET /collections`, `POST /collections`, `PATCH /collections/{cid}`, `DELETE /collections/{cid}`, `GET /collections/kpis`
+- `server.py` modifié :
+  - Imports : `from models import ..., ProductIn, CategoryIn, CollectionIn, SimpleNameIn`
+  - Classes `ProductIn`, `SimpleNameIn`, `CategoryIn`, `CollectionIn` : supprimées
+  - Blocs d'endpoints extraits : supprimés (`/products` CRUD, `/brands/*`, `/categories/*`, `/collections/*`, `/public/products`)
+  - Inclusion : `app.include_router(catalog_router)`
+- Smoke curl parallèle : `/products` → 120, `/public/products` → 120, `/brands` → 11, `/brands/full` → 11, `/categories` → 8, `/categories/tree` → 8 racines, `/categories/kpis` → top=Accessoires (CA 2 086 000 FCFA), `/collections/kpis` → structure OK, `/auth/me` & `/attendance/me` toujours OK.
+
+**Total refactor P5 à date :** server.py **6827 → 6262 (-565 lignes, -8,3%)**. Modules extraits : attendance, auth, catalog. Modèles mutualisés : 10 classes dans `models.py`.
+
 ### Vague J — Refactor P5 : extraction auth (Feb 2026) ✅
 **Tranche 2 du refactor du monolithe server.py (6656 → 6548 lignes, -108).**
 
