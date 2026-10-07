@@ -1,5 +1,30 @@
 # Chez Dina — PRD
 
+## Vague 4 — Clients, messagerie & UX globale (Feb 2026) ✅
+
+### KPI cards compactes
+- `KPICard.jsx` : taille des textes et chiffres réduite (padding p-4, label text-[10px], value text-xl au lieu de text-3xl, hero text-3xl au lieu de text-5xl, delta text-xs, sparkline h-8)
+
+### ConfirmDialog universel
+- Nouveau composant `components/shared/ConfirmDialog.jsx` (ConfirmProvider + useConfirm hook)
+- Monté globalement dans `App.js` autour de l'arborescence
+- Remplace `window.confirm` pour les actions sensibles : blacklist/réactivation cliente, régénération code d'accès (Customers.jsx)
+- Testids : `confirm-dialog`, `confirm-ok`, `confirm-cancel`
+
+### Classement top clientes
+- Nouveau endpoint `GET /api/customers/top?limit=20` (admin+manager) : rank + name + phone + tier + loyalty_points + total_spent + orders_count
+- Nouveau endpoint public `GET /api/public/account/top-customers?limit=10` : version anonymisée (prénom + initiale, pas de téléphone)
+- Nouvel onglet « Top clientes » dans `/console/clientes` avec podium or/argent/bronze pour les 3 premières
+
+### Segments IA & broadcast
+- Nouveau endpoint `POST /api/segments/ai {prompt, name?}` : utilise Claude Sonnet via EMERGENT_LLM_KEY pour parser une demande FR naturelle → règles de segment auto
+- Nouveau modal `AISegmentModal` dans `/console/segments` (bouton `seg-ai` + modal `seg-ai-modal`) avec exemples cliquables
+- Chaque segment a un bouton Megaphone (`seg-broadcast-<name>`) qui navigue vers `/console/messagerie?segment_id=X` → ouvre automatiquement le BroadcastModal pré-sélectionné
+- `BroadcastModal` étendu : le `<select>` target inclut un `<optgroup>` avec tous les segments définis
+
+### Riders — messagerie interne
+- Dans `RiderProfile` : nouveau bouton « Messagerie interne » (`rider-internal-msg`) à côté de WhatsApp, navigue vers `/console/messagerie?rider_id=X`
+
 ## Vague 3 — Appros, promos & stock (Feb 2026) ✅
 
 ### Appros — Coûts additionnels dans le bon de commande

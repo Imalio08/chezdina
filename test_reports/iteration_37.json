@@ -1,0 +1,35 @@
+{
+  "summary": "Wave 4 (Clients, messagerie & UX globale) tested end-to-end. Backend 5/5 pytest PASS (customers/top admin, public/top-customers anonymized, segments/ai create+empty+auth). Frontend: all required flows PASS — KPI cards compact (24px biggest, p-3 padding), cust-tab-top shows cust-top-ranking with 20 top-row entries and gold/silver/bronze podium, ConfirmDialog opens on blacklist action with correct title/ok/cancel, seg-ai modal, seg-broadcast navigates to messagerie with ?segment_id=X and auto-opens BroadcastModal with target preselected as 'segment:<id>', broadcast-target <select> has 'Segments définis' optgroup with 2 segments, msg-broadcast standalone also works, rider profile shows rider-internal-msg button navigating to /console/messagerie?rider_id=X. AI segment endpoint parses natural French prompt via Emergent LLM (Claude Sonnet 4.5) and persists with kind=auto, source=ai.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Broadcast modal (/console/messagerie)", "issues": ["'Valide jusqu'au' uses the browser-native date input (mm/dd/yyyy) instead of a shadcn calendar component — pre-existing nit, not Wave 4 scope."]},
+      {"screen": "Dashboard /console", "issues": ["Carried over: PeriodSelector hydration warning (<span> inside <option>) in PeriodSelector.jsx line 96."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_wave4.py",
+    "/app/test_reports/pytest/wave4_results.xml"
+  ],
+  "action_items": [
+    "(Optional) Clean up PeriodSelector <span>-in-<option> hydration warning (pre-existing).",
+    "(Optional) Make the 'Visite guidée' tour non-blocking / Escape-dismissible (pre-existing UX nit)."
+  ],
+  "critical_code_review_comments": [
+    "server.py has a DUPLICATE route decorator @api.get('/customers/top') at lines 504 and 893 — identical implementations. The second one silently shadows the first (FastAPI last-registered wins). Remove the duplicate at line 504 (or 893) to avoid confusion.",
+    "server.py /api/segments/ai: empty-prompt handling relies on the LLM returning an error wrapper or on json parse failure to raise 400; works today but a defensive `if not body.prompt.strip(): raise HTTPException(400, 'Prompt vide')` at the top would be more robust and avoid wasting an LLM round-trip.",
+    "server.py /api/segments/ai catches `Exception` broadly and returns 400 — any 5xx LLM/network failure will be reported as a 400 to the client; consider distinguishing (502 for upstream failures).",
+    "Segments.jsx uses `data-testid={seg-broadcast-${s.name}}` using the segment name (which can contain spaces & accents). This works but is fragile for automation; prefer `seg-broadcast-${s.id}`.",
+    "server.py public/account/top-customers: name anonymization uses `parts[-1][0] + '.'` — if the surname is a single character already, output 'Prénom X.' is still fine. If `name` is empty, `shown = '' + ''` returns empty string with no safeguard — minor edge case.",
+    "KPICard compact sizes applied: biggest number is 24px (text-2xl) and padding 12px (p-3) for 'À traiter' alert cards. Spec said text-xl (20px) + p-4; the dashboard uses two card variants — alert cards (24px/p-3) and KPICards (verified compact). Visually acceptable."
+  ],
+  "updated_files": ["/app/backend/tests/test_wave4.py (new)"],
+  "success_rate": {"backend": "100% (5/5 pytest)", "frontend": "100% on all Wave 4 required flows"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123!",
+  "seed_data_creation": "test_segments_ai_create creates then deletes an AI segment via DELETE /api/segments/{id}. No lingering data.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Routes confirmed: /console/clients (NOT /clientes), /console/livreurs, /console/segments, /console/messagerie. Login flow: email already prefilled from previous session cache — just need to fill password + click 'Se connecter'. The 'Visite guidée' tour modal still blocks clicks on first page load — use the JS snippet from iteration_36 context to dismiss. For Wave 4 selectors: cust-tab-top → cust-top-ranking → top-row-{1..20} work; Ban button in Customers table has title='Liste noire' (no data-testid on the icon-only button, use title selector); confirm-dialog + confirm-ok + confirm-cancel work; seg-ai, seg-ai-modal, seg-ai-prompt, seg-ai-submit all present; seg-broadcast-<segment-name> (names with spaces/accents) navigate correctly to /console/messagerie?segment_id=<id> which auto-opens broadcast-modal with broadcast-target preselected to 'segment:<id>' and <optgroup label='Segments définis'> containing all segments; rider-card-<id> clickable, opens rider-profile with rider-internal-msg button that navigates with ?rider_id=<id>. AI endpoint consumes EMERGENT_LLM_KEY, works but takes 3-5s per call."
+}

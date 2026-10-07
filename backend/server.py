@@ -890,27 +890,6 @@ async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
     await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso()}})
     return {"ok": True, "message": msg}
 
-@api.get("/customers/top")
-async def customers_top(user: dict = Depends(get_user), limit: int = 20):
-    """Top customers ranking by total_spent + loyalty_points. Public-friendly fields only."""
-    rows = await db.customers.find({"status": {"$ne": "blacklist"}}, {"password_hash": 0}).to_list(5000)
-    for r in rows:
-        r["rank_score"] = (r.get("total_spent", 0) or 0) + (r.get("loyalty_points", 0) or 0) * 10
-    rows.sort(key=lambda x: -x.get("rank_score", 0))
-    top = []
-    for i, r in enumerate(rows[:limit]):
-        top.append({
-            "rank": i + 1,
-            "id": r.get("id"),
-            "name": r.get("name"),
-            "phone": r.get("phone"),
-            "tier": r.get("tier"),
-            "loyalty_points": r.get("loyalty_points", 0),
-            "total_spent": r.get("total_spent", 0),
-            "orders_count": r.get("orders_count", 0),
-        })
-    return top
-
 @api.get("/public/account/top-customers")
 async def public_top_customers(limit: int = 10):
     """Public ranking for customer space — masks phone, keeps first name + rank."""
