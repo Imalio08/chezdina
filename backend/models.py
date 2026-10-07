@@ -170,3 +170,33 @@ class HoldIn(BaseModel):
     customer: Optional[Dict[str, Any]] = None
     note: Optional[str] = None
     expires_in_hours: Optional[int] = 24
+
+
+# ---------- Riders / Deliveries ----------
+class AssignIn(BaseModel):
+    rider_id: str
+    rider_name: str
+
+
+class SessionIn(BaseModel):
+    rider_id: str
+    rider_name: str
+    date: Optional[str] = None
+
+
+class ReconcileIn(BaseModel):
+    order_id: str
+    collected: bool
+    amount: Optional[float] = None
+    pin: Optional[str] = None
+    note: Optional[str] = None
+
+
+class RiderLocationIn(BaseModel):
+    lat: float
+    lng: float
+    accuracy: Optional[float] = None
+    heading: Optional[float] = None
+    speed: Optional[float] = None
+    battery_level: Optional[int] = Field(default=None, ge=0, le=100)
+    battery_charging: Optional[bool] = None
