@@ -767,7 +767,7 @@ async def public_rider_position(code: str):
                 age = (datetime.now(timezone.utc) - datetime.fromisoformat(p["at"].replace("Z","+00:00"))).total_seconds()
             except Exception:
                 age = 999
-            if age < 60:
+            if age < 90:
                 pos = {"lat": p["lat"], "lng": p["lng"], "simulated": False, "at": p.get("at")}
     if not pos:
         pos = await _simulated_rider_position(o)
@@ -1506,15 +1506,22 @@ async def reconcile(sid: str, body: ReconcileIn, user: dict = Depends(require_ro
 # ---------- Rider live GPS ----------
 @api.post("/riders/location")
 async def push_rider_location(body: RiderLocationIn, user: dict = Depends(get_user)):
-    doc = {
+    """Push rider GPS position (every ~30s from the rider app). Writes to both
+    `rider_locations` (admin map) and `rider_positions` (public order tracking)."""
+    at = now_iso()
+    base = {
         "rider_id": user.get("id"),
         "rider_name": user.get("name"),
-        "lat": body.lat, "lng": body.lng, "accuracy": body.accuracy or 0,
-        "updated_at": now_iso(),
+        "lat": body.lat, "lng": body.lng,
     }
     await db.rider_locations.update_one(
         {"rider_id": user.get("id")},
-        {"$set": doc},
+        {"$set": {**base, "accuracy": body.accuracy or 0, "updated_at": at}},
+        upsert=True,
+    )
+    await db.rider_positions.update_one(
+        {"rider_id": user.get("id")},
+        {"$set": {**base, "at": at, "accuracy": body.accuracy or 0}},
         upsert=True,
     )
     return {"ok": True}

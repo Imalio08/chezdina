@@ -1,5 +1,15 @@
 # Chez Dina — PRD
 
+### Vague E.2 — Rider GPS Live (Feb 2026) ✅
+**Objectif** : supprimer le chemin simulé en captant la position réelle du livreur toutes les 30 s.
+
+- **RiderShell.jsx** : hybride `watchPosition` (changements de position live) + `setInterval(30000)` (heartbeat garanti même si le livreur est immobile) · envoi vers `/riders/location` · fallback `getCurrentPosition` si pas encore de cache
+- **Indicateur UI** dans la topbar livreur (`[data-testid=rider-gps-indicator]`) : `GPS live` (vert, avec heure du dernier envoi en tooltip) · `GPS en attente…` (orange) · `GPS refusé` (rouge, si l'utilisateur a refusé la permission)
+- **Carte.jsx** : passe de `getCurrentPosition` ponctuel à `watchPosition` continu — le livreur voit sa propre position se mettre à jour en direct sur la carte
+- **Backend `/riders/location`** : correction du bug critique — écrivait seulement dans `rider_locations` alors que l'endpoint public `/public/order/{code}/rider-position` lit `rider_positions` · maintenant upsert dans les 2 collections
+- **Fenêtre de fraîcheur** côté public : passée de 60 s à 90 s (tolère la cadence 30 s + latence réseau)
+- **Testé via curl** : push lat/lng → endpoint public retourne `simulated: false` avec les bonnes coordonnées (vérifié sur la commande live DN-260920-1032, rider Kouamé Serge)
+
 ### Vague E.1 — Clean slate pre-launch (Feb 2026) ✅
 - Nouveau bouton rouge **« Vider la base avant mise en prod »** dans Paramètres → Données
 - Backend `POST /api/admin/wipe-for-production` (admin only) : vide 32 collections transactionnelles (produits, commandes, clientes, livraisons, promotions, factures, bons de commande, messages, événements analytics, etc.) · conserve `users`, `business`, `site_settings`, `stores`, `zones`

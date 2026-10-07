@@ -32,7 +32,14 @@ export default function Carte() {
 
   useEffect(() => {
     api.get("/riders/me/today").then(r => setOrders(r.data.orders || [])).catch(() => { });
-    if (navigator.geolocation) navigator.geolocation.getCurrentPosition(p => setMyPos({ lat: p.coords.latitude, lng: p.coords.longitude }), () => { }, { timeout: 5000 });
+    if (!navigator.geolocation) return;
+    // Live GPS watch for rider: shows own position on map
+    const wid = navigator.geolocation.watchPosition(
+      p => setMyPos({ lat: p.coords.latitude, lng: p.coords.longitude }),
+      () => { },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+    return () => navigator.geolocation.clearWatch(wid);
   }, []);
 
   const enriched = useMemo(() => orders.map(o => ({ ...o, _pos: o.geo || pseudoCoord(o.code), _k: statusToKey(o.status) })), [orders]);

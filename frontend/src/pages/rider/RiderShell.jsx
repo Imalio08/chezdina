@@ -21,6 +21,7 @@ export default function RiderShell() {
   useEffect(() => { api.get("/public/site").then(r => setSite(r.data || {})).catch(() => {}); }, []);
   const logo = site.logo;
   const [checkedIn, setCheckedIn] = useState(null); // null = loading, true/false
+  const [gpsState, setGpsState] = useState({ live: false, last_sent: null, denied: false, accuracy: null });
   useEffect(() => {
     const root = document.documentElement;
     const t = theme === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : theme;
@@ -32,11 +33,31 @@ export default function RiderShell() {
   }, []);
   useEffect(() => {
     if (!checkedIn) return; // Don't track location before check-in
-    if (!navigator.geolocation) return;
-    let last = 0;
-    const push = (p) => { const now = Date.now(); if (now - last < 20000) return; last = now; api.post("/riders/location", { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }).catch(() => { }); };
-    const wid = navigator.geolocation.watchPosition(push, () => { }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
-    return () => navigator.geolocation.clearWatch(wid);
+    if (!navigator.geolocation) { setGpsState(s => ({ ...s, denied: true })); return; }
+    const latest = { current: null };
+    const push = async (coords) => {
+      try {
+        await api.post("/riders/location", { lat: coords.latitude, lng: coords.longitude, accuracy: coords.accuracy });
+        setGpsState({ live: true, last_sent: new Date(), denied: false, accuracy: coords.accuracy });
+      } catch { /* ignore transient errors */ }
+    };
+    // Live watch: keep latest position in memory as it changes
+    const wid = navigator.geolocation.watchPosition(
+      p => { latest.current = p.coords; push(p.coords); },
+      e => { if (e.code === e.PERMISSION_DENIED) setGpsState(s => ({ ...s, denied: true })); },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 20000 }
+    );
+    // Heartbeat every 30s so backend always has a <90s-old position even when rider is stationary
+    const tick = setInterval(() => {
+      if (latest.current) { push(latest.current); return; }
+      // No cached position yet — try a one-shot fix
+      navigator.geolocation.getCurrentPosition(
+        p => { latest.current = p.coords; push(p.coords); },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 30000, timeout: 15000 }
+      );
+    }, 30000);
+    return () => { navigator.geolocation.clearWatch(wid); clearInterval(tick); };
   }, [checkedIn]);
   useEffect(() => {
     import("@/lib/offlineQueue").then(m => { const stop = m.startAutoSync(); return () => stop && stop(); });
@@ -52,7 +73,16 @@ export default function RiderShell() {
           {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-lg object-cover bg-white"/> : (user?.photo ? <img src={user.photo} alt="" className="w-9 h-9 rounded-full object-cover" /> : <div className="w-9 h-9 rounded-full bg-[#fde8e8] text-[#b02a2a] grid place-items-center text-sm font-bold">{user?.name?.[0] || "L"}</div>)}
           <div>
             <div className="font-serif text-sm leading-none">Bonjour {user?.name?.split(" ")[0] || "Livreur"}</div>
-            <div className="text-[10px] text-[#999]">{site.name || "Chez Dina"} · Livreur · ● Pointé</div>
+            <div className="text-[10px] text-[#999] flex items-center gap-1" data-testid="rider-gps-indicator">
+              {site.name || "Chez Dina"} · Livreur · ● Pointé
+              {gpsState.denied ? (
+                <span className="text-[#c62828]" title="Autorisez la géolocalisation pour un suivi en direct">· ⚠ GPS refusé</span>
+              ) : gpsState.live ? (
+                <span className="text-[#1f8a4c]" title={gpsState.last_sent ? `Dernière position envoyée à ${gpsState.last_sent.toLocaleTimeString("fr-FR")}` : ""}>· GPS live</span>
+              ) : (
+                <span className="text-[#e4991e]">· GPS en attente…</span>
+              )}
+            </div>
           </div>
         </div>
         <button onClick={() => { logout(); nav("/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout"><LogOut size={11} />Sortir</button>
