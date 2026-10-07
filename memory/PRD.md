@@ -1,5 +1,28 @@
 # Chez Dina — PRD
 
+### Vague H — Photos robustes + Paramètres Pointage + Stats CSV/PDF (Feb 2026) ✅
+**Photos (SmartImage)**
+- Nouveau composant `/app/frontend/src/components/shared/SmartImage.jsx` : `<img>` avec `onError` → fallback (lettre initiale ou icône) sur gradient `#fff5f5 → #fde8e8`.
+- Appliqué partout : `ProductCardV2`, `Home` (hero, catégories, lookbook, mosaic), `storefront/Product` (image principale + miniatures), `MosaicSection`, console `Products` (grid + table), `CustomerDetail` (avatar + produits favoris + listes), `Customers` (avatars table/grid), `ProductDetailView` (gallery + miniatures).
+- Fini les visuels cassés : si une URL Unsplash expire ou est bloquée, un placeholder élégant s'affiche automatiquement.
+
+**Paramètres → Pointage (nouveau tab)**
+- `/console/parametres?tab=pointage` avec :
+  - Toggle global « Activation du pointage » (si OFF, le bouton Pointer disparaît pour tout le monde)
+  - Par rôle (`manager`, `sales`, `stock_keeper`, `community_manager`, `rider`) : toggle d'autorisation + horaires (ouverture, fermeture, tolérance min de retard)
+- Backend : nouvelle route `PATCH /api/business/attendance-config` (admin). Les boutons Pointer dans ConsoleLayout + RiderShell lisent cette config et se cachent selon le rôle.
+
+**Historique pointages (/console/presence)**
+- Refonte complète en table des stats par employé : jours travaillés, absences, retards, minutes de retard, heure moyenne d'arrivée, ponctualité %.
+- Sélecteur de période : 7, 30, 60, 90 jours.
+- **Export CSV** (UTF-8 BOM pour Excel) via `data-testid='export-csv'`.
+- **Export PDF** via jsPDF (A4 paysage, logo + totaux agrégés) via `data-testid='export-pdf'`.
+- Backend : nouvelle route `GET /api/attendance/all-stats?days=N` (admin + manager).
+- Drill-down par employé conservé (calendrier mensuel + KPI).
+
+**P0 Refactor server.py — en attente**
+- Le monolithe reste à découper. Les ajouts d'endpoints restent inline en attendant la prochaine itération refactor.
+
 ### Vague G — Pointage selfie-only + RBAC par rôle (Feb 2026) ✅
 **Pointage simplifié**
 - `/api/attendance/check-in` ne demande plus de GPS/géofence : seul le selfie est requis (`method=phone`). Les champs `lat/lng/distance_m/outside` sont enregistrés à `null`.

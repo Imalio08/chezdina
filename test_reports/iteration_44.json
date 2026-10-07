@@ -1,0 +1,32 @@
+{
+  "summary": "Iteration 44 — Tested new /api/attendance/all-stats + PATCH /api/business/attendance-config endpoints (RBAC + persistence + no-GPS check-in regression) and the new Pointage settings tab + Historique pointages (CSV/PDF export). Backend: 13/13 PASS. Frontend: Pointage settings tab renders (toggle + 5 role rows + save → toast), Historique page shows period selector (7/30/60/90), CSV button triggers download 'pointages-30j-2026-10-07.csv', PDF button triggers 'pointages-30j-2026-10-07.pdf', stats-table with all required columns, detail-{user_id} opens employee-detail panel. Rider login shows rider-punch-btn. However, TWO frontend issues found: (1) topbar-punch button does NOT disappear when admin disables attendance-enabled and saves — spec says it should hide for admin when global enabled=false. (2) In Pointage settings, the role-toggle checkboxes for 'rider' (Livreur) and 'stock_keeper' (Stock) render unchecked by default, even though seeded enabled_roles includes 'rider' (confirmed because rider-punch-btn is visible to rider user). Appears Settings UI is not loading enabled_roles state correctly for all roles (role-key mapping / state hydration mismatch).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ConsoleLayout topbar", "issue": "data-testid='topbar-punch' remains visible for admin after attendanceCfg.enabled is toggled OFF and saved (toast 'Modifications enregistrées' shown, but button not hidden). Per spec, button should disappear when global enabled=false.", "selector": "[data-testid='topbar-punch']", "priority": "HIGH"},
+      {"component": "Settings PointageTab", "issue": "role-toggle-rider and role-toggle-stock_keeper render unchecked after loading /api/business, even though seeded enabled_roles contains 'rider' (verified rider sees rider-punch-btn). Likely a role-key mapping / initial-state hydration bug in PointageTab (possibly reading 'livreur'/'stock' instead of 'rider'/'stock_keeper', or local toggle state defaulting to false).", "selector": "[data-testid='role-toggle-rider'], [data-testid='role-toggle-stock_keeper']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_iter44_attendance_stats.py", "/app/test_reports/pytest/iter44.xml"],
+  "action_items": [
+    "Fix ConsoleLayout/useBusinessConfig so topbar-punch is hidden when attendance_config.enabled === false (admin included).",
+    "Fix PointageTab initial state: hydrate role toggles from attendance_config.enabled_roles using exact backend keys ('rider','stock_keeper','manager','sales','community_manager'). Currently rider & stock_keeper toggles stay unchecked after load.",
+    "Minor: React hydration warning in console — '<span> cannot be a child of <option>' (occurs on login page SearchSelect/select). Not blocking."
+  ],
+  "critical_code_review_comments": [
+    "Backend endpoints are properly RBAC-protected: admin+manager can read /api/attendance/all-stats, sales/cm correctly 403. PATCH /api/business/attendance-config strict admin-only (manager also 403), persists through GET /api/business.",
+    "Settings PointageTab toggle state must mirror backend enabled_roles with matching role keys; verify PointageTab's role list uses the same identifiers used in RBAC ('rider','stock_keeper').",
+    "React hydration warning on login page (span inside option) should be fixed in whichever select renders option content as span."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter44_attendance_stats.py"],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "~85% (2 bugs — topbar visibility and role toggle hydration)"},
+  "test_credentials": "admin=aouattaraesca@gmail.com/Admin123! · manager=manager.cocody@dinastore.ci/Manager123! · sales=agent1@dinastore.ci/Agent123! · cm=cm@dinastore.ci/Cm123! · rider=rider1@dinastore.ci/Rider123!",
+  "seed_data_creation": "None (backend test restores attendance_config to all-5-roles enabled after PATCH test)",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend endpoints fully verified: GET /api/attendance/all-stats (admin/manager OK, sales/cm 403) across days=7/30/90 with proper row schema (user_id,name,role,worked_days,absences,late_count,late_min_total,avg_arrival,punctuality_pct). PATCH /api/business/attendance-config admin-only, persists via GET /api/business.attendance_config. check-in without GPS still works (200/409, not 422). Frontend Pointage settings tab + presence page selectors all present (data-testid='settings-tab-pointage','attendance-enabled','role-row-{role}','role-toggle-{role}','role-open/close/tol-{role}','pointage-save','period-days','export-csv','export-pdf','stats-table','detail-{user_id}','employee-detail'). CSV/PDF downloads confirmed working (pointages-30j-YYYY-MM-DD.csv/pdf). Rider sees rider-punch-btn. Two bugs to retest after fix: (1) topbar-punch should disappear when enabled=false; (2) role-toggle-rider & role-toggle-stock_keeper should be checked on load since enabled_roles includes them in seed.",
+  "rca_of_the_issue": "Bug 1 (topbar-punch persists when enabled=false): likely ConsoleLayout grants admin an unconditional punch button, ignoring attendance_config.enabled. Should return null when !cfg?.enabled regardless of role. Bug 2 (rider/stock_keeper toggles unchecked): PointageTab likely initializes toggle state from enabled_roles but role identifiers used in UI loop ('rider','stock_keeper') do not match keys present in backend's enabled_roles array for those two roles, OR default useState([]) overrides fetched config before useEffect sync. Verify PointageTab's useEffect dependency on business config and that it maps backend keys exactly."
+}

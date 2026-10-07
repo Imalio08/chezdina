@@ -124,6 +124,7 @@ export default function ConsoleLayout() {
   const [aiMsgs, setAiMsgs] = useState(() => JSON.parse(sessionStorage.getItem("dina_ai_history") || "[]"));
   const [showPunch, setShowPunch] = useState(false);
   const [punchStatus, setPunchStatus] = useState(null);
+  const [attendanceCfg, setAttendanceCfg] = useState({ enabled: true, enabled_roles: null });
   const nav = useNavigate();
   const { pathname } = useLocation();
   const unreadCount = notifs.filter(n => !readIds.has(n.id)).length;
@@ -137,13 +138,21 @@ export default function ConsoleLayout() {
     }
   }, [pathname, user?.role, nav]);
 
-  // Attendance status for topbar badge
+  // Attendance status + config for topbar badge — refetch on route change so saves in Settings propagate
   useEffect(() => {
     const fetchStatus = () => api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {});
-    fetchStatus();
+    const fetchCfg = () => api.get("/business").then(r => {
+      const cfg = r.data?.attendance_config || { enabled: true, enabled_roles: null };
+      setAttendanceCfg(cfg);
+    }).catch(() => {});
+    fetchStatus(); fetchCfg();
     const t = setInterval(fetchStatus, 60000);
-    return () => clearInterval(t);
-  }, []);
+    const onCfg = () => fetchCfg();
+    window.addEventListener("attendance-config-changed", onCfg);
+    return () => { clearInterval(t); window.removeEventListener("attendance-config-changed", onCfg); };
+  }, [pathname]);
+
+  const punchAllowed = attendanceCfg.enabled !== false && (user?.role === "admin" ? attendanceCfg.enabled !== false : (!Array.isArray(attendanceCfg.enabled_roles) || attendanceCfg.enabled_roles.includes(user?.role)));
 
   useEffect(() => { localStorage.setItem("dina_sidebar_open", JSON.stringify(openSections)); }, [openSections]);
   useEffect(() => { localStorage.setItem("dina_sidebar_collapsed", collapsed ? "1" : "0"); }, [collapsed]);
@@ -328,14 +337,16 @@ export default function ConsoleLayout() {
             {online ? <><Wifi size={12}/>En ligne</> : <><WifiOff size={12}/>Hors ligne</>}
           </div>
           <div className="hidden md:inline-flex"><HelpButton/></div>
-          <button
-            onClick={() => setShowPunch(true)}
-            className={`dina-chip ${punchStatus?.checked_in && !punchStatus?.departure ? "!border-[#1f8a4c] !text-[#1f8a4c]" : punchStatus?.departure ? "!border-[#999] !text-[#999]" : "!border-[#b02a2a] !text-[#b02a2a]"}`}
-            data-testid="topbar-punch"
-            title={punchStatus?.departure ? "Journée terminée" : punchStatus?.checked_in ? "Pointer le départ" : "Pointer l'arrivée"}
-          >
-            <Clock size={12}/><span className="hidden sm:inline">{punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer"}</span>
-          </button>
+          {punchAllowed && (
+            <button
+              onClick={() => setShowPunch(true)}
+              className={`dina-chip ${punchStatus?.checked_in && !punchStatus?.departure ? "!border-[#1f8a4c] !text-[#1f8a4c]" : punchStatus?.departure ? "!border-[#999] !text-[#999]" : "!border-[#b02a2a] !text-[#b02a2a]"}`}
+              data-testid="topbar-punch"
+              title={punchStatus?.departure ? "Journée terminée" : punchStatus?.checked_in ? "Pointer le départ" : "Pointer l'arrivée"}
+            >
+              <Clock size={12}/><span className="hidden sm:inline">{punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer"}</span>
+            </button>
+          )}
           <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip hidden md:inline-flex" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
           <div className="relative">
             <button onClick={()=>setShowNotif(!showNotif)} className="dina-chip relative" data-testid="notifications-button">

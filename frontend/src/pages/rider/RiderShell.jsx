@@ -22,6 +22,7 @@ export default function RiderShell() {
   const logo = site.logo;
   const [punchStatus, setPunchStatus] = useState(null);
   const [showPunch, setShowPunch] = useState(false);
+  const [attendanceCfg, setAttendanceCfg] = useState({ enabled: true, enabled_roles: null });
   const [gpsState, setGpsState] = useState({ live: false, last_sent: null, denied: false, accuracy: null, heading: null, battery_saver: false });
   const tickRef = useRef(null);
 
@@ -32,12 +33,17 @@ export default function RiderShell() {
     localStorage.setItem("rider_theme", theme);
   }, [theme]);
 
-  // Attendance status (display only — no gate)
+  // Attendance status (display only — no gate) — refetch config on event
   useEffect(() => {
     const fetchStatus = () => api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {});
-    fetchStatus();
+    const fetchCfg = () => api.get("/business").then(r => {
+      setAttendanceCfg(r.data?.attendance_config || { enabled: true, enabled_roles: null });
+    }).catch(() => {});
+    fetchStatus(); fetchCfg();
     const t = setInterval(fetchStatus, 60000);
-    return () => clearInterval(t);
+    const onCfg = () => fetchCfg();
+    window.addEventListener("attendance-config-changed", onCfg);
+    return () => { clearInterval(t); window.removeEventListener("attendance-config-changed", onCfg); };
   }, []);
 
   // Live GPS tracking for deliveries (not tied to clock-in)
@@ -109,6 +115,7 @@ export default function RiderShell() {
 
   const punchLabel = punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer";
   const punchColor = punchStatus?.departure ? "text-[#999]" : punchStatus?.checked_in ? "text-[#1f8a4c]" : "text-[#b02a2a]";
+  const punchAllowed = attendanceCfg.enabled !== false && (!Array.isArray(attendanceCfg.enabled_roles) || attendanceCfg.enabled_roles.includes("rider"));
 
   return (
     <div className="min-h-screen bg-[#fff5f5] dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-white pb-20 font-sora">
@@ -130,13 +137,15 @@ export default function RiderShell() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => setShowPunch(true)}
-            className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-[11px] font-semibold ${punchColor} border-current`}
-            data-testid="rider-punch-btn"
-          >
-            <Clock size={12}/>{punchLabel}
-          </button>
+          {punchAllowed && (
+            <button
+              onClick={() => setShowPunch(true)}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-full border text-[11px] font-semibold ${punchColor} border-current`}
+              data-testid="rider-punch-btn"
+            >
+              <Clock size={12}/>{punchLabel}
+            </button>
+          )}
           <button onClick={() => { logout(); nav("/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout"><LogOut size={11} />Sortir</button>
         </div>
       </div>

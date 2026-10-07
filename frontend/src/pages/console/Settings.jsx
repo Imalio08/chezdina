@@ -457,6 +457,8 @@ function PointageTab() {
         api.patch("/business/attendance-config", cfg),
         api.patch("/business/working-hours", { working_hours: hours }),
       ]);
+      // Notify ConsoleLayout + RiderShell to refetch config
+      window.dispatchEvent(new Event("attendance-config-changed"));
       toast.success(SAVED_MSG);
     } catch { toast.error(ERROR_MSG); } finally { setSaving(false); }
   };
