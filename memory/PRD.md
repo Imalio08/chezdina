@@ -1,5 +1,11 @@
 # Chez Dina — PRD
 
+### Vague E.1 — Clean slate pre-launch (Feb 2026) ✅
+- Nouveau bouton rouge **« Vider la base avant mise en prod »** dans Paramètres → Données
+- Backend `POST /api/admin/wipe-for-production` (admin only) : vide 32 collections transactionnelles (produits, commandes, clientes, livraisons, promotions, factures, bons de commande, messages, événements analytics, etc.) · conserve `users`, `business`, `site_settings`, `stores`, `zones`
+- UI : modale avec saisie forcée de « VIDER » pour empêcher les clics accidentels, résumé des collections vidées affiché après confirmation, rechargement auto de la console
+- Testé via curl : bon rejet si confirm ≠ "VIDER" (400 avec message FR)
+
 ## Vague E — Final Pass before Production (Feb 2026) ✅
 
 ### Responsive

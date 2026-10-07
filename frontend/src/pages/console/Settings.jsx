@@ -434,6 +434,11 @@ function SecuriteTab() {
 
 /* -------- Données -------- */
 function DonneesTab() {
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wipeInput, setWipeInput] = useState("");
+  const [wiping, setWiping] = useState(false);
+  const [wipeResult, setWipeResult] = useState(null);
+
   const exportAll = async () => {
     try {
       const r = await api.get("/export/all");
@@ -453,6 +458,18 @@ function DonneesTab() {
     try { await api.delete("/admin/demo-data"); toast.success("Supprimé"); setTimeout(() => window.location.reload(), 1500); }
     catch { toast.error("Réservé Super admin"); }
   };
+  const wipeForProd = async () => {
+    if (wipeInput !== "VIDER" || wiping) return;
+    setWiping(true);
+    try {
+      const r = await api.post("/admin/wipe-for-production", { confirm: "VIDER" });
+      setWipeResult(r.data);
+      toast.success("Base nettoyée · prête pour la production");
+    } catch (e) {
+      toast.error(e?.response?.data?.detail || "Réservé Super admin");
+    } finally { setWiping(false); }
+  };
+
   return (
     <div className="space-y-3" data-testid="tab-donnees">
       <div className="dina-card-white p-5 space-y-2">
@@ -460,6 +477,7 @@ function DonneesTab() {
         <p className="text-sm text-[#666]">Téléchargez toutes vos données au format JSON (produits, clientes, commandes, dépenses, etc.).</p>
         <button onClick={exportAll} className="dina-btn-primary" data-testid="export-all"><Database size={14}/> Exporter mes données</button>
       </div>
+
       <div className="dina-card-white p-5 space-y-2">
         <div className="font-serif text-xl">Données de démonstration</div>
         <p className="text-sm text-[#666]">Ajouter ou retirer un jeu de démonstration (tag DEMO_PACK1).</p>
@@ -468,6 +486,45 @@ function DonneesTab() {
           <button onClick={deleteDemo} className="dina-btn-danger !min-h-[36px]" data-testid="delete-demo-button"><Trash2 size={14}/> Supprimer démo</button>
         </div>
       </div>
+
+      <div className="dina-card-white p-5 space-y-2 border-2 border-[#c62828]/30">
+        <div className="font-serif text-xl text-[#c62828] flex items-center gap-2"><Shield size={18}/>Préparer pour la production</div>
+        <p className="text-sm text-[#666]">Vide <strong>toutes les données transactionnelles et démo</strong> (produits, commandes, clientes, livraisons, promotions, messages, événements, etc.) en 1 clic.<br/>Garde : <strong>comptes staff, business, paramètres vitrine, boutiques, zones</strong>.</p>
+        <div className="text-xs text-[#c62828] bg-[#fff5f5] p-2 rounded">⚠ Action irréversible · à n'exécuter qu'avant le lancement officiel.</div>
+        <button onClick={() => { setWipeOpen(true); setWipeInput(""); setWipeResult(null); }} className="dina-btn-danger !min-h-[36px]" data-testid="wipe-for-prod-button"><Trash2 size={14}/> Vider la base avant mise en prod</button>
+      </div>
+
+      {wipeOpen && (
+        <div className="fixed inset-0 bg-black/60 z-50 grid place-items-center p-4" onClick={() => !wiping && setWipeOpen(false)}>
+          <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="wipe-modal">
+            {!wipeResult ? (
+              <>
+                <div className="font-serif text-xl mb-2 flex items-center gap-2 text-[#c62828]"><Shield size={20}/>Confirmer la mise en production</div>
+                <p className="text-sm text-[#666] mb-3">Cette action supprime toutes les commandes, clientes, produits, livraisons, promotions, messages et événements. Elle ne peut pas être annulée.</p>
+                <div className="text-xs mb-1 text-[#1c1c1c] dark:text-[#f0f0f0]">Tapez <code className="bg-[#fff5f5] text-[#b02a2a] px-2 py-0.5 rounded font-bold">VIDER</code> pour confirmer :</div>
+                <input autoFocus className="dina-input mb-3" value={wipeInput} onChange={e => setWipeInput(e.target.value)} data-testid="wipe-confirm-input"/>
+                <div className="flex gap-2">
+                  <button onClick={() => setWipeOpen(false)} disabled={wiping} className="dina-btn-secondary flex-1" data-testid="wipe-cancel">Annuler</button>
+                  <button onClick={wipeForProd} disabled={wipeInput !== "VIDER" || wiping} className="dina-btn-danger flex-1" data-testid="wipe-confirm">
+                    {wiping ? "Nettoyage…" : "Confirmer"}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="font-serif text-xl mb-2 flex items-center gap-2 text-[#1f8a4c]">✓ Base nettoyée</div>
+                <p className="text-sm text-[#666] mb-3">Votre installation est prête pour le lancement. Résumé des collections vidées :</p>
+                <div className="max-h-56 overflow-y-auto scrollbar-thin text-xs bg-[#fafafa] dark:bg-[#141414] rounded p-3 mb-3 font-mono">
+                  {Object.entries(wipeResult.wiped || {}).filter(([,n]) => n > 0).map(([k,n]) => <div key={k} className="flex justify-between"><span>{k}</span><span className="tabular text-[#c62828]">-{n}</span></div>)}
+                  {Object.values(wipeResult.wiped || {}).every(n => n === 0) && <div className="text-[#666]">Rien à vider · base déjà propre.</div>}
+                </div>
+                <div className="text-xs text-[#666] mb-3">Conservés : {(wipeResult.kept || []).join(", ")}</div>
+                <button onClick={() => { setWipeOpen(false); window.location.reload(); }} className="dina-btn-primary w-full" data-testid="wipe-done">Recharger la console</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

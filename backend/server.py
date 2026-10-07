@@ -6670,6 +6670,29 @@ async def startup():
     await seed_if_empty()
     logger.info("Dina API ready")
 
+@api.post("/admin/wipe-for-production")
+async def wipe_for_production(body: Dict[str, Any], user: dict = Depends(require_role("admin"))):
+    """One-click clean slate before going live: wipes all transactional/demo data while keeping
+    staff accounts, business settings, site settings, stores and zones (your real config).
+    Requires body { confirm: 'VIDER' } to prevent accidents."""
+    if (body or {}).get("confirm") != "VIDER":
+        raise HTTPException(400, "Confirmation requise : envoyer {\"confirm\":\"VIDER\"}")
+    wipe = [
+        "products","orders","reviews","customers","promotions","expenses","delivery_sessions",
+        "abandoned_carts","stock_alerts","suppliers","purchase_orders","invoices","attendance",
+        "waitlist","inventories","stock_adjustments","stock_adjustment_requests","cash_sessions",
+        "cash_movements","events","notifications","notifications_read","conversations","messages",
+        "message_attachments","holds","shared_carts","out_of_catalog","segments","customer_segments_v2",
+        "manual_gaps","approvals","pages","campaigns","loyalty_rules","coupons","vouchers",
+    ]
+    counts = {}
+    for coll in wipe:
+        try:
+            res = await db[coll].delete_many({})
+            counts[coll] = res.deleted_count
+        except Exception: counts[coll] = 0
+    return {"ok": True, "wiped": counts, "kept": ["users","business","site_settings","stores","zones"]}
+
 @api.post("/seed")
 async def reseed(force: bool = False, user: dict = Depends(require_role("admin"))):
     if force:
