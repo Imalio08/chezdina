@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
-import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket, Facebook, Instagram, Youtube, Linkedin, Hash, Share2 } from "lucide-react";
+import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket, Facebook, Instagram, Youtube, Linkedin, Hash, Share2, Sun, Moon } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useCustomer } from "@/context/CustomerContext";
 import useSiteTheme from "@/hooks/useSiteTheme";
@@ -13,7 +13,7 @@ const SOCIAL_ICONS = {
 
 export default function StorefrontLayout() {
   useSiteTheme();
-  const { cart } = useApp();
+  const { cart, theme, setTheme } = useApp();
   const { customer, logout } = useCustomer();
   const count = cart.reduce((s,x)=>s+x.qty,0);
   const nav = useNavigate();
@@ -44,6 +44,14 @@ export default function StorefrontLayout() {
     return () => window.removeEventListener("click", onClick);
   }, []);
 
+  // On first load with no stored pref, honor system preference (but still write it so toggle makes sense)
+  useEffect(() => {
+    if (!localStorage.getItem("dina_theme") && window.matchMedia) {
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      if (prefersDark) setTheme("dark");
+    }
+  }, [setTheme]);
+
   const brandName = biz.name || site.name || "Chez Dina";
   const brandInitials = (brandName.split(" ").map(w => w[0]).join("").slice(0, 2) || "CD").toUpperCase();
 
@@ -72,9 +80,9 @@ export default function StorefrontLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-[#f0f0f0]">
       <div className="bg-[#b02a2a] text-white text-center text-xs py-1.5">Livraison 24h à Abidjan · Paiement à la livraison · WhatsApp 0777 92 61 79</div>
-      <header className="sticky top-0 z-30 bg-white border-b border-[#ececec]">
+      <header className="sticky top-0 z-30 bg-white dark:bg-[#141414] border-b border-[#ececec] dark:border-[#2a2a2a]">
         <div className="max-w-6xl mx-auto px-4 h-20 flex items-center gap-3 md:gap-4">
           <Link to="/boutique" className="flex items-center gap-2 shrink-0" data-testid="storefront-logo">
             {site.logo ? (
@@ -89,7 +97,7 @@ export default function StorefrontLayout() {
               </>
             )}
           </Link>
-          <nav className="hidden lg:flex items-center gap-5 text-sm text-[#1c1c1c] ml-2">
+          <nav className="hidden lg:flex items-center gap-5 text-sm text-[#1c1c1c] dark:text-[#f0f0f0] ml-2">
             <Link to="/boutique/catalog" data-testid="nav-catalog">Catalogue</Link>
             <Link to="/boutique/catalog?category=Chaussures">Talons</Link>
             <Link to="/boutique/catalog?category=Robes">Robes</Link>
@@ -99,7 +107,7 @@ export default function StorefrontLayout() {
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none" />
             <input
               type="search"
-              className="w-full h-10 pl-9 pr-9 rounded-full border border-[#ececec] bg-[#fafafa] focus:bg-white focus:border-[#b02a2a] text-sm transition outline-none"
+              className="w-full h-10 pl-9 pr-9 rounded-full border border-[#ececec] dark:border-[#2a2a2a] bg-[#fafafa] dark:bg-[#1a1a1a] text-[#1c1c1c] dark:text-[#f0f0f0] focus:bg-white dark:focus:bg-[#242424] focus:border-[#b02a2a] text-sm transition outline-none"
               placeholder="Rechercher un produit, une marque…"
               value={q}
               onChange={(e) => { setQ(e.target.value); setOpen(true); }}
@@ -111,12 +119,12 @@ export default function StorefrontLayout() {
               <button type="button" onClick={() => { setQ(""); setSugg([]); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-[#999]" aria-label="Effacer"><X size={14}/></button>
             )}
             {open && sugg.length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-white border border-[#ececec] rounded-xl shadow-lg py-2 z-40 max-h-80 overflow-y-auto" data-testid="search-suggestions">
+              <div className="absolute left-0 right-0 top-full mt-1 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-lg py-2 z-40 max-h-80 overflow-y-auto" data-testid="search-suggestions">
                 {sugg.slice(0, 8).map((s, i) => (
                   <Link
                     key={i}
                     to={s.link}
-                    className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm"
+                    className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm"
                     onMouseDown={(e) => e.preventDefault()}
                     data-testid={`search-sugg-${i}`}
                   >
@@ -128,26 +136,35 @@ export default function StorefrontLayout() {
               </div>
             )}
           </form>
+          <button
+            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            className="w-9 h-9 grid place-items-center shrink-0 rounded-full hover:bg-[#fafafa] dark:hover:bg-[#1a1a1a] transition"
+            data-testid="storefront-theme-toggle"
+            title={theme === "dark" ? "Mode clair" : "Mode sombre"}
+            aria-label={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}
+          >
+            {theme === "dark" ? <Sun size={18} className="text-[#f4b12c]"/> : <Moon size={18}/>}
+          </button>
           {customer ? (
             <div ref={umRef} className="relative shrink-0">
-              <button onClick={(e) => { e.stopPropagation(); setUserMenu(v => !v); }} className="h-9 pl-2 pr-2 rounded-full hover:bg-[#fafafa] flex items-center gap-1.5 text-sm" data-testid="storefront-user-menu">
+              <button onClick={(e) => { e.stopPropagation(); setUserMenu(v => !v); }} className="h-9 pl-2 pr-2 rounded-full hover:bg-[#fafafa] dark:hover:bg-[#1a1a1a] flex items-center gap-1.5 text-sm" data-testid="storefront-user-menu">
                 {customer.photo ? (
                   <img src={customer.photo} alt="" className="w-7 h-7 rounded-full object-cover"/>
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-[#fde8e8] text-[#b02a2a] font-semibold grid place-items-center text-xs">{(customer.name || "D")[0]}</div>
+                  <div className="w-7 h-7 rounded-full bg-[#fde8e8] dark:bg-[#2a1818] text-[#b02a2a] font-semibold grid place-items-center text-xs">{(customer.name || "D")[0]}</div>
                 )}
-                <span className="hidden md:inline font-medium text-[#1c1c1c]">Bonjour, {(customer.name || "").split(" ")[0]}</span>
-                <ChevronDown size={14} className="text-[#666]"/>
+                <span className="hidden md:inline font-medium text-[#1c1c1c] dark:text-[#f0f0f0]">Bonjour, {(customer.name || "").split(" ")[0]}</span>
+                <ChevronDown size={14} className="text-[#666] dark:text-[#999]"/>
               </button>
               {userMenu && (
-                <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-[#ececec] rounded-xl shadow-lg py-1 z-40" data-testid="user-dropdown" onClick={() => setUserMenu(false)}>
-                  <Link to="/boutique/compte" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-account"><User size={14}/>Mon compte</Link>
-                  <Link to="/boutique/compte/commandes" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-orders"><Package size={14}/>Mes commandes</Link>
-                  <Link to="/boutique/compte/messages" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-messages"><MessageSquare size={14}/>Messages</Link>
-                  <Link to="/boutique/compte/favoris" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-favorites"><Heart size={14}/>Favoris</Link>
-                  <Link to="/boutique/compte/bons-achat" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm" data-testid="menu-vouchers"><Ticket size={14}/>Bons d'achat</Link>
-                  <div className="border-t border-[#f0f0f0] my-1"></div>
-                  <button onClick={() => { logout(); nav("/boutique"); }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] text-sm text-[#c62828]" data-testid="menu-logout-header"><LogOut size={14}/>Déconnexion</button>
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-lg py-1 z-40" data-testid="user-dropdown" onClick={() => setUserMenu(false)}>
+                  <Link to="/boutique/compte" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-account"><User size={14}/>Mon compte</Link>
+                  <Link to="/boutique/compte/commandes" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-orders"><Package size={14}/>Mes commandes</Link>
+                  <Link to="/boutique/compte/messages" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-messages"><MessageSquare size={14}/>Messages</Link>
+                  <Link to="/boutique/compte/favoris" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-favorites"><Heart size={14}/>Favoris</Link>
+                  <Link to="/boutique/compte/bons-achat" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-vouchers"><Ticket size={14}/>Bons d'achat</Link>
+                  <div className="border-t border-[#f0f0f0] dark:border-[#2a2a2a] my-1"></div>
+                  <button onClick={() => { logout(); nav("/boutique"); }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm text-[#c62828]" data-testid="menu-logout-header"><LogOut size={14}/>Déconnexion</button>
                 </div>
               )}
             </div>
@@ -162,16 +179,16 @@ export default function StorefrontLayout() {
       </header>
       <Outlet />
       <a href="https://wa.me/2250777926179" target="_blank" rel="noreferrer" className="fixed bottom-5 right-5 bg-[#1f8a4c] text-white rounded-full w-14 h-14 grid place-items-center shadow-lg" data-testid="storefront-whatsapp"><MessageCircle size={22}/></a>
-      <footer className="border-t border-[#ececec] mt-20 py-10 text-sm text-[#666] bg-[#fff5f5]">
+      <footer className="border-t border-[#ececec] dark:border-[#2a2a2a] mt-20 py-10 text-sm text-[#666] dark:text-[#aaa] bg-[#fff5f5] dark:bg-[#141414]">
         <div className="max-w-6xl mx-auto px-4 grid md:grid-cols-4 gap-6">
           <div>
             {site.logo ? <img src={site.logo} alt={brandName} className="h-10 object-contain mb-2"/> : <div className="font-serif text-xl text-[#b02a2a] mb-2">{brandName}</div>}
             <p>{biz.tagline || "Mode féminine · Abidjan."}<br/>Livraison partout en Côte d'Ivoire.</p>
-            <div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c]">{biz.whatsapp || "+225 07 77 92 61 79"}</strong></div>
+            <div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c] dark:text-[#f0f0f0]">{biz.whatsapp || "+225 07 77 92 61 79"}</strong></div>
           </div>
-          <div><div className="font-semibold text-[#1c1c1c] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li><Link to="/boutique/nouveautes">Nouveautés</Link></li><li><Link to="/boutique/promotions">Promotions</Link></li><li><Link to="/boutique/guide-tailles">Guide des tailles</Link></li></ul></div>
-          <div><div className="font-semibold text-[#1c1c1c] mb-2">Aide</div><ul className="space-y-1"><li><Link to="/boutique/livraison-retours">Livraison & retours</Link></li><li><Link to="/boutique/suivi-commande">Suivi de commande</Link></li><li><Link to="/boutique/contact">Contact</Link></li></ul></div>
-          <div><div className="font-semibold text-[#1c1c1c] mb-2">Suivez-nous</div><ul className="space-y-1">
+          <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li><Link to="/boutique/nouveautes">Nouveautés</Link></li><li><Link to="/boutique/promotions">Promotions</Link></li><li><Link to="/boutique/guide-tailles">Guide des tailles</Link></li></ul></div>
+          <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Aide</div><ul className="space-y-1"><li><Link to="/boutique/livraison-retours">Livraison & retours</Link></li><li><Link to="/boutique/suivi-commande">Suivi de commande</Link></li><li><Link to="/boutique/contact">Contact</Link></li></ul></div>
+          <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Suivez-nous</div><ul className="space-y-1">
             {Object.entries(social).filter(([k,v])=>v).map(([k,v])=>{
               const Icon = SOCIAL_ICONS[k] || Share2;
               return <li key={k}><a href={v} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-[#b02a2a]" data-testid={`footer-social-${k}`}><Icon size={12}/>{k.charAt(0).toUpperCase()+k.slice(1)}</a></li>;

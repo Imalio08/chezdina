@@ -87,6 +87,7 @@ export default function Checkout() {
   const prevImg = (pid, len) => setImgIdx(p=>({...p, [pid]: ((p[pid]||0)-1+len) % len}));
 
   return (
+    <>
     <div className="max-w-5xl mx-auto px-4 py-8 grid md:grid-cols-[1fr_380px] gap-8">
       <div>
         <h1 className="font-serif text-3xl mb-5">Panier & Livraison</h1>
@@ -190,6 +191,6 @@ export default function Checkout() {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

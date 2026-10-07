@@ -3,6 +3,8 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import { ExternalLink, Save, Image as ImageIcon, Megaphone, BookOpen, ShieldCheck, PanelTop, Sparkles } from "lucide-react";
 import ImageUpload from "@/components/shared/ImageUpload";
+import IconPicker from "@/components/shared/IconPicker";
+import SaveButton from "@/components/shared/SaveButton";
 
 const TABS = [
   { id: "hero", label: "Hero", icon: PanelTop },
@@ -76,7 +78,7 @@ function HeroTab({ site, onSave, saving }) {
           </div>
         </div>
       </div>
-      <button onClick={()=>onSave({ hero: h })} disabled={saving} className="dina-btn-primary" data-testid="hero-save"><Save size={13}/>Enregistrer</button>
+      <SaveButton loading={saving} onClick={()=>onSave({ hero: h })} testid="hero-save"/>
     </div>
   );
 }
@@ -103,7 +105,7 @@ function PopupTab({ site, onSave, saving }) {
           <ImageUpload value={p.image?[p.image]:[]} onChange={imgs=>setP({...p,image:imgs[0]||""})} single max={1} maxKB={300} testid="popup-image"/>
         </div>
       </div>
-      <button onClick={()=>onSave({ welcome_popup: p })} disabled={saving} className="dina-btn-primary" data-testid="popup-save"><Save size={13}/>Enregistrer</button>
+      <SaveButton loading={saving} onClick={()=>onSave({ welcome_popup: p })} testid="popup-save"/>
     </div>
   );
 }
@@ -125,7 +127,7 @@ function AnnouncementTab({ site, onSave, saving }) {
         <div><label className="text-[10px] uppercase text-[#666] font-semibold">Texte</label><input type="color" className="dina-input h-10" value={a.text_color||"#ffffff"} onChange={e=>setA({...a,text_color:e.target.value})} data-testid="ann-fg"/></div>
       </div>
       <div className="rounded-lg py-2 px-3 text-center text-sm font-medium" style={{background:a.bg_color,color:a.text_color}}>{a.text || "Aperçu du bandeau…"}</div>
-      <button onClick={()=>onSave({ announcement: a })} disabled={saving} className="dina-btn-primary" data-testid="ann-save"><Save size={13}/>Enregistrer</button>
+      <SaveButton loading={saving} onClick={()=>onSave({ announcement: a })} testid="ann-save"/>
     </div>
   );
 }
@@ -155,7 +157,7 @@ function LookbookTab({ site, onSave, saving }) {
           </div>
         </div>
       ))}
-      <button onClick={()=>onSave({ lookbook: books })} disabled={saving} className="dina-btn-primary" data-testid="lb-save"><Save size={13}/>Enregistrer</button>
+      <SaveButton loading={saving} onClick={()=>onSave({ lookbook: books })} testid="lb-save"/>
     </div>
   );
 }
@@ -177,18 +179,16 @@ function TrustTab({ site, onSave, saving }) {
         <button onClick={add} className="dina-btn-secondary !min-h-[36px] text-xs">+ Ajouter</button>
       </div>
       {t.items.map((it,i)=>(
-        <div key={i} className="grid md:grid-cols-[100px_1fr_1fr_auto] gap-2 items-end border border-[#ececec] dark:border-[#2a2a2a] rounded-lg p-3" data-testid={`trust-item-${i}`}>
+        <div key={i} className="grid md:grid-cols-[160px_1fr_1fr_auto] gap-2 items-end border border-[#ececec] dark:border-[#2a2a2a] rounded-lg p-3" data-testid={`trust-item-${i}`}>
           <div><label className="text-[10px] uppercase text-[#666]">Icône</label>
-            <select className="dina-input" value={it.icon} onChange={e=>upd(i,"icon",e.target.value)} data-testid={`trust-icon-${i}`}>
-              <option value="truck">Livraison</option><option value="shield">Bouclier</option><option value="whatsapp">WhatsApp</option><option value="star">Étoile</option><option value="heart">Cœur</option>
-            </select>
+            <IconPicker value={it.icon} onChange={v=>upd(i,"icon",v)} testid={`trust-icon-${i}`}/>
           </div>
           <Input label="Titre" value={it.title} onChange={v=>upd(i,"title",v)} testid={`trust-title-${i}`}/>
           <Input label="Texte" value={it.text} onChange={v=>upd(i,"text",v)} testid={`trust-text-${i}`}/>
           <button onClick={()=>rm(i)} className="text-[#c62828] text-sm">Retirer</button>
         </div>
       ))}
-      <button onClick={()=>onSave({ trust_band: t })} disabled={saving} className="dina-btn-primary" data-testid="trust-save"><Save size={13}/>Enregistrer</button>
+      <SaveButton loading={saving} onClick={()=>onSave({ trust_band: t })} testid="trust-save"/>
     </div>
   );
 }

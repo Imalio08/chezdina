@@ -6,9 +6,9 @@ import api from "@/lib/api";
 import {
   LayoutDashboard, ShoppingCart, Package, Truck, Boxes, Users, Megaphone, FileText, Wallet, BarChart3, UserCog,
   Sparkles, Plug, Settings as Cog, Bell, Moon, Sun, LogOut, Store, Wifi, WifiOff, Search, Receipt, Gift, Star,
-  X, ShoppingBag, Globe, MessageSquare, Send, ChevronDown, ChevronRight, Plus, Minimize2, Maximize2, Target,
+  X, ShoppingBag, Globe, MessageSquare, Send, ChevronDown, ChevronRight, ChevronLeft, Plus, Minimize2, Maximize2, Target,
   TrendingUp, Palette, FileCode, Menu, Shield, Database, ClipboardList, MapPin, Tag, Layers, Hourglass, Heart,
-  Building2, UserCheck, BookOpen, Calendar, GraduationCap, HelpCircle, CheckCircle2
+  Building2, UserCheck, BookOpen, Calendar, GraduationCap, HelpCircle, CheckCircle2, PanelLeftClose, PanelLeftOpen
 } from "lucide-react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import HelpButton from "@/components/console/HelpButton";
@@ -110,6 +110,12 @@ export default function ConsoleLayout() {
     const saved = JSON.parse(localStorage.getItem("dina_sidebar_open") || "null");
     return saved || Object.fromEntries(SECTIONS.map(s => [s.label, true]));
   });
+  const [collapsed, setCollapsed] = useState(() => localStorage.getItem("dina_sidebar_collapsed") === "1");
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const v = parseInt(localStorage.getItem("dina_sidebar_width") || "260", 10);
+    return Number.isFinite(v) && v >= 200 && v <= 400 ? v : 260;
+  });
+  const resizingRef = useRef(false);
   const [showAi, setShowAi] = useState(false);
   const [aiMinimized, setAiMinimized] = useState(false);
   const [aiMsgs, setAiMsgs] = useState(() => JSON.parse(sessionStorage.getItem("dina_ai_history") || "[]"));
@@ -118,6 +124,19 @@ export default function ConsoleLayout() {
   const unreadCount = notifs.filter(n => !readIds.has(n.id)).length;
 
   useEffect(() => { localStorage.setItem("dina_sidebar_open", JSON.stringify(openSections)); }, [openSections]);
+  useEffect(() => { localStorage.setItem("dina_sidebar_collapsed", collapsed ? "1" : "0"); }, [collapsed]);
+  useEffect(() => { localStorage.setItem("dina_sidebar_width", String(sidebarWidth)); }, [sidebarWidth]);
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!resizingRef.current) return;
+      const w = Math.min(400, Math.max(200, e.clientX));
+      setSidebarWidth(w);
+    };
+    const onUp = () => { if (resizingRef.current) { resizingRef.current = false; document.body.style.cursor = ""; document.body.style.userSelect = ""; } };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => { window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); };
+  }, []);
   useEffect(() => { sessionStorage.setItem("dina_ai_history", JSON.stringify(aiMsgs.slice(-30))); }, [aiMsgs]);
   useEffect(() => {
     const fetchNotifs = () => api.get("/notifications").then(r => setNotifs(r.data || [])).catch(()=>{});
@@ -146,42 +165,81 @@ export default function ConsoleLayout() {
   const timeAgo = (iso) => { if (!iso) return ""; const d = (new Date()-new Date(iso))/1000; return d<60?"à l'instant":d<3600?`il y a ${Math.floor(d/60)} min`:d<86400?`il y a ${Math.floor(d/3600)} h`:`il y a ${Math.floor(d/86400)} j`; };
   const isAdmin = user?.role === "admin";
 
+  const effectiveWidth = collapsed ? 72 : sidebarWidth;
+  const startResize = (e) => { if (collapsed) return; e.preventDefault(); resizingRef.current = true; document.body.style.cursor = "col-resize"; document.body.style.userSelect = "none"; };
+
   return (
     <div className="min-h-screen flex bg-[#f5f5f5] dark:bg-[#0f0f0f]">
-      <aside className="w-[260px] shrink-0 bg-[#1c1c1c] text-white flex flex-col sticky top-0 h-screen">
-        <div className="px-5 py-5 border-b border-[#2a2a2a]">
-          <div className="flex items-center gap-2">
-            {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-full object-cover bg-white"/> : <div className="w-9 h-9 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>}
-            <div><div className="font-serif text-xl tracking-tight">{site.name || "Chez Dina"}</div><div className="text-[10px] uppercase tracking-widest text-[#999]">console</div></div>
-          </div>
-          <a href="/boutique" target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1.5 text-xs text-[#b02a2a] hover:text-white" data-testid="view-storefront-link"><Store size={12}/>Voir le site vitrine →</a>
+      <aside style={{ width: effectiveWidth }} className={`shrink-0 bg-[#1c1c1c] text-white flex flex-col sticky top-0 h-screen relative transition-[width] duration-150`} data-testid="console-sidebar" data-collapsed={collapsed ? "1" : "0"}>
+        <div className={`${collapsed ? "px-2 py-4" : "px-5 py-5"} border-b border-[#2a2a2a] flex items-center ${collapsed ? "justify-center" : "justify-between gap-2"}`}>
+          {!collapsed ? (
+            <div className="flex items-center gap-2 min-w-0">
+              {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-full object-cover bg-white shrink-0"/> : <div className="w-9 h-9 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm shrink-0">CD</div>}
+              <div className="min-w-0"><div className="font-serif text-xl tracking-tight truncate">{site.name || "Chez Dina"}</div><div className="text-[10px] uppercase tracking-widest text-[#999]">console</div></div>
+            </div>
+          ) : (
+            logo ? <img src={logo} alt="" className="w-9 h-9 rounded-full object-cover bg-white"/> : <div className="w-9 h-9 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm">CD</div>
+          )}
+          <button
+            onClick={() => setCollapsed(c => !c)}
+            className="text-[#999] hover:text-white p-1 rounded hover:bg-[#2a2a2a] shrink-0"
+            title={collapsed ? "Déplier" : "Réduire"}
+            data-testid="sidebar-collapse-toggle"
+          >
+            {collapsed ? <PanelLeftOpen size={16}/> : <PanelLeftClose size={16}/>}
+          </button>
         </div>
-        <nav className="flex-1 overflow-y-auto scrollbar-thin px-2 py-3">
+        {!collapsed && (
+          <div className="px-5 pt-3">
+            <a href="/boutique" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-[#b02a2a] hover:text-white" data-testid="view-storefront-link"><Store size={12}/>Voir le site vitrine →</a>
+          </div>
+        )}
+        <nav className={`flex-1 overflow-y-auto scrollbar-thin ${collapsed ? "px-1" : "px-2"} py-3`}>
           {SECTIONS.filter(s => !s.adminOnly || isAdmin).map((sec) => {
             const open = openSections[sec.label] !== false;
             const items = sec.items.filter(it => !it.adminOnly || isAdmin);
             return (
               <div key={sec.label || `top-${items[0]?.to}`} className="mb-1">
-                {sec.label ? (
+                {sec.label && !collapsed ? (
                   <button onClick={()=>toggleSection(sec.label)} className="w-full flex items-center justify-between px-3 py-1.5 text-[10px] font-semibold text-[#999] uppercase tracking-wider hover:text-white" data-testid={`sidebar-section-${sec.label}`}>
                     <span>{sec.label}</span>
                     {open ? <ChevronDown size={10}/> : <ChevronRight size={10}/>}
                   </button>
-                ) : null}
-                {(!sec.label || open) && items.map(({to, icon:Icon, label, end}) => (
-                  <NavLink key={to} to={to} end={end} className={({isActive}) => `dina-sidebar-link ${isActive?"active":""}`} data-testid={`nav-${label.toLowerCase().replace(/\s+/g,"-").replace(/é/g,"e").replace(/è/g,"e").replace(/&/g,"et").replace(/[^\w-]/g,"")}`}>
-                    <Icon size={14}/><span className="truncate">{label}</span>
+                ) : (sec.label && collapsed ? <div className="h-px bg-[#2a2a2a] my-1 mx-2"/> : null)}
+                {(!sec.label || open || collapsed) && items.map(({to, icon:Icon, label, end}) => (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    end={end}
+                    title={collapsed ? label : undefined}
+                    className={({isActive}) => `dina-sidebar-link ${isActive?"active":""} ${collapsed ? "!justify-center !px-2" : ""}`}
+                    data-testid={`nav-${label.toLowerCase().replace(/\s+/g,"-").replace(/é/g,"e").replace(/è/g,"e").replace(/&/g,"et").replace(/[^\w-]/g,"")}`}
+                  >
+                    <Icon size={14}/>
+                    {!collapsed && <span className="truncate">{label}</span>}
                   </NavLink>
                 ))}
               </div>
             );
           })}
         </nav>
-        <div className="px-4 py-3 border-t border-[#2a2a2a] text-xs">
-          <button onClick={()=>setShowUserMenu(!showUserMenu)} className="w-full flex items-center gap-3 hover:bg-[#2a2a2a] rounded-lg p-2 transition" data-testid="user-menu-trigger">
-            <div className="w-9 h-9 rounded-full bg-[#b02a2a] text-white font-semibold grid place-items-center">{(user?.name||"?").slice(0,1)}</div>
-            <div className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-medium">{user?.name}</div><div className="text-[#999] capitalize">{user?.role}</div></div>
-            <ChevronRight size={12} className="text-[#999]"/>
+        {!collapsed && (
+          <div
+            onMouseDown={startResize}
+            className="absolute top-0 right-0 h-full w-1 cursor-col-resize hover:bg-[#b02a2a]/50 active:bg-[#b02a2a] z-10 group"
+            title="Redimensionner"
+            data-testid="sidebar-resize-handle"
+          >
+            <div className="h-full w-px bg-[#2a2a2a] group-hover:bg-[#b02a2a] mx-auto"/>
+          </div>
+        )}
+        <div className={`${collapsed ? "px-2" : "px-4"} py-3 border-t border-[#2a2a2a] text-xs`}>
+          <button onClick={()=>setShowUserMenu(!showUserMenu)} className={`w-full flex items-center ${collapsed ? "justify-center" : "gap-3"} hover:bg-[#2a2a2a] rounded-lg p-2 transition`} data-testid="user-menu-trigger" title={collapsed ? user?.name : undefined}>
+            <div className="w-9 h-9 rounded-full bg-[#b02a2a] text-white font-semibold grid place-items-center shrink-0">{(user?.name||"?").slice(0,1)}</div>
+            {!collapsed && <>
+              <div className="min-w-0 flex-1 text-left"><div className="truncate text-sm font-medium">{user?.name}</div><div className="text-[#999] capitalize">{user?.role}</div></div>
+              <ChevronRight size={12} className="text-[#999]"/>
+            </>}
           </button>
           {showUserMenu && (
             <div className="mt-2 bg-[#2a2a2a] rounded-lg p-1 space-y-0.5" data-testid="user-menu">

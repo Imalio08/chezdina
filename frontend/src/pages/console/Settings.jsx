@@ -6,6 +6,10 @@ import {
   Save, Upload, Store, Phone, ShoppingCart, Truck, CreditCard, FileText,
   Bell, Plug, Users, Shield, Database, Trash2, Image as ImageIcon,
 } from "lucide-react";
+import SaveButton from "@/components/shared/SaveButton";
+
+const SAVED_MSG = "Modifications enregistrées";
+const ERROR_MSG = "Erreur · modifications non enregistrées";
 
 const TABS = [
   { id: "identite", label: "Identité", icon: Store },
@@ -98,12 +102,15 @@ function IdentiteTab() {
     r.readAsDataURL(file);
   };
 
+  const [saving, setSaving] = useState(false);
   const save = async () => {
+    if (saving) return;
+    setSaving(true);
     try {
       await api.patch("/business", b);
       await api.patch("/site", { logo: site.logo, favicon: site.favicon });
       toast.success("Identité enregistrée · logo propagé partout");
-    } catch { toast.error("Erreur"); }
+    } catch { toast.error(ERROR_MSG); } finally { setSaving(false); }
   };
 
   return (
@@ -139,7 +146,7 @@ function IdentiteTab() {
         </div>
       </div>
 
-      <button onClick={save} className="dina-btn-primary" data-testid="identite-save"><Save size={14}/> Enregistrer l'identité</button>
+      <SaveButton loading={saving} onClick={save} testid="identite-save">Enregistrer l'identité</SaveButton>
     </div>
   );
 }
@@ -147,8 +154,9 @@ function IdentiteTab() {
 /* -------- Coordonnées -------- */
 function CoordonneesTab() {
   const [b, setB] = useState({});
+  const [saving, setSaving] = useState(false);
   useEffect(() => { api.get("/business").then(r => setB(r.data || {})).catch(() => {}); }, []);
-  const save = async () => { try { await api.patch("/business", b); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
+  const save = async () => { if (saving) return; setSaving(true); try { await api.patch("/business", b); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); } };
   const upd = (k, v) => setB({...b, [k]: v});
   return (
     <div className="dina-card-white p-5 space-y-3" data-testid="tab-coordonnees">
@@ -162,7 +170,7 @@ function CoordonneesTab() {
         <input className="dina-input" placeholder="RCCM" value={b.rccm || ""} onChange={e => upd("rccm", e.target.value)}/>
         <input className="dina-input" placeholder="NCC" value={b.ncc || ""} onChange={e => upd("ncc", e.target.value)}/>
       </div>
-      <button onClick={save} className="dina-btn-primary" data-testid="coordonnees-save"><Save size={14}/> Enregistrer</button>
+      <SaveButton loading={saving} onClick={save} testid="coordonnees-save"/>
     </div>
   );
 }
@@ -170,8 +178,9 @@ function CoordonneesTab() {
 /* -------- Ventes & caisse -------- */
 function VentesTab() {
   const [s, setS] = useState({ discount_max: 20, out_of_stock_rule: "block", exchange_policy: "48h non portés", float_default: 10000, cancel_reasons: ["Rupture","Changement d'avis","Prix élevé"] });
+  const [saving, setSaving] = useState(false);
   useEffect(() => { api.get("/public/site").then(r => setS({...s, ...(r.data?.sales || {})})).catch(() => {}); /* eslint-disable-next-line */ }, []);
-  const save = async () => { try { await api.patch("/site", { sales: s }); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
+  const save = async () => { if (saving) return; setSaving(true); try { await api.patch("/site", { sales: s }); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); } };
   return (
     <div className="dina-card-white p-5 space-y-3" data-testid="tab-ventes">
       <div className="font-serif text-xl">Ventes & caisse</div>
@@ -197,7 +206,7 @@ function VentesTab() {
         <div className="text-xs text-[#666] mb-1">Motifs d'annulation</div>
         <input className="dina-input" placeholder="Rupture, Changement d'avis, …" value={(s.cancel_reasons || []).join(", ")} onChange={e => setS({...s, cancel_reasons: e.target.value.split(",").map(x => x.trim()).filter(Boolean)})}/>
       </div>
-      <button onClick={save} className="dina-btn-primary" data-testid="ventes-save"><Save size={14}/> Enregistrer</button>
+      <SaveButton loading={saving} onClick={save} testid="ventes-save"/>
     </div>
   );
 }
@@ -205,8 +214,9 @@ function VentesTab() {
 /* -------- Livraison -------- */
 function LivraisonTab() {
   const [s, setS] = useState({ score_weights: { on_time: 40, no_cancel: 30, rating: 20, proof: 10 }, proof_threshold: 50000, slots: ["Matin 9h-12h","Après-midi 14h-18h","Soir 18h-21h"] });
+  const [saving, setSaving] = useState(false);
   useEffect(() => { api.get("/public/site").then(r => setS({...s, ...(r.data?.delivery || {})})).catch(() => {}); /* eslint-disable-next-line */ }, []);
-  const save = async () => { try { await api.patch("/site", { delivery: s }); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
+  const save = async () => { if (saving) return; setSaving(true); try { await api.patch("/site", { delivery: s }); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); } };
   const w = s.score_weights || { on_time:40, no_cancel:30, rating:20, proof:10 };
   const total = Object.values(w).reduce((a,b)=>a+b,0);
   return (
@@ -245,7 +255,7 @@ function LivraisonTab() {
         ))}
       </div>
 
-      <button onClick={save} className="dina-btn-primary" data-testid="livraison-save"><Save size={14}/> Enregistrer</button>
+      <SaveButton loading={saving} onClick={save} testid="livraison-save"/>
     </div>
   );
 }
@@ -327,7 +337,7 @@ function PaiementsTab() {
         <input className="dina-input" placeholder="Numéro MTN Money" value={s.mtn_money} onChange={e => setS({...s, mtn_money: e.target.value})}/>
       </div>
 
-      <button onClick={save} disabled={busy} className="dina-btn-primary" data-testid="paiements-save"><Save size={14}/> {busy ? "Enregistrement…" : "Enregistrer"}</button>
+      <SaveButton loading={busy} onClick={save} testid="paiements-save"/>
     </div>
   );
 }
@@ -335,8 +345,9 @@ function PaiementsTab() {
 /* -------- Documents -------- */
 function DocumentsTab() {
   const [s, setS] = useState({ receipt_footer: "Merci pour votre achat !", invoice_footer: "RCCM: xxx · NCC: xxx", show_qr: true, show_barcode: false });
+  const [saving, setSaving] = useState(false);
   useEffect(() => { api.get("/public/site").then(r => setS({...s, ...(r.data?.documents || {})})).catch(() => {}); /* eslint-disable-next-line */ }, []);
-  const save = async () => { try { await api.patch("/site", { documents: s }); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
+  const save = async () => { if (saving) return; setSaving(true); try { await api.patch("/site", { documents: s }); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); } };
   return (
     <div className="dina-card-white p-5 space-y-3" data-testid="tab-documents">
       <div className="font-serif text-xl">Documents imprimables</div>
@@ -348,7 +359,7 @@ function DocumentsTab() {
       </label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={s.show_qr} onChange={e => setS({...s, show_qr: e.target.checked})}/> Afficher QR de suivi sur fiche colis</label>
       <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={s.show_barcode} onChange={e => setS({...s, show_barcode: e.target.checked})}/> Afficher code-barres sur étiquette</label>
-      <button onClick={save} className="dina-btn-primary" data-testid="documents-save"><Save size={14}/> Enregistrer</button>
+      <SaveButton loading={saving} onClick={save} testid="documents-save"/>
     </div>
   );
 }
@@ -356,8 +367,9 @@ function DocumentsTab() {
 /* -------- Notifications -------- */
 function NotificationsTab() {
   const [s, setS] = useState({ wa_order_confirm: true, wa_delivery_code: true, wa_delivery_update: true, wa_abandoned_cart: false, email_daily_summary: false });
+  const [saving, setSaving] = useState(false);
   useEffect(() => { api.get("/public/site").then(r => setS({...s, ...(r.data?.notifications || {})})).catch(() => {}); /* eslint-disable-next-line */ }, []);
-  const save = async () => { try { await api.patch("/site", { notifications: s }); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
+  const save = async () => { if (saving) return; setSaving(true); try { await api.patch("/site", { notifications: s }); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); } };
   return (
     <div className="dina-card-white p-5 space-y-2" data-testid="tab-notifications">
       <div className="font-serif text-xl mb-2">Notifications</div>
@@ -367,7 +379,7 @@ function NotificationsTab() {
           <input type="checkbox" checked={!!s[k]} onChange={e => setS({...s, [k]: e.target.checked})} data-testid={`notif-${k}`}/>
         </label>
       ))}
-      <button onClick={save} className="dina-btn-primary mt-2" data-testid="notifications-save"><Save size={14}/> Enregistrer</button>
+      <SaveButton loading={saving} onClick={save} testid="notifications-save" className="mt-2"/>
     </div>
   );
 }
@@ -403,8 +415,9 @@ function EquipeTab() {
 /* -------- Sécurité -------- */
 function SecuriteTab() {
   const [s, setS] = useState({ require_pin_discounts: true, require_pin_refunds: true, session_timeout_min: 30, two_factor: false });
+  const [saving, setSaving] = useState(false);
   useEffect(() => { api.get("/public/site").then(r => setS({...s, ...(r.data?.security || {})})).catch(() => {}); /* eslint-disable-next-line */ }, []);
-  const save = async () => { try { await api.patch("/site", { security: s }); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
+  const save = async () => { if (saving) return; setSaving(true); try { await api.patch("/site", { security: s }); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); } };
   return (
     <div className="dina-card-white p-5 space-y-2" data-testid="tab-securite">
       <div className="font-serif text-xl">Sécurité</div>
@@ -414,7 +427,7 @@ function SecuriteTab() {
         <input type="number" className="dina-input" value={s.session_timeout_min} onChange={e => setS({...s, session_timeout_min: +e.target.value})}/>
       </label>
       <label className="flex items-center justify-between text-sm py-1"><span>Double authentification admin</span><input type="checkbox" checked={s.two_factor} onChange={e => setS({...s, two_factor: e.target.checked})}/></label>
-      <button onClick={save} className="dina-btn-primary mt-2" data-testid="securite-save"><Save size={14}/> Enregistrer</button>
+      <SaveButton loading={saving} onClick={save} testid="securite-save" className="mt-2"/>
     </div>
   );
 }

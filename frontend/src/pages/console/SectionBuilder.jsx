@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import { Plus, Save, Trash2, GripVertical, Eye, EyeOff, ExternalLink, Image as ImageIcon, Grid3x3, Shield, Megaphone, Sparkles, FileText, X, Upload, Layers } from "lucide-react";
 import { Link } from "react-router-dom";
 import { toast as toast2 } from "sonner";
+import IconPicker from "@/components/shared/IconPicker";
+import SaveButton from "@/components/shared/SaveButton";
 
 const SECTION_TYPES = [
   { v: "hero", label: "Hero (mosaïque défilante)", icon: ImageIcon, defaults: { tagline: "Nouvelle collection", title: "Vos talons,", highlight: "votre allure.", subtitle: "Description…", cta_label: "Découvrir", cta_link: "/boutique/catalog", mosaic: [] } },
@@ -67,7 +69,7 @@ export default function SectionBuilder() {
         <div className="flex gap-2">
           <Link to="/boutique" target="_blank" className="dina-btn-secondary !min-h-[40px]" data-testid="section-preview"><ExternalLink size={13} />Prévisualiser</Link>
           <button onClick={() => setShowAdd(true)} className="dina-btn-secondary !min-h-[40px]" data-testid="section-add"><Plus size={13} />Ajouter</button>
-          <button onClick={save} disabled={saving} className="dina-btn-primary !min-h-[40px]" data-testid="section-save"><Save size={14} />{saving ? "Enregistrement…" : "Enregistrer"}</button>
+          <SaveButton loading={saving} onClick={save} testid="section-save"/>
         </div>
       </div>
 
@@ -168,14 +170,9 @@ function PropsEditor({ section, onChange, onClose }) {
         {section.type === "trust_strip" && (
           <div className="space-y-2">
             {(p.items || []).map((it, i) => (
-              <div key={i} className="grid grid-cols-[80px_1fr_1fr] gap-2 items-end">
+              <div key={i} className="grid grid-cols-[160px_1fr_1fr] gap-2 items-end">
                 <Field label="Icône">
-                  <select className="dina-input" value={it.icon || "shield"} onChange={e => { const items = [...p.items]; items[i] = { ...it, icon: e.target.value }; onChange({ items }); }}>
-                    <option value="truck">Camion</option>
-                    <option value="shield">Bouclier</option>
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="gift">Cadeau</option>
-                  </select>
+                  <IconPicker value={it.icon || "shield"} onChange={v => { const items = [...p.items]; items[i] = { ...it, icon: v }; onChange({ items }); }} testid={`sb-trust-icon-${i}`}/>
                 </Field>
                 <Field label="Titre"><input className="dina-input" value={it.title} onChange={e => { const items = [...p.items]; items[i] = { ...it, title: e.target.value }; onChange({ items }); }} /></Field>
                 <Field label="Texte"><input className="dina-input" value={it.text} onChange={e => { const items = [...p.items]; items[i] = { ...it, text: e.target.value }; onChange({ items }); }} /></Field>

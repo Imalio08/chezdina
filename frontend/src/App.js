@@ -76,7 +76,7 @@ import AcceptanceChecklist from "@/pages/console/AcceptanceChecklist";
 import Rate from "@/pages/public/Rate";
 import ScanRedirect from "@/pages/public/ScanRedirect";
 import Nouveautes from "@/pages/storefront/Nouveautes";
-import Promotions from "@/pages/storefront/Promotions";
+import StorePromotions from "@/pages/storefront/Promotions";
 import GuideTailles from "@/pages/storefront/GuideTailles";
 import LivraisonRetours from "@/pages/storefront/LivraisonRetours";
 import Suivi from "@/pages/storefront/Suivi";
@@ -136,7 +136,7 @@ export default function App() {
               <Route path="compte/*" element={<AccountShell />} />
               <Route path="bons-plans" element={<BonsPlans />} />
               <Route path="nouveautes" element={<Nouveautes />} />
-              <Route path="promotions" element={<Promotions />} />
+              <Route path="promotions" element={<StorePromotions />} />
               <Route path="guide-tailles" element={<GuideTailles />} />
               <Route path="livraison-retours" element={<LivraisonRetours />} />
               <Route path="suivi-commande" element={<Suivi />} />
