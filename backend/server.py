@@ -15,50 +15,16 @@ import bcrypt, jwt
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dina")
 
-client = AsyncIOMotorClient(os.environ['MONGO_URL'])
-db = client[os.environ['DB_NAME']]
+# Shared primitives (moved to deps.py — P5 Refactor Feb 2026)
+from deps import (
+    client, db, JWT_SECRET, JWT_ALG,
+    hash_pw, verify_pw, make_token, make_customer_token,
+    new_id, now_iso, gen_access_code, clean,
+    get_user, require_role,
+)
 
 app = FastAPI(title="Chez Dina API")
 api = APIRouter(prefix="/api")
-
-JWT_SECRET = os.environ.get("JWT_SECRET", "dina-dev-secret")
-JWT_ALG = "HS256"
-
-hash_pw = lambda p: bcrypt.hashpw(p.encode(), bcrypt.gensalt()).decode()
-def verify_pw(p, h):
-    try: return bcrypt.checkpw(p.encode(), h.encode())
-    except Exception: return False
-def make_token(uid, role, m=60*24*7):
-    return jwt.encode({"sub": uid, "role": role, "exp": datetime.now(timezone.utc)+timedelta(minutes=m)}, JWT_SECRET, algorithm=JWT_ALG)
-def new_id(): return str(uuid.uuid4())
-def now_iso(): return datetime.now(timezone.utc).isoformat()
-def gen_access_code(): return str(secrets.randbelow(1_000_000)).zfill(6)
-def make_customer_token(cid: str, m: int = 60*24*30):
-    return jwt.encode({"sub": cid, "kind": "customer", "exp": datetime.now(timezone.utc)+timedelta(minutes=m)}, JWT_SECRET, algorithm=JWT_ALG)
-def clean(d):
-    if isinstance(d, list): return [clean(x) for x in d]
-    if isinstance(d, dict): return {k: clean(v) for k, v in d.items() if k != "_id"}
-    return d
-
-async def get_user(request: Request):
-    token = request.cookies.get("access_token")
-    if not token:
-        h = request.headers.get("Authorization", "")
-        if h.startswith("Bearer "): token = h[7:]
-    if not token: raise HTTPException(401, "Non authentifié")
-    try: payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-    except Exception: raise HTTPException(401, "Session expirée")
-    user = await db.users.find_one({"id": payload["sub"]})
-    if not user: raise HTTPException(401, "Introuvable")
-    for k in ("_id","password_hash","pin_hash"): user.pop(k, None)
-    return user
-
-def require_role(*roles):
-    async def dep(user: dict = Depends(get_user)):
-        if user.get("role") not in roles and user.get("role") != "admin":
-            raise HTTPException(403, "Accès refusé")
-        return user
-    return dep
 
 # ---------- Pydantic models ----------
 class LoginIn(BaseModel): email: str; password: str
@@ -6268,146 +6234,8 @@ async def manager_balance(mid: str, user: dict = Depends(require_role("admin","m
     total = sum(r.get("amount",0) for r in rows)
     return {"balance": total, "entries": clean(rows)}
 
-# -------- Attendance (check-in with selfie + GPS + geofence) --------
-def _haversine_m(lat1, lon1, lat2, lon2):
-    import math
-    R = 6371000
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    dphi = math.radians(lat2-lat1); dl = math.radians(lon2-lon1)
-    a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dl/2)**2
-    return int(2*R*math.asin(math.sqrt(a)))
-
-@api.get("/attendance/me")
-async def attendance_me(user: dict = Depends(get_user)):
-    today = datetime.now(timezone.utc).date().isoformat()
-    arr = await db.attendance.find_one({"user_id": user.get("id"), "day": today, "kind":"arrival"})
-    dep = await db.attendance.find_one({"user_id": user.get("id"), "day": today, "kind":"departure"})
-    return {"checked_in": bool(arr), "arrival": clean(arr), "departure": clean(dep)}
-
-@api.post("/attendance/check-in")
-async def check_in(body: Dict[str,Any], user: dict = Depends(get_user)):
-    """kind: 'arrival' | 'departure'. Requires only a live selfie (b64). GPS/geofence are NOT required."""
-    kind = body.get("kind","arrival")
-    method = body.get("method","phone")  # phone | tablet
-    selfie = body.get("selfie")
-    if not selfie:
-        raise HTTPException(400, "Selfie requis (caméra avant)")
-    today = datetime.now(timezone.utc).date().isoformat()
-    now = datetime.now(timezone.utc)
-    biz = await db.business.find_one({"id":"main"}) or {}
-    # Compute lateness vs role hours (informational only)
-    hours = (biz.get("working_hours") or {}).get(user.get("role","")) or {"open":"08:00","tolerance_min":10}
-    late = False; late_min = 0
-    if kind == "arrival":
-        oh, om = (hours.get("open","08:00").split(":") + ["00"])[:2]
-        open_dt = now.replace(hour=int(oh), minute=int(om), second=0, microsecond=0)
-        tol = int(hours.get("tolerance_min",10))
-        delta = int((now - open_dt).total_seconds()/60)
-        if delta > tol: late = True; late_min = delta
-    # Departure without reconciliation flag (riders)
-    flags = []
-    if kind == "departure" and user.get("role") == "rider":
-        pending_recon = await db.delivery_sessions.count_documents({"rider_id": user.get("id"), "status": {"$ne": "reconciled"}})
-        if pending_recon > 0:
-            flags.append("depart_sans_reconciliation")
-            await db.notifications.insert_one({"id":new_id(),"type":"attendance_alert","title":"Départ sans réconciliation","msg":f"{user.get('name')} a pointé le départ sans réconcilier ses livraisons","color":"#c62828","at":now_iso(),"link":"/console/livraisons"})
-    doc = {"id": new_id(), "user_id": user.get("id"), "user_name": user.get("name"), "user_role": user.get("role"),
-           "day": today, "kind": kind, "method": method, "at": now_iso(), "selfie": selfie,
-           "lat": None, "lng": None, "distance_m": None, "outside": False,
-           "late": late, "late_min": late_min, "flags": flags}
-    await db.attendance.insert_one(doc)
-    return {"ok": True, "late": late, "late_min": late_min, "flags": flags, "at": doc["at"]}
-
-@api.get("/attendance/today")
-async def attendance_today(user: dict = Depends(require_role("admin","manager"))):
-    today = datetime.now(timezone.utc).date().isoformat()
-    rows = await db.attendance.find({"day": today}).sort("at",-1).to_list(200)
-    all_employees = await db.users.find({"role": {"$in": ["manager","rider","caissiere","sales","stock_keeper","community_manager"]}, "active": True}).to_list(200)
-    present_ids = {r["user_id"] for r in rows if r["kind"]=="arrival"}
-    not_checked = [{"id":u["id"],"name":u["name"],"role":u["role"]} for u in all_employees if u["id"] not in present_ids]
-    return {"today": clean(rows), "not_checked_in": not_checked, "present_count": len(present_ids), "total_employees": len(all_employees)}
-
-@api.get("/attendance/calendar/{eid}")
-async def attendance_calendar(eid: str, month: Optional[str] = None, user: dict = Depends(require_role("admin","manager"))):
-    """Return per-day status for a given employee and month (YYYY-MM)."""
-    now = datetime.now(timezone.utc)
-    ym = month or now.strftime("%Y-%m")
-    rows = await db.attendance.find({"user_id": eid, "day": {"$regex": f"^{ym}"}}).to_list(1000)
-    days = {}
-    for r in rows:
-        d = days.setdefault(r["day"], {"arrival": None, "departure": None, "late": False, "late_min": 0, "flags": []})
-        if r["kind"] == "arrival": d["arrival"] = r["at"]; d["late"] = r.get("late", False); d["late_min"] = r.get("late_min",0)
-        if r["kind"] == "departure": d["departure"] = r["at"]
-        d["flags"] = list(set(d["flags"] + (r.get("flags") or [])))
-    return {"month": ym, "days": days}
-
-@api.get("/attendance/stats/{eid}")
-async def attendance_stats(eid: str, days: int = 30, user: dict = Depends(require_role("admin","manager"))):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
-    rows = await db.attendance.find({"user_id": eid, "day": {"$gte": cutoff}}).to_list(1000)
-    worked_days = len({r["day"] for r in rows if r["kind"]=="arrival"})
-    late_count = sum(1 for r in rows if r["kind"]=="arrival" and r.get("late"))
-    total_late_min = sum(r.get("late_min",0) for r in rows)
-    outside = sum(1 for r in rows if r.get("outside"))
-    arrivals = [r for r in rows if r["kind"]=="arrival" and r.get("at")]
-    avg_arrival_h = None
-    if arrivals:
-        total_min = sum((datetime.fromisoformat(r["at"].replace("Z","+00:00")).hour*60 + datetime.fromisoformat(r["at"].replace("Z","+00:00")).minute) for r in arrivals)
-        avg = total_min // len(arrivals)
-        avg_arrival_h = f"{avg//60:02d}:{avg%60:02d}"
-    return {"worked_days": worked_days, "late_count": late_count, "late_min_total": total_late_min, "outside_count": outside,
-            "punctuality_pct": round((worked_days-late_count)/max(1,worked_days)*100, 1), "avg_arrival": avg_arrival_h}
-
-@api.patch("/business/geofence")
-async def update_geofence(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
-    """Set the store GPS, radius and mandatory flag."""
-    geo = {"lat": float(body.get("lat") or 0), "lng": float(body.get("lng") or 0),
-           "radius_m": int(body.get("radius_m", 150)), "mandatory": bool(body.get("mandatory", False))}
-    await db.business.update_one({"id":"main"}, {"$set": {"geofence": geo}}, upsert=True)
-    return {"ok": True, "geofence": geo}
-
-@api.patch("/business/working-hours")
-async def update_working_hours(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
-    await db.business.update_one({"id":"main"}, {"$set": {"working_hours": body.get("working_hours") or {}}}, upsert=True)
-    return {"ok": True}
-
-@api.patch("/business/attendance-config")
-async def update_attendance_config(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
-    """Who can punch? body: {enabled: bool, enabled_roles: [role_keys...]}"""
-    cfg = {
-        "enabled": bool(body.get("enabled", True)),
-        "enabled_roles": list(body.get("enabled_roles") or ["manager","sales","stock_keeper","community_manager","rider"]),
-    }
-    await db.business.update_one({"id":"main"}, {"$set": {"attendance_config": cfg}}, upsert=True)
-    return {"ok": True, "attendance_config": cfg}
-
-@api.get("/attendance/all-stats")
-async def attendance_all_stats(days: int = 30, user: dict = Depends(require_role("admin","manager"))):
-    """Bulk ponctualité/retards/absences per employee for CSV/PDF export."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
-    employees = await db.users.find({"role": {"$in": ["manager","sales","stock_keeper","community_manager","rider"]}, "active": True}, {"id":1,"name":1,"role":1}).to_list(500)
-    out = []
-    for u in employees:
-        rows = await db.attendance.find({"user_id": u["id"], "day": {"$gte": cutoff}}).to_list(1000)
-        arr_rows = [r for r in rows if r.get("kind") == "arrival"]
-        worked_days = len({r["day"] for r in arr_rows})
-        late_count = sum(1 for r in arr_rows if r.get("late"))
-        late_min_total = sum(r.get("late_min", 0) for r in arr_rows)
-        absences = max(0, days - worked_days)
-        avg_arrival_h = None
-        if arr_rows:
-            total_min = sum((datetime.fromisoformat(r["at"].replace("Z","+00:00")).hour*60 + datetime.fromisoformat(r["at"].replace("Z","+00:00")).minute) for r in arr_rows if r.get("at"))
-            if total_min:
-                avg = total_min // len(arr_rows)
-                avg_arrival_h = f"{avg//60:02d}:{avg%60:02d}"
-        out.append({
-            "user_id": u["id"], "name": u.get("name"), "role": u.get("role"),
-            "worked_days": worked_days, "absences": absences,
-            "late_count": late_count, "late_min_total": late_min_total,
-            "avg_arrival": avg_arrival_h,
-            "punctuality_pct": round((worked_days - late_count) / max(1, worked_days) * 100, 1),
-        })
-    return {"period_days": days, "rows": out}
+# -------- Attendance (modern endpoints moved to routers/attendance.py — P5 Refactor Feb 2026) --------
+# Historical kiosk endpoints remain in this file for now (lines ~2646 /attendance/punch, 3583 /attendance/today-kiosk).
 
 # -------- Stock adjustment with approval --------
 @api.post("/stock/adjustments")
@@ -6819,7 +6647,9 @@ async def root(): return {"name":"Chez Dina API","v":"2.0"}
 app.include_router(api)
 # P5 Refactor scaffold — modular routers go here as domains get extracted from server.py.
 from routers.meta import router as meta_router
+from routers.attendance import router as attendance_router
 app.include_router(meta_router)
+app.include_router(attendance_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")
