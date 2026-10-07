@@ -1,0 +1,27 @@
+{
+  "summary": "Iter46 P5 refactor regression — PASS. The extraction of attendance endpoints into /app/backend/routers/attendance.py and shared primitives into /app/backend/deps.py did not break anything. Backend: 25/25 tests PASS covering all 9 attendance endpoints (shape + RBAC), 3 business PATCH endpoints (admin-only), and 9 non-attendance server.py endpoints (login x5 roles, /api/auth/me, /api/products, /api/public/products, /api/orders, /api/customers, /api/business, /api/public/site, /api/public/business). Frontend: 5/5 scenarios PASS — admin dashboard loads with topbar-punch visible; /console/presence shows stats-table + CSV + PDF export buttons; /console/parametres?tab=pointage shows 6/6 toggles checked and pointage-save button; sales login shows RBAC-filtered sidebar (no Finances, no Produits); rider1 login lands on /rider with rider-punch-btn visible. RBAC enforced: sales & cm get 403 on /api/attendance/today and /api/attendance/all-stats; manager & sales get 403 on PATCH /api/business/attendance-config. attendance_config left in {enabled:true, enabled_roles:[manager,sales,stock_keeper,community_manager,rider]} as requested.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/test_iter46_refactor_regression.py",
+    "/app/test_reports/pytest/iter46.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "deps.py cleanly isolates the single Motor client, bcrypt helpers, JWT helpers and the auth dependencies — good foundation for further router extractions.",
+    "routers/attendance.py uses `prefix='/api'` on its own APIRouter and is included with `app.include_router(attendance_router)` AFTER `app.include_router(api)` — ordering is fine because paths don't collide.",
+    "server.py still imports `AsyncIOMotorClient`, `bcrypt`, `jwt` at module level even though they are re-exported from deps. Non-blocking but a future cleanup could drop those unused top-level imports.",
+    "Note: original problem statement claimed endpoint '/api/me' but the actual endpoint is '/api/auth/me'. Updated test accordingly; no code bug.",
+    "deps.require_role grants implicit access to 'admin' regardless of listed roles — preserved from monolith, correct behavior."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter46_refactor_regression.py (new)"
+  ],
+  "success_rate": {"backend": "100% (25/25)", "frontend": "100% (5/5)"},
+  "test_credentials": "admin=aouattaraesca@gmail.com/Admin123! · manager=manager.cocody@dinastore.ci/Manager123! · sales=agent1@dinastore.ci/Agent123! · cm=cm@dinastore.ci/Cm123! · rider=rider1@dinastore.ci/Rider123!",
+  "seed_data_creation": "None persistent. The test_check_in_with_selfie creates/updates manager attendance for today, but attendance_config left as {enabled:true, enabled_roles:[manager,sales,stock_keeper,community_manager,rider]} as requested.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "P5 refactor baseline (deps.py + routers/attendance.py) is stable. For future router extractions, the pattern app.include_router(api) followed by app.include_router(<new_router>) works. Use /app/backend/tests/test_iter46_refactor_regression.py as a regression smoke for subsequent slices. Note the real auth endpoint is /api/auth/me (not /api/me)."
+}

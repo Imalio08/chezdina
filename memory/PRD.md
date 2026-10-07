@@ -1,5 +1,25 @@
 # Chez Dina — PRD
 
+### Vague I — Refactor P5 : extraction attendance (Feb 2026) ✅
+**Tranche 1 du refactor du monolithe server.py (6827 → 6656 lignes).**
+
+- Création `/app/backend/deps.py` (91 lignes) : primitives partagées
+  - Motor client + db (singleton), JWT_SECRET/ALG
+  - `hash_pw`, `verify_pw`, `make_token`, `make_customer_token`, `new_id`, `now_iso`, `gen_access_code`, `clean`
+  - `get_user` + `require_role` (auth deps)
+- Création `/app/backend/routers/attendance.py` (186 lignes, 9 endpoints) :
+  - `GET /attendance/me`, `POST /attendance/check-in`, `GET /attendance/today`
+  - `GET /attendance/calendar/{eid}`, `GET /attendance/stats/{eid}`, `GET /attendance/all-stats`
+  - `PATCH /business/geofence`, `PATCH /business/working-hours`, `PATCH /business/attendance-config`
+  - Toutes utilisent `APIRouter(prefix="/api", tags=["attendance"])` + import de `deps`
+- `server.py` modifié :
+  - Lignes 15-41 : importent les primitives depuis `deps.py` (plus de doublon)
+  - Lignes 6271-6410 (ancien bloc attendance) : supprimées
+  - Inclusion du router : `app.include_router(attendance_router)` après `app.include_router(api)`
+- Tests smoke curl : tous les endpoints extraits répondent avec les mêmes shapes qu'avant. `/api/public/products` et `/api/auth/login` toujours OK.
+
+**Prochaines tranches à faire :** auth, catalog, orders, riders, messagerie.
+
 ### Vague H — Photos robustes + Paramètres Pointage + Stats CSV/PDF (Feb 2026) ✅
 **Photos (SmartImage)**
 - Nouveau composant `/app/frontend/src/components/shared/SmartImage.jsx` : `<img>` avec `onError` → fallback (lettre initiale ou icône) sur gradient `#fff5f5 → #fde8e8`.
