@@ -65,6 +65,13 @@ const SECTIONS = [
     { to: "/console/site?tab=seo", icon: Target, label: "SEO & partage" },
     { to: "/console/site?tab=apercu", icon: Globe, label: "Aperçu" },
   ]},
+  { label: "App Livreur", items: [
+    { to: "/console/livreur-app?tab=identite", icon: Palette, label: "Identité" },
+    { to: "/console/livreur-app?tab=onglets",  icon: LayoutDashboard, label: "Onglets" },
+    { to: "/console/livreur-app?tab=annonces", icon: Megaphone, label: "Annonces" },
+    { to: "/console/livreur-app?tab=aide",     icon: BookOpen, label: "Aide" },
+    { to: "/console/livreur-app?tab=apercu",   icon: Globe, label: "Aperçu" },
+  ]},
   { label: "Pilotage", items: [
     { to: "/console/statistiques", icon: BarChart3, label: "Statistiques" },
     { to: "/console/finances", icon: Wallet, label: "Finances" },

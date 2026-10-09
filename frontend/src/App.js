@@ -32,6 +32,7 @@ import Manuel from "@/pages/console/Manuel";
 import ManuelModule from "@/pages/console/ManuelModule";
 import SiteSettings from "@/pages/console/SiteSettings";
 import SiteVitrine from "@/pages/console/SiteVitrine";
+import LivreurApp from "@/pages/console/LivreurApp";
 import Placeholder from "@/pages/console/Placeholder";
 import FichesColis from "@/pages/console/FichesColis";
 import RiderShell from "@/pages/rider/RiderShell";
@@ -168,6 +169,7 @@ export default function App() {
               <Route path="statistiques" element={<ErrorBoundary><Statistiques /></ErrorBoundary>} />
               <Route path="equipe" element={<ErrorBoundary><Team /></ErrorBoundary>} />
               <Route path="site" element={<ErrorBoundary><SiteVitrine /></ErrorBoundary>} />
+              <Route path="livreur-app" element={<ErrorBoundary><LivreurApp /></ErrorBoundary>} />
               <Route path="integrations" element={<ErrorBoundary><Integrations /></ErrorBoundary>} />
               <Route path="parametres" element={<ErrorBoundary><Settings /></ErrorBoundary>} />
               <Route path="manuel" element={<ErrorBoundary><Manuel /></ErrorBoundary>} />

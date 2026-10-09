@@ -23,7 +23,6 @@ const TABS = [
   { id: "integrations", label: "Intégrations", icon: Plug },
   { id: "equipe", label: "Équipe & horaires", icon: Users },
   { id: "pointage", label: "Pointage", icon: Clock },
-  { id: "rider-app", label: "App Livreur", icon: Smartphone },
   { id: "securite", label: "Sécurité", icon: Shield },
   { id: "donnees", label: "Données", icon: Database },
 ];
@@ -78,7 +77,6 @@ export default function Settings() {
           {tab === "integrations" && <IntegrationsTab />}
           {tab === "equipe" && <EquipeTab />}
           {tab === "pointage" && <PointageTab />}
-          {tab === "rider-app" && <RiderAppTab />}
           {tab === "securite" && <SecuriteTab />}
           {tab === "donnees" && <DonneesTab />}
         </main>
