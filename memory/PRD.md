@@ -1,5 +1,16 @@
 # Chez Dina — PRD
 
+### Vague R — Catalogue 30 SKUs images 100% vérifiées (Feb 2026) ✅
+**Problème** : la cliente a signalé des images incorrectes sur la vitrine (baskets homme, livres, pâtes, vêtements, sneakers Nike/NB) sur certains produits. Cause racine : plusieurs IDs photo Unsplash ont été inventés (hashes `abc...`, `cde...`, `abd...`) → Unsplash servait des photos aléatoires.
+
+**Correction** :
+- Catalogue réduit à **30 SKUs** à la demande de la gérante : 20 chaussures (essentiellement talons/escarpins) + 10 sacs.
+- Chaque image a été **visuellement vérifiée** via Gemini Flash Lite comme montrant soit un escarpin/sandale à talon pour femme, soit un sac à main/pochette pour femme. Suppression de tous les IDs inventés.
+- Pool d'images : 9 photos escarpins vérifiées (Unsplash + Pexels) × 20 produits = chaque image peut servir pour 2-3 variantes couleurs ; 10 photos sacs vérifiées × 10 produits = 1 image par sac.
+- Marques : Dina Soles (20 chaussures) + Dina Carry (10 sacs).
+- Fichier `/app/backend/routers/admin.py` entièrement réécrit avec `VERIFIED_SHOE_IMAGES` et `VERIFIED_BAG_IMAGES` comme constantes au sommet et chaque produit référence son index image.
+
+
 ### Vague Q — CMS Livreur promu + PWA rider séparée + Catalogue chaussures/sacs (Feb 2026) ✅
 **CMS App Livreur en section console dédiée**
 - Nouveau fichier `/app/frontend/src/pages/console/LivreurApp.jsx` (390 lignes) : page top-level `/console/livreur-app` miroir de SiteVitrine avec 5 sous-onglets :
