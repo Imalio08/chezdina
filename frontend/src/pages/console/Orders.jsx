@@ -126,8 +126,7 @@ export default function Orders() {
               <td className="text-right tabular font-semibold cursor-pointer" onClick={()=>setSelected(o)}>{fcfa(o.total)}</td>
               <td>
                 <div className="flex items-center justify-center gap-1">
-                  <button onClick={() => openInvoice(o, "view")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Voir facture" data-testid={`invoice-view-${o.code}`}><FileText size={13}/></button>
-                  <button onClick={() => openInvoice(o, "pdf")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Imprimer PDF" data-testid={`invoice-pdf-${o.code}`}><Download size={13}/></button>
+                  <button onClick={() => openInvoice(o, "pdf")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Télécharger facture PDF" data-testid={`invoice-pdf-${o.code}`}><Download size={13}/></button>
                   <button onClick={() => openInvoice(o, "wa")} className="text-[#1f8a4c] hover:text-[#b02a2a] p-1" title="Envoyer par WhatsApp" data-testid={`invoice-wa-${o.code}`}><MessageCircle size={13}/></button>
                 </div>
               </td>

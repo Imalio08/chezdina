@@ -1,5 +1,31 @@
 # Chez Dina — PRD
 
+### Vague S — P0 : POS refondue + PDFs réels avec logo (Feb 2026) ✅
+**POS/Caisse refondue** (`/app/frontend/src/pages/console/POS.jsx`)
+- Grille produits forcée à **2 colonnes exactement** (plus de scroll horizontal), images réduites à `h-28` (au lieu de `aspect-square`), suppression des lignes "pointures/couleurs/En stock" pour alléger la carte.
+- Nouveau bloc **Total en HAUT** du panier (`data-testid=pos-cart-totals-top`) : affiche "Total à encaisser" en grand (`text-2xl`, serif, rouge Chez Dina), sous-total/livraison/remise en-dessous, et bouton **Encaisser** intégré dans le bloc. Les articles ajoutés descendent en-dessous → la gérante voit immédiatement le total grossir sans scroller.
+- Panier largeur fixe `320-360px` (plus de `min(400px,33vw)` qui débordait sur petits écrans).
+
+**Factures PDF réelles avec logo** (`/app/frontend/src/lib/pdfInvoice.js` — nouveau)
+- `downloadInvoicePDF(order, invoice, business)` : génère un PDF A4 propre avec :
+  - **Logo du magasin** (si uploadé) + nom + adresse + téléphone + TikTok dans l'entête
+  - Titre "FACTURE" en rouge + N° + commande + date + statut à droite
+  - Blocs Cliente + Livraison
+  - Tableau articles (Article · Qté · P.U. · Montant) avec séparateurs
+  - Bloc Totaux à droite (sous-total · livraison · remise · TOTAL en gras rouge)
+  - Footer "Merci pour votre confiance Chez Dina"
+- `downloadPackingSlipPDF(order, business)` : même entête logo, "FICHE COLIS", + zones signatures cliente et livreur en bas.
+- `fetchBusinessForPdf(api)` : récupère logo+nom+adresse+phone+tiktok depuis `/public/site`.
+
+**Orders refondue** (`/app/frontend/src/pages/console/Orders.jsx`)
+- Bouton "Voir facture" → PDF réel téléchargé (plus de redirection vers `/noter/{code}` qui était le formulaire d'avis).
+- Bouton "Télécharger PDF" → PDF A4 avec logo.
+- Nouveau bouton **"Fiche colis"** dans le drawer : télécharge la fiche colis PDF avec logo (pour impression + remise au livreur).
+- Bouton "WhatsApp" → télécharge le PDF ET ouvre `wa.me/...` avec message prérempli invitant la gérante à joindre le PDF au message (WhatsApp Web ne permet pas d'auto-attacher depuis le navigateur).
+
+**Reste pour P1/P2** : nettoyage images catalogue, fiches détail cliquables, bouton session caisse, rôles simplifiés, pointage dans login.
+
+
 ### Vague R — Catalogue 30 SKUs images 100% vérifiées (Feb 2026) ✅
 **Problème** : la cliente a signalé des images incorrectes sur la vitrine (baskets homme, livres, pâtes, vêtements, sneakers Nike/NB) sur certains produits. Cause racine : plusieurs IDs photo Unsplash ont été inventés (hashes `abc...`, `cde...`, `abd...`) → Unsplash servait des photos aléatoires.
 

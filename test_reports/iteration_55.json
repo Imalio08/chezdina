@@ -1,0 +1,36 @@
+{
+  "summary": "P0 Iter56 fixes tested. Backend /api/invoices/from-order/{id} works. POS layout refondu is correct: totals block at TOP (data-testid=pos-cart-totals-top), pos-checkout inside this block, grid-cols-2 only (no sm/md/lg variants), product card h-28 confirmed, 'En stock' and 'pointures/couleurs' lines removed, no horizontal page scroll at 1366x768. Live total correctly updates (0 -> 68 000 FCFA after adding 2 items). Orders drawer now exposes order-invoice-pdf / order-slip-pdf / order-invoice-wa and order-invoice-view is REMOVED. jsPDF downloads trigger real files: facture-FACT-2026-xxxx.pdf, fiche-colis-DN-xxxx.pdf. Toast 'Facture ... générée' appears. /boutique smoke OK. TWO regressions found vs the problem statement: (1) invoice-view-{code} buttons are STILL present on the Orders table rows (statement claimed removed). (2) A duplicate 'Encaisser · {total} FCFA' button is still visible at the BOTTOM of the cart column — the element data-testid=pos-checkout-bottom-hidden has Tailwind class 'hidden' but is overridden by 'dina-btn-primary' which sets display:inline-flex, so it renders anyway.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Orders.jsx line 129", "issue": "invoice-view-{code} button is STILL rendered on each table row — statement says it should be REMOVED. 200 occurrences detected (one per row).", "selector": "[data-testid^='invoice-view-']", "priority": "HIGH"},
+      {"component": "POS.jsx line 399", "issue": "Duplicate 'Encaisser · {total} FCFA' button renders at the BOTTOM of the cart column. The class 'hidden' is overridden by 'dina-btn-primary' (display:inline-flex). Either delete the element or add '!hidden'/style={{display:'none'}}.", "selector": "[data-testid='pos-checkout-bottom-hidden']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/login (console)", "issues": ["Email + password <input> elements have no name/type/placeholder/data-testid attributes — slows automated testing. (noted previously by memory file)"]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_invoice_from_order.py",
+    "/app/test_reports/pytest/invoice_from_order.xml"
+  ],
+  "action_items": [
+    "Remove the invoice-view-{o.code} <button> from Orders.jsx line 129 (table row) — only pdf + wa should remain per the P0 brief.",
+    "Delete (or truly hide with !important) the bottom duplicate checkout button at POS.jsx line 399 (data-testid=pos-checkout-bottom-hidden). Right now it renders a second big red 'Encaisser · 68 000 FCFA' button below the cart items, which was supposed to be removed when the totals block moved to the top."
+  ],
+  "critical_code_review_comments": [
+    "POS.jsx uses Tailwind 'hidden' + custom class 'dina-btn-primary' — the custom class wins specificity, so 'hidden' has no effect. Prefer conditional rendering ({false && <button/>}) over leftover placeholders.",
+    "Orders.jsx openInvoice treats action==='view' identically to action==='pdf' (both call downloadInvoicePDF). The 'view' branch is dead code if the view button is removed as planned.",
+    "pdfInvoice.js: downloadInvoicePDF trusts invoice.number/created_at from backend but falls back silently to Date.now() — fine, but filename sanitization is missing (e.g. if number contains '/', browser may reject). Low risk.",
+    "pdfInvoice.js header(): doc.addImage inside try/catch silently swallows errors — if the merchant uploads a non-PNG logo (jpg/webp) the logo will be missing from the PDF without any warning. Consider detecting mime from the data URL."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "85%"},
+  "test_credentials": "aouattaraesca@gmail.com / Admin123!",
+  "seed_data_creation": "none",
+  "retest_needed": true,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "After fixes, re-check: (a) [data-testid^='invoice-view-'] count on /console/commandes must be 0, (b) [data-testid='pos-checkout-bottom-hidden'] must either not exist or have getBoundingClientRect().height===0. Backend regression test file /app/backend/tests/test_invoice_from_order.py already covers POST /api/invoices/from-order/{id} and should keep passing. jsPDF downloads were observed in Playwright (facture-FACT-*.pdf, fiche-colis-DN-*.pdf). GuidedTour overlay blocks clicks on fresh session — strip it via document.querySelector('[data-testid=\"guided-tour\"]').remove() or set localStorage keys guided_tour_dashboard_done=1 before navigating.",
+  "rca of the issue": "Issue #1 (invoice-view still present): the dev edited the drawer buttons and openInvoice() handler but forgot to delete the <button data-testid='invoice-view-{o.code}'> inside the table-row action column at Orders.jsx line 129. Issue #2 (bottom checkout visible): the dev used Tailwind 'hidden' as a soft toggle, but the companion custom class 'dina-btn-primary' re-sets display:inline-flex with higher specificity, so 'hidden' is ignored. Fix: remove the element entirely (preferred, since the top block already contains pos-checkout), or append '!' to override: className='dina-btn-primary !hidden ...'."
+}

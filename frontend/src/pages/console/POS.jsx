@@ -377,7 +377,7 @@ function POSInner() {
         )}
 
         {/* Items */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin -mx-2 px-2 min-h-[80px]">
+        <div className="-mx-2 px-2 min-h-[80px]">
           {cart.length===0 ? <div className="text-center text-sm text-[#666] py-10">Aucun article · Tapez un produit pour l'ajouter</div> :
             cart.map(it=>{
               const prod = products.find(p => p.id === it.product_id);
@@ -394,9 +394,7 @@ function POSInner() {
             })}
         </div>
 
-        {/* Totals block moved to TOP — removed from here */}
-
-        <button onClick={()=>setShowPayment(true)} disabled={!cart.length} className="dina-btn-primary w-full mt-3 !min-h-[48px] hidden" data-testid="pos-checkout-bottom-hidden"><CreditCard size={16}/>{mode==="delivery"?"Commander · ":"Encaisser · "}{fcfa(total)}</button>
+        {/* Totals block moved to TOP — removed from here (bottom checkout button deleted) */}
         </div> {/* /scrollable area */}
       </div>
 
