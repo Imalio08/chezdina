@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt } from "lucide-react";
+import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
 const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","retournee","annulee","echouee"];
 
@@ -61,22 +62,26 @@ export default function Orders() {
         const r = await api.post(`/invoices/from-order/${o.id}`);
         inv = r.data;
       }
-      if (action === "view") {
-        window.open(`/noter/${o.code}`, "_blank");
-      } else if (action === "pdf") {
-        const win = window.open("", "_blank");
-        if (win) {
-          win.document.write(`<pre style="font-family:monospace;padding:20px">FACTURE ${inv.number}\nCommande ${inv.order_code}\n\nCliente: ${inv.customer?.name || "—"}\nTotal: ${fcfa(inv.total)}\n</pre>`);
-          win.document.close();
-          win.print();
-        }
+      const business = await fetchBusinessForPdf(api);
+      if (action === "view" || action === "pdf") {
+        // Generate the REAL A4 PDF with logo + lines + totals and trigger download.
+        downloadInvoicePDF(o, inv, business);
+        toast.success(`Facture ${inv.number} générée`);
+      } else if (action === "slip") {
+        downloadPackingSlipPDF(o, business);
+        toast.success(`Fiche colis ${o.code} générée`);
       } else if (action === "wa") {
+        // Generate the PDF first, then open WhatsApp with a note telling the
+        // merchant to attach the just-downloaded PDF (WhatsApp Web doesn't
+        // support auto-attachments from the browser).
+        downloadInvoicePDF(o, inv, business);
         const phone = (o.customer?.phone || "").replace(/\D/g, "");
         if (!phone) return toast.error("Numéro cliente manquant");
-        const txt = `Bonjour ${o.customer.name}, voici votre facture ${inv.number} pour la commande ${o.code} — Total ${fcfa(inv.total)}. Merci de votre confiance Chez Dina`;
+        const txt = `Bonjour ${o.customer?.name || ""}, voici votre facture ${inv.number} pour la commande ${o.code} — Total ${fcfa(inv.total)}. Le PDF a été téléchargé, pensez à le joindre à ce message. Merci Chez Dina 💛`;
         window.open(`https://wa.me/${phone}?text=${encodeURIComponent(txt)}`, "_blank");
+        toast.success("PDF téléchargé · joignez-le au message WhatsApp");
       }
-    } catch { toast.error("Erreur facture"); }
+    } catch (e) { console.error(e); toast.error("Erreur facture"); }
   };
 
   return (
@@ -190,9 +195,9 @@ function OrderDrawer({ order, onClose, onStatus, onReload, onInvoice }) {
 
         <div className="mb-4 p-3 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg flex items-center justify-between flex-wrap gap-2" data-testid="order-invoice-block">
           <div className="flex items-center gap-2 text-sm"><Receipt size={14} className="text-[#b02a2a]"/><span className="font-semibold">Facture</span><span className="text-xs text-[#666]">générée automatiquement</span></div>
-          <div className="flex gap-1">
-            <button onClick={() => onInvoice(order, "view")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="order-invoice-view"><FileText size={12}/>Voir</button>
-            <button onClick={() => onInvoice(order, "pdf")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="order-invoice-pdf"><Download size={12}/>PDF</button>
+          <div className="flex gap-1 flex-wrap">
+            <button onClick={() => onInvoice(order, "pdf")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="order-invoice-pdf"><Download size={12}/>Facture PDF</button>
+            <button onClick={() => onInvoice(order, "slip")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="order-slip-pdf"><Printer size={12}/>Fiche colis</button>
             <button onClick={() => onInvoice(order, "wa")} className="dina-btn-secondary !min-h-[32px] text-xs !text-[#1f8a4c]" data-testid="order-invoice-wa"><MessageCircle size={12}/>WhatsApp</button>
           </div>
         </div>

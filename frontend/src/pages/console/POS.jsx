@@ -165,7 +165,7 @@ function POSInner() {
 
   // --- UI ---
   return (
-    <div className="grid md:grid-cols-[1fr_min(360px,36vw)] lg:grid-cols-[1fr_min(400px,33vw)] gap-4 min-h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)]">
+    <div className="grid md:grid-cols-[1fr_320px] lg:grid-cols-[1fr_360px] gap-3 min-h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)] overflow-hidden">
       {/* LEFT: Product area */}
       <div className="dina-card-white p-4 flex flex-col min-h-0">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -249,7 +249,7 @@ function POSInner() {
             </table>}
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-2.5 overflow-y-auto scrollbar-thin flex-1 pr-1" data-testid="pos-products-grid">
+          <div className="grid grid-cols-2 gap-2.5 overflow-y-auto scrollbar-thin flex-1 pr-1" data-testid="pos-products-grid">
           {filtered.length === 0 ? <div className="col-span-full text-center text-sm text-[#666] py-10">Aucun produit</div> :
           filtered.map(p=>{
             const waitlist = isWaitlist(p);
@@ -258,21 +258,20 @@ function POSInner() {
             const promoPct = promo ? Math.round((p.price_old - p.price)/p.price_old*100) : 0;
             return (
               <button key={p.id} onClick={()=>!waitlist && setSheetProduct(p)} className={`text-left bg-white dark:bg-[#141414] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl overflow-hidden hover:border-[#b02a2a] hover:shadow-md transition group ${waitlist?"opacity-60":""}`} data-testid={`pos-product-${p.id}`}>
-                <div className="aspect-square bg-[#fff5f5] dark:bg-[#2a1818] overflow-hidden relative">
+                <div className="h-28 bg-[#fff5f5] dark:bg-[#2a1818] overflow-hidden relative">
                   <img src={p.image || p.images?.[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy"/>
                   {promo && <span className="absolute top-1.5 left-1.5 bg-[#b02a2a] text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">-{promoPct}%</span>}
                   {waitlist && <span className="absolute inset-0 bg-black/40 grid place-items-center text-white text-[11px] font-bold text-center px-2">Liste<br/>d'attente</span>}
                   {!waitlist && totalStk === 0 && <span className="absolute inset-0 bg-black/40 grid place-items-center text-white text-xs font-bold">RUPTURE</span>}
                   {!waitlist && totalStk > 0 && totalStk < 5 && <span className="absolute top-1.5 right-1.5 bg-[#e4991e] text-white text-[9px] px-1.5 py-0.5 rounded-full font-semibold">Plus que {totalStk}</span>}
                 </div>
-                <div className="p-2.5">
-                  <div className="text-[10px] text-[#999] font-semibold">{p.brand}</div>
-                  <div className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.2em]">{p.name}</div>
-                  <div className="flex items-center justify-between mt-1.5">
-                    <div><span className="tabular text-sm font-bold text-[#b02a2a]">{fcfa(p.price)}</span>{promo && <span className="text-[10px] text-[#999] line-through tabular ml-1">{fcfa(p.price_old)}</span>}</div>
-                    <span className={`text-[9px] tabular ${totalStk<5?"text-[#c62828]":"text-[#1f8a4c]"}`}>{totalStk===0?"Rupture":totalStk<=3?`${totalStk} rest.`:`En stock`}</span>
+                <div className="p-2">
+                  <div className="text-[9px] text-[#999] font-semibold truncate">{p.brand}</div>
+                  <div className="text-xs font-medium leading-tight line-clamp-2 min-h-[2.1em]">{p.name}</div>
+                  <div className="flex items-center justify-between mt-1">
+                    <div><span className="tabular text-xs font-bold text-[#b02a2a]">{fcfa(p.price)}</span>{promo && <span className="text-[9px] text-[#999] line-through tabular ml-1">{fcfa(p.price_old)}</span>}</div>
+                    <span className={`text-[9px] tabular ${totalStk<5?"text-[#c62828]":"text-[#1f8a4c]"}`}>{totalStk===0?"Rupture":totalStk<=3?`${totalStk}`:`✓`}</span>
                   </div>
-                  {(p.sizes?.length||p.colors?.length) ? <div className="text-[10px] text-[#999] mt-0.5">{p.sizes?.length?`${p.sizes.length} ${p.category?.toLowerCase().includes("chaussure")?"pointures":"tailles"}`:""}{p.sizes?.length&&p.colors?.length?" · ":""}{p.colors?.length?`${p.colors.length} couleurs`:""}</div> : null}
                 </div>
               </button>
             );
@@ -282,20 +281,48 @@ function POSInner() {
       </div>
 
       {/* RIGHT: Cart (desktop) + mobile bottom sheet */}
-      <div className={`dina-card-white p-4 flex flex-col min-h-0 overflow-y-auto scrollbar-thin ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 md:static":"hidden md:flex"}`}>
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-semibold">Panier · <span className="text-[#666] text-xs">{cart.length} article{cart.length>1?"s":""}</span></div>
+      <div className={`dina-card-white p-3 flex flex-col min-h-0 ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 md:static":"hidden md:flex"}`}>
+        <div className="flex items-center justify-between mb-2">
+          <div className="font-semibold text-sm">Panier · <span className="text-[#666] text-xs">{cart.length} article{cart.length>1?"s":""}</span></div>
           <div className="flex items-center gap-2">
             <button onClick={()=>setViewMobileCart(false)} className="md:hidden text-[#666]"><X size={16}/></button>
-            {cart.length>0 && <button onClick={shareCart} className="text-xs text-[#1f8a4c] flex items-center gap-1 hover:underline" data-testid="pos-share-cart"><Share2 size={11}/>Partager</button>}
+            {cart.length>0 && <button onClick={shareCart} className="text-[10px] text-[#1f8a4c] flex items-center gap-1 hover:underline" data-testid="pos-share-cart"><Share2 size={10}/>Partager</button>}
             {cart.length>0 && <button onClick={async()=>{
               const note = prompt("Note pour cette commande ouverte ? (optionnel)") || "";
               try { await api.post("/pos/holds", { items: cart, customer, note, expires_in_hours: 24 }); toast.success("Panier mis en attente"); clearCart(); }
               catch { toast.error("Erreur"); }
-            }} className="text-xs text-[#5867fd] flex items-center gap-1" data-testid="pos-hold"><PauseCircle size={11}/>Attente</button>}
-            {cart.length>0 && <button onClick={clearCart} className="text-xs text-[#c62828]" data-testid="pos-clear">Vider</button>}
+            }} className="text-[10px] text-[#5867fd] flex items-center gap-1" data-testid="pos-hold"><PauseCircle size={10}/>Attente</button>}
+            {cart.length>0 && <button onClick={clearCart} className="text-[10px] text-[#c62828]" data-testid="pos-clear">Vider</button>}
           </div>
         </div>
+
+        {/* Totals block — displayed at the TOP, grows live as items are added */}
+        <div className="mb-3 p-3 bg-gradient-to-br from-[#fff5f5] to-white dark:from-[#2a1818] dark:to-[#1a1a1a] rounded-xl border border-[#fde8e8] dark:border-[#3a2222]" data-testid="pos-cart-totals-top">
+          <div className="flex justify-between items-baseline">
+            <span className="text-[11px] uppercase tracking-wider text-[#666] font-semibold">Total à encaisser</span>
+            <span className="font-serif tabular text-2xl font-bold text-[#b02a2a]">{fcfa(total)}</span>
+          </div>
+          <div className="mt-1.5 space-y-0.5 text-[11px] text-[#666]">
+            <div className="flex justify-between"><span>Sous-total ({cart.length})</span><span className="tabular">{fcfa(subtotal)}</span></div>
+            {mode==="delivery" && <div className="flex justify-between"><span>Livraison · {zone}</span><span className="tabular">{fcfa(fee)}</span></div>}
+            <div className="flex justify-between items-center">
+              <span>Remise</span>
+              <input type="number" className="dina-input w-20 text-right tabular !py-0.5 !h-6 !text-[11px]" value={discount||""} onChange={e=>{
+                const v = Number(e.target.value||0);
+                const limit = subtotal * 0.20;
+                if (v > limit && v > Number(discount||0)) {
+                  setPinAuth({ action:"discount_over_limit", actionLabel:`Remise > 20% (limite ${fcfa(limit)})`, amount: v, onApprove: () => { setDiscount(v); setPinAuth(null); } });
+                  return;
+                }
+                setDiscount(e.target.value);
+              }} data-testid="pos-discount"/>
+            </div>
+          </div>
+          <button onClick={()=>setShowPayment(true)} disabled={!cart.length} className="dina-btn-primary w-full mt-2 !min-h-[40px] !text-sm" data-testid="pos-checkout"><CreditCard size={14}/>{mode==="delivery"?"Commander":"Encaisser"}</button>
+        </div>
+
+        {/* Scrollable area with mode / customer / items */}
+        <div className="flex-1 overflow-y-auto scrollbar-thin -mx-1 px-1 min-h-0">
 
         {/* Mode selector */}
         <div className="grid grid-cols-3 gap-1 mb-3 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-1">
@@ -367,26 +394,10 @@ function POSInner() {
             })}
         </div>
 
-        {/* Totals */}
-        <div className="border-t border-[#ececec] dark:border-[#2a2a2a] pt-3 space-y-1.5 text-sm">
-          <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(subtotal)}</span></div>
-          {mode==="delivery" && <div className="flex justify-between"><span className="text-[#666]">Livraison · {zone}</span><span className="tabular">{fcfa(fee)}</span></div>}
-          <div className="flex justify-between items-center">
-            <span className="text-[#666]">Remise</span>
-            <input type="number" className="dina-input w-24 text-right tabular !py-1" value={discount||""} onChange={e=>{
-              const v = Number(e.target.value||0);
-              const limit = subtotal * 0.20;
-              if (v > limit && v > Number(discount||0)) {
-                setPinAuth({ action:"discount_over_limit", actionLabel:`Remise > 20% (limite ${fcfa(limit)})`, amount: v, onApprove: () => { setDiscount(v); setPinAuth(null); } });
-                return;
-              }
-              setDiscount(e.target.value);
-            }} data-testid="pos-discount"/>
-          </div>
-          <div className="flex justify-between font-semibold text-base pt-1 border-t border-[#ececec] dark:border-[#2a2a2a]"><span>Total</span><span className="tabular text-[#b02a2a] text-lg">{fcfa(total)}</span></div>
-        </div>
+        {/* Totals block moved to TOP — removed from here */}
 
-        <button onClick={()=>setShowPayment(true)} disabled={!cart.length} className="dina-btn-primary w-full mt-3 !min-h-[48px]" data-testid="pos-checkout"><CreditCard size={16}/>{mode==="delivery"?"Commander · ":"Encaisser · "}{fcfa(total)}</button>
+        <button onClick={()=>setShowPayment(true)} disabled={!cart.length} className="dina-btn-primary w-full mt-3 !min-h-[48px] hidden" data-testid="pos-checkout-bottom-hidden"><CreditCard size={16}/>{mode==="delivery"?"Commander · ":"Encaisser · "}{fcfa(total)}</button>
+        </div> {/* /scrollable area */}
       </div>
 
       {/* Mobile floating cart button */}
