@@ -101,9 +101,10 @@ export default function StorefrontLayout() {
           </Link>
           <nav className="hidden lg:flex items-center gap-5 text-sm text-[#1c1c1c] dark:text-[#f0f0f0] ml-2">
             <Link to="/boutique/catalog" data-testid="nav-catalog">Catalogue</Link>
-            <Link to="/boutique/catalog?category=Chaussures">Talons</Link>
-            <Link to="/boutique/catalog?category=Robes">Robes</Link>
-            <Link to="/boutique/catalog?category=Sacs">Sacs</Link>
+            <Link to="/boutique/catalog?category=Talons">Talons</Link>
+            <Link to="/boutique/catalog?category=Sandales">Sandales</Link>
+            <Link to="/boutique/catalog?category=Sacs à main">Sacs</Link>
+            <Link to="/boutique/catalog?category=Pochettes">Pochettes</Link>
           </nav>
           <form onSubmit={submit} className="flex-1 max-w-xl relative" data-testid="storefront-search-form">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none" />

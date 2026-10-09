@@ -1,5 +1,34 @@
 # Chez Dina — PRD
 
+### Vague Q — CMS Livreur promu + PWA rider séparée + Catalogue chaussures/sacs (Feb 2026) ✅
+**CMS App Livreur en section console dédiée**
+- Nouveau fichier `/app/frontend/src/pages/console/LivreurApp.jsx` (390 lignes) : page top-level `/console/livreur-app` miroir de SiteVitrine avec 5 sous-onglets :
+  - **Identité** : logo rider (upload), couleur primaire + couleur de fond (color pickers), salutation + sous-titre (templates `{name}` / `{brand}`)
+  - **Onglets** : réordonner (▲▼), renommer, changer icône (15 options lucide), masquer, ajouter des onglets personnalisés avec URL externe, supprimer les onglets custom (builtins protégés)
+  - **Annonces** : bannière activable + 4 variantes stylisées (info/succès/attention/urgent) avec aperçu live
+  - **Aide** : modal aide activable (titre + contenu libre, support ligne cliquable)
+  - **Aperçu** : rendu `téléphone` statique (preview card) + iframe `/rider` live côte-à-côte, bouton Rafraîchir
+- Hook partagé `useRiderCms()` : GET/PATCH `/api/rider-cms`, event `rider-cms-changed` déclenché à la save.
+- Barre d'actions sticky bas de page : Enregistrer + Réinitialiser (sauf onglet Aperçu).
+- `ConsoleLayout.jsx` : nouveau groupe sidebar "App Livreur" avec 5 items (identité/onglets/annonces/aide/aperçu).
+- `Settings.jsx` : onglet "App Livreur" retiré (migré dans la nouvelle section dédiée).
+
+**PWA Livreur séparée (install → `/rider`)**
+- `routers/pwa.py` : nouveaux endpoints
+  - `GET /api/public/manifest-rider.webmanifest` : `start_url: /rider`, `scope: /rider`, `name: "Chez Dina — Livreur"`, `theme_color` = rider_cms.primary_color, 3 icônes.
+  - `GET /api/public/pwa-icon-rider/{size}` : utilise `rider_cms.logo` (fallback = logo principal, puis initiales sur `primary_color`). Pillow resize + maskable safe area 80%.
+- `RiderShell.jsx` : useEffect qui swap `<link rel="manifest">` vers le manifest rider pendant que l'app livreur est montée + met à jour `theme-color`. Revert automatique au démontage. Résultat : "Ajouter à l'écran d'accueil" depuis `/rider` installe une app qui s'ouvre sur `/rider` et porte le logo livreur.
+
+**Catalogue restreint à chaussures + sacs femme (100 SKUs)**
+- `routers/admin.py` : vêtements (`WOMEN_CLOTHING`) entièrement supprimés à la demande de la gérante.
+- Nouveau split 54 chaussures + 46 sacs = **100 SKUs avec 100 images Unsplash uniques** (vérifié).
+- Chaussures : 13 talons · 12 sandales · 6 mules · 4 ballerines · 7 baskets · 5 bottes · 4 mocassins · 2 espadrilles
+- Sacs : 19 sacs à main · 9 pochettes · 7 mini sacs · 7 cabas · 4 sacs à dos
+- Marques : Dina Soles (chaussures) · Dina Carry (sacs). Description retouchée (sans mention vêtement).
+
+**Tests Iter54 à venir** : à valider via testing agent (CMS, PWA rider, catalogue).
+
+
 ### Vague P — Messagerie extraction + PWA icons dynamiques (Feb 2026) ✅
 **Refactor P5 phase 7 : extraction du router messagerie**
 - Nouveau `/app/backend/routers/messagerie.py` (328 lignes, 11 endpoints) :
