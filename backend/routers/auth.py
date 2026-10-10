@@ -49,6 +49,12 @@ async def me(user: dict = Depends(get_user)):
     return user
 
 
+@router.post("/auth/me/tour-done")
+async def mark_tour_done(user: dict = Depends(get_user)):
+    await db.users.update_one({"id": user["id"]}, {"$set": {"tour_done": True, "tour_done_at": now_iso()}})
+    return {"ok": True}
+
+
 @router.post("/auth/logout")
 async def logout(response: Response):
     response.delete_cookie("access_token", path="/")

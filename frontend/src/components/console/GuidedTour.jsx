@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/api";
 import { useLocation, Link } from "react-router-dom";
 import { X, ArrowRight, GraduationCap } from "lucide-react";
 
 /**
  * Short guided tour shown on first login of each user.
- * Steps are personalized by role. State persisted in localStorage per user id.
+ * Steps are personalized by role. Shown once per employee (flag stored on the user account).
  */
 const STEPS_BY_ROLE = {
   admin: [
@@ -54,13 +55,15 @@ export default function GuidedTour() {
   const key = user?.id ? `dina_tour_done_${user.id}` : null;
   const steps = useMemo(() => STEPS_BY_ROLE[user?.role] || STEPS_BY_ROLE.manager, [user?.role]);
 
+  const onConsole = location.pathname.startsWith("/console");
   useEffect(() => {
-    if (!user?.id) return;
-    const done = localStorage.getItem(key);
-    if (!done && location.pathname.startsWith("/console")) {
-      setTimeout(() => setOpen(true), 800);
-    }
-  }, [user?.id, key, location.pathname]);
+    if (!user?.id || !onConsole) return;
+    const markDone = () => { localStorage.setItem(key, "1"); api.post("/auth/me/tour-done").catch(() => {}); };
+    if (user.tour_done) return;
+    const seen = localStorage.getItem(key);
+    markDone();
+    if (!seen) setOpen(true);
+  }, [user?.id, user?.tour_done, key, onConsole]); // eslint-disable-line
 
   useEffect(() => {
     const onReplay = () => { setStep(0); setOpen(true); setReplay(true); };

@@ -1065,3 +1065,19 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : curl (envoi livreur, lecture admin, 403 admin) + capture desktop.
 - Constaté (non corrigé) : console en largeur mobile (390 px) — contenu principal décalé de 260 px, à traiter.
 
+
+## 2026-10-10 — Aperçu PDF, filtres, Prêtes, feuille de route, responsive
+- PDF : tous les PDF (facture, fiche colis, feuille(s) de route, reçu POS, bons d'achat, pointages) s'ouvrent dans un aperçu (components/shared/PdfPreview.jsx, pdfjs-dist 3.11 + public/pdf.worker.min.js) avec Télécharger / Imprimer / Partager.
+- Feuille de route : mise en page refaite (colonnes à largeur fixe + retour à la ligne, notes, saut de page avec en-tête répété) ; DeliveryDays utilise la même fonction.
+- Filtres partagés (components/shared/OrderFilters.jsx : recherche, statut, date, créneau, zone, livreur) sur Préparation, Commandes, Fiches colis, Courses livreur ; Journées de livraison : date / livreur / état.
+- Préparation : KPI « Toutes » + « Prêtes », cartes Prêtes (fiche commande + fiche colis), Kanban Prêtes sans limite au jour.
+- Responsive : console mobile corrigée (aside « relative » restait dans le flux → décalage 260 px), règles CSS de garde (index.css fin), header boutique 320 px, page Contact (crash horaires objet) corrigée, guide tailles scrollable.
+- Testé : iteration_68 (frontend 100 %).
+- Reste : la visite guidée et la case « Pointer mon arrivée » (photo) gênent les tests automatiques.
+
+
+## 2026-10-10 — Visite guidée une seule fois par employé
+- Flag `tour_done` sur le compte (POST /api/auth/me/tour-done), marqué dès le premier affichage ; les employés l'ayant déjà vue sur un appareil (localStorage) sont synchronisés comme « vue ».
+- Relance manuelle depuis le Manuel conservée (événement dina-replay-tour).
+- Testé : capture (1re visite = affichée, navigation = plus affichée, nouvel appareil = plus affichée).
+

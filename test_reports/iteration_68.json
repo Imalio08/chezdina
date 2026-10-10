@@ -1,0 +1,32 @@
+{
+  "summary": "Frontend-only E2E PASS for iter-68 scope. Verified (1) PDF preview modal flow (openPdf → PdfPreviewHost): on od-slip-pdf, od-invoice-pdf (console/commandes/DN-261002-1011), prep-ready-slip-* (Préparation 'Prêtes'), rider-print-route (/console/livreurs/<id>), dd-print-all (/console/livraisons) — modal [data-testid=pdf-preview-modal] opens with rendered canvas inside [data-testid=pdf-preview-pages] and buttons pdf-preview-download / pdf-preview-print / pdf-preview-close; nothing auto-downloads. (2) Route sheet PDF layout: header 'FEUILLE DE ROUTE' + columns #, Commande/Cliente, Adresse, Téléphone, Montant render cleanly with wrapping and no overlapping text (screenshot captured). (3) Préparation: all KPI boxes present (prep-kpi-all / -nouvelle / -confirmee / -prep / -prete). Clicking prep-kpi-prete renders 38 ready cards [prep-ready-card-*] each with prep-ready-open-* + prep-ready-slip-*. prep-view-table / prep-view-kanban + prep-filters-q/date/slot/zone/rider/reset all present and functional (reset button appears when q typed). (4) Shared OrderFilters wired: orders-filters-*, fiches-filters-* (with status), dd-filter-date/-rider/-state/-reset, rider-order-filters-q/-slot/-zone — all present. (5) Order detail 3rd messaging tab od-msg-tab-rider-customer renders thread-readonly-rider_customer (no input) — regression OK. (6) Console mobile at 390px: sidebar is off-canvas, main occupies full 390px width (rect confirmed), [data-testid=mobile-menu-toggle] visible, tapping it slides aside in (260px) with overlay; Escape closes. (7) Zero horizontal page overflow at 320/375/414/768/1024/1440 for console (dashboard, preparation, commandes, fiches-colis, livraisons), rider app (/rider, /rider/carte, /rider/historique, /rider/performance, /rider/profil), and storefront (/boutique, /boutique/catalog, /boutique/checkout, /boutique/contact, /boutique/guide-tailles). Storefront header at 320 shows cart icon. Contact page no longer crashes (hours.map fix verified — no error elements). (8) Rider login /rider/login with rider1@dinastore.ci / Rider123! lands in /rider; filters bar and order list render.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console (all pages)", "issues": ["GuidedTour modal (data-testid=guided-tour) intercepts pointer events on first admin visit and blocks any click on page controls until closed. In this iteration it blocked rider-print-route until bypassed via force=True + localStorage flag. Consider skipping it when a focusable action is already in the viewport, or persist 'done' flag server-side so returning admins don't see it."]},
+      {"screen": "/login (staff)", "issues": ["(carryover from iter-67) 'Pointer mon arrivée en me connectant' checkbox is pre-checked and blocks submit until a photo is taken. Not blocking this iteration."]}
+    ]
+  },
+  "test_report_links": ["/app/test_reports/iteration_68.json"],
+  "action_items": [
+    "(optional) Auto-dismiss or defer GuidedTour when a dialog/action is already shown — currently it overlays the whole viewport (z-50) and intercepts all clicks.",
+    "(cosmetic) The design-tool wrapper injects <span> inside <select><option>…</option></select> in PeriodSelector.jsx, producing React 'hydration' console warnings at /console (dev-only noise, no functional impact)."
+  ],
+  "critical_code_review_comments": [
+    "PdfPreview.jsx: good — openPdf falls back to doc.save() if host unmounted; blob URL is revoked on unmount; print uses hidden iframe (works for same-origin blob). canShare guarded by navigator.canShare.",
+    "ConsoleLayout.jsx: removing 'relative' on <aside> correctly moves it to position:fixed on mobile so <main> is full-width. Verified rect {x:0, width:390} at 390px viewport.",
+    "Preparation.jsx: prep-col-prete lists all ready orders (not limited to today); good. prep-kslip- stopPropagation prevents accidental card open — good.",
+    "OrderFilters is shared across Orders / FichesColis / Preparation / Rider Courses with a `fields` prop — nice DRY. Keep status field only exposed in FichesColis (verified via statuses prop).",
+    "pdfInvoice.drawRiderRoute: visually confirmed in rendered PDF — columns #/Commande/Cliente/Adresse/Téléphone/Montant align; address 'Yopougon · Yopougon · près de la pharmacie' wraps instead of overlapping phone column."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "n/a (frontend-only)", "frontend": "100% of iter-68 scope (PDF modal, Préparation ready+filters, shared filters, mobile layout, responsive sweep, route sheet layout, rider login)"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123!; Rider rider1@dinastore.ci / Rider123!",
+  "seed_data_creation": "None. No data created or statuses changed.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "To bypass GuidedTour on admin console, set localStorage keys 'dina_guided_tour_done' and 'dina_tour_done' to '1' before navigating, or close its button; otherwise it intercepts all clicks (fixed z-50). Admin API login works: POST /api/auth/login returns access_token → localStorage.setItem('dina_token', token). Rider login via /rider/login works out of the box. PDF preview modal uses pdfjs legacy build and renders canvases inside [data-testid=pdf-preview-pages] — count >=1 confirms render.",
+  "rca of the issue": "N/A — no bugs found."
+}
