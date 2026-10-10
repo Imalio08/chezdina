@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { editImageFile } from "@/components/shared/ImageEditor";
 import { playChime, setSoundEnabled } from "@/lib/notifySound";
 import { Camera, Phone, MessageCircle, AlertTriangle, Sun, Moon, Smartphone } from "lucide-react";
 
@@ -26,13 +27,14 @@ export default function Profil() {
   };
 
   const onPhoto = async (e) => {
-    const f = e.target.files?.[0]; if (!f) return;
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    const ed = await editImageFile(f, { aspect: 1 }); if (!ed) return;
     const reader = new FileReader();
     reader.onload = async () => {
       try { await api.patch("/users/me/photo", { photo: reader.result }); setUser({ ...user, photo: reader.result }); toast.success("Photo mise à jour"); }
       catch { toast.error("Erreur"); }
     };
-    reader.readAsDataURL(f);
+    reader.readAsDataURL(ed);
   };
 
   const callManager = () => { window.location.href = "tel:+2250777926179"; };

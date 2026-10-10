@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { Shield, Camera, X, Check, AlertTriangle } from "lucide-react";
+import { compressImage } from "@/lib/imageCompress";
+import { editImage } from "@/components/shared/ImageEditor";
 
 export default function DeliveryProofModal({ order, onClose, onDone }) {
   const [tab, setTab] = useState("code"); // code | photo | thirdparty
@@ -22,9 +24,10 @@ export default function DeliveryProofModal({ order, onClose, onDone }) {
   const highValue = (order.total || 0) >= threshold;
   const needsPin = tab !== "code" && highValue;
 
-  const onPhoto = (e) => {
-    const f = e.target.files?.[0]; if (!f) return;
-    const r = new FileReader(); r.onload = () => setPhoto(r.result); r.readAsDataURL(f);
+  const onPhoto = async (e) => {
+    const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
+    const c = await compressImage(f, 1600, 0.9); const ed = await editImage(c);
+    if (ed) setPhoto(await compressImage(await (await fetch(ed)).blob()));
   };
   const getPos = () => new Promise(res => { if (!navigator.geolocation) return res({}); navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res({}), { timeout: 5000 }); });
 
@@ -80,11 +83,11 @@ export default function DeliveryProofModal({ order, onClose, onDone }) {
                 </label>
               </div>
               <div>
-                <label className="text-xs uppercase text-[#999]">Signature cliente</label>
-                <div className="border border-[#ececec] dark:border-[#2a2a2a] rounded-lg bg-white" data-testid="proof-signature">
-                  <SignatureCanvas ref={ref => setSigRef(ref)} canvasProps={{ className: "w-full h-32 rounded-lg" }} penColor="#1c1c1c" />
+                <label className="text-xs uppercase text-[#999]">Signature cliente · signez avec le doigt</label>
+                <div className="border-2 border-[#1c1c1c]/30 rounded-lg bg-white" data-testid="proof-signature">
+                  <SignatureCanvas ref={ref => setSigRef(ref)} canvasProps={{ className: "w-full h-52 rounded-lg touch-none" }} penColor="#000000" minWidth={2.5} maxWidth={5} backgroundColor="rgb(255,255,255)" />
                 </div>
-                <button onClick={() => sigRef && sigRef.clear()} className="text-[11px] text-[#b02a2a] mt-1">Effacer</button>
+                <button onClick={() => sigRef && sigRef.clear()} className="text-xs font-semibold text-[#b02a2a] mt-1" data-testid="proof-signature-clear">Effacer la signature</button>
               </div>
               {tab === "thirdparty" && (
                 <>

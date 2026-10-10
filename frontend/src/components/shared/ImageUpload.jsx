@@ -1,6 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Upload, X, Camera, GripVertical, Star } from "lucide-react";
 import { toast } from "sonner";
+import { editImageFile } from "@/components/shared/ImageEditor";
 
 /**
  * ImageUpload — drag & drop + camera, multi, auto resize to WebP under maxKB.
@@ -49,7 +50,10 @@ export default function ImageUpload({ value = [], onChange, max = 10, maxKB = 50
     try {
       const compressed = [];
       for (const f of files) {
-        try { compressed.push(await compress(f)); }
+        try {
+          const ed = await editImageFile(f, { aspect: typeof aspect === "number" ? aspect : null });
+          if (ed) compressed.push(await compress(ed));
+        }
         catch (e) { toast.error(`${f.name} : ${e.message}`); }
       }
       const next = single ? compressed.slice(0,1) : [...list, ...compressed].slice(0, max);

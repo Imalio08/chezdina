@@ -2,10 +2,44 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import { fcfa, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
-import { Phone, MessageCircle, Navigation, ChevronRight, X, MapPin } from "lucide-react";
+import { Phone, MessageCircle, Navigation, ChevronRight, X, MapPin, Send } from "lucide-react";
 import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
 import { SlotBadge } from "@/components/delivery/SlotPicker";
-import OrderThread from "@/components/shared/OrderThread";
+import OrderThread, { PhotoButton } from "@/components/shared/OrderThread";
+import { useNavigate as useNav } from "react-router-dom";
+
+const FAIL_REASONS = ["Cliente absente", "Cliente injoignable", "Refus de la commande", "Adresse introuvable", "Autre"];
+
+function FailForm({ order, onCancel, onStatus }) {
+  const [reason, setReason] = useState(FAIL_REASONS[0]);
+  const [note, setNote] = useState("");
+  const [photo, setPhoto] = useState(null);
+  const [later, setLater] = useState(false);
+  const [date, setDate] = useState("");
+  const [busy, setBusy] = useState(false);
+  const today = new Date().toISOString().slice(0, 10);
+  const submit = async () => {
+    if (reason === "Autre" && !note.trim()) return toast.error("Précisez le motif");
+    if (later && !date) return toast.error("Choisissez la date de report");
+    const label = `Échec : ${reason}${note.trim() ? ` — ${note.trim()}` : ""}`;
+    setBusy(true);
+    try {
+      if (photo || note.trim()) await api.post(`/orders/${order.id}/thread/rider/send`, { text: label, attachments: photo ? [{ type: "image", url: photo, name: "echec.jpg", mime: "image/jpeg" }] : [] }).catch(() => {});
+      await onStatus(order.id, later ? "reportee" : "echouee", label, later ? date : undefined);
+    } finally { setBusy(false); }
+  };
+  return (
+    <div className="p-3 rounded-lg border border-[#c62828] bg-[#fff5f5] dark:bg-[#2a1818] space-y-2" data-testid="fail-form">
+      <div className="text-xs font-semibold text-[#c62828]">Livraison impossible — motif</div>
+      <div className="flex flex-wrap gap-1.5">{FAIL_REASONS.map(r => <button key={r} onClick={() => setReason(r)} className={`text-[11px] px-2.5 py-1 rounded-full border ${reason === r ? "bg-[#c62828] text-white border-[#c62828]" : "border-[#ececec] dark:border-[#2a2a2a]"}`} data-testid={`fail-reason-${FAIL_REASONS.indexOf(r)}`}>{r}</button>)}</div>
+      <textarea className="dina-input" rows={2} placeholder="Note (ce qui s'est passé)" value={note} onChange={e => setNote(e.target.value)} data-testid="fail-note"/>
+      <div className="flex items-center gap-2"><PhotoButton onPick={setPhoto} testid="fail-photo"/>{photo ? <img src={photo} alt="" className="h-12 rounded"/> : <span className="text-[11px] text-[#666]">Photo facultative (porte, lieu…)</span>}</div>
+      <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={later} onChange={e => setLater(e.target.checked)} data-testid="fail-postpone"/>Proposer un report</label>
+      {later && <input type="date" min={today} className="dina-input" value={date} onChange={e => setDate(e.target.value)} data-testid="fail-date"/>}
+      <div className="flex gap-2"><button onClick={onCancel} className="dina-btn-secondary flex-1 !min-h-[40px]">Annuler</button><button onClick={submit} disabled={busy} className="dina-btn-primary flex-1 !min-h-[40px] !bg-[#c62828]" data-testid="fail-confirm">{later ? "Reporter" : "Confirmer l'échec"}</button></div>
+    </div>
+  );
+}
 
 const FILTERS = [
   { v: "all", label: "Toutes", k: null },
@@ -124,6 +158,9 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
   const [showWa, setShowWa] = useState(false);
   const [postpone, setPostpone] = useState(false);
   const [chat, setChat] = useState(false);
+  const [clientChat, setClientChat] = useState(false);
+  const [fail, setFail] = useState(false);
+  const navTo = useNav();
   useEffect(() => { api.get("/delivery-templates").then(r => setTemplates(r.data.wa_templates || [])).catch(() => { }); }, []);
   const phone = order.customer?.phone?.replace(/\D/g, "") || "";
   const callPhone = () => { api.post(`/orders/${order.id}/contact-log`, { kind: "call" }).catch(() => { }); window.location.href = `tel:${phone}`; };
@@ -140,10 +177,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(prefill)}`, "_blank");
     setShowWa(false);
   };
-  const itinerary = () => {
-    const q = encodeURIComponent(`${order.customer?.address || order.note || order.delivery_zone || "Abidjan"}`);
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${q}`, "_blank");
-  };
+  const itinerary = () => navTo(`/rider/carte?route=${order.id}`);
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end" onClick={onClose}>
@@ -153,11 +187,13 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
           <button onClick={onClose}><X size={18} /></button>
         </div>
         <div className="p-4 space-y-3">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-4 gap-2">
             <button onClick={callPhone} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-call"><Phone size={14} /><span>Appeler</span></button>
             <button onClick={() => setShowWa(true)} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-whatsapp"><MessageCircle size={14} /><span>WhatsApp</span></button>
+            <button onClick={() => setClientChat(c => !c)} className={`dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5 ${clientChat ? "!border-[#b02a2a] !text-[#b02a2a]" : ""}`} data-testid="order-message-client"><Send size={14} /><span>Message</span></button>
             <button onClick={itinerary} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-route"><Navigation size={14} /><span>Itinéraire</span></button>
           </div>
+          {clientChat && <div className="dina-card-white p-3" data-testid="rider-client-chat"><div className="text-xs font-semibold mb-2">Messagerie avec {order.customer?.name || "la cliente"}</div><OrderThread orderId={order.id} party="rider_customer" me="rider" height="max-h-60" quickReplies={["Je suis en route", "J'arrive dans 10 minutes", "Je suis devant chez vous", "Pouvez-vous me rappeler ?"]}/></div>}
           <div className="p-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg text-sm">
             <div className="font-semibold">{order.customer?.name}</div>
             <div className="text-xs text-[#666] flex items-center gap-1"><MapPin size={10} />{order.customer?.address || order.delivery_zone}</div>
@@ -175,10 +211,11 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
           <div className="grid grid-cols-2 gap-2">
             {["confirmee", "prete", "assignee"].includes(order.status) && <button onClick={() => onStatus(order.id, "en_livraison")} className="dina-btn-primary !min-h-[44px]" data-testid="status-en-route">Je démarre</button>}
             {order.status === "en_livraison" && <button onClick={() => onDeliver(order)} className="dina-btn-primary !min-h-[44px]" data-testid="rider-delivered">Livrée</button>}
-            {order.status !== "livree" && <button onClick={() => { const r = prompt("Raison ?") || ""; onStatus(order.id, "echouee", r); }} className="dina-btn-secondary !min-h-[44px] text-xs" style={{ color: "#c62828" }} data-testid="status-fail">Échec</button>}
+            {order.status !== "livree" && <button onClick={() => setFail(true)} className="dina-btn-secondary !min-h-[44px] text-xs" style={{ color: "#c62828" }} data-testid="status-fail">Échec</button>}
             {order.status !== "livree" && <button onClick={() => setPostpone(true)} className="dina-btn-secondary !min-h-[44px] text-xs" data-testid="status-reschedule">Reporter</button>}
           </div>
           {postpone && <PostponeForm onCancel={() => setPostpone(false)} onConfirm={(date, reason) => onStatus(order.id, "reportee", reason || "Reportée", date)}/>}
+          {fail && <FailForm order={order} onCancel={() => setFail(false)} onStatus={onStatus}/>}
           <button onClick={() => setChat(c => !c)} className="dina-btn-secondary w-full !min-h-[44px] text-xs" data-testid="rider-msg-store"><MessageCircle size={14}/>{chat ? "Masquer les messages" : "Message boutique"}</button>
           {chat && <div className="dina-card-white p-3" data-testid="rider-order-chat"><OrderThread orderId={order.id} party="rider" me="rider" height="max-h-60" quickReplies={["Je suis en route", "Cliente injoignable", "Livraison effectuée", "Adresse introuvable"]}/></div>}
         </div>

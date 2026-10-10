@@ -249,7 +249,7 @@ export default function RiderShell() {
               <Clock size={12}/>{punchLabel}
             </button>
           )}
-          <button onClick={() => { logout(); nav("/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout"><LogOut size={11} />Sortir</button>
+          <button onClick={() => { logout(); nav("/rider/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout"><LogOut size={11} />Sortir</button>
         </div>
       </div>
 

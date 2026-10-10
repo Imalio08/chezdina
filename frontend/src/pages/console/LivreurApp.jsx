@@ -3,6 +3,7 @@
  * Structure miroir de SiteVitrine (sous-onglets Identité / Onglets / Annonces / Aide / Aperçu).
  */
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { toast } from "sonner";
@@ -92,6 +93,35 @@ function useRiderCms() {
 }
 
 /* ============================ Root ============================ */
+const RESERVED = ["rider", "boutique", "console", "login", "scan", "suivi", "api"];
+
+function AccessCard({ ctx }) {
+  const [slug, setSlug] = useState(ctx.cms.access_slug || "");
+  const clean = slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
+  const url = `${window.location.origin}/${ctx.cms.access_slug || "rider"}`;
+  const save = async () => {
+    if (clean && RESERVED.includes(clean)) return toast.error("Ce mot est réservé, choisissez-en un autre");
+    try { await api.patch("/rider-cms", { access_slug: clean }); ctx.setCms(c => ({ ...c, access_slug: clean })); setSlug(clean); toast.success("Adresse enregistrée"); }
+    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
+  };
+  const copy = () => navigator.clipboard?.writeText(url).then(() => toast.success("Lien copié"));
+  const share = () => window.open(`https://wa.me/?text=${encodeURIComponent(`Bonjour, voici l'accès à l'app livreur Chez Dina : ${url}\nOuvrez-le dans Safari/Chrome puis « Ajouter à l'écran d'accueil ».`)}`, "_blank");
+  return (
+    <div className="dina-card-white p-4 flex gap-4 flex-wrap items-center" data-testid="rider-access-card">
+      <div className="bg-white p-2 rounded-lg border border-[#ececec]"><QRCodeSVG value={url} size={96} data-testid="rider-access-qr"/></div>
+      <div className="flex-1 min-w-[240px] space-y-2">
+        <div className="font-semibold text-sm">Adresse d'accès à l'app livreur</div>
+        <div className="flex items-center gap-1 text-sm"><span className="text-[#666]">{window.location.host}/</span>
+          <input className="dina-input !min-h-[34px] text-sm flex-1 max-w-[180px]" placeholder="livreur" value={slug} onChange={e => setSlug(e.target.value)} data-testid="rider-access-slug"/>
+          <button onClick={save} className="dina-btn-primary !min-h-[34px] text-xs" data-testid="rider-access-save">Enregistrer</button></div>
+        <div className="text-xs font-mono break-all" data-testid="rider-access-url">{url}</div>
+        <div className="flex gap-2"><button onClick={copy} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="rider-access-copy">Copier</button><button onClick={share} className="dina-btn-secondary !min-h-[32px] text-xs !text-[#1f8a4c]" data-testid="rider-access-wa">Envoyer par WhatsApp</button></div>
+        <div className="text-[11px] text-[#999]">/rider reste toujours valable. Les livreurs se connectent sur {window.location.host}/rider/login.</div>
+      </div>
+    </div>
+  );
+}
+
 export default function LivreurApp() {
   const [sp, setSp] = useSearchParams();
   const [tab, setTab] = useState(sp.get("tab") || "identite");
@@ -109,6 +139,8 @@ export default function LivreurApp() {
           <ExternalLink size={14}/> Voir l'app livreur
         </a>
       </div>
+
+      {ctx.loaded && <AccessCard ctx={ctx}/>}
 
       <div className="flex gap-1 border-b border-[#ececec] overflow-x-auto" data-testid="livreur-app-tabs">
         {TABS.map(t => (

@@ -328,27 +328,29 @@ async def _notify_reply(conv: Dict[str, Any], who: str, role: str, text: str) ->
 
 
 async def _order_thread(o: Dict[str, Any], party: str) -> Dict[str, Any]:
-    if party not in ("customer", "rider"):
+    if party not in ("customer", "rider", "rider_customer"):
         raise HTTPException(400, "Fil inconnu")
     key = f"order:{o['id']}|{party}"
     conv = await db.conversations.find_one({"key": key})
-    if party == "customer":
-        cust = o.get("customer") or {}
-        if not cust.get("id"):
-            raise HTTPException(400, "Cette cliente n'a pas de compte · utilisez WhatsApp")
-        other = {"kind": "customer", "id": cust["id"], "name": cust.get("name")}
+    cust = o.get("customer") or {}
+    if party in ("customer", "rider_customer") and not cust.get("id"):
+        raise HTTPException(400, "Cette cliente n'a pas de compte · utilisez WhatsApp")
+    if party in ("rider", "rider_customer") and not o.get("rider_id"):
+        raise HTTPException(400, "Aucun livreur assigné")
+    if party == "rider_customer":
+        participants = [{"kind": "rider", "id": o["rider_id"], "name": f"{o.get('rider_name') or 'Livreur'} (livreur) · {o.get('code')}"},
+                        {"kind": "customer", "id": cust["id"], "name": cust.get("name")}]
     else:
-        if not o.get("rider_id"):
-            raise HTTPException(400, "Aucun livreur assigné")
-        other = {"kind": "rider", "id": o["rider_id"], "name": o.get("rider_name")}
-    participants = [{"kind": "store", "id": "store", "name": f"Chez Dina · {o.get('code')}"}, other]
+        other = ({"kind": "customer", "id": cust["id"], "name": cust.get("name")} if party == "customer"
+                 else {"kind": "rider", "id": o["rider_id"], "name": o.get("rider_name")})
+        participants = [{"kind": "store", "id": "store", "name": f"Chez Dina · {o.get('code')}"}, other]
     if conv:
         if conv.get("participants") != participants:
             await db.conversations.update_one({"id": conv["id"]}, {"$set": {"participants": participants}})
             conv["participants"] = participants
         return conv
     conv = {
-        "id": new_id(), "key": key, "kind": f"commande_{'cliente' if party == 'customer' else 'livreur'}",
+        "id": new_id(), "key": key, "kind": {"customer": "commande_cliente", "rider": "commande_livreur"}.get(party, "livreur_cliente"),
         "order_id": o["id"], "order_code": o.get("code"), "closed": False, "archived": False, "pinned": False,
         "participants": participants, "messages": [], "created_at": now_iso(), "updated_at": now_iso(),
     }
@@ -360,7 +362,7 @@ async def _order_for(oid: str, party: str, user: dict) -> Dict[str, Any]:
     o = await db.orders.find_one({"$or": [{"id": oid}, {"code": oid}]})
     if not o:
         raise HTTPException(404, "Commande introuvable")
-    if user.get("role") == "rider" and (party != "rider" or o.get("rider_id") != user["id"]):
+    if user.get("role") == "rider" and (party not in ("rider", "rider_customer") or o.get("rider_id") != user["id"]):
         raise HTTPException(403, "Accès refusé")
     return o
 
@@ -398,12 +400,12 @@ async def send_order_thread(oid: str, party: str, body: Dict[str, Any], user: di
 @router.get("/orders-messages/unread")
 async def orders_unread(user: dict = Depends(get_user)):
     if user.get("role") == "rider":
-        rows = await db.conversations.find({"key": {"$regex": r"^order:.*\|rider$"}, "participants.id": user["id"]}, {"messages": 1, "order_code": 1}).to_list(500)
+        rows = await db.conversations.find({"key": {"$regex": r"^order:.*\|rider(_customer)?$"}, "participants.id": user["id"]}, {"messages": 1, "order_code": 1}).to_list(500)
         by: Dict[str, int] = {}
         for c in rows:
-            n = sum(1 for m in c.get("messages") or [] if m.get("from_kind") == "store" and user["id"] not in (m.get("read_by") or []))
+            n = sum(1 for m in c.get("messages") or [] if m.get("from_kind") in ("store", "customer") and user["id"] not in (m.get("read_by") or []))
             if n:
-                by[c.get("order_code")] = n
+                by[c.get("order_code")] = by.get(c.get("order_code"), 0) + n
         return {"count": sum(by.values()), "by_order": by}
     rows = await db.conversations.find({"key": {"$regex": "^order:"}}, {"messages": 1, "order_code": 1}).to_list(3000)
     by: Dict[str, int] = {}

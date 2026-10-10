@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { Send, Camera, X } from "lucide-react";
 import { dateTimeFmt } from "@/lib/format";
 import { compressImage } from "@/lib/imageCompress";
+import { editImage } from "@/components/shared/ImageEditor";
 
 export function MessagePhotos({ m, onOpen }) {
   const imgs = (m.attachments || []).filter(a => a.type === "image");
@@ -26,7 +27,7 @@ export function PhotoButton({ onPick, disabled, testid }) {
   const pick = async (e) => {
     const f = e.target.files?.[0]; e.target.value = "";
     if (!f) return;
-    try { onPick(await compressImage(f)); } catch (err) { toast.error(err.message); }
+    try { const c = await compressImage(f, 1600, 0.9); const ed = await editImage(c); if (ed) onPick(await compressImage(await (await fetch(ed)).blob())); } catch (err) { toast.error(err.message); }
   };
   return (
     <>

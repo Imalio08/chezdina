@@ -1,5 +1,6 @@
-import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import React, { useEffect, useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import api from "@/lib/api";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { AppProvider } from "@/context/AppContext";
@@ -99,6 +100,8 @@ import SharedCart from "@/pages/storefront/SharedCart";
 
 import SubdomainRouter from "@/components/SubdomainRouter";
 import BrandingBootstrapper from "@/components/BrandingBootstrapper";
+import { ImageEditorHost } from "@/components/shared/ImageEditor";
+import RiderLogin from "@/pages/rider/RiderLogin";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -110,8 +113,19 @@ function Protected({ children }) {
 function ProtectedRider({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/rider/login" replace />;
   return children;
+}
+function SlugRedirect() {
+  const { slug } = useParams();
+  const [miss, setMiss] = useState(false);
+  useEffect(() => {
+    api.get("/public/rider-cms").then(r => {
+      const s = (r.data?.access_slug || "").toLowerCase();
+      if (s && s === slug.toLowerCase()) window.location.replace("/rider"); else setMiss(true);
+    }).catch(() => setMiss(true));
+  }, [slug]);
+  return miss ? <Navigate to="/console" replace /> : <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
 }
 
 export default function App() {
@@ -122,6 +136,7 @@ export default function App() {
         <CustomerProvider>
         <BrowserRouter>
           <Toaster position="top-right" richColors />
+          <ImageEditorHost />
           <BrandingBootstrapper />
           <SubdomainRouter />
           <Routes>
@@ -129,6 +144,7 @@ export default function App() {
             <Route path="/scan" element={<ScanRedirect />} />
             <Route path="/suivi/:code" element={<Tracking />} />
             <Route path="/boutique/panier-partage/:id" element={<SharedCart />} />
+            <Route path="/rider/login" element={<RiderLogin />} />
             <Route path="/rider" element={<ProtectedRider><RiderShell /></ProtectedRider>}>
               <Route index element={<ErrorBoundary><RiderCourses /></ErrorBoundary>} />
               <Route path="carte" element={<ErrorBoundary><RiderCarte /></ErrorBoundary>} />
@@ -220,6 +236,7 @@ export default function App() {
             <Route path="/noter/:code" element={<ErrorBoundary><Rate/></ErrorBoundary>} />
             <Route path="/console/livreur" element={<ProtectedRider><ErrorBoundary><Rider /></ErrorBoundary></ProtectedRider>} />
             <Route path="/" element={<Navigate to="/console" replace />} />
+            <Route path="/:slug" element={<SlugRedirect />} />
             <Route path="*" element={<Navigate to="/console" replace />} />
           </Routes>
         </BrowserRouter>
