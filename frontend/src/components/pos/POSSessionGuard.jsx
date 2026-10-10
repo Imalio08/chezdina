@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Lock, PlayCircle } from "lucide-react";
 import { toast } from "sonner";
+import { OpenModal } from "@/pages/console/CashSessions";
 
 /**
  * Verrou POS : interdit la vente sans session de caisse ouverte.
@@ -14,8 +15,7 @@ export default function POSSessionGuard({ children }) {
   const nav = useNavigate();
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(null);  // session objet | null si pas ouverte
-  const [openingAmount, setOpeningAmount] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [showOpen, setShowOpen] = useState(false);
 
   const check = async () => {
     setLoading(true);
@@ -28,17 +28,6 @@ export default function POSSessionGuard({ children }) {
   };
   useEffect(() => { check(); const t = setInterval(check, 30000); return () => clearInterval(t); }, []);
 
-  const openSession = async () => {
-    const n = parseInt(openingAmount || "0", 10);
-    if (Number.isNaN(n) || n < 0) { toast.error("Montant invalide"); return; }
-    setSubmitting(true);
-    try {
-      await api.post("/cash-sessions/open", { opening_cash: n });
-      toast.success("Session ouverte · bonne journée !");
-      await check();
-    } catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
-    finally { setSubmitting(false); }
-  };
 
   if (loading) return <div className="min-h-[60vh] grid place-items-center text-sm text-[#666]">Vérification de la session…</div>;
   if (open) return children;
@@ -50,15 +39,12 @@ export default function POSSessionGuard({ children }) {
           <Lock size={28} className="text-[#b02a2a]"/>
         </div>
         <div className="font-serif text-2xl mb-2">Ouvrez votre session de caisse pour commencer</div>
-        <div className="text-sm text-[#666] mb-5">Aucune vente ne peut être effectuée sans session ouverte. Comptez votre fond de caisse et entrez le montant initial.</div>
-        <label className="text-xs uppercase text-[#666] font-semibold block text-left mb-1">Fond de caisse initial (FCFA)</label>
-        <input type="number" inputMode="numeric" min="0" className="dina-input tabular text-right text-xl mb-4"
-               value={openingAmount} onChange={e => setOpeningAmount(e.target.value)}
-               placeholder="0" data-testid="pos-guard-opening" autoFocus/>
+        <div className="text-sm text-[#666] mb-5">Aucune vente ne peut être effectuée sans session ouverte. Choisissez la gérante, la date et saisissez le fond de caisse.</div>
         <div className="flex gap-2">
           <button onClick={() => nav("/console")} className="dina-btn-secondary flex-1">Retour au tableau de bord</button>
-          <button onClick={openSession} disabled={submitting} className="dina-btn-primary flex-1" data-testid="pos-guard-open"><PlayCircle size={14}/>{submitting ? "…" : "Ouvrir la session"}</button>
+          <button onClick={() => setShowOpen(true)} className="dina-btn-primary flex-1" data-testid="pos-guard-open"><PlayCircle size={14}/>Ouvrir une session</button>
         </div>
+        {showOpen && <OpenModal user={user} onCancel={() => setShowOpen(false)} onDone={() => { setShowOpen(false); check(); }}/>}
         <div className="text-[11px] text-[#999] mt-3">Ou allez dans <b>Sessions de caisse</b> pour plus d'options.</div>
       </div>
     </div>

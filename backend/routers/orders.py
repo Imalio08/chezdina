@@ -187,13 +187,33 @@ async def list_cash_sessions(user: dict = Depends(get_user)):
     return clean(rows)
 
 
+@router.get("/cash-sessions/managers")
+async def list_session_managers(user: dict = Depends(get_user)):
+    rows = await db.users.find({"role": {"$in": ["admin", "manager"]}, "active": True}, {"_id": 0, "id": 1, "name": 1, "role": 1}).to_list(100)
+    return rows
+
+
 @router.post("/cash-sessions/open")
 async def open_cash_session(body: CashSessionOpenIn, user: dict = Depends(get_user)):
     exists = await db.cash_sessions.find_one({"closed": False})
     if exists:
         raise HTTPException(400, "Une session de caisse est déjà ouverte")
+    try:
+        d = datetime.strptime(body.session_date, "%Y-%m-%d").date()
+    except ValueError:
+        raise HTTPException(400, "Date invalide")
+    if d > datetime.now(timezone.utc).date():
+        raise HTTPException(400, "La date ne peut pas être dans le futur")
+    if body.opening_cash < 0:
+        raise HTTPException(400, "Fond de caisse invalide")
+    mgr = await db.users.find_one({"id": body.manager_id, "role": {"$in": ["admin", "manager"]}, "active": True})
+    if not mgr:
+        raise HTTPException(404, "Gérante introuvable")
+    if mgr.get("attendance_code") != body.pin.strip():
+        raise HTTPException(403, "PIN de la gérante invalide")
     doc = {
-        "id": new_id(), "opened_at": now_iso(), "opened_by": user.get("name"),
+        "id": new_id(), "opened_at": now_iso(), "opened_by": mgr.get("name"),
+        "manager_id": mgr["id"], "session_date": body.session_date, "created_by": user.get("name"),
         "opening_cash": float(body.opening_cash), "closed": False, "note": body.note or "",
     }
     await db.cash_sessions.insert_one(doc)

@@ -144,6 +144,9 @@ class OrderIn(BaseModel):
 class CashSessionOpenIn(BaseModel):
     opening_cash: float = 0
     note: Optional[str] = None
+    manager_id: str
+    session_date: str
+    pin: str
 
 
 class CashSessionCloseIn(BaseModel):

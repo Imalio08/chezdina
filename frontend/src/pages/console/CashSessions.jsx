@@ -14,15 +14,10 @@ export default function CashSessions() {
   const [handoverFor, setHandoverFor] = useState(null);
   const [validateFor, setValidateFor] = useState(null);
   const [rejectFor, setRejectFor] = useState(null);
-  const [openCash, setOpenCash] = useState(0);
 
   const load = () => api.get("/cash-sessions").then(r => setSessions(r.data || [])).catch(() => { });
   useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
 
-  const open = async () => {
-    try { await api.post("/cash-sessions/open", { opening_cash: +openCash }); toast.success("Session ouverte"); setOpening(false); setOpenCash(0); load(); }
-    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
-  };
 
   const current = sessions.find(s => !s.closed);
   const pendingValidation = sessions.filter(s => s.status === "pending_validation");
@@ -39,7 +34,7 @@ export default function CashSessions() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Journée de caisse</h1><p className="text-sm text-[#666]">Ouvrir ma journée · versement à la propriétaire · validation · écarts comptabilisés</p></div>
         <div className="flex gap-2 flex-wrap">
-          {!current && <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[44px] !text-base !px-6" data-testid="cash-open"><PlayCircle size={16} />Ouvrir ma journée</button>}
+          {!current && <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[44px] !text-base !px-6" data-testid="cash-open"><PlayCircle size={16} />Ouvrir une session</button>}
           {current && current.status !== "pending_validation" && <button onClick={() => setClosingFor(current)} className="dina-btn-primary !min-h-[40px]" style={{ background: "#c62828" }} data-testid="cash-close"><StopCircle size={14} />Clôturer la journée</button>}
         </div>
       </div>
@@ -49,7 +44,7 @@ export default function CashSessions() {
           <PlayCircle size={32} className="mx-auto text-[#b02a2a] mb-2"/>
           <div className="font-serif text-xl">Aucune journée ouverte</div>
           <p className="text-sm text-[#666] mb-3">Vous devez ouvrir votre journée pour commencer à encaisser des ventes au comptoir.</p>
-          <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[40px]" data-testid="cash-open-empty"><PlayCircle size={14} />Ouvrir ma journée maintenant</button>
+          <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[40px]" data-testid="cash-open-empty"><PlayCircle size={14} />Ouvrir une session</button>
         </div>
       )}
 
@@ -67,7 +62,7 @@ export default function CashSessions() {
               <div className="font-serif text-xl flex items-center gap-2">Session en cours · {current.opened_by}
                 {current.status === "pending_validation" && <span className="dina-chip text-[10px] !text-[#e4991e] !border-[#e4991e]">En attente de validation Owner</span>}
               </div>
-              <div className="text-xs text-[#666]">Ouverte {dateTimeFmt(current.opened_at)}</div>
+              <div className="text-xs text-[#666]" data-testid="cash-current-date">{current.session_date && <>Journée du {dateFr(current.session_date)} · </>}Ouverte {dateTimeFmt(current.opened_at)}</div>
             </div>
             <div className="flex gap-2 flex-wrap">
               {!current.handover_at && (
@@ -102,13 +97,14 @@ export default function CashSessions() {
         <div className="overflow-x-auto">
           <table className="dina-table">
             <thead><tr>
-              <th>Ouverte</th><th>Fermée</th><th>Par</th><th>Statut</th>
+              <th>Journée</th><th>Ouverte</th><th>Fermée</th><th>Par</th><th>Statut</th>
               <th className="text-right">Fond</th><th className="text-right">Ventes espèces</th><th className="text-right">Attendu</th>
               <th className="text-right">Compté</th><th className="text-right">Versé</th><th className="text-right">Écart owner</th><th></th>
             </tr></thead>
-            <tbody>{sessions.length === 0 ? <tr><td colSpan={11} className="text-sm text-[#666] text-center py-8">Aucune session</td></tr>
+            <tbody>{sessions.length === 0 ? <tr><td colSpan={12} className="text-sm text-[#666] text-center py-8">Aucune session</td></tr>
             : sessions.map(s => (
               <tr key={s.id} data-testid={`cash-row-${s.id}`}>
+                <td className="text-xs font-medium">{s.session_date ? dateFr(s.session_date) : "—"}</td>
                 <td className="text-xs">{dateTimeFmt(s.opened_at)}</td>
                 <td className="text-xs">{s.closed_at ? dateTimeFmt(s.closed_at) : <span className="text-[#1f8a4c]">en cours</span>}</td>
                 <td>{s.opened_by}</td>
@@ -136,7 +132,7 @@ export default function CashSessions() {
         </div>
       )}
 
-      {opening && <OpenModal openCash={openCash} setOpenCash={setOpenCash} onCancel={() => setOpening(false)} onConfirm={open}/>}
+      {opening && <OpenModal user={user} onCancel={() => setOpening(false)} onDone={() => { setOpening(false); load(); }}/>}
       {closingFor && <CloseModal session={closingFor} onClose={() => setClosingFor(null)} onDone={() => { setClosingFor(null); load(); }} />}
       {handoverFor && <HandoverModal session={handoverFor} onClose={() => setHandoverFor(null)} onDone={() => { setHandoverFor(null); load(); }} />}
       {validateFor && <ValidateHandoverModal session={validateFor} onClose={() => setValidateFor(null)} onDone={() => { setValidateFor(null); load(); }} />}
@@ -199,15 +195,55 @@ function KPIsmall({ label, value, color }) {
   return <div className="p-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg"><div className="text-[10px] uppercase text-[#666]">{label}</div><div className="font-serif text-sm tabular mt-0.5 truncate" style={color ? { color } : {}}>{value}</div></div>;
 }
 
-function OpenModal({ openCash, setOpenCash, onCancel, onConfirm }) {
+const todayLocal = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const dateFr = (iso) => { const [y, m, d] = iso.split("-"); return `${d}/${m}/${y}`; };
+
+export function OpenModal({ user, onCancel, onDone }) {
+  const [managers, setManagers] = useState([]);
+  const [managerId, setManagerId] = useState("");
+  const [date, setDate] = useState(todayLocal());
+  const [amount, setAmount] = useState("");
+  const [pin, setPin] = useState("");
+  const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  useEffect(() => {
+    api.get("/cash-sessions/managers").then(r => {
+      const list = r.data || [];
+      setManagers(list);
+      setManagerId(list.find(m => m.id === user?.id)?.id || list[0]?.id || "");
+    }).catch(() => toast.error("Impossible de charger les gérantes"));
+  }, [user?.id]);
+  const submit = async () => {
+    if (!managerId) return toast.error("Choisissez une gérante");
+    if (!date || date > todayLocal()) return toast.error("Date invalide : aujourd'hui ou une date passée");
+    if (amount === "" || +amount < 0) return toast.error("Saisissez le fond de caisse");
+    if (pin.length < 4) return toast.error("PIN de la gérante requis");
+    setSubmitting(true);
+    try {
+      await api.post("/cash-sessions/open", { manager_id: managerId, session_date: date, opening_cash: +amount, pin, note });
+      toast.success(`Session ouverte · fond ${fcfa(+amount)}`);
+      onDone();
+    } catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
+    finally { setSubmitting(false); }
+  };
   return (
     <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onCancel}>
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-        <div className="font-serif text-xl mb-1">Ouvrir ma journée</div>
-        <p className="text-xs text-[#666] mb-4">Comptez le fond de caisse initial présent dans le tiroir et saisissez-le ci-dessous.</p>
-        <label className="text-xs uppercase text-[#666]">Fond de caisse initial (FCFA)</label>
-        <input type="number" className="dina-input mt-1 mb-4 tabular text-right text-lg" value={openCash} onChange={e => setOpenCash(e.target.value)} data-testid="cash-open-amount" autoFocus placeholder="Ex. 50000"/>
-        <div className="flex gap-2"><button onClick={onCancel} className="dina-btn-secondary flex-1">Annuler</button><button onClick={onConfirm} className="dina-btn-primary flex-1" data-testid="cash-open-confirm"><PlayCircle size={13}/>Ouvrir ma journée</button></div>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="cash-open-modal">
+        <div className="flex items-center justify-between mb-1"><div className="font-serif text-xl">Ouvrir une session</div><button onClick={onCancel} data-testid="cash-open-close"><X size={18}/></button></div>
+        <p className="text-xs text-[#666] mb-4">Comptez le fond de caisse présent dans le tiroir avant d'ouvrir.</p>
+        <label className="text-xs uppercase text-[#666] font-semibold">Gérante</label>
+        <select className="dina-input mt-1 mb-3" value={managerId} onChange={e => setManagerId(e.target.value)} data-testid="cash-open-manager">
+          {managers.map(m => <option key={m.id} value={m.id}>{m.name}{m.role === "admin" ? " (Admin)" : ""}</option>)}
+        </select>
+        <label className="text-xs uppercase text-[#666] font-semibold">Date de la journée</label>
+        <input type="date" max={todayLocal()} className="dina-input mt-1 mb-3" value={date} onChange={e => setDate(e.target.value)} data-testid="cash-open-date"/>
+        <label className="text-xs uppercase text-[#666] font-semibold">Fond de caisse (FCFA)</label>
+        <input type="number" min="0" inputMode="numeric" className="dina-input mt-1 tabular text-right text-lg" value={amount} onChange={e => setAmount(e.target.value)} data-testid="cash-open-amount" placeholder="Ex. 50000"/>
+        <div className="text-right text-xs text-[#b02a2a] font-semibold tabular mt-1 mb-3" data-testid="cash-open-amount-preview">{fcfa(+amount || 0)}</div>
+        <label className="text-xs uppercase text-[#666] font-semibold flex items-center gap-1"><Shield size={11}/>PIN de la gérante</label>
+        <input type="password" inputMode="numeric" maxLength={6} className="dina-input mt-1 mb-3 tracking-[0.5em] text-center text-lg" value={pin} onChange={e => setPin(e.target.value.replace(/\D/g, ""))} data-testid="cash-open-pin"/>
+        <textarea className="dina-input mb-4" rows={2} placeholder="Note (facultative)" value={note} onChange={e => setNote(e.target.value)} data-testid="cash-open-note"/>
+        <div className="flex gap-2"><button onClick={onCancel} className="dina-btn-secondary flex-1">Annuler</button><button onClick={submit} disabled={submitting} className="dina-btn-primary flex-1" data-testid="cash-open-confirm"><PlayCircle size={13}/>{submitting ? "Ouverture…" : "Ouvrir la session"}</button></div>
       </div>
     </div>
   );
