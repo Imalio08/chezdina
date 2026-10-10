@@ -977,3 +977,9 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Corrigé : crash POS (`stockFilter` non défini) ; la vue grille applique désormais tri et filtre stock.
 - Toujours en attente (Msg 202) : formulaire « Ouvrir une session », réconciliation livreur Versé/Non versé, aperçu PDF + WhatsApp, vues Tableau/Kanban Préparation, créneaux livreurs, commandes reportées, notifications avec lien direct.
 
+
+## 2026-10-10 — Ouverture de session de caisse
+- Formulaire « Ouvrir une session » (Sessions de caisse + verrou POS) : gérante (liste admin/gérantes actives), date (aujourd'hui ou passée), fond de caisse (aperçu 50,000 FCFA), PIN de la gérante choisie obligatoire, note.
+- API : GET /api/cash-sessions/managers ; POST /api/cash-sessions/open {manager_id, session_date, opening_cash, pin, note}. Colonne « Journée » ajoutée à l'historique.
+- Testé : iteration_57 (backend 10/10, frontend 100%).
+

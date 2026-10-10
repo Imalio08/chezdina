@@ -1,0 +1,32 @@
+{
+  "summary": "Iter58 — Form 'Ouvrir une session' end-to-end verified. Backend: 10/10 pytest passed on /api/cash-sessions/managers + /api/cash-sessions/open covering happy-path, future date (400), wrong PIN (403), unknown manager (404), negative amount (400), already-open (400), past date (200), and close still works with admin PIN 1234. Frontend (/console/sessions-caisse): empty-state cash-no-session + cash-open-empty render when no session; cash-open-modal opens; cash-open-manager loads 3 managers (Aïcha Admin, Fatou Konaté, Mireille Yao), defaults to the logged-in user (admin); cash-open-date defaults to today AND has max=today (blocks future via native picker); cash-open-amount-preview renders exactly '50,000 FCFA' with the French thousands separator; wrong PIN 0000 shows 'PIN de la gérante invalide' toast; correct PIN 2222 (Fatou) + 50000 opens the session; cash-current-session shows 'Session en cours · Fatou Konaté' and cash-current-date = 'Journée du 10/10/2026 · Ouverte 10 oct., 01:16'; Historique table headers are ['Journée','Ouverte','Fermée','Par','Statut','Fond','Ventes espèces','Attendu','Compté','Versé','Écart owner','']. POS guard: when session was closed, /console/pos rendered pos-session-guard with pos-guard-open which opens the SAME OpenModal — after opening, POS loaded (no guard). cash-close with PIN 1234 still works. Session left OPEN at the end for the POS as required by the agent-to-agent contract.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard (PeriodSelector)", "issues": ["React hydration warning still present: <span> cannot be a child of <option> — dev-tool x-component wrapper. Pre-existing, non-blocking (noted iter56)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter58_cash_open.py",
+    "/app/test_reports/pytest/iter58.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "OpenModal race: if a user clicks 'Ouvrir la session' before GET /cash-sessions/managers resolves (modal mount), managerId is empty-string and submit() surfaces 'Choisissez une gérante' toast. Harmless but could be improved by disabling the confirm button while managers list is loading.",
+    "orders.py open_cash_session: already-open check happens BEFORE date/PIN validations. If a session is open, user gets 'déjà ouverte' even when their PIN or date is wrong. Order is pragmatic (short-circuit) but hides form-level issues from the client. Current order is fine for UX, worth a comment.",
+    "orders.py open_cash_session: date parsing accepts any 'YYYY-MM-DD' including dates from year 0001. Add a minimum sanity bound (e.g. not more than 90 days in the past) if business requires it.",
+    "CashSessions.jsx OpenModal: date <input type='date' max=today> blocks future via the native picker, but a user could still paste/type a future date — the UI guard `date > todayLocal()` protects, and the backend rejects with 400. Both layers OK.",
+    "CashSessions.jsx formatting: fcfa() renders '50,000 FCFA' (locale fr-FR uses non-breaking space by default; the preview test confirms the '50,000 FCFA' comma format). If this must be '50 000 FCFA' per some fr-CI style guide, revisit fcfa() in /lib/format.",
+    "CashSessionOpenIn: no Pydantic validator on session_date format — relies on strptime inside the handler. Consider pydantic Field(pattern=r'^\\d{4}-\\d{2}-\\d{2}$') for 422 instead of 400."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (10/10)", "frontend": "100% (all 7 checks)"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! PIN 1234 ; Gérante manager.cocody@dinastore.ci / Manager123! PIN 2222 ; Fatou Konaté is the active manager used in UI run.",
+  "seed_data_creation": "Each test run opens/closes transient TEST_ sessions. Final state: 1 session OPEN (manager Fatou Konaté, opening_cash 50000, session_date=today, note='TEST UI') so /console/pos is unlocked for the next agent.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression file: /app/backend/tests/test_iter58_cash_open.py. Run with: python -m pytest backend/tests/test_iter58_cash_open.py -o addopts='' . For UI, remember to (a) uncheck login-punch-toggle before login, (b) remove the GuidedTour overlay via `document.querySelectorAll('[data-testid=\"guided-tour\"]').forEach(e => e.remove())` after each navigation — it blocks all clicks, (c) wait for the managers <select> to be populated before reading options (`wait_for_function` on options.length>0), there is a visible race between modal mount and GET /cash-sessions/managers.",
+  "rca of the issue": "No bugs. The feature is correctly wired across backend (manager PIN check, future-date guard, duplicate-open guard, negative amount guard, unknown-manager 404) and frontend (OpenModal with manager select defaulting to logged-in user, date=today max=today, amount preview, PIN, note; POS guard reuses the exported OpenModal; current session card shows session_date in DD/MM/YYYY; new 'Journée' column in history)."
+}
