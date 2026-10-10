@@ -1,0 +1,31 @@
+{
+  "summary": "Iter58 — Versements livreurs + Aperçu facture PDF/WhatsApp. Backend: 7/7 pytest passed on /api/delivery-sessions/{sid}/close + /reconcile + /api/invoices/from-order. Verified (a) close returns 400 'Versements manquants : CODE,...' when a livree+cod order has no reconciliation; (b) prepaid livree and cod-not-delivered DO NOT appear in missing list; (c) PATCH /reconcile {collected:true} without PIN -> 400 'PIN gérante requis', with wrong PIN -> 403, with manager PIN 2222 -> 200 and reconciliation.approved_by populated; (d) {collected:false} unmarks (session can't be closed again until re-versé); (e) /invoices/from-order returns {number,total}. Frontend: logged in as admin, navigated to /console/journees-livraison -> deliv-tab-sessions found; 6 close-session-* buttons, 3 versement-* cells, 1 reconcile-* button, 1 versement-unmark-* button; opening reconcile modal shows reconcile-amount + reconcile-pin + reconcile-confirm. Orders page: 200 invoice-view-* eye icons; clicking opens invoice-preview-modal with iframe src starting 'blob:', invoice-preview-download/wa/close all visible; invoice-preview-close dismisses modal cleanly. 200 invoice-wa-* icons rendered. OrderDetail page: od-invoice-view/pdf/wa all present; od-invoice-view opens same invoice-preview-modal. DeliveryDays page (/console/livraisons): 10 dd-row rows; day-tab-reconciliation present on the day detail; dd-close/dd-versements-missing correctly hidden when session is already closed (expected behaviour from `!session.closed` guard).",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard (PeriodSelector)", "issues": ["React hydration warning <span> cannot be a child of <option> — pre-existing (iter56/57), dev-tool x-component wrapper, non-blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter58_versements_invoice.py",
+    "/app/test_reports/pytest/iter58_versements.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/riders.py close_session: builds `missing` from order.code — if an order was deleted after being added to the session, o.get('code') is missing from the orders list but the stale id in s.orders is silently skipped (fine, documented).",
+    "routers/riders.py reconcile: amount defaults to order.total only when payment_method=='cod'; prepaid orders would get due=0 then ecart=amount. Not a current bug (callers never reconcile prepaid), but worth a guard.",
+    "VersementCell.jsx: unmark uses window.confirm — in Playwright/E2E needs explicit dialog handler. Minor, non-blocking.",
+    "InvoicePreviewModal.jsx: shareInvoiceOnWhatsApp catches AbortError but silently falls through on other share errors; could surface a toast on unexpected failure.",
+    "pdfInvoice.js fcfa() uses 'en-US' locale (comma separator) — consistent with 'FORMAT' agreed in task statement ('77,000 FCFA'), but intentionally diverges from fr-FR non-breaking space. OK, documented."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "100% (all 10 UI selectors + flows)"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! PIN 1234 ; Gérante PIN 2222 (manager.cocody) used for reconcile. Both PINs valid for the Marquer-versé flow because the handler accepts role in ['admin','manager'].",
+  "seed_data_creation": "Backend fixture created 4 TEST_versement orders + 2 transient delivery sessions, all closed by end of run (DN-261010-* codes). Residual: TEST_versement orders remain in DB with status=livree and reconciliations collected (harmless, prefixed TEST_versement for later cleanup).",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: python -m pytest backend/tests/test_iter58_versements_invoice.py -o addopts='' . UI tips: login form inputs have NO data-testid — use `page.locator('form input').nth(0/1)`. GuidedTour overlay must be removed after every navigation. /console/livraisons -> DeliveryDays component (dd-* testids); /console/journees-livraison -> Deliveries component (deliv-* testids) — the task statement swapped them. dd-close is only rendered on OPEN days (`!session.closed`). Invoice preview modal needs ~3-4s wait after click because fetchBusinessForPdf hits /api/public/site before jsPDF build.",
+  "rca of the issue": "No bugs. Backend close/reconcile logic correctly filters by status=='livree' AND payment_method=='cod' AND !verse(rec[o.id]) and bubbles missing codes in the 400 detail. Reconcile correctly enforces PIN (400) + validity (403) + role (admin|manager). FE InvoicePreviewModal uses URL.createObjectURL on the jsPDF blob and revokes it on unmount; shareInvoiceOnWhatsApp falls back to downloadBlob + wa.me when navigator.canShare({files}) is unavailable (headless Chrome)."
+}

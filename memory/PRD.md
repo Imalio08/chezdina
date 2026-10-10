@@ -983,3 +983,10 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - API : GET /api/cash-sessions/managers ; POST /api/cash-sessions/open {manager_id, session_date, opening_cash, pin, note}. Colonne « Journée » ajoutée à l'historique.
 - Testé : iteration_57 (backend 10/10, frontend 100%).
 
+## 2026-10-10 — Versements livreurs + Aperçu PDF facture
+- Statut « Versé / Non versé » par commande (Livraisons › Journées livreurs, Journées de livraison › Réconciliation). « Marquer versé » = montant + PIN gérante ; « Annuler » repasse en non versé.
+- Clôture de journée livreur bloquée (UI + API 400 « Versements manquants : … ») tant qu'une commande livrée payée à la livraison n'est pas versée.
+- Icône œil (Commandes, tiroir, fiche commande) : aperçu PDF facture dans une fenêtre + Télécharger + WhatsApp (partage natif avec PDF joint si supporté, sinon téléchargement + wa.me).
+- Testé : iteration_58 (backend 7/7, frontend 100%). Données TEST_ nettoyées.
+
+
