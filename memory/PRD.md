@@ -970,3 +970,10 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - ❌ Pas de badge "Déjà vu X fois" — remplacé par signaux réels (prix en baisse, plus que X en stock, retour en stock)
 - ✅ WhatsApp outbox + wa.me (API Business branché plus tard)
 - ✅ Analytics first-party (pas d'outil externe)
+
+## 2026-10-10 — POS : défilement + bouton « + »
+- Liste produits POS défile verticalement (grille & liste) ; sur mobile, toute la page défile avec le panier sous les produits.
+- Bouton « + » rond sur chaque carte en vue grille : ajout direct si sans taille/couleur, sinon ouvre le sélecteur.
+- Corrigé : crash POS (`stockFilter` non défini) ; la vue grille applique désormais tri et filtre stock.
+- Toujours en attente (Msg 202) : formulaire « Ouvrir une session », réconciliation livreur Versé/Non versé, aperçu PDF + WhatsApp, vues Tableau/Kanban Préparation, créneaux livreurs, commandes reportées, notifications avec lien direct.
+

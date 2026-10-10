@@ -44,6 +44,7 @@ function POSInner() {
   const [vListe, setVListe] = useState(() => localStorage.getItem("pos_view") !== "grid");
   const [showTop, setShowTop] = useState(false);
   const [sort, setSort] = useState("name");
+  const [stockFilter, setStockFilter] = useState("all");
   const colorMap = { "Noir":"#111","Blanc":"#f5f5f5","Rouge":"#b02a2a","Beige":"#d7bfa6","Doré":"#d4af37","Marine":"#1b2b5c","Rose poudré":"#e8b7b3","Camel":"#b08b5a","Nude":"#dcc5b3","Vert émeraude":"#1f6b4a" };
 
   useEffect(()=>{ localStorage.setItem("pos_view", vListe?"list":"grid"); }, [vListe]);
@@ -84,7 +85,7 @@ function POSInner() {
       if (/^\d+$/.test(nq) && (p.sizes||[]).includes(nq)) return true;
       return false;
     });
-  }, [products, q, cat]);
+  }, [products, q, cat, stockFilter]);
 
   const sortedFiltered = useMemo(() => {
     let list = [...filtered];
@@ -174,7 +175,7 @@ function POSInner() {
 
   // --- UI ---
   return (
-    <div className="grid md:grid-cols-[1fr_320px] lg:grid-cols-[1fr_360px] gap-3 min-h-[calc(100vh-7rem)] max-h-[calc(100vh-7rem)] overflow-hidden">
+    <div className="grid md:grid-cols-[1fr_320px] lg:grid-cols-[1fr_360px] gap-3 md:h-[calc(100vh-7rem)] md:overflow-hidden">
       {/* LEFT: Product area */}
       <div className="dina-card-white p-4 flex flex-col min-h-0">
         <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -224,7 +225,7 @@ function POSInner() {
         </div>
 
         {vListe ? (
-          <div className="flex-1 overflow-y-auto scrollbar-thin border border-[#ececec] dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#141414]" data-testid="pos-products-table">
+          <div className="md:flex-1 md:min-h-0 md:overflow-y-auto overflow-x-auto scrollbar-thin border border-[#ececec] dark:border-[#2a2a2a] rounded-xl bg-white dark:bg-[#141414]" data-testid="pos-products-table">
             {sortedFiltered.length === 0 ? <div className="text-center text-sm text-[#666] py-10">Aucun produit</div> :
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-[#fafafa] dark:bg-[#141414] text-[10px] uppercase text-[#666] font-semibold border-b border-[#ececec] dark:border-[#2a2a2a]">
@@ -262,21 +263,26 @@ function POSInner() {
             </table>}
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-2.5 overflow-y-auto scrollbar-thin flex-1 pr-1" data-testid="pos-products-grid">
-          {filtered.length === 0 ? <div className="col-span-full text-center text-sm text-[#666] py-10">Aucun produit</div> :
-          filtered.map(p=>{
+          <div className="grid grid-cols-2 auto-rows-max content-start gap-2.5 md:flex-1 md:min-h-0 md:overflow-y-auto scrollbar-thin pr-1 pb-2" data-testid="pos-products-grid">
+          {sortedFiltered.length === 0 ? <div className="col-span-full text-center text-sm text-[#666] py-10">Aucun produit</div> :
+          sortedFiltered.map(p=>{
             const waitlist = isWaitlist(p);
             const totalStk = Object.values(p.stock_by_size||{}).reduce((s,v)=>s+Number(v||0),0) || p.stock || 0;
             const promo = p.price_old && p.price_old > p.price;
             const promoPct = promo ? Math.round((p.price_old - p.price)/p.price_old*100) : 0;
             return (
-              <button key={p.id} onClick={()=>!waitlist && setSheetProduct(p)} className={`text-left bg-white dark:bg-[#141414] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl overflow-hidden hover:border-[#b02a2a] hover:shadow-md transition group ${waitlist?"opacity-60":""}`} data-testid={`pos-product-${p.id}`}>
+              <div key={p.id} role="button" tabIndex={0} onClick={()=>!waitlist && setSheetProduct(p)} className={`cursor-pointer text-left bg-white dark:bg-[#141414] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl overflow-hidden hover:border-[#b02a2a] hover:shadow-md transition group ${waitlist?"opacity-60":""}`} data-testid={`pos-product-${p.id}`}>
                 <div className="h-28 bg-[#fff5f5] dark:bg-[#2a1818] overflow-hidden relative">
                   <img src={p.image || p.images?.[0]} alt="" className="w-full h-full object-cover group-hover:scale-105 transition" loading="lazy"/>
                   {promo && <span className="absolute top-1.5 left-1.5 bg-[#b02a2a] text-white text-[9px] px-1.5 py-0.5 rounded-full font-bold">-{promoPct}%</span>}
                   {waitlist && <span className="absolute inset-0 bg-black/40 grid place-items-center text-white text-[11px] font-bold text-center px-2">Liste<br/>d'attente</span>}
                   {!waitlist && totalStk === 0 && <span className="absolute inset-0 bg-black/40 grid place-items-center text-white text-xs font-bold">RUPTURE</span>}
                   {!waitlist && totalStk > 0 && totalStk < 5 && <span className="absolute top-1.5 right-1.5 bg-[#e4991e] text-white text-[9px] px-1.5 py-0.5 rounded-full font-semibold">Plus que {totalStk}</span>}
+                  {!waitlist && totalStk > 0 && <button type="button" aria-label="Ajouter au panier" onClick={e=>{
+                    e.stopPropagation();
+                    if ((p.sizes||[]).length===0 && (p.colors||[]).length<=1) { addToCart(p, 1, "", p.colors?.[0]||""); toast.success("Ajouté au panier"); }
+                    else setSheetProduct(p);
+                  }} className="absolute bottom-1.5 right-1.5 w-8 h-8 rounded-full bg-[#b02a2a] text-white grid place-items-center shadow-md hover:bg-[#8f1f1f] hover:scale-110 active:scale-95 transition-transform" data-testid={`pos-grid-add-${p.id}`}><Plus size={16}/></button>}
                 </div>
                 <div className="p-2">
                   <div className="text-[9px] text-[#999] font-semibold truncate">{p.brand}</div>
@@ -286,7 +292,7 @@ function POSInner() {
                     <span className={`text-[9px] tabular ${totalStk<5?"text-[#c62828]":"text-[#1f8a4c]"}`}>{totalStk===0?"Rupture":totalStk<=3?`${totalStk}`:`✓`}</span>
                   </div>
                 </div>
-              </button>
+              </div>
             );
           })}
         </div>
@@ -294,7 +300,7 @@ function POSInner() {
       </div>
 
       {/* RIGHT: Cart (desktop) + mobile bottom sheet */}
-      <div className={`dina-card-white p-3 flex flex-col min-h-0 ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 md:static":"hidden md:flex"}`}>
+      <div className={`dina-card-white p-3 flex flex-col min-h-0 ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 md:static":"flex"}`} data-testid="pos-cart-panel">
         <div className="flex items-center justify-between mb-2">
           <div className="font-semibold text-sm">Panier · <span className="text-[#666] text-xs">{cart.length} article{cart.length>1?"s":""}</span></div>
           <div className="flex items-center gap-2">
