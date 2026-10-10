@@ -1,16 +1,16 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
-import { ChevronRight, Store, Truck, Smartphone, Sparkles } from "lucide-react";
+import { ChevronRight, Store, Truck, Smartphone, Sparkles, Camera, CheckCircle, Clock } from "lucide-react";
 import api from "@/lib/api";
 
 const COLLAGE = [
-  "https://images.unsplash.com/photo-1595777457583-95e059d581b8?w=600",
+  "https://images.unsplash.com/photo-1596703263926-eb0762ee17e4?w=600",
   "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=600",
   "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=600",
-  "https://images.unsplash.com/photo-1612336307429-8a898d10e223?w=600",
-  "https://images.unsplash.com/photo-1618354691373-d851c5c3a990?w=600",
+  "https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=600",
+  "https://images.unsplash.com/photo-1562273138-f46be4ebdf33?w=600",
   "https://images.unsplash.com/photo-1591561954555-607968c989ab?w=600",
 ];
 
@@ -23,13 +23,55 @@ export default function Login() {
   const [pin, setPin] = useState("");
   const [loading, setLoading] = useState(false);
   const [site, setSite] = useState({});
+  // Integrated attendance punch at login — opt-in checkbox
+  const [punchOnLogin, setPunchOnLogin] = useState(true);
+  const [photoDataUrl, setPhotoDataUrl] = useState(null);
+  const [camOpen, setCamOpen] = useState(false);
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
   useEffect(() => { api.get("/public/site").then(r => setSite(r.data || {})).catch(() => {}); }, []);
+  useEffect(() => () => { if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); } }, []);
+
+  const openCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
+      streamRef.current = stream;
+      setCamOpen(true);
+      setTimeout(() => { if (videoRef.current) { videoRef.current.srcObject = stream; videoRef.current.play().catch(() => {}); } }, 100);
+    } catch {
+      toast.error("Caméra indisponible — vous pouvez vous connecter sans photo");
+      setPunchOnLogin(false);
+    }
+  };
+
+  const capturePhoto = () => {
+    if (!videoRef.current) return;
+    const v = videoRef.current;
+    const canvas = document.createElement("canvas");
+    canvas.width = 320; canvas.height = 240;
+    canvas.getContext("2d").drawImage(v, 0, 0, 320, 240);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.6);
+    setPhotoDataUrl(dataUrl);
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    setCamOpen(false);
+  };
 
   const submit = async (e) => {
     e.preventDefault(); setLoading(true);
     try {
       const u = mode === "password" ? await login(email, password) : await loginPin(pin);
-      toast.success(`Bienvenue ${u.name}`);
+      // If opted in and we have a photo, send it to the attendance endpoint
+      if (punchOnLogin && photoDataUrl && u.role !== "rider") {
+        try {
+          await api.post("/attendance/check-in", { selfie: photoDataUrl, kind: "arrival", method: "phone" });
+          toast.success(`Bienvenue ${u.name} · Pointage enregistré ✓`);
+        } catch {
+          toast.success(`Bienvenue ${u.name} · Pointage non enregistré`);
+        }
+      } else {
+        toast.success(`Bienvenue ${u.name}`);
+      }
       nav(u.role === "rider" ? "/rider" : "/console");
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Connexion impossible");
@@ -103,6 +145,27 @@ export default function Login() {
             </>
           )}
 
+          {/* Pointage intégré */}
+          <div className="mb-5 p-3 rounded-lg border border-[#fde8e8] bg-[#fff5f5]">
+            <label className="flex items-center gap-2 text-xs text-[#1c1c1c] font-semibold cursor-pointer">
+              <input type="checkbox" checked={punchOnLogin} onChange={e => setPunchOnLogin(e.target.checked)} className="w-4 h-4 accent-[#b02a2a]" data-testid="login-punch-toggle"/>
+              <Clock size={13} className="text-[#b02a2a]"/> Pointer mon arrivée en me connectant
+            </label>
+            {punchOnLogin && (
+              <div className="mt-2 flex items-center gap-2">
+                {photoDataUrl ? (
+                  <>
+                    <img src={photoDataUrl} alt="Pointage" className="w-14 h-10 object-cover rounded border border-[#fde8e8]" data-testid="login-punch-photo"/>
+                    <div className="text-[11px] text-[#1f8a4c] flex items-center gap-1"><CheckCircle size={12}/>Photo prête</div>
+                    <button type="button" onClick={() => { setPhotoDataUrl(null); openCamera(); }} className="text-[11px] text-[#5867fd] ml-auto underline">Reprendre</button>
+                  </>
+                ) : (
+                  <button type="button" onClick={openCamera} className="dina-btn-secondary !min-h-[32px] text-xs w-full" data-testid="login-punch-camera"><Camera size={12}/>Prendre une photo</button>
+                )}
+              </div>
+            )}
+          </div>
+
           <button className="dina-btn-primary w-full" disabled={loading} data-testid="login-submit">
             {loading ? "Connexion…" : "Se connecter"}
           </button>
@@ -112,6 +175,22 @@ export default function Login() {
           </div>
         </form>
       </div>
+
+      {/* Camera capture modal */}
+      {camOpen && (
+        <div className="fixed inset-0 bg-black/80 z-50 grid place-items-center p-4" data-testid="login-camera-modal">
+          <div className="bg-white rounded-2xl p-5 w-full max-w-sm">
+            <div className="font-serif text-xl mb-3">Prenez votre photo de pointage</div>
+            <div className="aspect-[4/3] rounded-xl overflow-hidden bg-[#111] mb-3">
+              <video ref={videoRef} className="w-full h-full object-cover" muted playsInline/>
+            </div>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => { if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; } setCamOpen(false); }} className="dina-btn-secondary flex-1">Annuler</button>
+              <button type="button" onClick={capturePhoto} className="dina-btn-primary flex-1" data-testid="login-camera-shoot"><Camera size={14}/>Prendre</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

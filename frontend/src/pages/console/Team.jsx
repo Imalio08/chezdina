@@ -5,8 +5,9 @@ import { toast } from "sonner";
 import { Plus, Trash2, Pencil } from "lucide-react";
 
 const ROLES = [
-  { v:"admin", label:"Admin" },{ v:"manager", label:"Manager" },{ v:"sales", label:"Vendeuse" },
-  { v:"stock_keeper", label:"Gestionnaire stock" },{ v:"rider", label:"Livreur" },
+  { v:"admin", label:"Propriétaire" },
+  { v:"manager", label:"Gérante" },
+  { v:"rider", label:"Livreur" },
 ];
 
 export default function Team() {

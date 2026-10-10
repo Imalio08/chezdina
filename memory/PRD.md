@@ -1,5 +1,26 @@
 # Chez Dina — PRD
 
+### Vague T — P1 + P2 : Rôles simplifiés, Pointage au login, Session caisse plus claire (Feb 2026) ✅
+**Rôles simplifiés** (`/app/frontend/src/lib/rbac.js` + `/app/frontend/src/pages/console/Team.jsx`)
+- Suppression des rôles `sales`, `stock_keeper`, `community_manager`.
+- 3 rôles actifs : **Propriétaire** (admin, voit tout, valide finances), **Gérante** (manager, gère la boutique au quotidien), **Livreur** (rider).
+- Duty segregation Propriétaire-only : `/console/finances`, `/console/resultat`, `/console/equipe`, `/console/presence`, `/console/parametres`, `/console/site`, `/console/livreur-app`, `/console/integrations`, `/console/roles`, `/console/approbations`, `/console/audit`, `/console/checklist`. La Gérante peut saisir dépenses/encaissements mais pas valider ni modifier les règles.
+
+**Pointage intégré au login** (`/app/frontend/src/pages/Login.jsx`)
+- Nouveau bloc "Pointer mon arrivée en me connectant" (coché par défaut) directement dans le formulaire de connexion.
+- Bouton `Prendre une photo` → ouvre une modal caméra (facingMode: user), capture 320×240 JPEG, confirme.
+- Au submit : POST `/api/attendance/check-in` avec `selfie` (base64) + `kind: "arrival"` + `method: "phone"` (si rôle ≠ rider).
+- Fonctionne pour la Gérante : plus besoin de cliquer sur l'icône Pointage en haut, c'est automatique à la connexion.
+
+**Session caisse — bouton d'ouverture ultra-visible** (`/app/frontend/src/pages/console/CashSessions.jsx`)
+- Titre page renommé "Journée de caisse" (plus clair que "Sessions de caisse").
+- Bouton principal "**Ouvrir ma journée**" en gros et avec icône Play.
+- Si aucune session active → carte alerte vide + CTA central "Ouvrir ma journée maintenant" (`cash-open-empty`).
+- Modal d'ouverture explicite : "Comptez le fond de caisse initial présent dans le tiroir et saisissez-le ci-dessous".
+
+**Fiches détail cliquables** : Customers.jsx utilisait déjà `nav(/console/clients/:id)` sur chaque ligne de table et carte grid (vérifié). CustomerDetail existe et est routé.
+
+
 ### Vague S — P0 : POS refondue + PDFs réels avec logo (Feb 2026) ✅
 **POS/Caisse refondue** (`/app/frontend/src/pages/console/POS.jsx`)
 - Grille produits forcée à **2 colonnes exactement** (plus de scroll horizontal), images réduites à `h-28` (au lieu de `aspect-square`), suppression des lignes "pointures/couleurs/En stock" pour alléger la carte.

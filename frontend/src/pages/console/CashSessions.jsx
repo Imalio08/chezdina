@@ -37,12 +37,21 @@ export default function CashSessions() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div><h1 className="font-serif text-3xl">Sessions de caisse</h1><p className="text-sm text-[#666]">Ouverture · versement Gérante → validation Owner · écarts automatiquement comptabilisés</p></div>
+        <div><h1 className="font-serif text-3xl">Journée de caisse</h1><p className="text-sm text-[#666]">Ouvrir ma journée · versement à la propriétaire · validation · écarts comptabilisés</p></div>
         <div className="flex gap-2 flex-wrap">
-          {!current && <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[40px]" data-testid="cash-open"><PlayCircle size={14} />Ouvrir caisse</button>}
-          {current && current.status !== "pending_validation" && <button onClick={() => setClosingFor(current)} className="dina-btn-primary !min-h-[40px]" style={{ background: "#c62828" }} data-testid="cash-close"><StopCircle size={14} />Clôturer</button>}
+          {!current && <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[44px] !text-base !px-6" data-testid="cash-open"><PlayCircle size={16} />Ouvrir ma journée</button>}
+          {current && current.status !== "pending_validation" && <button onClick={() => setClosingFor(current)} className="dina-btn-primary !min-h-[40px]" style={{ background: "#c62828" }} data-testid="cash-close"><StopCircle size={14} />Clôturer la journée</button>}
         </div>
       </div>
+
+      {!current && (
+        <div className="dina-card-white p-5 border-2 border-dashed border-[#fde8e8] text-center" data-testid="cash-no-session">
+          <PlayCircle size={32} className="mx-auto text-[#b02a2a] mb-2"/>
+          <div className="font-serif text-xl">Aucune journée ouverte</div>
+          <p className="text-sm text-[#666] mb-3">Vous devez ouvrir votre journée pour commencer à encaisser des ventes au comptoir.</p>
+          <button onClick={() => setOpening(true)} className="dina-btn-primary !min-h-[40px]" data-testid="cash-open-empty"><PlayCircle size={14} />Ouvrir ma journée maintenant</button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard label="Sessions" value={kpis.sessions_total} color="#1c1c1c" testid="cash-kpi-total"/>
@@ -194,10 +203,11 @@ function OpenModal({ openCash, setOpenCash, onCancel, onConfirm }) {
   return (
     <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onCancel}>
       <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-sm" onClick={e => e.stopPropagation()}>
-        <div className="font-serif text-xl mb-4">Ouvrir une session</div>
-        <label className="text-xs uppercase text-[#666]">Fond de caisse (FCFA)</label>
-        <input type="number" className="dina-input mt-1 mb-4 tabular text-right" value={openCash} onChange={e => setOpenCash(e.target.value)} data-testid="cash-open-amount" autoFocus/>
-        <div className="flex gap-2"><button onClick={onCancel} className="dina-btn-secondary flex-1">Annuler</button><button onClick={onConfirm} className="dina-btn-primary flex-1" data-testid="cash-open-confirm">Ouvrir</button></div>
+        <div className="font-serif text-xl mb-1">Ouvrir ma journée</div>
+        <p className="text-xs text-[#666] mb-4">Comptez le fond de caisse initial présent dans le tiroir et saisissez-le ci-dessous.</p>
+        <label className="text-xs uppercase text-[#666]">Fond de caisse initial (FCFA)</label>
+        <input type="number" className="dina-input mt-1 mb-4 tabular text-right text-lg" value={openCash} onChange={e => setOpenCash(e.target.value)} data-testid="cash-open-amount" autoFocus placeholder="Ex. 50000"/>
+        <div className="flex gap-2"><button onClick={onCancel} className="dina-btn-secondary flex-1">Annuler</button><button onClick={onConfirm} className="dina-btn-primary flex-1" data-testid="cash-open-confirm"><PlayCircle size={13}/>Ouvrir ma journée</button></div>
       </div>
     </div>
   );

@@ -2,63 +2,72 @@
 // Keys = console pathnames (without query string). Values = roles with access.
 // `admin` always has access to everything.
 // If a path isn't listed here, it falls back to admin-only.
+//
+// Simplified Feb 2026 at owner's request: only 3 roles (admin = Propriétaire,
+// manager = Gérante, rider = Livreur). The Gérante manages the shop end-to-end
+// EXCEPT: finance/results, cash validation, role & team management, audit log,
+// settings, PWA/CMS editing — reserved to the Propriétaire for duty segregation.
 
 export const ROLE_LABELS = {
-  admin: "Super Admin",
+  admin: "Propriétaire",
   manager: "Gérante",
-  sales: "Vendeuse",
-  stock_keeper: "Stock",
-  community_manager: "Community Manager",
   rider: "Livreur",
 };
 
+// All active role options exposed in staff forms.
+export const ACTIVE_ROLES = ["admin", "manager", "rider"];
+
 // Explicit per-path access list (role keys allowed). "admin" is always implied.
 export const PATH_ROLES = {
-  "/console": ["manager", "sales", "stock_keeper", "community_manager"], // dashboard
-  "/console/pos": ["manager", "sales"],
-  "/console/commandes": ["manager", "sales"],
-  "/console/preparation": ["manager", "sales", "stock_keeper"],
-  "/console/sessions-caisse": ["manager", "sales"],
-  "/console/liste-attente": ["manager", "sales"],
-  "/console/paniers-abandonnes": ["manager", "community_manager"],
+  // Operations — Gérante
+  "/console": ["manager"],
+  "/console/pos": ["manager"],
+  "/console/commandes": ["manager"],
+  "/console/preparation": ["manager"],
+  "/console/sessions-caisse": ["manager"],
+  "/console/liste-attente": ["manager"],
+  "/console/paniers-abandonnes": ["manager"],
   "/console/livraisons": ["manager"],
   "/console/journees-livraison": ["manager"],
   "/console/livreurs": ["manager"],
   "/console/zones": ["manager"],
-  "/console/produits": ["manager", "stock_keeper"],
-  "/console/marques": ["manager", "stock_keeper"],
-  "/console/categories": ["manager", "stock_keeper"],
-  "/console/fournisseurs": ["manager", "stock_keeper"],
-  "/console/achats": ["manager", "stock_keeper"],
-  "/console/stock": ["manager", "stock_keeper"],
-  "/console/clients": ["manager", "sales", "community_manager"],
-  "/console/messagerie": ["manager", "sales", "community_manager"],
-  "/console/segments": ["manager", "community_manager"],
-  "/console/promotions": ["manager", "community_manager"],
-  "/console/campagnes": ["manager", "community_manager"],
-  "/console/campagnes-whatsapp": ["manager", "community_manager"],
-  "/console/fidelite": ["manager", "community_manager"],
-  "/console/parrainage": ["manager", "community_manager"],
-  "/console/avis": ["manager", "community_manager"],
-  "/console/equipe": ["manager"], // view-only lookups
-  "/console/pointage": ["manager", "sales", "stock_keeper", "community_manager"], // kiosk tablet
-  "/console/presence": ["manager"], // historique pointages
-  "/console/site": ["manager", "community_manager"],
-  "/console/statistiques": ["manager", "community_manager"],
-  "/console/finances": ["manager"],
-  "/console/depenses": ["manager"],
-  "/console/encaissements": ["manager"],
-  "/console/resultat": ["manager"],
+  "/console/produits": ["manager"],
+  "/console/marques": ["manager"],
+  "/console/categories": ["manager"],
+  "/console/fournisseurs": ["manager"],
+  "/console/achats": ["manager"],
+  "/console/stock": ["manager"],
+  "/console/clients": ["manager"],
+  "/console/messagerie": ["manager"],
+  "/console/segments": ["manager"],
+  "/console/promotions": ["manager"],
+  "/console/campagnes": ["manager"],
+  "/console/campagnes-whatsapp": ["manager"],
+  "/console/fidelite": ["manager"],
+  "/console/parrainage": ["manager"],
+  "/console/avis": ["manager"],
+  "/console/statistiques": ["manager"],
+  "/console/pointage": ["manager"],
+  "/console/manuel": ["manager"],
+  "/console/depenses": ["manager"],       // enregistre les dépenses, pas validation
+  "/console/encaissements": ["manager"],  // enregistre les encaissements
   "/console/facturation": ["manager"],
-  "/console/manuel": ["manager", "sales", "stock_keeper", "community_manager"],
+  "/console/fiches-colis": ["manager"],
   "/console/alertes": ["manager"],
+
+  // Supervision & finances — Propriétaire uniquement (duty segregation)
+  "/console/finances": [],
+  "/console/resultat": [],
+  "/console/equipe": [],
+  "/console/presence": [],
+  "/console/site": [],
+  "/console/livreur-app": [],
   "/console/integrations": [],
   "/console/parametres": [],
   "/console/roles": [],
   "/console/approbations": [],
   "/console/audit": [],
   "/console/checklist": [],
-  "/console/fiches-colis": ["manager"],
 };
 
 /** Returns true if the role can access the given path. */
@@ -66,21 +75,18 @@ export function canAccess(role, pathname) {
   if (!role) return false;
   if (role === "admin") return true;
   if (!pathname) return false;
-  // Strip query string
   const path = pathname.split("?")[0];
-  // Longest-prefix wins so '/console/finances' beats the umbrella '/console' entry
   const keys = Object.keys(PATH_ROLES).sort((a, b) => b.length - a.length);
   for (const key of keys) {
     if (path === key || path.startsWith(key + "/")) {
       return PATH_ROLES[key].includes(role);
     }
   }
-  return false; // default deny
+  return false;
 }
 
 /** Returns the landing page for the given role (fallback = /console). */
 export function landingFor(role) {
-  if (role === "admin" || role === "manager" || role === "sales" || role === "community_manager") return "/console";
-  if (role === "stock_keeper") return "/console/produits";
+  if (role === "rider") return "/rider";
   return "/console";
 }
