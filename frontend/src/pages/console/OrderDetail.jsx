@@ -3,7 +3,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
-import { ChevronLeft, Download, Printer, MessageCircle, FileText, User, Truck, MapPin, Clock, Send } from "lucide-react";
+import { ChevronLeft, Download, Printer, MessageCircle, FileText, User, Truck, MapPin, Clock, Send, Eye } from "lucide-react";
+import { InvoicePreviewModal, buildInvoicePreview, shareInvoiceOnWhatsApp } from "@/components/shared/InvoicePreviewModal";
 import SmartImage from "@/components/shared/SmartImage";
 import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
@@ -14,6 +15,7 @@ export default function OrderDetail() {
   const nav = useNavigate();
   const [order, setOrder] = useState(null);
   const [invoice, setInvoice] = useState(null);
+  const [preview, setPreview] = useState(null);
 
   const load = async () => {
     try {
@@ -45,16 +47,11 @@ export default function OrderDetail() {
         const r = await api.post(`/invoices/from-order/${order.id}`);
         inv = r.data; setInvoice(inv);
       }
+      if (action === "view") { setPreview(await buildInvoicePreview(api, order, inv)); return; }
+      if (action === "wa") { await shareInvoiceOnWhatsApp(await buildInvoicePreview(api, order, inv)); return; }
       const business = await fetchBusinessForPdf(api);
       if (action === "pdf") { downloadInvoicePDF(order, inv, business); toast.success(`Facture ${inv.number} générée`); }
       else if (action === "slip") { downloadPackingSlipPDF(order, business); toast.success(`Fiche colis ${order.code} générée`); }
-      else if (action === "wa") {
-        downloadInvoicePDF(order, inv, business);
-        const phone = (order.customer?.phone || "").replace(/\D/g, "");
-        if (!phone) return toast.error("Numéro cliente manquant");
-        const txt = `Bonjour ${order.customer?.name || ""}, voici votre facture ${inv.number} pour la commande ${order.code} — Total ${fcfa(inv.total)}. Le PDF a été téléchargé, pensez à le joindre à ce message. Merci Chez Dina 💛`;
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(txt)}`, "_blank");
-      }
     } catch { toast.error("Erreur facture"); }
   };
 
@@ -64,6 +61,7 @@ export default function OrderDetail() {
 
   return (
     <div className="space-y-5 font-sora" data-testid="order-detail">
+      {preview && <InvoicePreviewModal data={preview} onClose={() => setPreview(null)}/>}
       <button onClick={() => nav("/console/commandes")} className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13}/>Retour aux commandes</button>
       <div className="dina-card-white p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
@@ -96,6 +94,7 @@ export default function OrderDetail() {
 
         <InfoCard icon={FileText} title="Facture" testid="order-invoice">
           <div className="flex gap-1 flex-wrap">
+            <button onClick={() => invoiceAction("view")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="od-invoice-view"><Eye size={12}/>Aperçu</button>
             <button onClick={() => invoiceAction("pdf")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="od-invoice-pdf"><Download size={12}/>Facture PDF</button>
             <button onClick={() => invoiceAction("slip")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="od-slip-pdf"><Printer size={12}/>Fiche colis</button>
             <button onClick={() => invoiceAction("wa")} className="dina-btn-secondary !min-h-[32px] text-xs !text-[#1f8a4c]" data-testid="od-invoice-wa"><MessageCircle size={12}/>WhatsApp</button>

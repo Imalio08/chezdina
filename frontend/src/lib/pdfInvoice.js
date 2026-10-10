@@ -116,6 +116,16 @@ function totalsBlock(doc, order, y) {
 }
 
 export function downloadInvoicePDF(order, invoice = {}, business = {}) {
+  const { doc, filename } = buildInvoiceDoc(order, invoice, business);
+  doc.save(filename);
+}
+
+export function invoicePdfBlob(order, invoice = {}, business = {}) {
+  const { doc, filename } = buildInvoiceDoc(order, invoice, business);
+  return { blob: doc.output("blob"), filename };
+}
+
+function buildInvoiceDoc(order, invoice = {}, business = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   const number = invoice.number || `INV-${order.code}`;
   const createdDate = new Date(invoice.created_at || order.created_at || Date.now()).toLocaleDateString("fr-FR");
@@ -132,7 +142,7 @@ export function downloadInvoicePDF(order, invoice = {}, business = {}) {
   doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(100, 100, 100);
   doc.text("Merci pour votre confiance Chez Dina.", 105, 280, { align: "center" });
   doc.setTextColor(0, 0, 0);
-  doc.save(`facture-${number}.pdf`);
+  return { doc, filename: `facture-${number}.pdf` };
 }
 
 export function downloadPackingSlipPDF(order, business = {}) {

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Plus, Check, X, Pencil, Trash2, Printer, Map, Shield, GripVertical, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import LeafletMap from "@/components/shared/LeafletMap";
+import { VersementCell, missingVersements } from "@/components/delivery/VersementCell";
 
 export default function Deliveries() {
   const [tab, setTab] = useState("board");
@@ -43,7 +44,8 @@ export default function Deliveries() {
   };
   const closeSession = async (sid) => {
     if (!confirm("Clôturer la journée ?")) return;
-    await api.patch(`/delivery-sessions/${sid}/close`); toast.success("Journée clôturée"); load();
+    try { await api.patch(`/delivery-sessions/${sid}/close`); toast.success("Journée clôturée"); load(); }
+    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
   };
 
   const toShip = orders.filter(o => ["prete", "confirmee", "nouvelle"].includes(o.status) && !o.rider_id);
@@ -166,8 +168,9 @@ export default function Deliveries() {
                   <div className="font-serif text-xl">{s.rider_name}</div>
                   <div className="text-xs text-[#666]">Journée du {s.date} · {(s.orders || []).length} commande{(s.orders || []).length > 1 ? "s" : ""}</div>
                 </div>
-                <button onClick={() => closeSession(s.id)} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid={`close-session-${s.id}`}>Clôturer journée</button>
+                <button onClick={() => closeSession(s.id)} disabled={missingVersements(s).length > 0} title={missingVersements(s).length ? "Toutes les livraisons payées à la livraison doivent être « Versé »" : ""} className="dina-btn-secondary !min-h-[36px] text-xs disabled:opacity-50 disabled:cursor-not-allowed" data-testid={`close-session-${s.id}`}>Clôturer journée</button>
               </div>
+              {missingVersements(s).length > 0 && <div className="mb-3 p-2.5 rounded-lg bg-[#fff5f5] dark:bg-[#2a1818] text-xs text-[#c62828]" data-testid={`versements-missing-${s.id}`}>{missingVersements(s).length} livraison(s) non versée(s) : {missingVersements(s).map(o => o.code).join(", ")} — clôture bloquée</div>}
 
               <div className="grid grid-cols-4 gap-2 mb-4">
                 <div className="p-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg"><div className="text-[10px] uppercase text-[#666]">À collecter</div><div className="font-serif text-lg tabular font-semibold">{fcfa(s.total_to_collect || 0)}</div></div>
@@ -178,7 +181,7 @@ export default function Deliveries() {
 
               <div className="overflow-x-auto">
                 <table className="dina-table">
-                  <thead><tr><th>Code</th><th>Cliente</th><th>Zone</th><th>Statut</th><th className="text-right">À collecter</th><th>Montant reçu</th><th>Écart</th><th>Validation</th></tr></thead>
+                  <thead><tr><th>Code</th><th>Cliente</th><th>Zone</th><th>Statut</th><th className="text-right">À collecter</th><th>Montant reçu</th><th>Écart</th><th>Versement</th></tr></thead>
                   <tbody>{(s.orders_detail || []).map(o => {
                     const rec = s.reconciliations?.[o.id];
                     const isCod = o.payment_method === "cod";
@@ -194,12 +197,7 @@ export default function Deliveries() {
                         <td className="text-right tabular font-semibold">{isCod ? fcfa(o.total) : "—"}</td>
                         <td className="tabular">{confirmed && amount != null ? fcfa(amount) : "—"}</td>
                         <td className={`tabular ${ecart > 0 ? "text-[#1f8a4c]" : ecart < 0 ? "text-[#c62828]" : "text-[#666]"}`}>{ecart != null ? (ecart > 0 ? "+" : "") + fcfa(ecart) : "—"}</td>
-                        <td>{isCod
-                          ? confirmed
-                            ? <span className="dina-chip !text-[#1f8a4c] !border-[#1f8a4c]"><Check size={10} />{typeof rec === "object" ? rec.approved_by : "Validé"}</span>
-                            : <button onClick={() => setReconcileFor({ session: s, order: o })} className="dina-btn-primary !min-h-[28px] text-[11px]" data-testid={`reconcile-${o.code}`}><Shield size={10} />Valider</button>
-                          : <span className="text-xs text-[#666]">Prépayée</span>}
-                        </td>
+                        <td><VersementCell session={s} order={o} onVerse={(ord) => setReconcileFor({ session: s, order: ord })} onReload={load}/></td>
                       </tr>
                     );
                   })}</tbody>
@@ -245,7 +243,7 @@ export default function Deliveries() {
   );
 }
 
-function ReconcileLineModal({ session, order, onClose, onDone }) {
+export function ReconcileLineModal({ session, order, onClose, onDone }) {
   const [amount, setAmount] = useState(order.total || 0);
   const [pin, setPin] = useState("");
   const [note, setNote] = useState("");
@@ -256,7 +254,7 @@ function ReconcileLineModal({ session, order, onClose, onDone }) {
     setLoading(true);
     try {
       await api.patch(`/delivery-sessions/${session.id}/reconcile`, { order_id: order.id, collected: true, amount: +amount, pin, note });
-      toast.success("Encaissement validé");
+      toast.success("Livraison marquée versée");
       onDone();
     } catch (e) {
       toast.error(e.response?.data?.detail || "PIN invalide");
@@ -295,7 +293,7 @@ function ReconcileLineModal({ session, order, onClose, onDone }) {
 
         <div className="flex gap-2">
           <button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button>
-          <button onClick={submit} disabled={loading || !pin} className="dina-btn-primary flex-1" data-testid="reconcile-confirm">{loading ? "Validation…" : "Valider l'encaissement"}</button>
+          <button onClick={submit} disabled={loading || !pin} className="dina-btn-primary flex-1" data-testid="reconcile-confirm">{loading ? "Validation…" : "Marquer versé"}</button>
         </div>
       </div>
     </div>

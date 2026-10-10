@@ -7,6 +7,8 @@ import { Plus, Calendar, Package, DollarSign, AlertTriangle, CheckCircle2, Users
 import KPICard from "@/components/shared/KPICard";
 import LiveDeliveryMap from "@/components/delivery/LiveDeliveryMap";
 import jsPDF from "jspdf";
+import { VersementCell, missingVersements } from "@/components/delivery/VersementCell";
+import { ReconcileLineModal } from "@/pages/console/Deliveries";
 
 /** Build a printable route-sheet PDF for a rider's day: list of orders with addresses, phones, amounts. */
 function printRouteSheetPDF(session, assigned, brand = {}) {
@@ -169,6 +171,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
   const [assignTo, setAssignTo] = useState(null);
   const [suggestions, setSuggestions] = useState(null);
   const [locations, setLocations] = useState([]);
+  const [reconcileOrder, setReconcileOrder] = useState(null);
   const sid = session.id;
   const ready = orders.filter(o => o.mode === "delivery" && (o.status === "prete" || o.status === "confirmee") && !o.rider_id);
   const assigned = session.orders_detail || orders.filter(o => (session.orders||[]).includes(o.id));
@@ -208,10 +211,12 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
     } catch { toast.error("Erreur"); }
   };
 
+  const missing = missingVersements(session);
   const close = async () => {
+    if (missing.length) return toast.error(`Versements manquants : ${missing.map(o => o.code).join(", ")}`);
     if (!confirm("Clôturer définitivement la journée ?")) return;
     try { await api.patch(`/delivery-sessions/${sid}/close`); toast.success("Journée clôturée"); onBack(); }
-    catch { toast.error("Erreur"); }
+    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
   };
 
   return (
@@ -219,8 +224,14 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
       <button onClick={onBack} className="text-sm text-[#666] hover:text-[#b02a2a]">← Retour aux journées</button>
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-2xl">Journée · {session.date || session.created_at?.slice(0,10)}</h1><div className="text-sm text-[#666]">Livreur : <b>{session.rider_name}</b> · {assigned.length} commandes</div></div>
-        {!session.closed && <button onClick={close} className="dina-btn-primary !min-h-[40px]" data-testid="dd-close">Clôturer la journée</button>}
+        {!session.closed && <button onClick={close} disabled={missing.length > 0} title={missing.length ? "Toutes les livraisons payées à la livraison doivent être « Versé »" : ""} className="dina-btn-primary !min-h-[40px] disabled:opacity-50 disabled:cursor-not-allowed" data-testid="dd-close">Clôturer la journée</button>}
       </div>
+      {!session.closed && missing.length > 0 && (
+        <button onClick={() => setTab("reconciliation")} className="w-full text-left p-3 rounded-lg bg-[#fff5f5] dark:bg-[#2a1818] border-l-4 border-[#c62828] text-sm text-[#c62828]" data-testid="dd-versements-missing">
+          <b>{missing.length} livraison(s) non versée(s)</b> : {missing.map(o => o.code).join(", ")} — marquez-les « Versé » dans Réconciliation pour pouvoir clôturer.
+        </button>
+      )}
+      {reconcileOrder && <ReconcileLineModal session={session} order={reconcileOrder} onClose={() => setReconcileOrder(null)} onDone={() => { setReconcileOrder(null); onReload(); }}/>}
 
       <div className="flex gap-1 border-b border-[#ececec] dark:border-[#2a2a2a] overflow-x-auto">
         {[["affectation","Affectation"],["suivi","Suivi"],["reconciliation","Réconciliation"],["fiches","Fiches & feuilles"]].map(([k,l])=>(
@@ -315,8 +326,8 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
         <div className="dina-card-white p-4">
           <div className="font-serif text-lg mb-3">Réconciliation</div>
           <table className="dina-table">
-            <thead><tr><th>Commande</th><th>Statut</th><th className="text-right">Articles</th><th className="text-right">Livraison</th><th className="text-right">Déjà payé</th><th className="text-right">À encaisser</th></tr></thead>
-            <tbody>{assigned.length === 0 ? <tr><td colSpan={6} className="text-center text-sm text-[#666] py-6">Aucune donnée</td></tr> :
+            <thead><tr><th>Commande</th><th>Statut</th><th className="text-right">Articles</th><th className="text-right">Livraison</th><th className="text-right">Déjà payé</th><th className="text-right">À encaisser</th><th>Versement</th></tr></thead>
+            <tbody>{assigned.length === 0 ? <tr><td colSpan={7} className="text-center text-sm text-[#666] py-6">Aucune donnée</td></tr> :
               assigned.map(o => (
                 <tr key={o.id}>
                   <td className="font-medium">{o.code}</td>
@@ -325,6 +336,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
                   <td className="text-right tabular">{fcfa(o.delivery_fee||0)}</td>
                   <td className="text-right tabular text-[#1f8a4c]">{o.payment_status==="paye"?fcfa(o.total||0):"—"}</td>
                   <td className="text-right tabular">{fcfa(o.payment_method==="cod"?(o.total||0):0)}</td>
+                  <td>{o.status === "livree" || o.payment_method !== "cod" ? <VersementCell session={session} order={o} onVerse={setReconcileOrder} onReload={onReload}/> : <span className="text-[10px] text-[#999]">Pas encore livrée</span>}</td>
                 </tr>
               ))}
             </tbody>

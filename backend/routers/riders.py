@@ -316,5 +316,16 @@ async def reconcile(sid: str, body: ReconcileIn, user: dict = Depends(require_ro
 
 @router.patch("/delivery-sessions/{sid}/close")
 async def close_session(sid: str, user: dict = Depends(require_role("admin", "manager"))):
+    s = await db.delivery_sessions.find_one({"id": sid})
+    if not s:
+        raise HTTPException(404)
+    rec = s.get("reconciliations", {})
+    orders = await db.orders.find({"id": {"$in": s.get("orders", [])}}).to_list(500)
+    def verse(r):
+        return r.get("collected") if isinstance(r, dict) else bool(r)
+    missing = [o.get("code") for o in orders
+               if o.get("status") == "livree" and o.get("payment_method") == "cod" and not verse(rec.get(o["id"]))]
+    if missing:
+        raise HTTPException(400, f"Versements manquants : {', '.join(missing)}")
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"closed": True, "closed_at": now_iso()}})
     return {"ok": True}

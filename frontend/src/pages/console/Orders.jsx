@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
-import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt } from "lucide-react";
+import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt, Eye } from "lucide-react";
+import { InvoicePreviewModal, buildInvoicePreview, shareInvoiceOnWhatsApp } from "@/components/shared/InvoicePreviewModal";
 import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
 const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","retournee","annulee","echouee"];
@@ -14,6 +15,7 @@ export default function Orders() {
   const [view, setView] = useState("table");
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState(null);
+  const [preview, setPreview] = useState(null);
 
   const load = async () => { try { const r = await api.get("/orders"); setOrders(r.data || []); } catch { toast.error("Erreur"); } };
   useEffect(() => { load(); }, []);
@@ -64,24 +66,16 @@ export default function Orders() {
         const r = await api.post(`/invoices/from-order/${o.id}`);
         inv = r.data;
       }
+      if (action === "view") { setPreview(await buildInvoicePreview(api, o, inv)); return; }
+      if (action === "wa") { await shareInvoiceOnWhatsApp(await buildInvoicePreview(api, o, inv)); return; }
       const business = await fetchBusinessForPdf(api);
-      if (action === "view" || action === "pdf") {
+      if (action === "pdf") {
         // Generate the REAL A4 PDF with logo + lines + totals and trigger download.
         downloadInvoicePDF(o, inv, business);
         toast.success(`Facture ${inv.number} générée`);
       } else if (action === "slip") {
         downloadPackingSlipPDF(o, business);
         toast.success(`Fiche colis ${o.code} générée`);
-      } else if (action === "wa") {
-        // Generate the PDF first, then open WhatsApp with a note telling the
-        // merchant to attach the just-downloaded PDF (WhatsApp Web doesn't
-        // support auto-attachments from the browser).
-        downloadInvoicePDF(o, inv, business);
-        const phone = (o.customer?.phone || "").replace(/\D/g, "");
-        if (!phone) return toast.error("Numéro cliente manquant");
-        const txt = `Bonjour ${o.customer?.name || ""}, voici votre facture ${inv.number} pour la commande ${o.code} — Total ${fcfa(inv.total)}. Le PDF a été téléchargé, pensez à le joindre à ce message. Merci Chez Dina 💛`;
-        window.open(`https://wa.me/${phone}?text=${encodeURIComponent(txt)}`, "_blank");
-        toast.success("PDF téléchargé · joignez-le au message WhatsApp");
       }
     } catch (e) { console.error(e); toast.error("Erreur facture"); }
   };
@@ -128,6 +122,7 @@ export default function Orders() {
               <td className="text-right tabular font-semibold cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{fcfa(o.total)}</td>
               <td>
                 <div className="flex items-center justify-center gap-1">
+                  <button onClick={() => openInvoice(o, "view")} className="text-[#666] hover:text-[#b02a2a] p-1" title="Aperçu facture PDF" data-testid={`invoice-view-${o.code}`}><Eye size={13}/></button>
                   <button onClick={() => openInvoice(o, "pdf")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Télécharger facture PDF" data-testid={`invoice-pdf-${o.code}`}><Download size={13}/></button>
                   <button onClick={() => openInvoice(o, "wa")} className="text-[#1f8a4c] hover:text-[#b02a2a] p-1" title="Envoyer par WhatsApp" data-testid={`invoice-wa-${o.code}`}><MessageCircle size={13}/></button>
                 </div>
@@ -152,6 +147,7 @@ export default function Orders() {
         </div>
       )}
 
+      {preview && <InvoicePreviewModal data={preview} onClose={() => setPreview(null)}/>}
       {selected && <OrderDrawer order={selected} onClose={()=>setSelected(null)} onStatus={changeStatus} onReload={load} onInvoice={openInvoice}/>}
     </div>
   );
@@ -197,6 +193,7 @@ function OrderDrawer({ order, onClose, onStatus, onReload, onInvoice }) {
         <div className="mb-4 p-3 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg flex items-center justify-between flex-wrap gap-2" data-testid="order-invoice-block">
           <div className="flex items-center gap-2 text-sm"><Receipt size={14} className="text-[#b02a2a]"/><span className="font-semibold">Facture</span><span className="text-xs text-[#666]">générée automatiquement</span></div>
           <div className="flex gap-1 flex-wrap">
+            <button onClick={() => onInvoice(order, "view")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="order-invoice-view"><Eye size={12}/>Aperçu</button>
             <button onClick={() => onInvoice(order, "pdf")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="order-invoice-pdf"><Download size={12}/>Facture PDF</button>
             <button onClick={() => onInvoice(order, "slip")} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="order-slip-pdf"><Printer size={12}/>Fiche colis</button>
             <button onClick={() => onInvoice(order, "wa")} className="dina-btn-secondary !min-h-[32px] text-xs !text-[#1f8a4c]" data-testid="order-invoice-wa"><MessageCircle size={12}/>WhatsApp</button>
