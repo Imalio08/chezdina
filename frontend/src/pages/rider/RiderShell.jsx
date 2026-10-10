@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
+import { toast } from "sonner";
+import { playChime, setSoundEnabled } from "@/lib/notifySound";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import {
   Package, Map, History, Trophy, User, LogOut, Clock,
@@ -23,6 +25,25 @@ export default function RiderShell() {
   const [cms, setCms] = useState(null);
   const [showHelp, setShowHelp] = useState(false);
   const [annDismissed, setAnnDismissed] = useState(() => localStorage.getItem("rider_ann_dismissed") || "");
+  const seenRef = useRef(null);
+  useEffect(() => {
+    if (user?.prefs?.sound === "off" && !localStorage.getItem("dina_sound")) setSoundEnabled(false);
+    const check = async () => {
+      try {
+        const [t, u] = await Promise.all([api.get("/riders/me/today"), api.get("/orders-messages/unread")]);
+        const ids = new Set((t.data?.orders || []).map(o => o.id));
+        const unread = u.data?.count || 0;
+        const prev = seenRef.current;
+        if (prev) {
+          const fresh = [...ids].filter(id => !prev.ids.has(id)).length;
+          if (fresh > 0) { playChime("order"); toast.success(`${fresh} nouvelle(s) course(s) affectée(s)`); }
+          else if (unread > prev.unread) { playChime("message"); toast("Nouveau message de la boutique"); }
+        }
+        seenRef.current = { ids, unread };
+      } catch { /* offline */ }
+    };
+    check(); const iv = setInterval(check, 20000); return () => clearInterval(iv);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     api.get("/public/site").then(r => setSite(r.data || {})).catch(() => {});

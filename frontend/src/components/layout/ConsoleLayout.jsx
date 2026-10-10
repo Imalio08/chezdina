@@ -15,6 +15,8 @@ import HelpButton from "@/components/console/HelpButton";
 import GuidedTour from "@/components/console/GuidedTour";
 import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
 import { canAccess, landingFor } from "@/lib/rbac";
+import { playChime, soundEnabled, setSoundEnabled } from "@/lib/notifySound";
+import { Volume2, VolumeX } from "lucide-react";
 
 const SECTIONS = [
   { label: "", items: [
@@ -115,9 +117,17 @@ export default function ConsoleLayout() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifs, setNotifs] = useState([]);
   const [unreadMsgs, setUnreadMsgs] = useState(0);
+  const [soundOn, setSoundOn] = useState(soundEnabled());
+  const prevUnread = useRef(null);
+  const seenNotifs = useRef(null);
+  const toggleSound = () => { const n = !soundOn; setSoundOn(n); setSoundEnabled(n); if (n) playChime("notif", true); };
   const { pathname: unreadPath } = useLocation();
   useEffect(() => {
-    const f = () => api.get("/orders-messages/unread").then(r => setUnreadMsgs(r.data?.count || 0)).catch(() => {});
+    const f = () => api.get("/orders-messages/unread").then(r => {
+      const c = r.data?.count || 0;
+      if (prevUnread.current !== null && c > prevUnread.current) playChime("message");
+      prevUnread.current = c; setUnreadMsgs(c);
+    }).catch(() => {});
     f(); const t = setInterval(f, 20000);
     window.addEventListener("dina:unread-refresh", f);
     return () => { clearInterval(t); window.removeEventListener("dina:unread-refresh", f); };
@@ -185,7 +195,15 @@ export default function ConsoleLayout() {
   }, []);
   useEffect(() => { sessionStorage.setItem("dina_ai_history", JSON.stringify(aiMsgs.slice(-30))); }, [aiMsgs]);
   useEffect(() => {
-    const fetchNotifs = () => api.get("/notifications").then(r => setNotifs(r.data || [])).catch(()=>{});
+    const fetchNotifs = () => api.get("/notifications").then(r => {
+      const list = r.data || [];
+      const ids = new Set(list.map(n => n.id));
+      if (seenNotifs.current) {
+        const fresh = list.filter(n => !seenNotifs.current.has(n.id));
+        if (fresh.length) playChime(fresh.some(n => n.type === "order_message") ? "message" : fresh.some(n => n.type === "order") ? "order" : "notif");
+      }
+      seenNotifs.current = ids; setNotifs(list);
+    }).catch(()=>{});
     fetchNotifs(); const t = setInterval(fetchNotifs, 30000); return () => clearInterval(t);
   }, []);
   useEffect(() => {
@@ -364,6 +382,7 @@ export default function ConsoleLayout() {
             </button>
           )}
           <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip hidden md:inline-flex" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
+          <button onClick={toggleSound} className="dina-chip hidden md:inline-flex" data-testid="sound-toggle" title={soundOn ? "Couper les sons" : "Activer les sons"}>{soundOn ? <Volume2 size={12}/> : <VolumeX size={12}/>}</button>
           <div className="relative">
             <button onClick={()=>setShowNotif(!showNotif)} className="dina-chip relative" data-testid="notifications-button">
               <Bell size={12}/>{unreadCount>0 && <span className="absolute -top-1 -right-1 bg-[#c62828] text-white text-[9px] rounded-full min-w-[16px] h-4 px-1 grid place-items-center font-bold">{unreadCount}</span>}

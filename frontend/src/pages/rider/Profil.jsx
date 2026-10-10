@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
+import { playChime, setSoundEnabled } from "@/lib/notifySound";
 import { Camera, Phone, MessageCircle, AlertTriangle, Sun, Moon, Smartphone } from "lucide-react";
 
 export default function Profil() {
@@ -16,6 +17,7 @@ export default function Profil() {
     const next = { ...prefs, ...patch };
     setPrefs(next);
     localStorage.setItem("rider_prefs", JSON.stringify(next));
+    if (patch.sound) { setSoundEnabled(patch.sound === "on"); if (patch.sound === "on") playChime("notif", true); }
     if (patch.theme) {
       localStorage.setItem("rider_theme", patch.theme);
       document.documentElement.classList.toggle("dark", patch.theme === "dark" || (patch.theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches));

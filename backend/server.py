@@ -4904,6 +4904,8 @@ async def manual_reseed(user: dict = Depends(require_role("admin"))):
             await db.manual_modules.update_one({"number": m["number"]}, {"$set": {**m, "updated_at": now}})
         else:
             await db.manual_modules.insert_one({**m, "id": new_id(), "created_at": now})
+    from manual_addenda import apply_manual_addenda
+    await apply_manual_addenda()
     return {"ok": True, "updated": len(RICH)}
 
 @api.get("/manual-gaps")
@@ -5586,6 +5588,8 @@ async def startup():
     await db.orders.create_index("code")
     await db.products.create_index("sku")
     await seed_if_empty()
+    from manual_addenda import apply_manual_addenda
+    await apply_manual_addenda()
     logger.info("Dina API ready")
 
 @api.post("/admin/wipe-for-production")

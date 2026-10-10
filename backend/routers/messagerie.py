@@ -398,7 +398,13 @@ async def send_order_thread(oid: str, party: str, body: Dict[str, Any], user: di
 @router.get("/orders-messages/unread")
 async def orders_unread(user: dict = Depends(get_user)):
     if user.get("role") == "rider":
-        return {"count": 0, "by_order": {}}
+        rows = await db.conversations.find({"key": {"$regex": r"^order:.*\|rider$"}, "participants.id": user["id"]}, {"messages": 1, "order_code": 1}).to_list(500)
+        by: Dict[str, int] = {}
+        for c in rows:
+            n = sum(1 for m in c.get("messages") or [] if m.get("from_kind") == "store" and user["id"] not in (m.get("read_by") or []))
+            if n:
+                by[c.get("order_code")] = n
+        return {"count": sum(by.values()), "by_order": by}
     rows = await db.conversations.find({"key": {"$regex": "^order:"}}, {"messages": 1, "order_code": 1}).to_list(3000)
     by: Dict[str, int] = {}
     for c in rows:
