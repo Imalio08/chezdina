@@ -1,0 +1,32 @@
+{
+  "summary": "Iter63 — Manual addenda (new sections) + notification sounds. Backend 5/5 PASSED: (1) GET /api/manual/modules returns the 14 new 'add-*' sections across the 6 expected modules — add-cash-open/add-pos-grid in 'Faire une vente à la caisse'; add-orders-pdf/add-orders-chat/add-orders-postpone/add-prep-views in 'Préparer et expédier une commande'; add-slots/add-versement/add-print-all in 'Livraison détaillée'; add-adjust/add-po-mov in 'Stock & inventaires'; add-notifs/add-demo in 'Paramètres & intégrations'; add-rider-tools in 'Espace livreur'. (2) POST /api/manual/reseed is idempotent — all 14 add-* ids still present, no duplicate add-* ids inside any module. (3) Each add-* section has at least one steps/text/callout block. (4) Rider unread flow: GET /api/orders-messages/unread as rider1 returns {count, by_order}; after admin POSTs a message in /api/orders/{oid}/thread/rider/send (from_kind='store'), rider's count +1 and by_order[code] +1. (5) Rider then GET /api/orders/{oid}/thread/rider marks messages read (count returns to baseline). Frontend: Console /console (admin) — sound-toggle button present and visible in top bar (data-testid='sound-toggle'), toggles localStorage dina_sound between 'on' and 'off' and persists; icon switches Volume2/VolumeX. Manual UI: all 6 modules (/console/manuel/{2,3,5,8,14,15}) render the 14 new section headings and their steps/callouts without blocking errors. Rider app /rider loads cleanly for rider1 (0 console errors), /rider/profil shows pref-sound checkbox (data-testid='pref-sound'), toggling it updates localStorage.dina_sound. All existing shell navigation (Courses/Carte/Historique/Performance/Profil) remains intact.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console (all pages)", "issues": ["Pre-existing React hydration warning: <span> cannot be a child of <option> (ConsoleLayout line ~326 — dev-tools wrapper on <option>). Non-blocking, carried over since iter56."]},
+      {"screen": "Console /console/manuel", "issues": ["Several SVG warnings: 'attribute height: Expected length, auto' — minor icon prop issue, non-blocking."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter63_manual_and_sounds.py",
+    "/app/test_reports/pytest/iter63.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "notifySound.js createOscillator counting via a stubbed AudioContext confirmed 0 oscillator starts triggered by force=true clicks (browser requires a real user gesture to resume() the context, so playChime early-returns on 'suspended' state — expected behavior per the file's comment). The sound trigger wiring itself (toggleSound+playChime, fetchNotifs delta, RiderShell polling) is correct code-wise and could be covered by a jsdom unit test if desired.",
+    "ConsoleLayout.jsx orders-messages/unread polling uses prevUnread.current to detect increments but relies on fetchNotifs for new-notification detection; both poll independently every ~30s and 20s — fine, just note that the audio chime for a store→rider message is handled by RiderShell on the rider side, while the console side plays on customer/rider replies. Make sure polling intervals stay consistent if changed later.",
+    "orders_unread rider branch (routers/messagerie.py:400-407) counts only from_kind=='store' msgs — matches spec. The non-rider branch sums both customer and rider replies — correct for staff. OK."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter63_manual_and_sounds.py (new)"
+  ],
+  "success_rate": {"backend": "100% (5/5)", "frontend": "100% of testable flows"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123!; Rider rider1@dinastore.ci / Rider123! — both validated this iteration.",
+  "seed_data_creation": "This run added one 'TEST_iter63' message in rider1's thread for an existing assigned order (then marked read by the rider). No other mutations. DEMO_SCN pack remains intact.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=https://dina-boutique.preview.emergentagent.com python -m pytest backend/tests/test_iter63_manual_and_sounds.py -o addopts='' -v. The rider-unread test discovers an assigned order via GET /api/riders/me/today then falls back to admin /api/orders scan; skips if none. Manual module routes are /console/manuel/{2,3,5,8,14,15} for the modules that received new add-* sections. The sound toggle in top bar uses data-testid='sound-toggle'; rider profile uses data-testid='pref-sound'. Audio chimes only fire after a real user gesture (not force=true clicks) — this is per spec in /app/frontend/src/lib/notifySound.js and is the correct browser policy.",
+  "rca of the issue": "N/A — no bugs."
+}

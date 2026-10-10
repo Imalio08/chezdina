@@ -1020,6 +1020,12 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Liste Commandes (table + kanban) : point rouge pulsé à côté du code si messages non lus (survol = nombre), rafraîchi 20 s ; filtre « Messages non lus (n) ». Disparaît après ouverture de la fiche.
 - Vérifié par capture (point, filtre, effacement).
 
+## 2026-10-10 — Manuel enrichi + sons de notification
+- manual_addenda.py : 14 sections pas à pas (caisse, commandes/PDF/messages/report, préparation, créneaux, versements, impression, ajustement stock, réception BC, notifications/sons, démo, livreur), fusionnées au démarrage et après /manual/reseed (idempotent).
+- Sons WebAudio (lib/notifySound.js) : console (nouvelle notification, réponse cliente/livreur, nouvelle commande) + interrupteur sound-toggle ; app livreur (nouvelle course, message boutique) + toast, réglage Profil. /orders-messages/unread gère le rôle livreur.
+- Testé : iteration_63 (backend 5/5, frontend 100%) ; lecture audio réelle non vérifiable en navigateur automatisé.
+
+
 
 
 
