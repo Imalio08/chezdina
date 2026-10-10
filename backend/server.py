@@ -5638,6 +5638,7 @@ from routers.admin import router as admin_router
 from routers.rider_cms import router as rider_cms_router
 from routers.messagerie import router as messagerie_router
 from routers.pwa import router as pwa_router
+from routers.sync import router as sync_router
 app.include_router(meta_router)
 app.include_router(attendance_router)
 app.include_router(auth_router)
@@ -5648,6 +5649,7 @@ app.include_router(admin_router)
 app.include_router(rider_cms_router)
 app.include_router(messagerie_router)
 app.include_router(pwa_router)
+app.include_router(sync_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")

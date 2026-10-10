@@ -797,6 +797,54 @@ function SecuriteTab() {
 }
 
 /* -------- Données -------- */
+function SyncCard() {
+  const [token, setToken] = useState(null);
+  const [src, setSrc] = useState("");
+  const [code, setCode] = useState("");
+  const [pin, setPin] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const me = process.env.REACT_APP_BACKEND_URL;
+  const gen = async () => {
+    try { const r = await api.post("/admin/sync/export-token"); setToken(r.data); }
+    catch (e) { toast.error(e.response?.data?.detail || "Réservé Super admin"); }
+  };
+  const copy = (t) => navigator.clipboard?.writeText(t).then(() => toast.success("Copié"));
+  const run = async () => {
+    if (!window.confirm("Remplacer TOUTES les données de ce site (produits, réglages, comptes, commandes…) par celles de la source ? Action irréversible.")) return;
+    setBusy(true); setResult(null);
+    try {
+      const r = await api.post("/admin/sync/import", { source_url: src, token: code, pin });
+      setResult(r.data); toast.success("Synchronisation terminée · reconnectez-vous");
+    } catch (e) { toast.error(e.response?.data?.detail || "Erreur de synchronisation"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="dina-card-white p-5 space-y-3" data-testid="sync-card">
+      <div className="font-serif text-xl">Synchroniser avec une autre version</div>
+      <p className="text-sm text-[#666]">Copiez toute la base (catalogue, réglages, comptes, manuel…) d'une version vers une autre, par exemple de la prévisualisation vers le site en ligne.</p>
+      <div className="grid md:grid-cols-2 gap-3">
+        <div className="p-3 rounded-lg bg-[#fafafa] dark:bg-[#141414] space-y-2">
+          <div className="text-xs uppercase font-semibold text-[#666]">1 · Sur la source : générer un code</div>
+          <button onClick={gen} className="dina-btn-secondary !min-h-[34px] text-xs" data-testid="sync-gen-token">Générer un code d'export (2 h)</button>
+          {token && <div className="text-xs space-y-1" data-testid="sync-token-box">
+            <div>Adresse source : <button onClick={() => copy(me)} className="font-mono underline break-all">{me}</button></div>
+            <div>Code : <button onClick={() => copy(token.token)} className="font-mono underline break-all" data-testid="sync-token">{token.token}</button></div>
+          </div>}
+        </div>
+        <div className="p-3 rounded-lg bg-[#fff5f5] dark:bg-[#2a1818] space-y-2">
+          <div className="text-xs uppercase font-semibold text-[#c62828]">2 · Sur la destination : importer</div>
+          <input className="dina-input !min-h-[34px] text-xs" placeholder="Adresse source (https://…)" value={src} onChange={e => setSrc(e.target.value)} data-testid="sync-src"/>
+          <input className="dina-input !min-h-[34px] text-xs font-mono" placeholder="Code d'export" value={code} onChange={e => setCode(e.target.value)} data-testid="sync-code"/>
+          <input type="password" inputMode="numeric" className="dina-input !min-h-[34px] text-xs" placeholder="Votre PIN admin" value={pin} onChange={e => setPin(e.target.value)} data-testid="sync-pin"/>
+          <button onClick={run} disabled={busy || !src || !code || !pin} className="dina-btn-danger !min-h-[34px] text-xs" data-testid="sync-import">{busy ? "Synchronisation…" : "Remplacer les données de ce site"}</button>
+          {result && <div className="text-xs text-[#1f8a4c]" data-testid="sync-result">{result.collections} collections copiées · {result.counts?.products} produits. Déconnectez-vous puis reconnectez-vous.</div>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function DonneesTab() {
   const [wipeOpen, setWipeOpen] = useState(false);
   const [wipeInput, setWipeInput] = useState("");
@@ -841,6 +889,8 @@ function DonneesTab() {
         <p className="text-sm text-[#666]">Téléchargez toutes vos données au format JSON (produits, clientes, commandes, dépenses, etc.).</p>
         <button onClick={exportAll} className="dina-btn-primary" data-testid="export-all"><Database size={14}/> Exporter mes données</button>
       </div>
+
+      <SyncCard/>
 
       <div className="dina-card-white p-5 space-y-2">
         <div className="font-serif text-xl">Données de démonstration</div>
