@@ -209,7 +209,7 @@ function POSInner() {
         )}
 
         {/* Product list — table view by default (Fix pack 3) */}
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center gap-2 mb-2 flex-wrap">
           <div className="flex gap-0.5 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-0.5 text-xs">
             <button onClick={()=>setVListe(true)} className={`px-2.5 py-1 rounded-md ${vListe?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-view-list">Liste</button>
             <button onClick={()=>setVListe(false)} className={`px-2.5 py-1 rounded-md ${!vListe?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-view-grid">Grille</button>
@@ -219,7 +219,7 @@ function POSInner() {
             <button onClick={()=>setStockFilter("all")} className={`px-2 py-1 rounded-md ${stockFilter==="all"?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-filter-all">Tous</button>
             <button onClick={()=>setStockFilter("in_stock")} className={`px-2 py-1 rounded-md ${stockFilter==="in_stock"?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-filter-stock">En stock</button>
           </div>
-          <div className="ml-auto flex gap-0.5 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-0.5 text-[11px]">
+          <div className="sm:ml-auto flex gap-0.5 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-0.5 text-[11px]">
             {[["name","A-Z"],["price","Prix"],["stock","Stock"]].map(([k,l])=>(<button key={k} onClick={()=>setSort(k)} className={`px-2 py-1 rounded-md ${sort===k?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid={`pos-sort-${k}`}>{l}</button>))}
           </div>
         </div>

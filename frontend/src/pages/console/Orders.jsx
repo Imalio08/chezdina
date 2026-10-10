@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt, Eye } from "lucide-react";
 import { InvoicePreviewModal, buildInvoicePreview, shareInvoiceOnWhatsApp } from "@/components/shared/InvoicePreviewModal";
 import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
 
 const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","retournee","annulee","echouee"];
 
@@ -17,6 +18,7 @@ export default function Orders() {
   const [selected, setSelected] = useState(null);
   const [preview, setPreview] = useState(null);
   const [unread, setUnread] = useState({});
+  const [f, setF] = useState({ ...EMPTY_FILTERS });
 
   const load = async () => { try { const r = await api.get("/orders"); setOrders(r.data || []); } catch { toast.error("Erreur"); } };
   const loadUnread = () => api.get("/orders-messages/unread").then(r => setUnread(r.data?.by_order || {})).catch(() => {});
@@ -50,7 +52,7 @@ export default function Orders() {
     if (selected) setSelected({...selected, status: payload.status});
   };
 
-  const filtered = orders.filter(o => !filter || (filter === "unread" ? unread[o.code] > 0 : o.status === filter));
+  const filtered = applyOrderFilters(orders, f).filter(o => !filter || (filter === "unread" ? unread[o.code] > 0 : o.status === filter));
   const unreadCount = orders.filter(o => unread[o.code] > 0).length;
   const counts = useMemo(() => {
     const by = (fn) => orders.filter(fn).length;
@@ -81,10 +83,8 @@ export default function Orders() {
       if (action === "pdf") {
         // Generate the REAL A4 PDF with logo + lines + totals and trigger download.
         downloadInvoicePDF(o, inv, business);
-        toast.success(`Facture ${inv.number} générée`);
       } else if (action === "slip") {
         downloadPackingSlipPDF(o, business);
-        toast.success(`Fiche colis ${o.code} générée`);
       }
     } catch (e) { console.error(e); toast.error("Erreur facture"); }
   };
@@ -111,8 +111,10 @@ export default function Orders() {
         <KpiMini label="CA livré" value={fcfa(counts.ca_livre)} color="#1f8a4c" compact testid="orders-kpi-ca"/>
       </div>
 
-      <div className="flex gap-2 flex-wrap">
-        <button onClick={()=>setFilter("")} className={`dina-chip ${!filter?"!bg-[#1c1c1c] !text-white":""}`}>Tout ({orders.length})</button>
+      <OrderFilters orders={orders} value={f} onChange={setF} fields={["q", "date", "slot", "zone", "rider"]} testid="orders-filters"/>
+
+      <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1 lg:flex-wrap">
+        <button onClick={()=>setFilter("")} className={`dina-chip shrink-0 ${!filter?"!bg-[#1c1c1c] !text-white":""}`}>Tout ({orders.length})</button>
         <button onClick={()=>setFilter("unread")} className={`dina-chip ${filter==="unread"?"!bg-[#e53935] !text-white !border-[#e53935]":"!text-[#e53935]"}`} data-testid="orders-filter-unread"><span className="w-2 h-2 rounded-full bg-[#e53935]"/>Messages non lus ({unreadCount})</button>
         {STATUSES.map(s=><button key={s} onClick={()=>setFilter(s)} className={`dina-chip ${filter===s?"!bg-[#1c1c1c] !text-white":""}`} data-testid={`orders-filter-${s}`}><span className="status-dot" style={{background:statusColor[s]}}/>{statusLabel[s]} ({orders.filter(o=>o.status===s).length})</button>)}
       </div>
@@ -133,7 +135,7 @@ export default function Orders() {
               <td>
                 <div className="flex items-center justify-center gap-1">
                   <button onClick={() => openInvoice(o, "view")} className="text-[#666] hover:text-[#b02a2a] p-1" title="Aperçu facture PDF" data-testid={`invoice-view-${o.code}`}><Eye size={13}/></button>
-                  <button onClick={() => openInvoice(o, "pdf")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Télécharger facture PDF" data-testid={`invoice-pdf-${o.code}`}><Download size={13}/></button>
+                  <button onClick={() => openInvoice(o, "pdf")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Voir la facture PDF" data-testid={`invoice-pdf-${o.code}`}><FileText size={13}/></button>
                   <button onClick={() => openInvoice(o, "wa")} className="text-[#1f8a4c] hover:text-[#b02a2a] p-1" title="Envoyer par WhatsApp" data-testid={`invoice-wa-${o.code}`}><MessageCircle size={13}/></button>
                 </div>
               </td>

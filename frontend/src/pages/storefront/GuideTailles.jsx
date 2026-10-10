@@ -27,10 +27,10 @@ export default function GuideTailles() {
           </section>
           <section>
             <h2 className="font-serif text-xl mb-3">Chaussures (EUR)</h2>
-            <table className="w-full text-sm border-collapse">
+            <div className="overflow-x-auto"><table className="w-full text-sm border-collapse">
               <thead><tr className="bg-[#fff5f5]"><th className="p-2 text-left">Pointure</th><th className="p-2">36</th><th className="p-2">37</th><th className="p-2">38</th><th className="p-2">39</th><th className="p-2">40</th><th className="p-2">41</th><th className="p-2">42</th></tr></thead>
               <tbody><tr><td className="p-2 font-semibold">Pied (cm)</td>{[23,23.5,24,24.5,25,25.8,26.5].map(c => <td key={c} className="p-2 text-center tabular">{c}</td>)}</tr></tbody>
-            </table>
+            </table></div>
           </section>
           <p className="text-xs text-[#666] italic">Si vous hésitez entre deux tailles, prenez la plus grande. Pour les sacs et accessoires, aucune taille requise.</p>
         </div>

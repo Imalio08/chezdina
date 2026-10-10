@@ -1,4 +1,5 @@
 import { jsPDF } from "jspdf";
+import { openPdf } from "@/components/shared/PdfPreview";
 
 const fcfa = (n) => `${Math.round(n||0).toLocaleString("fr-FR").replace(/,/g," ")} FCFA`;
 
@@ -52,5 +53,5 @@ export function downloadReceiptPDF(order, business = {}) {
   doc.setFont("helvetica", "normal"); doc.setFontSize(7);
   doc.text("Retrouvez-nous sur TikTok " + (business.tiktok || "@dinoush04"), w/2, y, { align: "center" });
 
-  doc.save(`recu-${order.code || "chez-dina"}.pdf`);
+  openPdf(doc, `recu-${order.code || "chez-dina"}.pdf`);
 }

@@ -238,7 +238,7 @@ export default function ConsoleLayout() {
     <div className="min-h-screen flex bg-[#f5f5f5] dark:bg-[#0f0f0f]">
       {/* Mobile drawer overlay */}
       {mobileOpen && <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setMobileOpen(false)} data-testid="sidebar-mobile-overlay"/>}
-      <aside style={{ width: effectiveWidth }} className={`shrink-0 bg-[#1c1c1c] text-white flex flex-col h-screen relative transition-[width,transform] duration-150 lg:sticky lg:top-0 lg:translate-x-0 fixed inset-y-0 left-0 z-50 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`} data-testid="console-sidebar" data-collapsed={collapsed ? "1" : "0"}>
+      <aside style={{ width: Math.min(effectiveWidth, typeof window !== "undefined" ? window.innerWidth * 0.85 : effectiveWidth) }} className={`shrink-0 bg-[#1c1c1c] text-white flex flex-col h-screen transition-[width,transform] duration-150 lg:sticky lg:top-0 lg:translate-x-0 fixed inset-y-0 left-0 z-50 ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`} data-testid="console-sidebar" data-collapsed={collapsed ? "1" : "0"}>
         <div className={`${collapsed ? "px-2 py-4" : "px-5 py-5"} border-b border-[#2a2a2a] flex items-center ${collapsed ? "justify-center" : "justify-between gap-2"}`}>
           {!collapsed ? (
             <div className="flex items-center gap-2 min-w-0">
@@ -388,7 +388,7 @@ export default function ConsoleLayout() {
               <Bell size={12}/>{unreadCount>0 && <span className="absolute -top-1 -right-1 bg-[#c62828] text-white text-[9px] rounded-full min-w-[16px] h-4 px-1 grid place-items-center font-bold">{unreadCount}</span>}
             </button>
             {showNotif && (
-              <div className="absolute right-0 top-9 w-96 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 z-40 max-h-[70vh] overflow-y-auto scrollbar-thin" data-testid="notifications-panel">
+              <div className="absolute right-0 top-9 w-96 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 z-40 max-h-[70vh] overflow-y-auto scrollbar-thin" data-testid="notifications-panel">
                 <div className="flex justify-between items-center px-2 py-1 mb-1 sticky top-0 bg-white dark:bg-[#1a1a1a]">
                   <span className="font-semibold text-sm">Notifications{notifs.length>0 && <span className="text-xs text-[#666] font-normal ml-1">({notifs.length})</span>}</span>
                   <div className="flex items-center gap-2">{unreadCount>0 && <button onClick={markAllRead} className="text-xs text-[#b02a2a] hover:underline" data-testid="notifs-mark-read">Tout lu</button>}<button onClick={()=>setShowNotif(false)}><X size={14}/></button></div>
@@ -406,7 +406,7 @@ export default function ConsoleLayout() {
             )}
           </div>
         </header>
-        <div className="p-6 flex-1"><ErrorBoundary><Outlet /></ErrorBoundary></div>
+        <div className="p-3 sm:p-4 lg:p-6 flex-1 min-w-0"><ErrorBoundary><Outlet /></ErrorBoundary></div>
       </main>
       <GuidedTour/>
 

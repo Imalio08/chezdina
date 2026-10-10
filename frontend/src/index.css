@@ -169,3 +169,19 @@ html.dark .scrollbar-thin::-webkit-scrollbar-thumb { background: #333; }
 
 @keyframes focusFlash { 0%,100%{box-shadow:0 0 0 0 rgba(176,42,42,0)} 25%,75%{box-shadow:0 0 0 3px rgba(176,42,42,.55)} }
 .focus-flash { animation: focusFlash 1.5s ease-in-out 2; border-radius: 12px; }
+
+/* Responsive guards: component classes must not override Tailwind visibility utilities */
+.hidden.dina-chip, .hidden.dina-btn-primary, .hidden.dina-btn-secondary { display: none; }
+@media (min-width: 640px) { .sm\:inline-flex.dina-chip, .sm\:inline-flex.dina-btn-primary, .sm\:inline-flex.dina-btn-secondary { display: inline-flex; } }
+@media (min-width: 768px) { .md\:inline-flex.dina-chip, .md\:inline-flex.dina-btn-primary, .md\:inline-flex.dina-btn-secondary { display: inline-flex; } }
+@media (min-width: 1024px) { .lg\:inline-flex.dina-chip, .lg\:inline-flex.dina-btn-primary, .lg\:inline-flex.dina-btn-secondary { display: inline-flex; } }
+.grid > * { min-width: 0; }
+.dina-input.pl-7 { padding-left: 1.75rem; } .dina-input.pl-8 { padding-left: 2rem; } .dina-input.pl-9 { padding-left: 2.25rem; } .dina-input.pl-10 { padding-left: 2.5rem; }
+.dina-input.pr-16 { padding-right: 4rem; } .dina-input.pr-10 { padding-right: 2.5rem; }
+.rounded-lg.w-fit { max-width: 100%; overflow-x: auto; scrollbar-width: none; }
+.rounded-lg.w-fit > * { flex-shrink: 0; white-space: nowrap; }
+html, body { max-width: 100%; overflow-x: clip; }
+img, video, canvas, svg { max-width: 100%; }
+@supports (padding: env(safe-area-inset-bottom)) { .safe-bottom { padding-bottom: env(safe-area-inset-bottom); } }
+@media (max-width: 639px) { h1.font-serif.text-3xl { font-size: 1.6rem; line-height: 2rem; } .dina-btn-primary, .dina-btn-secondary { padding: 8px 12px; } }
+

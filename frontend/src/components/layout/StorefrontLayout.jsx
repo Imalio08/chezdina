@@ -85,17 +85,17 @@ export default function StorefrontLayout() {
     <div className="min-h-screen bg-white dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-[#f0f0f0]">
       <div className="bg-[#b02a2a] text-white text-center text-xs py-1.5">Livraison 24h à Abidjan · Paiement à la livraison · WhatsApp 0777 92 61 79</div>
       <header className="sticky top-0 z-30 bg-white dark:bg-[#141414] border-b border-[#ececec] dark:border-[#2a2a2a]">
-        <div className="max-w-6xl mx-auto px-4 h-20 flex items-center gap-3 md:gap-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-4 h-16 sm:h-20 flex items-center gap-1.5 sm:gap-3 md:gap-4">
           <Link to="/boutique" className="flex items-center gap-2 shrink-0" data-testid="storefront-logo">
             {site.logo ? (
               <>
-                <img src={site.logo} alt={brandName} className="h-11 max-w-[120px] object-contain" data-testid="storefront-logo-img"/>
-                <div className="font-serif text-lg text-[#b02a2a] leading-tight">{brandName}</div>
+                <img src={site.logo} alt={brandName} className="h-9 sm:h-11 max-w-[90px] sm:max-w-[120px] object-contain" data-testid="storefront-logo-img"/>
+                <div className="font-serif text-lg text-[#b02a2a] leading-tight hidden sm:block">{brandName}</div>
               </>
             ) : (
               <>
-                <div className="w-11 h-11 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{brandInitials}</div>
-                <div className="font-serif text-xl text-[#b02a2a]">{brandName}</div>
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{brandInitials}</div>
+                <div className="font-serif text-xl text-[#b02a2a] hidden sm:block">{brandName}</div>
               </>
             )}
           </Link>
@@ -106,12 +106,12 @@ export default function StorefrontLayout() {
             <Link to="/boutique/catalog?category=Sacs à main">Sacs</Link>
             <Link to="/boutique/catalog?category=Pochettes">Pochettes</Link>
           </nav>
-          <form onSubmit={submit} className="flex-1 max-w-xl relative" data-testid="storefront-search-form">
+          <form onSubmit={submit} className="flex-1 min-w-0 max-w-xl relative" data-testid="storefront-search-form">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none" />
             <input
               type="search"
               className="w-full h-10 pl-9 pr-9 rounded-full border border-[#ececec] dark:border-[#2a2a2a] bg-[#fafafa] dark:bg-[#1a1a1a] text-[#1c1c1c] dark:text-[#f0f0f0] focus:bg-white dark:focus:bg-[#242424] focus:border-[#b02a2a] text-sm transition outline-none"
-              placeholder="Rechercher un produit, une marque…"
+              placeholder="Rechercher…"
               value={q}
               onChange={(e) => { setQ(e.target.value); setOpen(true); }}
               onFocus={() => setOpen(true)}
@@ -141,7 +141,7 @@ export default function StorefrontLayout() {
           </form>
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="w-9 h-9 grid place-items-center shrink-0 rounded-full hover:bg-[#fafafa] dark:hover:bg-[#1a1a1a] transition"
+            className="w-9 h-9 hidden sm:grid place-items-center shrink-0 rounded-full hover:bg-[#fafafa] dark:hover:bg-[#1a1a1a] transition"
             data-testid="storefront-theme-toggle"
             title={theme === "dark" ? "Mode clair" : "Mode sombre"}
             aria-label={theme === "dark" ? "Passer en mode clair" : "Passer en mode sombre"}

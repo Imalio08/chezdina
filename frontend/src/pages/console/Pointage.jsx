@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
+import { openPdf } from "@/components/shared/PdfPreview";
 import { Users, Clock, AlertTriangle, Download, FileText, Target, Save } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
 
@@ -124,8 +125,8 @@ export default function Pointage() {
     doc.setFont("helvetica", "bold"); doc.setFontSize(9);
     doc.text(`Total · ${allStats.rows.length} employés · ${totWorked} jours travaillés · ${totAbs} absences · ${totLate} retards`, 10, y);
 
-    doc.save(`pointages-${periodDays}j-${new Date().toISOString().slice(0, 10)}.pdf`);
-    toast.success("PDF exporté");
+    openPdf(doc, `pointages-${periodDays}j-${new Date().toISOString().slice(0, 10)}.pdf`);
+    toast.success("PDF généré");
   };
 
   if (!today) return <div className="text-sm text-[#666] text-center py-10">Chargement…</div>;

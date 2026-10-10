@@ -10,6 +10,7 @@
  *   await downloadPackingSlipPDF(order, business);
  */
 import { jsPDF } from "jspdf";
+import { openPdf } from "@/components/shared/PdfPreview";
 
 const fcfa = (n) => `${Math.round(n || 0).toLocaleString("en-US")} FCFA`;
 const safe = (s, fb = "—") => (s == null || s === "" ? fb : String(s));
@@ -20,14 +21,14 @@ function header(doc, business, title, meta) {
   if (business.logo) {
     try { doc.addImage(business.logo, "PNG", 15, y, 22, 22); } catch { /* ignore */ }
   }
-  doc.setFont("helvetica", "bold"); doc.setFontSize(18);
-  doc.text(safe(business.name, "Chez Dina"), 42, y + 7);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(16);
+  doc.text(doc.splitTextToSize(safe(business.name, "Chez Dina"), 70)[0], 42, y + 7);
   doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-  doc.text(safe(business.address, "Cocody Angré 7e, Abidjan"), 42, y + 13);
+  doc.text(doc.splitTextToSize(safe(business.address, "Cocody Angré 7e, Abidjan"), 70)[0], 42, y + 13);
   doc.text(safe(business.phone, "+225 07 77 92 61 79"), 42, y + 18);
   if (business.tiktok) doc.text(`TikTok ${business.tiktok}`, 42, y + 23);
   // Title (right)
-  doc.setFont("helvetica", "bold"); doc.setFontSize(22);
+  doc.setFont("helvetica", "bold"); doc.setFontSize(title.length > 12 ? 16 : 20);
   doc.setTextColor(176, 42, 42);
   doc.text(title, w - 15, y + 8, { align: "right" });
   doc.setTextColor(0, 0, 0);
@@ -36,7 +37,7 @@ function header(doc, business, title, meta) {
     doc.text(line, w - 15, y + 16 + i * 5, { align: "right" });
   });
   // Divider
-  const sepY = y + 32;
+  const sepY = Math.max(y + 32, y + 19 + meta.length * 5);
   doc.setDrawColor(176, 42, 42); doc.setLineWidth(0.6);
   doc.line(15, sepY, w - 15, sepY);
   doc.setDrawColor(0, 0, 0); doc.setLineWidth(0.2);
@@ -117,7 +118,7 @@ function totalsBlock(doc, order, y) {
 
 export function downloadInvoicePDF(order, invoice = {}, business = {}) {
   const { doc, filename } = buildInvoiceDoc(order, invoice, business);
-  doc.save(filename);
+  openPdf(doc, filename);
 }
 
 export function invoicePdfBlob(order, invoice = {}, business = {}) {
@@ -162,23 +163,23 @@ export function downloadPackingSlipPDF(order, business = {}) {
   doc.line(55, y + 10, 110, y + 10);
   doc.text("Signature livreur :", 120, y + 10);
   doc.line(160, y + 10, 195, y + 10);
-  doc.save(`fiche-colis-${order.code || "chez-dina"}.pdf`);
+  openPdf(doc, `fiche-colis-${order.code || "chez-dina"}.pdf`);
 }
 
 export function downloadRiderRoutePDF(rider, orders, business = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   drawRiderRoute(doc, rider, orders, business);
-  doc.save(`feuille-route-${rider.name?.replace(/\s/g, "_") || "livreur"}-${new Date().toISOString().slice(0,10)}.pdf`);
+  openPdf(doc, `feuille-route-${rider.name?.replace(/\s/g, "_") || "livreur"}-${rider.date || new Date().toISOString().slice(0,10)}.pdf`);
 }
 
 export function downloadAllRiderRoutesPDF(groups, business = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
   groups.forEach((g, i) => { if (i) doc.addPage(); drawRiderRoute(doc, g.rider, g.orders, business); });
-  doc.save(`feuilles-route-${new Date().toISOString().slice(0,10)}.pdf`);
+  openPdf(doc, `feuilles-route-${new Date().toISOString().slice(0,10)}.pdf`);
 }
 
 function drawRiderRoute(doc, rider, orders, business = {}) {
-  const today = new Date().toLocaleDateString("fr-FR");
+  const today = (rider.date ? new Date(rider.date) : new Date()).toLocaleDateString("fr-FR");
   let y = header(doc, business, "FEUILLE DE ROUTE", [
     `Livreur : ${rider.name || "—"}`,
     `Date : ${today}`,
@@ -192,40 +193,57 @@ function drawRiderRoute(doc, rider, orders, business = {}) {
   doc.text(`Total COD à encaisser : ${fcfa(totalCod)}`, 15, y);
   doc.text(`Déjà payé (ne pas encaisser) : ${fcfa(totalPaid)}`, 15, y + 5);
   y += 12;
-  // Table header
+  // Table: # | Commande·Cliente | Adresse | Tél | Paiement·Montant
   const w = 210;
-  doc.setFillColor(255, 245, 245);
-  doc.rect(15, y, w - 30, 8, "F");
-  doc.setFont("helvetica", "bold"); doc.setFontSize(9);
-  doc.text("#", 18, y + 5.5);
-  doc.text("Commande / Cliente / Adresse", 26, y + 5.5);
-  doc.text("Tél", 130, y + 5.5);
-  doc.text("Paiement", 160, y + 5.5);
-  doc.text("Montant", w - 18, y + 5.5, { align: "right" });
-  y += 10;
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  const COL = { n: 17, who: 24, addr: 80, tel: 136, amt: w - 17 };
+  const tableHead = () => {
+    doc.setFillColor(255, 245, 245);
+    doc.rect(15, y, w - 30, 8, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+    doc.text("#", COL.n, y + 5.5);
+    doc.text("Commande / Cliente", COL.who, y + 5.5);
+    doc.text("Adresse", COL.addr, y + 5.5);
+    doc.text("Téléphone", COL.tel, y + 5.5);
+    doc.text("Montant", COL.amt, y + 5.5, { align: "right" });
+    y += 11;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  };
+  tableHead();
+  const LH = 4.2;
   orders.forEach((o, i) => {
-    const addr = o.delivery_address || o.address || "";
-    const label = `${o.code}  ·  ${o.customer?.name || "—"}`;
-    const addrLines = doc.splitTextToSize(addr, 100);
-    doc.text(String(i + 1), 18, y + 4);
-    doc.text(label, 26, y + 4);
-    addrLines.forEach((ln, k) => doc.text(ln, 26, y + 4 + (k + 1) * 4));
-    doc.text(String(o.customer?.phone || "—"), 130, y + 4);
-    const pay = o.payment_method === "cod" ? "COD" : (o.payment_status === "paye" ? "Payé" : "—");
-    if (pay === "COD") doc.setTextColor(176, 42, 42);
-    doc.text(pay, 160, y + 4);
-    doc.setTextColor(0, 0, 0);
-    doc.text(fcfa(o.total), w - 18, y + 4, { align: "right" });
-    const h = 4 * (1 + addrLines.length) + 3;
-    y += h;
-    doc.setDrawColor(236, 236, 236);
+    const who = doc.splitTextToSize(`${o.code || ""}\n${o.customer?.name || "—"}`, 53);
+    const addrTxt = [o.delivery_zone, o.delivery_address || o.address || o.customer?.address].filter(Boolean).join(" · ") || "—";
+    const addr = doc.splitTextToSize(addrTxt, 53);
+    const tel = doc.splitTextToSize(String(o.customer?.phone || "—"), 31);
+    const note = o.notes ? doc.splitTextToSize(`Note : ${o.notes}`, w - 30 - (COL.who - 15)) : [];
+    const rows = Math.max(who.length, addr.length, tel.length, 2);
+    const h = rows * LH + note.length * LH + 3;
+    if (y + h > 272) { doc.addPage(); y = 20; tableHead(); }
+    doc.text(String(i + 1), COL.n, y);
+    doc.setFont("helvetica", "bold"); doc.text(who[0], COL.who, y); doc.setFont("helvetica", "normal");
+    who.slice(1).forEach((ln, k) => doc.text(ln, COL.who, y + (k + 1) * LH));
+    addr.forEach((ln, k) => doc.text(ln, COL.addr, y + k * LH));
+    tel.forEach((ln, k) => doc.text(ln, COL.tel, y + k * LH));
+    const cod = o.payment_method === "cod";
+    doc.setFont("helvetica", "bold");
+    doc.text(fcfa(o.total), COL.amt, y, { align: "right" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    if (cod) doc.setTextColor(176, 42, 42); else doc.setTextColor(31, 138, 76);
+    doc.text(cod ? "À encaisser" : "Déjà payé", COL.amt, y + LH, { align: "right" });
+    doc.setTextColor(0, 0, 0); doc.setFontSize(9);
+    if (note.length) {
+      doc.setTextColor(110, 110, 110); doc.setFont("helvetica", "italic");
+      note.forEach((ln, k) => doc.text(ln, COL.who, y + rows * LH + k * LH));
+      doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "normal");
+    }
+    y += h - 2;
+    doc.setDrawColor(230, 230, 230);
     doc.line(15, y, w - 15, y);
     doc.setDrawColor(0, 0, 0);
-    y += 1;
-    if (y > 275) { doc.addPage(); y = 20; }
+    y += 5;
   });
   // Footer
+  if (y > 270) { doc.addPage(); y = 25; }
   y += 6;
   doc.setFont("helvetica", "normal"); doc.setFontSize(9);
   doc.text("Signature livreur :", 15, y);

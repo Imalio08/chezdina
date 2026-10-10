@@ -3,7 +3,8 @@ import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom"
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
-import { Printer, X, Package, Phone, MapPin, QrCode } from "lucide-react";
+import { Printer, Phone, MapPin } from "lucide-react";
+import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
 
 const QR_URL = (txt, size=120) => `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(txt)}`;
 
@@ -13,6 +14,7 @@ export default function FichesColis() {
   const [orders, setOrders] = useState([]);
   const [selected, setSelected] = useState(new Set());
   const [format, setFormat] = useState("a4"); // 80mm | a6 | a4
+  const [f, setF] = useState({ ...EMPTY_FILTERS });
   const [brand, setBrand] = useState({ logo: "", name: "Chez Dina", phone: "+225 07 77 92 61 79", tiktok: "@dinoush04" });
   useEffect(() => {
     api.get("/orders").then(r => {
@@ -30,7 +32,9 @@ export default function FichesColis() {
   }, []); // eslint-disable-line
 
   const toggle = (id) => { const n = new Set(selected); n.has(id)?n.delete(id):n.add(id); setSelected(n); };
-  const toggleAll = () => selected.size===orders.length ? setSelected(new Set()) : setSelected(new Set(orders.map(o=>o.id)));
+  const shown = applyOrderFilters(orders, f);
+  const allShownSel = shown.length > 0 && shown.every(o => selected.has(o.id));
+  const toggleAll = () => { const n = new Set(selected); shown.forEach(o => allShownSel ? n.delete(o.id) : n.add(o.id)); setSelected(n); };
   const list = orders.filter(o => selected.has(o.id));
 
   const print = () => { if (!list.length) return toast.error("Sélectionnez des commandes"); window.print(); };
@@ -39,23 +43,24 @@ export default function FichesColis() {
     <div className="space-y-5">
       <div className="print:hidden flex items-center justify-between flex-wrap gap-3">
         <div><h1 className="font-serif text-3xl">Fiches colis</h1><p className="text-sm text-[#666]">Étiquettes QR imprimables à coller sur les sacs de livraison</p></div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <select className="dina-input !w-auto" value={format} onChange={e=>setFormat(e.target.value)} data-testid="format-select">
             <option value="80mm">Thermique 80mm</option>
             <option value="a6">A6 (100×150 mm)</option>
             <option value="a4">A4 — 4 par feuille</option>
           </select>
-          <button onClick={print} disabled={!list.length} className="dina-btn-primary" data-testid="print-labels"><Printer size={14}/>Imprimer ({list.size || list.length})</button>
+          <button onClick={print} disabled={!list.length} className="dina-btn-primary" data-testid="print-labels"><Printer size={14}/>Aperçu & impression ({list.length})</button>
         </div>
       </div>
 
-      <div className="print:hidden dina-card-white p-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="font-semibold text-sm">Commandes à expédier ({orders.length})</div>
-          <button onClick={toggleAll} className="text-xs text-[#b02a2a]" data-testid="toggle-all">{selected.size===orders.length?"Tout désélectionner":"Tout sélectionner"}</button>
+      <div className="print:hidden dina-card-white p-4 space-y-3">
+        <OrderFilters orders={orders} value={f} onChange={setF} fields={["q", "status", "date", "slot", "zone", "rider"]} statuses={["prete", "assignee", "en_livraison"]} testid="fiches-filters"/>
+        <div className="flex items-center justify-between">
+          <div className="font-semibold text-sm">Commandes à expédier ({shown.length}{shown.length !== orders.length ? ` / ${orders.length}` : ""})</div>
+          <button onClick={toggleAll} className="text-xs text-[#b02a2a]" data-testid="toggle-all">{allShownSel?"Tout désélectionner":"Tout sélectionner"}</button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 max-h-[55vh] overflow-y-auto">
-          {orders.map(o => (
+          {shown.map(o => (
             <label key={o.id} className={`flex items-center gap-3 p-3 border rounded-lg cursor-pointer transition ${selected.has(o.id)?"border-[#b02a2a] bg-[#fff5f5] dark:bg-[#2a1818]":"border-[#ececec] dark:border-[#2a2a2a]"}`} data-testid={`order-select-${o.code}`}>
               <input type="checkbox" checked={selected.has(o.id)} onChange={()=>toggle(o.id)} className="accent-[#b02a2a]"/>
               <div className="flex-1 min-w-0">
@@ -65,7 +70,7 @@ export default function FichesColis() {
               </div>
             </label>
           ))}
-          {orders.length === 0 && <div className="text-sm text-[#666] text-center col-span-full py-8">Aucune commande prête à expédier</div>}
+          {shown.length === 0 && <div className="text-sm text-[#666] text-center col-span-full py-8">{orders.length ? "Aucune commande pour ces filtres" : "Aucune commande prête à expédier"}</div>}
         </div>
       </div>
 

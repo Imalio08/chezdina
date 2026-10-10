@@ -101,6 +101,7 @@ import SharedCart from "@/pages/storefront/SharedCart";
 import SubdomainRouter from "@/components/SubdomainRouter";
 import BrandingBootstrapper from "@/components/BrandingBootstrapper";
 import { ImageEditorHost } from "@/components/shared/ImageEditor";
+import { PdfPreviewHost } from "@/components/shared/PdfPreview";
 import RiderLogin from "@/pages/rider/RiderLogin";
 
 function Protected({ children }) {
@@ -137,6 +138,7 @@ export default function App() {
         <BrowserRouter>
           <Toaster position="top-right" richColors />
           <ImageEditorHost />
+          <PdfPreviewHost />
           <BrandingBootstrapper />
           <SubdomainRouter />
           <Routes>

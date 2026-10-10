@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Plus, Trash2, X, Package, Download, Printer, FileSpreadsheet, Eye, Pencil, LayoutGrid, Table as TableIcon, QrCode, CheckSquare, AlertTriangle } from "lucide-react";
 import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
 import jsPDF from "jspdf";
+import { openPdf } from "@/components/shared/PdfPreview";
 import * as XLSX from "xlsx";
 
 const STATUSES = ["brouillon", "commande", "recu_partiel", "recu", "cloture"];
@@ -90,7 +91,7 @@ export default function PurchaseOrders() {
       if (y > 270) { doc.addPage(); y = 20; }
     });
     y += 4; doc.setFont("helvetica", "bold"); doc.text(`Total : ${fcfa(po.total || 0)}`, 185, y, { align: "right" });
-    doc.save(`${po.number}-${kind}.pdf`);
+    openPdf(doc, `${po.number}-${kind}.pdf`);
   };
 
   const exportXlsx = (po) => {

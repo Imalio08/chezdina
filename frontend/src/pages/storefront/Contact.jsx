@@ -11,7 +11,11 @@ export default function Contact() {
 
   useEffect(() => {
     api.get("/public/business").then(r => setBiz(r.data || {})).catch(() => {});
-    api.get("/public/site").then(r => setHours(r.data?.opening_hours || [])).catch(() => {});
+    api.get("/public/site").then(r => {
+      const oh = r.data?.opening_hours;
+      const DAYS = { mon: "Lundi", tue: "Mardi", wed: "Mercredi", thu: "Jeudi", fri: "Vendredi", sat: "Samedi", sun: "Dimanche" };
+      setHours(Array.isArray(oh) ? oh : oh && typeof oh === "object" ? Object.entries(DAYS).filter(([k]) => oh[k]).map(([k, label]) => ({ day: label, open: !oh[k].closed, start: oh[k].open, end: oh[k].close })) : []);
+    }).catch(() => {});
   }, []);
 
   const submit = async () => {

@@ -6,64 +6,10 @@ import { toast } from "sonner";
 import { Plus, Calendar, Package, DollarSign, AlertTriangle, CheckCircle2, Users, X, Printer, Map, Sparkles, UserPlus, FileText } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
 import LiveDeliveryMap from "@/components/delivery/LiveDeliveryMap";
-import jsPDF from "jspdf";
 import { VersementCell, missingVersements, OrderDayStatus } from "@/components/delivery/VersementCell";
 import { SlotPickerModal, SlotBadge } from "@/components/delivery/SlotPicker";
 import { ReconcileLineModal } from "@/pages/console/Deliveries";
-import { downloadAllRiderRoutesPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
-
-/** Build a printable route-sheet PDF for a rider's day: list of orders with addresses, phones, amounts. */
-function printRouteSheetPDF(session, assigned, brand = {}) {
-  const doc = new jsPDF();
-  const pad = 15;
-  // Header: logo + brand
-  let hy = 18;
-  if (brand.logo) {
-    try { doc.addImage(brand.logo, "PNG", pad, 10, 14, 14); } catch { /* ignore malformed logo */ }
-    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-    doc.text(brand.name || "Chez Dina", pad + 18, 18);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-    doc.text("Feuille de route livreur", pad + 18, 24);
-    hy = 30;
-  } else {
-    doc.setFont("helvetica", "bold"); doc.setFontSize(16);
-    doc.text(`${brand.name || "Chez Dina"} — Feuille de route livreur`, pad, 18);
-    hy = 24;
-  }
-  doc.setFont("helvetica", "normal"); doc.setFontSize(10);
-  doc.text(`Livreur : ${session.rider_name || "—"}`, pad, hy + 2);
-  doc.text(`Journée : ${session.date || (session.created_at || "").slice(0,10)}`, pad, hy + 8);
-  doc.text(`Commandes affectées : ${assigned.length}`, pad, hy + 14);
-  const totalToCollect = assigned.reduce((s,o) => s + (o.payment_method === "cod" ? (o.total || 0) : 0), 0);
-  doc.text(`Total à encaisser (COD) : ${fcfa(totalToCollect)}`, pad, hy + 20);
-  let y = hy + 32;
-  doc.setFont("helvetica", "bold");
-  doc.text("#", pad, y);
-  doc.text("Code", pad + 10, y);
-  doc.text("Cliente / Téléphone", pad + 40, y);
-  doc.text("Adresse", pad + 95, y);
-  doc.text("À encaisser", 195, y, { align: "right" });
-  y += 2; doc.line(pad, y, 195, y); y += 5;
-  doc.setFont("helvetica", "normal"); doc.setFontSize(9);
-  assigned.forEach((o, i) => {
-    if (y > 275) { doc.addPage(); y = 20; }
-    const toCollect = o.payment_method === "cod" ? (o.total || 0) : 0;
-    doc.text(String(i + 1), pad, y);
-    doc.text((o.code || "").slice(0, 14), pad + 10, y);
-    doc.text(((o.customer?.name || "—") + " · " + (o.customer?.phone || "")).slice(0, 36), pad + 40, y);
-    const addr = ((o.delivery_zone || "") + " · " + (o.delivery_address || o.customer?.address || "")).slice(0, 50);
-    doc.text(addr, pad + 95, y);
-    doc.text(toCollect > 0 ? fcfa(toCollect) : "Payé", 195, y, { align: "right" });
-    y += 5;
-    if (o.notes) {
-      doc.setTextColor(120); doc.text(("Note : " + o.notes).slice(0, 90), pad + 10, y); doc.setTextColor(0); y += 5;
-    }
-    doc.setDrawColor(220); doc.line(pad, y - 1, 195, y - 1); doc.setDrawColor(0);
-  });
-  doc.setFont("helvetica", "italic"); doc.setFontSize(8);
-  doc.text("Signature livreur : _______________________    Signature bureau : _______________________", pad, 285);
-  doc.save(`feuille-route-${(session.rider_name || "livreur").replace(/\s+/g, "-")}-${session.date || "jour"}.pdf`);
-}
+import { downloadAllRiderRoutesPDF, downloadRiderRoutePDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
 export default function DeliveryDays() {
   const [sessions, setSessions] = useState([]);
@@ -71,6 +17,8 @@ export default function DeliveryDays() {
   const [riders, setRiders] = useState([]);
   const [open, setOpen] = useState(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [sf, setSf] = useState({ date: "", rider: "", state: "" });
+  const shownSessions = sessions.filter(s => (!sf.date || (s.date || s.created_at?.slice(0,10)) === sf.date) && (!sf.rider || s.rider_id === sf.rider) && (!sf.state || (sf.state === "closed") === !!s.closed));
 
   const load = async () => {
     const [s, o, t] = await Promise.all([api.get("/delivery-sessions"), api.get("/orders"), api.get("/team")]);
@@ -120,11 +68,22 @@ export default function DeliveryDays() {
         <KPICard testid="dd-riders" label="Livreurs actifs" value={riders.length} icon={Users} color="#f4b12c"/>
       </div>
 
-      <div className="dina-card-white overflow-hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="dd-filters">
+        <input type="date" className="dina-input !min-h-[38px] text-xs" value={sf.date} onChange={e=>setSf({...sf, date: e.target.value})} data-testid="dd-filter-date"/>
+        <select className="dina-input !min-h-[38px] text-xs" value={sf.rider} onChange={e=>setSf({...sf, rider: e.target.value})} data-testid="dd-filter-rider">
+          <option value="">Tous livreurs</option>{riders.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+        </select>
+        <select className="dina-input !min-h-[38px] text-xs" value={sf.state} onChange={e=>setSf({...sf, state: e.target.value})} data-testid="dd-filter-state">
+          <option value="">Ouvertes et clôturées</option><option value="open">Ouvertes</option><option value="closed">Clôturées</option>
+        </select>
+        {(sf.date || sf.rider || sf.state) ? <button onClick={()=>setSf({ date: "", rider: "", state: "" })} className="dina-chip justify-center" data-testid="dd-filter-reset"><X size={12}/>Effacer</button> : <div/>}
+      </div>
+
+      <div className="dina-card-white overflow-hidden"><div className="overflow-x-auto">
         <table className="dina-table" data-testid="dd-table">
           <thead><tr><th>Date</th><th>Statut</th><th>Livreur</th><th className="text-right">Cmd</th><th className="text-right">Livrées</th><th className="text-right">À encaisser</th><th></th></tr></thead>
-          <tbody>{sessions.length === 0 ? <tr><td colSpan={7} className="text-center text-sm text-[#666] py-10">Aucune journée · créez-en une pour commencer</td></tr> :
-            sessions.map(s => (
+          <tbody>{shownSessions.length === 0 ? <tr><td colSpan={7} className="text-center text-sm text-[#666] py-10">{sessions.length ? "Aucune journée pour ces filtres" : "Aucune journée · créez-en une pour commencer"}</td></tr> :
+            shownSessions.map(s => (
               <tr key={s.id} className="cursor-pointer hover:bg-[#fafafa] dark:hover:bg-[#141414]" onClick={()=>setOpen(s)} data-testid={`dd-row-${s.id}`}>
                 <td className="font-medium">{s.date || s.created_at?.slice(0,10)}</td>
                 <td><span className="dina-chip !py-0.5 text-[10px]" style={{color:s.closed?"#1f8a4c":"#5867fd",borderColor:s.closed?"#1f8a4c":"#5867fd"}}>{s.closed?"Clôturée":"Ouverte"}</span></td>
@@ -137,7 +96,7 @@ export default function DeliveryDays() {
             ))}
           </tbody>
         </table>
-      </div>
+      </div></div>
 
       {createOpen && <CreateDayModal riders={riders} onClose={()=>setCreateOpen(false)} onDone={()=>{setCreateOpen(false); load();}}/>}
     </div>
@@ -385,10 +344,9 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
               className="dina-btn-secondary" data-testid="dd-print-fiches"
             ><Printer size={14}/>Imprimer les fiches colis</button>
             <button
-              onClick={() => {
+              onClick={async () => {
                 if (!assigned.length) return toast.error("Aucune commande affectée");
-                printRouteSheetPDF(session, assigned, brand);
-                toast.success("Feuille de route générée");
+                downloadRiderRoutePDF({ name: session.rider_name, date: session.date, zone: riders.find(r => r.id === session.rider_id)?.zone }, assigned, await fetchBusinessForPdf(api));
               }}
               className="dina-btn-primary" data-testid="dd-print-routesheet"
             ><FileText size={14}/>Feuille de route livreur (PDF)</button>

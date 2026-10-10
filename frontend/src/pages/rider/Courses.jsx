@@ -7,6 +7,7 @@ import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
 import { SlotBadge } from "@/components/delivery/SlotPicker";
 import OrderThread, { PhotoButton } from "@/components/shared/OrderThread";
 import { useNavigate as useNav } from "react-router-dom";
+import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
 
 const FAIL_REASONS = ["Cliente absente", "Cliente injoignable", "Refus de la commande", "Adresse introuvable", "Autre"];
 
@@ -54,6 +55,7 @@ const FILTERS = [
 export default function Courses() {
   const [d, setD] = useState(null);
   const [filter, setFilter] = useState("all");
+  const [of, setOf] = useState({ ...EMPTY_FILTERS });
   const [open, setOpen] = useState(null); // order detail
   const [proof, setProof] = useState(null);
 
@@ -80,7 +82,7 @@ export default function Courses() {
 
   if (!d) return <div className="text-sm text-[#666] text-center py-10">Chargement…</div>;
 
-  const filtered = d.orders.filter(match);
+  const filtered = applyOrderFilters(d.orders, of).filter(match);
 
   return (
     <div className="space-y-3">
@@ -99,6 +101,8 @@ export default function Courses() {
           </button>
         ))}
       </div>
+
+      <OrderFilters orders={d.orders} value={of} onChange={setOf} fields={["q", "slot", "zone"]} testid="rider-order-filters"/>
 
       <div className="space-y-2">
         {filtered.length === 0 && <div className="text-center text-sm text-[#666] py-10">Aucune course</div>}

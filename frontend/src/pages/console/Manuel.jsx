@@ -70,7 +70,7 @@ export default function Manuel() {
             </div>
           )}
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <Filter size={12} className="text-[#999]"/>
           {ROLE_FILTERS.map(f => (
             <button
