@@ -1,5 +1,17 @@
 # Chez Dina — PRD
 
+### Vague U — 3 fiches détail + vérif catalogue (Feb 2026) ✅
+**3 nouvelles pages de détail routées** :
+- `/app/frontend/src/pages/console/RiderDetail.jsx` → `/console/livreurs/:id` : profil livreur + 6 KPI (score, livraisons, en cours, note, encaissé COD, taux à temps) + 4 sections (pointages avec selfies, journées de livraison, dernières commandes cliquables, avis clientes).
+- `/app/frontend/src/pages/console/ProductDetail.jsx` → `/console/produits/:id` : galerie images + fiche prix/coût/marge + stock par taille + 4 KPI + historique mouvements stock + dernières ventes cliquables.
+- `/app/frontend/src/pages/console/OrderDetail.jsx` → `/console/commandes/:code` : entête commande + 3 cartes (Cliente cliquable, Livraison cliquable, Facture avec 3 boutons PDF/Fiche colis/WhatsApp) + items cliquables vers produit + bloc totaux + changement de statut par chips.
+- Routes ajoutées dans `App.js` sous `/console/*`.
+- Navigation câblée depuis `Orders.jsx` (lignes table + kanban cards → `/console/commandes/:code`), `Riders.jsx` (cards → `/console/livreurs/:id`), `Products.jsx` (card click → `/console/produits/:id`).
+- Cross-navigation : OrderDetail → livreur fiche · ProductDetail → commande vente · RiderDetail → commande cliquable.
+
+**Vérification visuelle catalogue** : screenshot `/boutique/catalog` confirmé **30 produits propres** · catégories Tout/Talons/Sandales/Sacs à main/Pochettes/Cabas (aucune catégorie vêtement) · images visibles toutes = chaussures/sacs femme (sac blanc fleurs, Gucci matelassé noir, cabas marron, cabas blanc croco, pochette strass, mini sac clous, orange baguette, etc.).
+
+
 ### Vague T — P1 + P2 : Rôles simplifiés, Pointage au login, Session caisse plus claire (Feb 2026) ✅
 **Rôles simplifiés** (`/app/frontend/src/lib/rbac.js` + `/app/frontend/src/pages/console/Team.jsx`)
 - Suppression des rôles `sales`, `stock_keeper`, `community_manager`.

@@ -68,6 +68,9 @@ import Suppliers from "@/pages/console/Suppliers";
 import PurchaseOrders from "@/pages/console/PurchaseOrders";
 import StockInventories from "@/pages/console/StockInventories";
 import CustomerDetail from "@/pages/console/CustomerDetail";
+import RiderDetail from "@/pages/console/RiderDetail";
+import ProductDetail from "@/pages/console/ProductDetail";
+import OrderDetail from "@/pages/console/OrderDetail";
 import Messagerie from "@/pages/console/Messagerie";
 import Segments from "@/pages/console/Segments";
 import Campagnes from "@/pages/console/Campagnes";
@@ -160,6 +163,9 @@ export default function App() {
               <Route path="avis" element={<ErrorBoundary><Reviews /></ErrorBoundary>} />
               <Route path="clients" element={<ErrorBoundary><Customers /></ErrorBoundary>} />
               <Route path="clients/:id" element={<ErrorBoundary><CustomerDetail /></ErrorBoundary>} />
+              <Route path="livreurs/:id" element={<ErrorBoundary><RiderDetail /></ErrorBoundary>} />
+              <Route path="produits/:id" element={<ErrorBoundary><ProductDetail /></ErrorBoundary>} />
+              <Route path="commandes/:code" element={<ErrorBoundary><OrderDetail /></ErrorBoundary>} />
               <Route path="messagerie" element={<ErrorBoundary><Messagerie /></ErrorBoundary>} />
               <Route path="fidelite" element={<ErrorBoundary><Loyalty /></ErrorBoundary>} />
               <Route path="promotions" element={<ErrorBoundary><Promotions /></ErrorBoundary>} />

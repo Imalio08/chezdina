@@ -7,6 +7,7 @@ import KPICard from "@/components/shared/KPICard";
 import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
 
 export default function Riders() {
+  const nav = useNavigate();
   const [riders, setRiders] = useState([]);
   const [orders, setOrders] = useState([]);
   const [scores, setScores] = useState({});
@@ -56,7 +57,7 @@ export default function Riders() {
           {riders.map(r => {
             const s = stats(r.id); const sc = scores[r.id];
             return (
-              <button key={r.id} onClick={()=>setOpen(r)} className="dina-card-white p-4 text-left hover:border-[#b02a2a]" data-testid={`rider-card-${r.id}`}>
+              <button key={r.id} onClick={()=>nav(`/console/livreurs/${r.id}`)} className="dina-card-white p-4 text-left hover:border-[#b02a2a]" data-testid={`rider-card-${r.id}`}>
                 <div className="flex items-start gap-3">
                   {r.photo ? <img src={r.photo} className="w-14 h-14 rounded-full object-cover"/> : <div className="w-14 h-14 rounded-full bg-[#fde8e8] grid place-items-center font-bold text-[#b02a2a]">{r.name?.[0]}</div>}
                   <div className="flex-1 min-w-0">

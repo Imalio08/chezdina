@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
@@ -8,6 +9,7 @@ import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from 
 const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","retournee","annulee","echouee"];
 
 export default function Orders() {
+  const nav = useNavigate();
   const [orders, setOrders] = useState([]);
   const [view, setView] = useState("table");
   const [filter, setFilter] = useState("");
@@ -117,13 +119,13 @@ export default function Orders() {
           <tbody>{filtered.length === 0 ? <tr><td colSpan={8} className="text-sm text-[#666] text-center py-8">Aucune commande pour ce filtre</td></tr>
           : filtered.slice(0,200).map(o=>(
             <tr key={o.id} className="hover:bg-[#fafafa] dark:hover:bg-[#141414]" data-testid={`order-row-${o.code}`}>
-              <td className="font-medium cursor-pointer" onClick={()=>setSelected(o)}>{o.code}</td>
-              <td className="text-[#666] cursor-pointer" onClick={()=>setSelected(o)}>{dateTimeFmt(o.created_at)}</td>
-              <td className="cursor-pointer" onClick={()=>setSelected(o)}>{o.customer?.name||"—"}</td>
-              <td className="capitalize cursor-pointer" onClick={()=>setSelected(o)}>{o.channel}</td>
-              <td className="capitalize text-xs cursor-pointer" onClick={()=>setSelected(o)}>{o.mode}</td>
-              <td className="cursor-pointer" onClick={()=>setSelected(o)}><span className="dina-chip" style={{color:statusColor[o.status]}}><span className="status-dot" style={{background:statusColor[o.status]}}/>{statusLabel[o.status]}</span></td>
-              <td className="text-right tabular font-semibold cursor-pointer" onClick={()=>setSelected(o)}>{fcfa(o.total)}</td>
+              <td className="font-medium cursor-pointer hover:text-[#b02a2a]" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.code}</td>
+              <td className="text-[#666] cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{dateTimeFmt(o.created_at)}</td>
+              <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.customer?.name||"—"}</td>
+              <td className="capitalize cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.channel}</td>
+              <td className="capitalize text-xs cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.mode}</td>
+              <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}><span className="dina-chip" style={{color:statusColor[o.status]}}><span className="status-dot" style={{background:statusColor[o.status]}}/>{statusLabel[o.status]}</span></td>
+              <td className="text-right tabular font-semibold cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{fcfa(o.total)}</td>
               <td>
                 <div className="flex items-center justify-center gap-1">
                   <button onClick={() => openInvoice(o, "pdf")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Télécharger facture PDF" data-testid={`invoice-pdf-${o.code}`}><Download size={13}/></button>
@@ -139,7 +141,7 @@ export default function Orders() {
             <div key={s} className="dina-card p-3 min-h-[200px]">
               <div className="font-semibold text-xs uppercase mb-2" style={{color:statusColor[s]}}>{statusLabel[s]} ({orders.filter(o=>o.status===s).length})</div>
               <div className="space-y-2">{orders.filter(o=>o.status===s).slice(0,10).map(o=>(
-                <div key={o.id} onClick={()=>setSelected(o)} className="bg-white rounded-lg border border-[#ececec] p-2 cursor-pointer hover:border-[#b02a2a]">
+                <div key={o.id} onClick={()=>nav(`/console/commandes/${o.code}`)} className="bg-white rounded-lg border border-[#ececec] p-2 cursor-pointer hover:border-[#b02a2a]">
                   <div className="text-xs font-medium">{o.code}</div>
                   <div className="text-xs text-[#666]">{o.customer?.name||"—"}</div>
                   <div className="tabular text-sm font-semibold">{fcfa(o.total)}</div>

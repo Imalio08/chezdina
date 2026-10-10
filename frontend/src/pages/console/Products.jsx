@@ -157,7 +157,7 @@ export default function Products() {
       {/* List */}
       {view === "grid" ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3" data-testid="products-grid">
-          {filtered.map(p => <ProductCard key={p.id} p={p} selected={selected.includes(p.id)} onToggle={toggleSel} onOpen={()=>setDetailId(p.id)} onEdit={()=>setEditId(p.id)} salesMap={salesMap}/>)}
+          {filtered.map(p => <ProductCard key={p.id} p={p} selected={selected.includes(p.id)} onToggle={toggleSel} onOpen={()=>nav(`/console/produits/${p.id}`)} onEdit={()=>setEditId(p.id)} salesMap={salesMap}/>)}
           {filtered.length === 0 && <div className="col-span-full dina-card-white py-12 text-center text-sm text-[#666]">Aucun produit</div>}
         </div>
       ) : (
