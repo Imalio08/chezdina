@@ -1006,6 +1006,17 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Réponse cliente/livreur → notification console (type order_message) vers /console/commandes/{code}?focus=order-messages.
 - Testé : iteration_61 (backend 13/13, frontend 100%). Messages TEST_ nettoyés.
 
+## 2026-10-10 — Lot photos + démo + stock + badge + feuilles multi-livreurs
+- Photos dans les fils de commande (console, app livreur, compte cliente) : compression JPEG 1280px, miniatures, lightbox (OrderThread, imageCompress.js).
+- Pack démo « DEMO_SCN » (routers/demo.py) branché sur POST /api/admin/seed-demo et DELETE /api/admin/demo-data : produits rupture/stock bas/liste d'attente/promo, 4 clientes avec code, commandes de tous statuts, journées livreurs du jour (créneaux, versé/non versé, échec, reportée), caisse validée + à valider, BC commandé/reçu partiel/reçu, avis, paniers, waitlist, alertes, approbations, dépenses, campagnes, fils non lus.
+- Réception BC (sans écart + validation écarts) → stock + mouvement « Réception BC-… ».
+- Badge rouge non-lus sur « Commandes » (GET /api/orders-messages/unread, POST /api/orders/{oid}/threads/read).
+- « Imprimer toutes les feuilles » (Journées de livraison) : PDF une page par livreur.
+- « Ajuster stock » sur fiche produit (admin direct + mouvement ; gérante → demande d'approbation).
+- Sessions de caisse : rafraîchissement 10 s + KPI Sessions visible.
+- Testé : iteration_62 (backend 15/15, frontend 100%).
+
+
 
 
 

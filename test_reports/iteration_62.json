@@ -1,0 +1,33 @@
+{
+  "summary": "Iter62 — Lot P0..P7 (Chez Dina). Backend 13/15 PASSED, 2 SKIPPED on re-run (idempotent — one-shot BC reception tests, both PASSED on their first execution during this iteration). Verified: (P0) demo pack already seeded (DEMO_SCN, 'Mules Raphia Naturel' rupture product present, BC-DEMO-0/1/2 statuses commande/recu_partiel/recu, demo cash_sessions pending_validation, delivery_sessions today, 4 demo customers can login via /public/customer-login-code, second POST /admin/seed-demo returns scenarios.skipped=true (no reseed). (P1) BC-DEMO-0 blind-receive with counted==ordered → status 'recu', product 'Mules Raphia Naturel' stock went 0 → 15 (+15 across sizes), stock_movements has 'Réception BC-DEMO-0'. BC-DEMO-1 validate-gaps added stock+qty_counted and 'Réception BC-DEMO-1 (écarts validés)' movement. (P2) GET /orders-messages/unread returns count>=1 with by_order dict (observed 4 initially). POST /orders/{code}/threads/read removes that order from by_order and decrements count by the exact per-order amount. Rider token returns {count:0, by_order:{}}. (Messages photos) POST /orders/{oid}/thread/customer/send with attachments=[{type:'image', url:'data:image/png;base64,...'}] and text='' → 200 and message.attachments[0].url preserved. Empty text + empty attachments → 400. Non-image attachments are filtered (file type → attachments becomes empty → 400). Customer side: POST /public/account/messages/send with image attachment on commande_cliente conversation_id → 200. UI: (P3) /console/livraisons dd-print-all triggers PDF download suggested_filename='feuilles-route-2026-10-10.pdf'. (P4) /console/produits/{id} product-adjust-stock opens adjust-stock-modal with all testids (adjust-size, adjust-in, adjust-out, adjust-qty, adjust-preview, adjust-reason, adjust-note, adjust-submit); as admin, +2 on size 37 preview shows 'Stock : 5 → 7', submit creates stock_movement 'Ajustement · Casse / défaut' qty=2 by Aïcha Ouattara. (P5) /console/pos has pos-filter-all and pos-filter-stock. (P7) /console/sessions-caisse has cash-kpi-total visible with color (indigo #5867fd) — route is '/console/sessions-caisse' NOT '/console/caisse-sessions'. (Photos UI) /console/commandes/{code}?focus=order-messages: thread-photo-btn-customer-input setInputFiles(tiny.png) → thread-photo-preview appears → od-msg-send sends → thread-photo <img> rendered → click opens photo-lightbox. nav-orders-unread badge visible in sidebar with correct count.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console (all pages)", "issues": ["Pre-existing React hydration warning: <span> cannot be a child of <option> (ConsoleLayout.jsx line 308 area — dev-tools wrapper on <option> content). Non-blocking, carried over since iter56."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter62_lot.py",
+    "/app/test_reports/pytest/iter62.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "There is no public GET /api/products/{id} endpoint — only PATCH/DELETE in routers/catalog.py and GET /products/{pid}/history in server.py. The ProductDetail.jsx page triggers GET /api/products/{id} (returns 405 'Method Not Allowed') in the browser (visible as 2× 405 in console). Not blocking because the page can be fed from the products list, but a dedicated GET endpoint would be cleaner.",
+    "_image_attachments silently drops attachments with http:// (non-TLS) or data URLs > 3MB; frontend should surface a user-visible error, not just an empty send.",
+    "orders_unread() scans the full conversations collection every call (regex ^order: + .messages projection), with Python-side iteration. Fine for a demo, but at scale this needs an indexed read_counter per (conv, user) or a Mongo aggregation.",
+    "demo seed_scenarios(): if a non-admin user calls purge, delivery_slots on real riders also get wiped (purge_scenarios unsets delivery_slots on any user with demo_slots_seeded=true — OK, but if an admin manually configured slots on top of demo they would be lost on purge).",
+    "server.py is 5651 lines — exceeds the 700-line guideline. Keep splitting into routers (demo.py already extracted — good)."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter62_lot.py (new)"
+  ],
+  "success_rate": {"backend": "100% (15/15 — 13 PASS + 2 SKIPPED after first run)", "frontend": "100% of testable flows for this lot"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! (PIN 1234); Manager manager.cocody@dinastore.ci / Manager123!; Rider rider1@dinastore.ci / Rider123!; demo customer +225 07 48 11 22 01 / code 202601 (and 3 others 202602..202604). All validated this iteration.",
+  "seed_data_creation": "DO NOT delete the DEMO_SCN pack (user wants it kept). State mutations I introduced during tests that main agent should know about: (1) BC-DEMO-0 is now status='recu' and 'Mules Raphia Naturel' stock is 15 (was 0 in seed) — rupture POS demo will no longer show a RUPTURE overlay for that product until pack is reseeded. (2) BC-DEMO-1 is now reception.validated=true and 'Sandales Perles Dorées' size 40 stock went 0→4. (3) +2 on first product (id 2c2005f5-...) size 37 via adjust-stock (reason 'Ajustement · Casse / défaut'). (4) Added 1 'TEST_iter62.png' image message + 1 customer tiny PNG message in two order threads. To fully restore seed, main agent can DELETE /api/admin/demo-data then POST /api/admin/seed-demo.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Run: REACT_APP_BACKEND_URL=https://dina-boutique.preview.emergentagent.com python -m pytest backend/tests/test_iter62_lot.py -o addopts='' -v. BC reception tests auto-SKIP if BC-DEMO-0 is already 'recu' or BC-DEMO-1 reception.validated — expected behavior on 2nd+ runs. POS page is at /console/pos (NOT /console/caisse). CashSessions page is at /console/sessions-caisse (NOT /console/caisse-sessions). ProductDetail attempts a GET /api/products/{id} that 405s — ignore in console for now. Guided tour modal has NO close button testid — use .locator('[data-testid=\"guided-tour\"] button').first.click(). Login page inputs have no testid/type=email — use page.locator('input').nth(0/1).",
+  "rca of the issue": "N/A — no blocking issues. All backend endpoints behave per spec, all critical UI testids are present and wired."
+}
