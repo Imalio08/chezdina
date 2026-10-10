@@ -995,4 +995,10 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_59 (backend 100%, frontend OK) ; 2 écarts du Board d'affectation corrigés ensuite. Données TEST_ nettoyées.
 
 
+## 2026-10-10 — Créneaux livreurs + Notifications ciblées
+- Créneaux par livreur (fiche livreur : nom, début, fin, capacité) ; GET/PUT /api/riders/{rid}/slots. Choix du créneau à l'affectation (Board glisser-déposer + « Affecter à » Journées de livraison) ; complet = avertissement, affectation autorisée ; « Sans créneau ». Badge créneau sur cartes, journée, fiche commande, app livreur.
+- Notifications : liens directs (commande, produit, cliente/panier, avis ?focus, approbations ?focus, sessions-caisse ?focus, fiche livreur) + notifications stockées en base désormais visibles. Hook useFocusParam (surbrillance).
+- Testé : iteration_60 (backend 13/13, frontend 100%).
+
+
 

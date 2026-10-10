@@ -1,0 +1,32 @@
+{
+  "summary": "Iter60 — Rider delivery slots + notification deep links. Backend 13/13 PASSED (test_iter60_slots.py): PUT/GET /api/riders/{rid}/slots validates HH:MM time format, start<end, label required, capacity>=1, admin/manager only; GET returns slots sorted by start with 'used' usage field. PATCH /api/delivery-sessions/{sid}/add-order with slot_id attaches delivery_slot {id,label,start,end} on order; slot_id=null detaches; invalid slot_id → 400; when slot capacity reached returns slot_full:true + warning string but still assigns. PATCH /api/deliveries/{oid}/assign accepts optional slot_id and persists delivery_slot. GET /api/notifications works and includes mixed kinds. Frontend verified: (1) /console/livreurs/{rid} rider-slots editor renders with slot-add + slot-row-i containing slot-label-i/start-i/end-i/capacity-i/delete-i + slots-save; save works (toast). (2) /console/journees-livraison Board d'affectation — real-mouse drag (page.mouse down/move/up) from board-unassigned card to board-rider-{rid} column (open session required) correctly opens slot-picker-modal with slot-option-{id} + slot-option-none + slot-picker-confirm; selecting a slot and confirming assigns the order and card shows slot-badge-{code} (e.g. 'Matin · 09:00–12:00'). (3) /console/commandes/{code} fiche shows slot-badge-{code} after assignment. (4) Rider app (rider1@dinastore.ci) /rider courses list cards show slot-badge-{code} for all orders carrying a slot. (5) Notifications bell: notifications-button opens notifications-panel; clicking notif-order → /console/commandes/{code} (deep link), notif-review → /console/avis?focus={id} and the row carries data-focus-id={id} with .focus-flash applied (verified via useFocusParam), notif-approval/notif-expense_request → /console/approbations, notif-handover → /console/sessions-caisse, notif-cart → /console/paniers-abandonnes. All notification kinds visible: order, review, cart, approval, expense_request, handover, handover_rejected, alert, attendance_alert.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Dashboard PeriodSelector", "issues": ["Pre-existing React hydration warning <span> inside <option> (dev-tool x-component wrapper, non-blocking, carried over since iter56)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_iter60_slots.py",
+    "/app/test_reports/pytest/iter60.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/riders.py _apply_slot: cap check uses `used >= cap` after decrementing used by 1 when the order is already in the slot — correct but subtle; a comment would help. The warning message « Créneau « X » complet (N/cap) » is good UX.",
+    "routers/riders.py get_rider_slots: sorts by start time string lex — fine for HH:MM 24h format.",
+    "Deliveries.jsx onDragStart uses setDragId (React state) but onDropToSession reads dragId from closure — works with real HTML5 drag because events fire in separate event loop ticks, but synthetic DataTransfer-based drag/drop events fire too quickly and React has not yet applied the setDragId update, so pendingDrop stays null. Not a product bug; UX works for real users. Consider using a ref (useRef) for dragId to be fully synchronous.",
+    "SlotPickerModal defaults choice to '' which maps to 'Sans créneau' option — users can accidentally confirm without picking a slot. Default-selecting the first slot (or forcing a selection) might be more intuitive, though 'Sans créneau' is intentional per spec."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_iter60_slots.py (new)"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% of testable flows"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123! (PIN 1234); Rider rider1@dinastore.ci / Rider123! (PIN 5555)",
+  "seed_data_creation": "Created ~6 TEST_* delivery orders (TEST_slot_cust, TEST_ui_slot, TEST_dd_slot, TEST_board, TEST_drag_real, TEST_dd_pick, TEST_dragslot) during assign/add-order tests; rider1 slots reset to a sensible single 'Matin 09:00-12:00 cap 5' slot after testing (per instructions). Kouamé Serge delivery_slots similarly ends as Matin only. test_iter60_slots.py's fixtures leave rider1 with Matin+Mini slots after each run.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: python -m pytest backend/tests/test_iter60_slots.py -o addopts=''. Route /console/journees-livraison = Deliveries.jsx (Board, board-unassigned, board-rider-{rid}); /console/livraisons = DeliveryDays.jsx (dd-row-{sid} rows; click opens inline detail with day-tab-{affectation|suivi|reconciliation}, dd-affect-current, dd-affect-other). Synthetic DragEvent + DataTransfer DOES NOT trigger onDrop state-dependent flows due to React state batching; use page.mouse.down/move/up with multi-step movements OR invoke setPendingDrop directly via React devtools. Rider slots PUT replaces entire list (not merge) — tests that pre-create slots then run add-order with slot_id must capture ids via GET after PUT. Order id is a UUID; there's no GET /api/orders/{id} — fetch via GET /api/deliveries and filter by id, or GET /api/orders.",
+  "rca of the issue": "N/A — no blocking issues. The initial perceived 'drag not opening slot-picker-modal' was a test harness artifact (synthetic DragEvent fires before React applies setDragId state), not a product bug: real-mouse drag via Playwright page.mouse works perfectly and opens the modal with the expected slot options."
+}
