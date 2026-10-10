@@ -87,6 +87,11 @@ WOMEN_BAGS = [
     ("Sac Cabas Marron Camel",            37500, 18000, ["Camel"],   "Cabas",       "Cuir",   7),
     ("Pochette Strass Soirée Argent",     29500, 14000, ["Argent"],  "Pochettes",   "Perles", 8),
     ("Sac Blanc Fleurs Chaîne",           31500, 15000, ["Blanc"],   "Sacs à main", "Cuir",   9),
+    # 4 pochettes additionnelles (Feb 2026, demande gérante)
+    ("Pochette Enveloppe Noir Soirée",    24500, 11500, ["Noir"],    "Pochettes",   "Cuir",   4),
+    ("Pochette Chaîne Métal Doré",        28500, 13500, ["Doré"],    "Pochettes",   "Satin",  8),
+    ("Pochette Perles Nude Mariée",       31500, 15000, ["Nude"],    "Pochettes",   "Perles", 9),
+    ("Pochette Satin Rouge Clutch",       26500, 12500, ["Rouge"],   "Pochettes",   "Satin",  0),
 ]
 
 
@@ -105,7 +110,7 @@ async def reseed_women_fashion(user: dict = Depends(require_role("admin"))):
     for cat, items, brand, images, sizes in universes:
         for name, price, cost, colors, subcat, material, img_idx in items:
             url = images[img_idx]
-            stock_by_size = {sz: random.randint(3, 15) for sz in sizes}
+            stock_by_size = {sz: random.randint(5, 25) for sz in sizes}
             doc = {
                 "id": new_id(),
                 "name": name,

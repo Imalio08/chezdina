@@ -48,6 +48,11 @@ function POSInner() {
 
   useEffect(()=>{ localStorage.setItem("pos_view", vListe?"list":"grid"); }, [vListe]);
 
+  // Persist cart draft so the sale resumes when the Gérante leaves and comes back
+  useEffect(() => { try { localStorage.setItem("pos_cart_draft", JSON.stringify(cart)); } catch {} }, [cart]);
+  useEffect(() => { try { if (customer) localStorage.setItem("pos_customer_draft", JSON.stringify(customer)); else localStorage.removeItem("pos_customer_draft"); } catch {} }, [customer]);
+  useEffect(() => { try { localStorage.setItem("pos_mode_draft", mode); } catch {} }, [mode]);
+
   useEffect(() => {
     api.get("/products").then(r=>setProducts(r.data)).catch(()=>{});
     api.get("/zones").then(r=>setZones(r.data)).catch(()=>{});
@@ -66,6 +71,10 @@ function POSInner() {
     return products.filter(p => {
       if (isInactive(p)) return false;
       if (cat !== "Tous" && p.category !== cat) return false;
+      if (stockFilter === "in_stock") {
+        const totalStk = Object.values(p.stock_by_size||{}).reduce((s,v)=>s+Number(v||0),0) || p.stock || 0;
+        if (totalStk <= 0) return false;
+      }
       if (!nq) return true;
       // Search by name, brand, SKU, barcode; typing a number also matches products with that size
       if (p.name?.toLowerCase().includes(nq)) return true;
@@ -205,6 +214,10 @@ function POSInner() {
             <button onClick={()=>setVListe(false)} className={`px-2.5 py-1 rounded-md ${!vListe?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-view-grid">Grille</button>
           </div>
           <button onClick={()=>setShowTop(!showTop)} className={`dina-chip text-[11px] ${showTop?"!bg-[#1c1c1c] !text-white":""}`} data-testid="pos-top8"><Flame size={11}/>Meilleures ventes</button>
+          <div className="flex gap-0.5 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-0.5 text-[11px]">
+            <button onClick={()=>setStockFilter("all")} className={`px-2 py-1 rounded-md ${stockFilter==="all"?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-filter-all">Tous</button>
+            <button onClick={()=>setStockFilter("in_stock")} className={`px-2 py-1 rounded-md ${stockFilter==="in_stock"?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid="pos-filter-stock">En stock</button>
+          </div>
           <div className="ml-auto flex gap-0.5 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-0.5 text-[11px]">
             {[["name","A-Z"],["price","Prix"],["stock","Stock"]].map(([k,l])=>(<button key={k} onClick={()=>setSort(k)} className={`px-2 py-1 rounded-md ${sort===k?"bg-white dark:bg-[#2a2a2a] font-semibold":""}`} data-testid={`pos-sort-${k}`}>{l}</button>))}
           </div>

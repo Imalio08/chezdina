@@ -15,7 +15,8 @@ export default function AttendancePunchModal({ open, onClose, onDone }) {
   const [stream, setStream] = useState(null);
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState(null); // { checked_in, arrival, departure }
+  const [status, setStatus] = useState(null);
+  const [pin, setPin] = useState("");
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
 
@@ -70,9 +71,10 @@ export default function AttendancePunchModal({ open, onClose, onDone }) {
 
   const submit = async () => {
     if (!snapshot) return toast.error("Prenez votre selfie");
+    if (!/^\d{4,6}$/.test(pin)) return toast.error("Entrez votre PIN (4 à 6 chiffres)");
     setLoading(true);
     try {
-      const { data } = await api.post("/attendance/check-in", { kind, method: "phone", selfie: snapshot });
+      const { data } = await api.post("/attendance/check-in", { kind, method: "phone", selfie: snapshot, pin });
       toast.success(kind === "arrival" ? "Arrivée pointée" : "Départ pointé");
       if (data.late) toast.info(`Retard de ${data.late_min} min noté`);
       onDone && onDone(data);
@@ -129,8 +131,20 @@ export default function AttendancePunchModal({ open, onClose, onDone }) {
           </button>
         ) : (
           <div className="space-y-2">
+            <input
+              type="password"
+              inputMode="numeric"
+              pattern="\d*"
+              maxLength={6}
+              value={pin}
+              onChange={e => setPin(e.target.value.replace(/\D/g, ""))}
+              placeholder="PIN (4 à 6 chiffres)"
+              className="dina-input w-full text-center text-xl tracking-[0.4em] font-serif"
+              data-testid="punch-pin"
+              autoFocus
+            />
             <button onClick={retake} className="dina-btn-secondary w-full !min-h-[38px]" data-testid="punch-retake">
-              <RotateCcw size={14}/>Reprendre
+              <RotateCcw size={14}/>Reprendre la photo
             </button>
             <button onClick={submit} disabled={loading} className="dina-btn-primary w-full !min-h-[46px]" data-testid="punch-submit">
               {loading ? <Loader2 size={16} className="animate-spin"/> : <CheckCircle2 size={16}/>}
@@ -139,7 +153,7 @@ export default function AttendancePunchModal({ open, onClose, onDone }) {
           </div>
         )}
 
-        <div className="text-[10px] text-center text-[#999] mt-3">Un selfie en direct suffit — pas besoin de GPS.</div>
+        <div className="text-[10px] text-center text-[#999] mt-3">Selfie + PIN · votre identité est vérifiée des deux côtés.</div>
       </div>
     </div>
   );

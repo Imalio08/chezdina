@@ -1,5 +1,23 @@
 # Chez Dina — PRD
 
+### Vague W — Format FCFA, Pochettes, Pointage PIN, POS persistance (Feb 2026) ✅
+**Format monétaire uniforme** : `fcfa()` dans `format.js` + `pdfInvoice.js` utilise maintenant `toLocaleString("en-US")` → affichage **77,000 FCFA** (virgule milliers) partout, y compris reçus/factures/fiches colis PDF.
+
+**Pointage PIN + photo** :
+- `AttendancePunchModal` ajoute un champ PIN après la capture selfie (centré, text-xl, type password, pattern numérique 4-6 chiffres, autofocus).
+- Backend `routers/attendance.py` : `/attendance/check-in` accepte un `pin` optionnel ; si fourni, vérifié avec `bcrypt.checkpw(pin, pin_hash)`, retourne 401 si incorrect. Double facteur selfie + PIN.
+
+**POS — Persistance panier + filtre stock** :
+- Panier, cliente, mode persistés dans `localStorage` (`pos_cart_draft`, `pos_customer_draft`, `pos_mode_draft`) → la gérante retrouve sa vente en cours au retour.
+- Nouveau toggle "Tous / En stock" dans la barre d'outils POS → masque les produits sans stock.
+
+**Catalogue** :
+- 4 pochettes ajoutées (Enveloppe Noir Soirée, Chaîne Métal Doré, Perles Nude Mariée, Satin Rouge Clutch) : **34 SKUs** total (6 pochettes au lieu de 2).
+- Stock relevé à 5-25 par taille → **100% des produits en stock** (demandé par la gérante).
+
+**Reste à traiter** : scroll POS, bouton panier sur grid card, feuille slots UI complète, flux réconciliation livreur, notifications deep link, manuel utilisateur, préparation table/kanban.
+
+
 ### Vague V — Historique stock, Chat commande, Feuille de route PDF (Feb 2026) ✅
 **Historique stock enrichi automatiquement**
 - Nouveau helper `_record_stock_mov(product_id, size, delta, reason, actor, ref)` dans `server.py` qui écrit dans `db.stock_movements`.

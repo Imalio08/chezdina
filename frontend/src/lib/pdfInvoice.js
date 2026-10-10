@@ -11,7 +11,7 @@
  */
 import { jsPDF } from "jspdf";
 
-const fcfa = (n) => `${Math.round(n || 0).toLocaleString("fr-FR").replace(/,/g, " ")} FCFA`;
+const fcfa = (n) => `${Math.round(n || 0).toLocaleString("en-US")} FCFA`;
 const safe = (s, fb = "—") => (s == null || s === "" ? fb : String(s));
 
 function header(doc, business, title, meta) {

@@ -25,12 +25,19 @@ async def attendance_me(user: dict = Depends(get_user)):
 
 @router.post("/attendance/check-in")
 async def check_in(body: Dict[str, Any], user: dict = Depends(get_user)):
-    """kind: 'arrival' | 'departure'. Requires only a live selfie (b64)."""
+    """kind: 'arrival' | 'departure'. Requires live selfie (b64). Optional PIN
+    double-checks identity (if provided, must match user.pin_hash)."""
     kind = body.get("kind", "arrival")
     method = body.get("method", "phone")  # phone | tablet
     selfie = body.get("selfie")
+    pin = (body.get("pin") or "").strip()
     if not selfie:
         raise HTTPException(400, "Selfie requis (caméra avant)")
+    if pin:
+        import bcrypt
+        pin_hash = user.get("pin_hash")
+        if not pin_hash or not bcrypt.checkpw(pin.encode(), pin_hash.encode()):
+            raise HTTPException(401, "PIN incorrect")
     today = datetime.now(timezone.utc).date().isoformat()
     now = datetime.now(timezone.utc)
     biz = await db.business.find_one({"id": "main"}) or {}
