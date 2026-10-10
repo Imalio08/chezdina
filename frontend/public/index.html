@@ -6,8 +6,24 @@
         <meta name="theme-color" content="#b02a2a" />
         <meta name="description" content="Chez Dina — chaussures, sacs & vêtements femme à Abidjan" />
         <link rel="icon" id="dynamic-favicon" type="image/png" href="/icons/icon-192.png" />
-        <link rel="apple-touch-icon" id="dynamic-apple-icon" href="/icons/icon-192.png" />
-        <link rel="manifest" id="dynamic-manifest" href="/manifest.json" />
+        <script>
+          (function(){
+            var p = location.pathname, rider = p.indexOf("/rider") === 0;
+            try { if (!rider && p === "/login" && localStorage.getItem("dina_app") === "rider") rider = true; } catch(e) {}
+            window.__dinaRiderManifest = rider;
+            if (rider) {
+              document.write('<link rel="apple-touch-icon" id="dynamic-apple-icon" href="/api/public/pwa-icon-rider/192" />');
+              document.write('<link rel="manifest" id="dynamic-manifest" href="/api/public/manifest-rider.webmanifest" />');
+              document.write('<meta name="apple-mobile-web-app-title" content="Chez Dina Livreur" />');
+              document.title = "Chez Dina Livreur";
+            } else {
+              document.write('<link rel="apple-touch-icon" id="dynamic-apple-icon" href="/icons/icon-192.png" />');
+              document.write('<link rel="manifest" id="dynamic-manifest" href="/manifest.json" />');
+              document.write('<meta name="apple-mobile-web-app-title" content="Chez Dina" />');
+            }
+          })();
+        </script>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600&display=swap" rel="stylesheet" />
@@ -25,6 +41,7 @@
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
         <title>Chez Dina — Boutique femme à Abidjan</title>
+        <script>if (location.pathname.indexOf("/rider") === 0) document.title = "Chez Dina Livreur";</script>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
     </head>

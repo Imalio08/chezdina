@@ -25,6 +25,12 @@ export default function BrandingBootstrapper() {
   useEffect(() => {
     if (pathname.startsWith("/rider")) localStorage.setItem("dina_app", "rider");
     else if (pathname.startsWith("/console") || pathname.startsWith("/boutique")) localStorage.setItem("dina_app", "store");
+    // iOS reads the manifest only at page load: entering the rider app via in-app navigation
+    // (e.g. /login → /rider) needs one real reload so "Add to Home Screen" picks the rider manifest.
+    if (pathname.startsWith("/rider") && window.__dinaRiderManifest === false) {
+      window.__dinaRiderManifest = true;
+      window.location.replace(window.location.href);
+    }
   }, [pathname]);
 
   useEffect(() => {
@@ -46,7 +52,7 @@ export default function BrandingBootstrapper() {
     setMeta("apple-mobile-web-app-capable", "yes");
     setMeta("mobile-web-app-capable", "yes");
     setMeta("apple-mobile-web-app-title", appTitle);
-    const base = process.env.REACT_APP_BACKEND_URL || "";
+    const base = rider ? "" : (process.env.REACT_APP_BACKEND_URL || "");
     const apple = document.getElementById("dynamic-apple-icon") || document.querySelector('link[rel="apple-touch-icon"]');
     if (apple) apple.href = rider ? `${base}/api/public/pwa-icon-rider/192` : logo;
     const manifest = document.getElementById("dynamic-manifest") || document.querySelector('link[rel="manifest"]');
