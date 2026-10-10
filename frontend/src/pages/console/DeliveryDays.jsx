@@ -7,7 +7,7 @@ import { Plus, Calendar, Package, DollarSign, AlertTriangle, CheckCircle2, Users
 import KPICard from "@/components/shared/KPICard";
 import LiveDeliveryMap from "@/components/delivery/LiveDeliveryMap";
 import jsPDF from "jspdf";
-import { VersementCell, missingVersements } from "@/components/delivery/VersementCell";
+import { VersementCell, missingVersements, OrderDayStatus } from "@/components/delivery/VersementCell";
 import { ReconcileLineModal } from "@/pages/console/Deliveries";
 
 /** Build a printable route-sheet PDF for a rider's day: list of orders with addresses, phones, amounts. */
@@ -79,7 +79,7 @@ export default function DeliveryDays() {
   const kpi = useMemo(() => {
     const open = sessions.filter(s => !s.closed).length;
     const closed = sessions.filter(s => s.closed).length;
-    const toCollect = sessions.reduce((s,sess) => s + ((sess.orders_detail||sess.orders||[]).reduce((a,o)=>a+(o.to_collect||o.total||0),0)), 0);
+    const toCollect = sessions.reduce((s,sess) => s + (sess.total_to_collect || 0), 0);
     return { open, closed, toCollect };
   }, [sessions]);
 
@@ -173,7 +173,8 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
   const [locations, setLocations] = useState([]);
   const [reconcileOrder, setReconcileOrder] = useState(null);
   const sid = session.id;
-  const ready = orders.filter(o => o.mode === "delivery" && (o.status === "prete" || o.status === "confirmee") && !o.rider_id);
+  const dayDate = session.date || new Date().toISOString().slice(0, 10);
+  const ready = orders.filter(o => o.mode === "delivery" && (o.status === "prete" || o.status === "confirmee") && !o.rider_id && (!o.rescheduled_for || o.rescheduled_for <= dayDate));
   const assigned = session.orders_detail || orders.filter(o => (session.orders||[]).includes(o.id));
 
   useEffect(() => {
@@ -291,7 +292,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
               {assigned.length === 0 ? <div className="text-sm text-[#666] text-center py-6">Aucune commande encore affectée · utilisez les cases à cocher à gauche</div> :
                 <div className="space-y-1.5 max-h-[500px] overflow-y-auto">{assigned.map(o => (
                   <div key={o.id} className="flex items-center gap-2 p-2 border border-[#ececec] dark:border-[#2a2a2a] rounded-lg" data-testid={`assigned-${o.id}`}>
-                    <span className="dina-chip !py-0.5 text-[9px]" style={{color:statusColor[o.status]||"#999",borderColor:statusColor[o.status]||"#999"}}>{statusLabel[o.status]||o.status}</span>
+                    <OrderDayStatus order={o} small/>
                     <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{o.code} · {o.customer?.name}</div><div className="text-xs text-[#666] truncate">{o.delivery_zone} · {fcfa(o.total)}</div></div>
                   </div>
                 ))}</div>
@@ -312,7 +313,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
             {assigned.length === 0 ? <div className="text-sm text-[#666] text-center py-6">Aucune commande affectée</div> :
               assigned.map(o => (
                 <div key={o.id} className="flex items-center gap-2 py-2 border-b border-[#f0f0f0] last:border-0 dark:border-[#2a2a2a]">
-                  <span className="dina-chip !py-0.5 text-[10px]" style={{color:statusColor[o.status]||"#999",borderColor:statusColor[o.status]||"#999"}}>{statusLabel[o.status]||o.status}</span>
+                  <OrderDayStatus order={o}/>
                   <span className="text-sm flex-1 truncate">{o.code} · {o.customer?.name}{o.delivery_zone && ` · ${o.delivery_zone}`}</span>
                   <span className="text-xs tabular font-semibold">{fcfa(o.total||0)}</span>
                 </div>
@@ -331,12 +332,12 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
               assigned.map(o => (
                 <tr key={o.id}>
                   <td className="font-medium">{o.code}</td>
-                  <td><span className="dina-chip !py-0.5 text-[10px]">{statusLabel[o.status]||o.status}</span></td>
+                  <td><OrderDayStatus order={o}/></td>
                   <td className="text-right tabular">{fcfa(o.subtotal||0)}</td>
                   <td className="text-right tabular">{fcfa(o.delivery_fee||0)}</td>
                   <td className="text-right tabular text-[#1f8a4c]">{o.payment_status==="paye"?fcfa(o.total||0):"—"}</td>
-                  <td className="text-right tabular">{fcfa(o.payment_method==="cod"?(o.total||0):0)}</td>
-                  <td>{o.status === "livree" || o.payment_method !== "cod" ? <VersementCell session={session} order={o} onVerse={setReconcileOrder} onReload={onReload}/> : <span className="text-[10px] text-[#999]">Pas encore livrée</span>}</td>
+                  <td className={`text-right tabular ${o.postponed_to ? "line-through text-[#999]" : ""}`}>{fcfa(o.payment_method==="cod"?(o.total||0):0)}</td>
+                  <td>{o.postponed_to || o.status === "livree" || o.payment_method !== "cod" ? <VersementCell session={session} order={o} onVerse={setReconcileOrder} onReload={onReload}/> : <span className="text-[10px] text-[#999]">Pas encore livrée</span>}</td>
                 </tr>
               ))}
             </tbody>

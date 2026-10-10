@@ -2,13 +2,22 @@ import React from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Check, Shield } from "lucide-react";
+import { statusLabel, statusColor } from "@/lib/format";
 
 export const isVerse = (rec) => (typeof rec === "object" && rec ? !!rec.collected : !!rec);
 
 export const missingVersements = (session) =>
-  (session.orders_detail || []).filter(o => o.status === "livree" && o.payment_method === "cod" && !isVerse(session.reconciliations?.[o.id]));
+  (session.orders_detail || []).filter(o => !o.postponed_to && o.status === "livree" && o.payment_method === "cod" && !isVerse(session.reconciliations?.[o.id]));
+
+const ddmm = (iso) => { const [, m, d] = (iso || "").split("-"); return d && m ? `${d}/${m}` : iso; };
+
+export function OrderDayStatus({ order, small }) {
+  if (order.postponed_to) return <span className={`dina-chip !py-0.5 ${small ? "text-[9px]" : "text-[10px]"} !text-[#e4991e] !border-[#e4991e]`} data-testid={`postponed-${order.code}`}>Reportée au {ddmm(order.postponed_to)}</span>;
+  return <span className={`dina-chip !py-0.5 ${small ? "text-[9px]" : "text-[10px]"}`} style={{ color: statusColor[order.status] || "#999", borderColor: statusColor[order.status] || "#999" }}>{statusLabel[order.status] || order.status}</span>;
+}
 
 export function VersementCell({ session, order, onVerse, onReload }) {
+  if (order.postponed_to) return <span className="text-[10px] text-[#999]">Hors encaissement (reportée)</span>;
   if (order.payment_method !== "cod") return <span className="text-xs text-[#666]">Prépayée</span>;
   const rec = session.reconciliations?.[order.id];
   const unmark = async () => {

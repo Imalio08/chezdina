@@ -240,6 +240,10 @@ async def suggest_split(body: Dict[str, Any], user: dict = Depends(require_role(
 
 
 # ---------- Delivery sessions ----------
+def _verse(r):
+    return bool(r.get("collected")) if isinstance(r, dict) else bool(r)
+
+
 @router.post("/delivery-sessions")
 async def create_session(body: SessionIn, user: dict = Depends(require_role("admin", "manager"))):
     d = body.date or datetime.now(timezone.utc).strftime("%Y-%m-%d")
@@ -264,12 +268,19 @@ async def list_sessions(user: dict = Depends(get_user), rider_id: Optional[str] 
     for s in rows:
         oids = s.get("orders", [])
         orders = await db.orders.find({"id": {"$in": oids}}).to_list(200)
+        postponed = s.get("postponed", {})
+        for o in orders:
+            if o["id"] in postponed:
+                o["postponed_to"] = postponed[o["id"]].get("to")
+        active = [o for o in orders if o["id"] not in postponed]
+        rec = s.get("reconciliations", {})
         s["orders_detail"] = orders
-        s["total_to_collect"] = sum(o.get("total", 0) for o in orders if o.get("payment_method") == "cod")
-        s["prepaid_count"] = sum(1 for o in orders if o.get("payment_method") != "cod")
-        s["delivered_count"] = sum(1 for o in orders if o.get("status") == "livree")
-        s["cancelled_count"] = sum(1 for o in orders if o.get("status") in ("annulee", "echouee"))
-        s["collected_total"] = sum(o.get("total", 0) for o in orders if o.get("payment_method") == "cod" and s.get("reconciliations", {}).get(o["id"]))
+        s["postponed_count"] = len(orders) - len(active)
+        s["total_to_collect"] = sum(o.get("total", 0) for o in active if o.get("payment_method") == "cod")
+        s["prepaid_count"] = sum(1 for o in active if o.get("payment_method") != "cod")
+        s["delivered_count"] = sum(1 for o in active if o.get("status") == "livree")
+        s["cancelled_count"] = sum(1 for o in active if o.get("status") in ("annulee", "echouee"))
+        s["collected_total"] = sum(o.get("total", 0) for o in active if o.get("payment_method") == "cod" and _verse(rec.get(o["id"])))
         out.append(s)
     return clean(out)
 
@@ -320,11 +331,10 @@ async def close_session(sid: str, user: dict = Depends(require_role("admin", "ma
     if not s:
         raise HTTPException(404)
     rec = s.get("reconciliations", {})
+    postponed = s.get("postponed", {})
     orders = await db.orders.find({"id": {"$in": s.get("orders", [])}}).to_list(500)
-    def verse(r):
-        return r.get("collected") if isinstance(r, dict) else bool(r)
     missing = [o.get("code") for o in orders
-               if o.get("status") == "livree" and o.get("payment_method") == "cod" and not verse(rec.get(o["id"]))]
+               if o["id"] not in postponed and o.get("status") == "livree" and o.get("payment_method") == "cod" and not _verse(rec.get(o["id"]))]
     if missing:
         raise HTTPException(400, f"Versements manquants : {', '.join(missing)}")
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"closed": True, "closed_at": now_iso()}})

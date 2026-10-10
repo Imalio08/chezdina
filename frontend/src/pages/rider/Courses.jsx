@@ -36,9 +36,9 @@ export default function Courses() {
     return true;
   };
 
-  const changeStatus = async (oid, status, reason) => {
-    try { await api.patch(`/orders/${oid}/status`, { status, reason }); toast.success("Mis à jour"); load(); setOpen(null); }
-    catch { toast.error("Erreur"); }
+  const changeStatus = async (oid, status, reason, next_date) => {
+    try { await api.patch(`/orders/${oid}/status`, { status, reason, next_date }); toast.success(next_date ? "Commande reportée" : "Mis à jour"); load(); setOpen(null); }
+    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
   };
   const confirmDeliver = (o) => setProof(o);
 
@@ -75,6 +75,20 @@ export default function Courses() {
   );
 }
 
+function PostponeForm({ onCancel, onConfirm }) {
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState("");
+  const [reason, setReason] = useState("");
+  return (
+    <div className="p-3 rounded-lg border border-[#e4991e] bg-[#fff8e8] dark:bg-[#2a2210] space-y-2" data-testid="postpone-form">
+      <div className="text-xs font-semibold text-[#e4991e]">Reporter la livraison au…</div>
+      <input type="date" min={today} className="dina-input" value={date} onChange={e => setDate(e.target.value)} data-testid="postpone-date"/>
+      <input className="dina-input" placeholder="Motif (ex. cliente absente)" value={reason} onChange={e => setReason(e.target.value)} data-testid="postpone-reason"/>
+      <div className="flex gap-2"><button onClick={onCancel} className="dina-btn-secondary flex-1 !min-h-[40px]">Annuler</button><button onClick={() => date ? onConfirm(date, reason) : toast.error("Choisissez une date")} className="dina-btn-primary flex-1 !min-h-[40px] !bg-[#e4991e]" data-testid="postpone-confirm">Confirmer</button></div>
+    </div>
+  );
+}
+
 function KPI({ label, v, c, wide }) {
   return (
     <div className={`dina-card-white p-3 ${wide ? "" : ""}`}>
@@ -105,6 +119,7 @@ function OrderCard({ order, onOpen }) {
 function OrderDetail({ order, onClose, onStatus, onDeliver }) {
   const [templates, setTemplates] = useState([]);
   const [showWa, setShowWa] = useState(false);
+  const [postpone, setPostpone] = useState(false);
   useEffect(() => { api.get("/delivery-templates").then(r => setTemplates(r.data.wa_templates || [])).catch(() => { }); }, []);
   const phone = order.customer?.phone?.replace(/\D/g, "") || "";
   const callPhone = () => { api.post(`/orders/${order.id}/contact-log`, { kind: "call" }).catch(() => { }); window.location.href = `tel:${phone}`; };
@@ -157,8 +172,9 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
             {["confirmee", "prete", "assignee"].includes(order.status) && <button onClick={() => onStatus(order.id, "en_livraison")} className="dina-btn-primary !min-h-[44px]" data-testid="status-en-route">Je démarre</button>}
             {order.status === "en_livraison" && <button onClick={() => onDeliver(order)} className="dina-btn-primary !min-h-[44px]" data-testid="rider-delivered">Livrée</button>}
             {order.status !== "livree" && <button onClick={() => { const r = prompt("Raison ?") || ""; onStatus(order.id, "echouee", r); }} className="dina-btn-secondary !min-h-[44px] text-xs" style={{ color: "#c62828" }} data-testid="status-fail">Échec</button>}
-            {order.status !== "livree" && <button onClick={() => { const r = prompt("Reporté à (date) ?"); if (r) onStatus(order.id, "reportee", r); }} className="dina-btn-secondary !min-h-[44px] text-xs" data-testid="status-reschedule">Reporter</button>}
+            {order.status !== "livree" && <button onClick={() => setPostpone(true)} className="dina-btn-secondary !min-h-[44px] text-xs" data-testid="status-reschedule">Reporter</button>}
           </div>
+          {postpone && <PostponeForm onCancel={() => setPostpone(false)} onConfirm={(date, reason) => onStatus(order.id, "reportee", reason || "Reportée", date)}/>}
         </div>
         {showWa && (
           <div className="fixed inset-0 bg-black/70 grid place-items-end z-[80]" onClick={() => setShowWa(false)}>

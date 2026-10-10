@@ -37,7 +37,8 @@ export default function Orders() {
       if (!next) return;
       payload = { status: "confirmee", reason: "Reportée", next_date: next };
     }
-    await api.patch(`/orders/${id}/status`, payload);
+    try { await api.patch(`/orders/${id}/status`, payload); }
+    catch (e) { return toast.error(e.response?.data?.detail || "Erreur"); }
     toast.success("Statut mis à jour"); load();
     if (selected) setSelected({...selected, status: payload.status});
   };

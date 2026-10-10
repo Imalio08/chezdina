@@ -2,22 +2,34 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
-import { Camera, Check, Package, ScanLine, AlertTriangle, X, ArrowLeft, Keyboard } from "lucide-react";
+import { Camera, Check, Package, ScanLine, AlertTriangle, X, ArrowLeft, Keyboard, LayoutGrid, List, Columns3 } from "lucide-react";
 
-const PREP_STATUSES = ["nouvelle", "confirmee", "en_preparation"];
+const PREP_STATUSES = ["nouvelle", "confirmee", "en_preparation", "prete"];
+const KANBAN_COLS = [["nouvelle", "Nouvelles", "#0021cc"], ["confirmee", "Confirmées", "#5867fd"], ["en_preparation", "En préparation", "#e4991e"], ["prete", "Prêtes (aujourd'hui)", "#1f8a4c"]];
+const todayIso = () => new Date().toISOString().slice(0, 10);
+const isReadyToday = (o) => o.status === "prete" && (o.updated_at || o.created_at || "").slice(0, 10) === todayIso();
 
 export default function Preparation() {
   const [orders, setOrders] = useState([]);
   const [filter, setFilter] = useState("en_preparation");
   const [current, setCurrent] = useState(null);
+  const [view, setView] = useState(() => localStorage.getItem("prep_view") || "cards");
+  useEffect(() => { localStorage.setItem("prep_view", view); }, [view]);
 
   const load = async () => {
-    try { const r = await api.get("/orders"); setOrders((r.data || []).filter(o => PREP_STATUSES.includes(o.status))); }
+    try { const r = await api.get("/orders"); setOrders((r.data || []).filter(o => PREP_STATUSES.includes(o.status) && (o.status !== "prete" || isReadyToday(o)))); }
     catch { toast.error("Erreur"); }
   };
   useEffect(() => { load(); const t = setInterval(load, 20000); return () => clearInterval(t); }, []);
 
-  const filtered = orders.filter(o => !filter || o.status === filter);
+  const moveTo = async (o, status) => {
+    if (o.status === status) return;
+    if (status === "prete") { setCurrent(o); return; }
+    try { await api.patch(`/orders/${o.id}/status-v3`, { status }); toast.success(`${o.code} → ${statusLabel[status]}`); load(); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
+  };
+
+  const filtered = orders.filter(o => o.status !== "prete" && (!filter || o.status === filter));
   const counts = useMemo(() => ({
     nouvelle: orders.filter(o => o.status === "nouvelle").length,
     confirmee: orders.filter(o => o.status === "confirmee").length,
@@ -28,20 +40,28 @@ export default function Preparation() {
 
   return (
     <div className="space-y-5" data-testid="preparation-page">
-      <div><h1 className="font-serif text-3xl">Préparation</h1><p className="text-sm text-[#666]">Scannez article par article avant de marquer la commande comme prête</p></div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div><h1 className="font-serif text-3xl">Préparation</h1><p className="text-sm text-[#666]">Scannez article par article avant de marquer la commande comme prête</p></div>
+        <div className="flex gap-0.5 bg-[#f5f5f5] dark:bg-[#141414] rounded-lg p-0.5 text-xs" data-testid="prep-view-switch">
+          {[["cards", "Cartes", LayoutGrid], ["table", "Tableau", List], ["kanban", "Kanban", Columns3]].map(([k, l, Icon]) => (
+            <button key={k} onClick={() => setView(k)} className={`px-3 py-1.5 rounded-md inline-flex items-center gap-1.5 transition-colors ${view === k ? "bg-white dark:bg-[#2a2a2a] font-semibold shadow-sm" : "text-[#666]"}`} data-testid={`prep-view-${k}`}><Icon size={12}/>{l}</button>
+          ))}
+        </div>
+      </div>
+      {view !== "kanban" && <div className="grid grid-cols-3 gap-2">
         <KpiBox label="Nouvelles" value={counts.nouvelle} color="#0021cc" active={filter==="nouvelle"} onClick={()=>setFilter("nouvelle")} testid="prep-kpi-nouvelle"/>
         <KpiBox label="Confirmées" value={counts.confirmee} color="#5867fd" active={filter==="confirmee"} onClick={()=>setFilter("confirmee")} testid="prep-kpi-confirmee"/>
         <KpiBox label="En préparation" value={counts.en_preparation} color="#e4991e" active={filter==="en_preparation"} onClick={()=>setFilter("en_preparation")} testid="prep-kpi-prep"/>
-      </div>
+      </div>}
 
-      {filtered.length === 0 ? (
+      {view === "kanban" ? <PrepKanban orders={orders} onOpen={setCurrent} onMove={moveTo}/>
+      : filtered.length === 0 ? (
         <div className="dina-card-white p-10 text-center">
           <Package size={32} className="mx-auto mb-3 text-[#999]"/>
           <div className="font-serif text-xl">Aucune commande à préparer</div>
           <div className="text-sm text-[#666] mt-1">Tout est à jour, bravo</div>
         </div>
-      ) : (
+      ) : view === "table" ? <PrepTable orders={filtered} onOpen={setCurrent}/> : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {filtered.map(o => (
             <button key={o.id} onClick={() => setCurrent(o)} className="dina-card-white p-4 text-left hover:border-[#b02a2a] transition" data-testid={`prep-card-${o.code}`}>
@@ -56,6 +76,68 @@ export default function Preparation() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function PrepTable({ orders, onOpen }) {
+  return (
+    <div className="dina-card-white overflow-hidden" data-testid="prep-table"><div className="overflow-x-auto"><table className="dina-table">
+      <thead><tr><th>Commande</th><th>Cliente</th><th className="text-right">Articles</th><th className="text-right">Montant</th><th>Zone</th><th>Date</th><th>Statut</th><th></th></tr></thead>
+      <tbody>{orders.map(o => (
+        <tr key={o.id} className="hover:bg-[#fafafa] dark:hover:bg-[#141414]" data-testid={`prep-row-${o.code}`}>
+          <td className="font-mono text-xs">{o.code}</td>
+          <td className="font-medium">{o.customer?.name || "—"}</td>
+          <td className="text-right tabular">{(o.items || []).reduce((s, i) => s + (i.qty || 1), 0)}</td>
+          <td className="text-right tabular font-semibold">{fcfa(o.total)}</td>
+          <td className="text-xs">{o.delivery_zone || (o.mode === "pickup" ? "Retrait" : "—")}</td>
+          <td className="text-xs text-[#666]">{dateTimeFmt(o.created_at)}</td>
+          <td><span className="dina-chip text-[10px]" style={{ color: statusColor[o.status] }}><span className="status-dot" style={{ background: statusColor[o.status] }}/>{statusLabel[o.status]}</span></td>
+          <td className="text-right"><button onClick={() => onOpen(o)} className="dina-btn-primary !min-h-[30px] text-[11px]" data-testid={`prep-start-${o.code}`}><ScanLine size={11}/>Préparer</button></td>
+        </tr>
+      ))}</tbody>
+    </table></div></div>
+  );
+}
+
+function PrepKanban({ orders, onOpen, onMove }) {
+  const [dragId, setDragId] = useState(null);
+  const [over, setOver] = useState(null);
+  const drop = (status) => (e) => {
+    e.preventDefault(); setOver(null);
+    const o = orders.find(x => x.id === dragId);
+    setDragId(null);
+    if (o) onMove(o, status);
+  };
+  return (
+    <div className="overflow-x-auto pb-2" data-testid="prep-kanban">
+      <div className="grid grid-cols-4 gap-3 min-w-[960px]">
+        {KANBAN_COLS.map(([status, label, color]) => {
+          const items = orders.filter(o => o.status === status);
+          return (
+            <div key={status} onDragOver={e => { e.preventDefault(); setOver(status); }} onDragLeave={() => setOver(null)} onDrop={drop(status)}
+              className={`rounded-xl p-2.5 min-h-[420px] transition-colors ${over === status ? "bg-[#fff5f5] dark:bg-[#2a1818] ring-2 ring-[#b02a2a]/40" : "bg-[#f7f7f7] dark:bg-[#141414]"}`} data-testid={`prep-col-${status}`}>
+              <div className="flex items-center justify-between mb-2 px-1">
+                <div className="text-xs font-semibold uppercase flex items-center gap-1.5"><span className="status-dot" style={{ background: color }}/>{label}</div>
+                <span className="text-xs tabular font-bold" style={{ color }}>{items.length}</span>
+              </div>
+              <div className="space-y-2 max-h-[65vh] overflow-y-auto scrollbar-thin">
+                {items.length === 0 && <div className="text-[11px] text-[#999] text-center py-8 border-2 border-dashed border-[#e5e5e5] dark:border-[#2a2a2a] rounded-lg">{status === "prete" ? "Déposez ici pour scanner" : "Aucune commande"}</div>}
+                {items.map(o => (
+                  <div key={o.id} draggable={status !== "prete"} onDragStart={() => setDragId(o.id)} onDragEnd={() => setDragId(null)} onClick={() => status !== "prete" && onOpen(o)}
+                    className={`bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-lg p-2.5 text-xs transition-transform hover:-translate-y-0.5 hover:shadow-md ${status !== "prete" ? "cursor-grab active:cursor-grabbing" : ""} ${dragId === o.id ? "opacity-50" : ""}`} data-testid={`prep-kcard-${o.code}`}>
+                    <div className="flex justify-between items-start"><span className="font-mono text-[10px] text-[#666]">{o.code}</span><span className="tabular font-semibold">{fcfa(o.total)}</span></div>
+                    <div className="font-medium text-sm truncate mt-0.5">{o.customer?.name || "—"}</div>
+                    <div className="text-[10px] text-[#666] mt-0.5 truncate">{(o.items || []).length} article(s) · {o.delivery_zone || (o.mode === "pickup" ? "Retrait" : "Comptoir")}</div>
+                    {status === "prete" && <div className="text-[10px] text-[#1f8a4c] font-semibold mt-1 flex items-center gap-1"><Check size={10}/>Scannée</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="text-[11px] text-[#999] mt-2">Glissez une carte pour changer son statut. Déposer dans « Prêtes » ouvre le scan obligatoire.</div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Plus, Check, X, Pencil, Trash2, Printer, Map, Shield, GripVertical, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
 import LeafletMap from "@/components/shared/LeafletMap";
-import { VersementCell, missingVersements } from "@/components/delivery/VersementCell";
+import { VersementCell, missingVersements, OrderDayStatus } from "@/components/delivery/VersementCell";
 
 export default function Deliveries() {
   const [tab, setTab] = useState("board");
@@ -193,8 +193,8 @@ export default function Deliveries() {
                         <td className="font-medium">{o.code}</td>
                         <td>{o.customer?.name}</td>
                         <td>{o.delivery_zone}</td>
-                        <td><span className="dina-chip" style={{ color: statusColor[o.status] }}>{statusLabel[o.status]}</span></td>
-                        <td className="text-right tabular font-semibold">{isCod ? fcfa(o.total) : "—"}</td>
+                        <td><OrderDayStatus order={o}/></td>
+                        <td className={`text-right tabular font-semibold ${o.postponed_to ? "line-through text-[#999]" : ""}`}>{isCod ? fcfa(o.total) : "—"}</td>
                         <td className="tabular">{confirmed && amount != null ? fcfa(amount) : "—"}</td>
                         <td className={`tabular ${ecart > 0 ? "text-[#1f8a4c]" : ecart < 0 ? "text-[#c62828]" : "text-[#666]"}`}>{ecart != null ? (ecart > 0 ? "+" : "") + fcfa(ecart) : "—"}</td>
                         <td><VersementCell session={s} order={o} onVerse={(ord) => setReconcileFor({ session: s, order: ord })} onReload={load}/></td>

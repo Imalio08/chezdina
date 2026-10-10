@@ -684,7 +684,19 @@ async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get
     tl = o.get("timeline", []); tl.append({"status": body.status, "at": now_iso(), "by": user.get("name"), "reason": body.reason, "next_date": body.next_date})
     upd = {"status": body.status, "timeline": tl}
     if body.reason: upd["last_reason"] = body.reason
-    if body.next_date: upd["rescheduled_for"] = body.next_date
+    if body.next_date:
+        try:
+            nd = datetime.strptime(body.next_date, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(400, "Date de report invalide (AAAA-MM-JJ)")
+        if nd < datetime.now(timezone.utc).date():
+            raise HTTPException(400, "La date de report doit être aujourd'hui ou plus tard")
+        upd["rescheduled_for"] = body.next_date
+        upd["delivery_date"] = body.next_date
+        if o.get("session_id"):
+            await db.delivery_sessions.update_one({"id": o["session_id"]}, {"$set": {f"postponed.{oid}": {
+                "to": body.next_date, "at": now_iso(), "by": user.get("name"), "reason": body.reason or ""}}})
+        upd.update({"status": "confirmee", "rider_id": None, "rider_name": None, "session_id": None})
     # When status becomes "en_livraison" (En route), generate delivery_code and enqueue WA
     if body.status == "en_livraison" and prev != "en_livraison" and not o.get("delivery_code"):
         phone = (o.get("customer") or {}).get("phone") or ""
