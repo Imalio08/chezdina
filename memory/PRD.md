@@ -1035,6 +1035,11 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - routers/sync.py : POST /api/admin/sync/export-token (admin, code 2 h), GET /api/admin/sync/export (en-tête X-Sync-Token ou ?token, dump gzip), POST /api/admin/sync/import {source_url, token, pin} (remplace toute la base, journal sync_history). UI : Paramètres › Données › « Synchroniser avec une autre version », déconnexion automatique après import.
 - Testé : iteration_65 (backend 10/10, frontend E2E) + vérification en-tête token.
 
+## 2026-10-10 — Bug iOS « Ajouter à l'écran d'accueil » (livreur → /boutique)
+- iOS lit manifest/apple-touch-icon/apple-mobile-web-app-title au chargement HTML : script inline synchrone dans public/index.html qui écrit les balises livreur pour /rider… (et /login si appareil livreur). Entrée sur /rider par navigation interne → 1 rechargement unique (window.__dinaRiderManifest).
+- Testé : iteration_66 (7/7). Requiert republication.
+
+
 
 
 

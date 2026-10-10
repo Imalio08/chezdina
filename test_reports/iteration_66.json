@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only regression on the iOS 'Add to Home Screen' fix for /rider PWA. 7/7 tests passed: /boutique keeps the storefront manifest (/manifest.json, start_url=/boutique, apple title 'Chez Dina', window.__dinaRiderManifest===false); /rider on a fresh load has rider-specific head tags BEFORE any JS runs (verified via raw HTTP GET of /rider which already contains link rel=manifest '/api/public/manifest-rider.webmanifest', apple-touch-icon '/api/public/pwa-icon-rider/192', meta apple-mobile-web-app-title 'Chez Dina Livreur'); the fetched rider manifest has start_url '/rider'; after rider login (rider1@dinastore.ci / Rider123!) the app navigates to /rider with exactly ONE reload (no loop), manifest href is rider and window.__dinaRiderManifest===true; internal navigation /rider → /rider/carte → /rider/profil does NOT reload (window flag preserved); admin login goes to /console with 0 extra reloads and keeps the boutique manifest; /boutique revisit remains correct.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "public/index.html inline script is correctly synchronous (document.write before DOMContentLoaded) and sets window.__dinaRiderManifest before React mounts — iOS Safari therefore reads the correct manifest/apple-touch-icon/title during the initial page parse. Verified via raw curl of /rider.",
+    "BrandingBootstrapper's single-reload guard (window.__dinaRiderManifest === false && pathname.startsWith('/rider')) is strict-equality, so it fires exactly once per hard load — no reload loop was observed in 7+ seconds of post-navigation idle.",
+    "Minor: CRA/webpack-dev-server caches public/index.html at startup; after editing the template the frontend MUST be restarted (sudo supervisorctl restart frontend) — I had to do this once during testing because the preview was serving a stale index.html without `window.__dinaRiderManifest = rider;`. This is only a dev-time concern (production bundles bake it in), but main agent should be aware if they iterate further on index.html.",
+    "The rider manifest href gets a cache-bust `?v=<updated_at>` from BrandingBootstrapper (relative URL, good) — iOS will refetch it as needed."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A", "frontend": "100% (7/7)"},
+  "test_credentials": "Rider: rider1@dinastore.ci / Rider123!; Admin: aouattaraesca@gmail.com / Admin123! — from /app/memory/test_credentials.md",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "iOS PWA manifest switching is now driven by a synchronous inline script in public/index.html (document.write of link rel=manifest / apple-touch-icon / meta apple-mobile-web-app-title before React mounts) + a one-shot location.replace in BrandingBootstrapper when entering /rider from a page loaded with the boutique manifest. IMPORTANT: when editing public/index.html, restart the frontend supervisor service — webpack-dev-server caches the template. Raw HTML sanity check: `curl -s $REACT_APP_BACKEND_URL/rider | head -27` must show the inline script WITH `window.__dinaRiderManifest = rider;`.",
+  "rca of the issue": "N/A — this iteration verified a fix shipped by E1. No bugs found. The earlier iteration_65 unrelated hydration warning (<span> inside <option>) is still present in the admin console but is a pre-existing React dev warning and does not affect the PWA fix."
+}
