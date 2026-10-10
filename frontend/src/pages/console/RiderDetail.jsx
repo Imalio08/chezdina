@@ -3,8 +3,9 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
-import { ChevronLeft, Phone, MessageSquare, Truck, Trophy, Clock, MapPin, Star, Package } from "lucide-react";
+import { ChevronLeft, Phone, MessageSquare, Truck, Trophy, Clock, MapPin, Star, Package, Printer } from "lucide-react";
 import SmartImage from "@/components/shared/SmartImage";
+import { downloadRiderRoutePDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
 export default function RiderDetail() {
   const { id } = useParams();
@@ -49,6 +50,15 @@ export default function RiderDetail() {
   const totalCollected = orders.filter(o => o.status === "livree" && o.payment_method === "cod").reduce((s, o) => s + (o.total || 0), 0);
   const openWa = () => { const d = (rider.phone || "").replace(/\D/g, ""); window.open(`https://wa.me/${d}`, "_blank"); };
 
+  const printTodayRoute = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const todayOrders = orders.filter(o => (o.created_at || "").slice(0, 10) === today || (o.delivery_date || "").slice(0, 10) === today);
+    if (!todayOrders.length) return toast.error("Aucune livraison assignée aujourd'hui");
+    const business = await fetchBusinessForPdf(api);
+    downloadRiderRoutePDF(rider, todayOrders, business);
+    toast.success(`Feuille de route générée (${todayOrders.length} livraisons)`);
+  };
+
   return (
     <div className="space-y-5 font-sora" data-testid="rider-detail">
       <button onClick={() => nav("/console/livreurs")} className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13}/>Retour aux livreurs</button>
@@ -63,7 +73,8 @@ export default function RiderDetail() {
             {rider.status && <span className={`dina-chip text-[10px] ${rider.status === "active" ? "!text-[#1f8a4c] !border-[#1f8a4c]" : "!text-[#999]"}`}>{rider.status}</span>}
           </div>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={printTodayRoute} className="dina-btn-secondary !min-h-[36px]" data-testid="rider-print-route"><Printer size={13}/>Feuille de route (jour)</button>
           <button onClick={openWa} className="dina-btn-secondary !min-h-[36px] !text-[#1f8a4c]" data-testid="rider-wa"><Phone size={13}/>WhatsApp</button>
           <button onClick={() => nav(`/console/messagerie?rider_id=${rider.id}`)} className="dina-btn-primary !min-h-[36px]" data-testid="rider-msg"><MessageSquare size={13}/>Message</button>
         </div>

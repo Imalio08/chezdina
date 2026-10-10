@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
-import { ChevronLeft, Download, Printer, MessageCircle, FileText, User, Truck, MapPin, Clock } from "lucide-react";
+import { ChevronLeft, Download, Printer, MessageCircle, FileText, User, Truck, MapPin, Clock, Send } from "lucide-react";
 import SmartImage from "@/components/shared/SmartImage";
 import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
@@ -65,7 +65,6 @@ export default function OrderDetail() {
   return (
     <div className="space-y-5 font-sora" data-testid="order-detail">
       <button onClick={() => nav("/console/commandes")} className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13}/>Retour aux commandes</button>
-
       <div className="dina-card-white p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>
@@ -137,6 +136,77 @@ export default function OrderDetail() {
           ))}
         </div>
       </div>
+
+      <OrderMessages order={order} />
+    </div>
+  );
+}
+
+function OrderMessages({ order }) {
+  const [tab, setTab] = useState(order.customer?.id ? "customer" : (order.rider_id ? "rider" : "customer"));
+  const [convId, setConvId] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
+
+  const partyId = tab === "customer" ? order.customer?.id : order.rider_id;
+  const partyName = tab === "customer" ? order.customer?.name : (order.rider_name || "Livreur");
+
+  const load = async () => {
+    if (!partyId) return;
+    try {
+      const body = tab === "customer" ? { customer_id: partyId, order_id: order.id, kind: "boutique_cliente" } : { rider_id: partyId, order_id: order.id, kind: "boutique_livreur" };
+      const r = await api.post("/messages/open", body);
+      setConvId(r.data.id);
+      const c = await api.get(`/messages/conversations/${r.data.id}`);
+      setMessages(c.data?.messages || []);
+    } catch { /* ignore */ }
+  };
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [tab, order.id]);
+
+  const send = async () => {
+    const txt = text.trim();
+    if (!txt || sending) return;
+    setSending(true);
+    try {
+      const body = tab === "customer" ? { customer_id: partyId, order_id: order.id, text: txt, kind: "boutique_cliente" } : { rider_id: partyId, order_id: order.id, text: txt, kind: "boutique_livreur" };
+      const r = await api.post("/messages/send", body);
+      setText("");
+      setMessages(m => [...m, r.data.message]);
+      setConvId(r.data.conversation_id);
+    } catch { toast.error("Erreur envoi"); }
+    finally { setSending(false); }
+  };
+
+  return (
+    <div className="dina-card-white p-4" data-testid="order-messages">
+      <div className="flex items-center gap-2 font-semibold mb-3"><MessageCircle size={14} className="text-[#b02a2a]"/>Messages</div>
+      <div className="flex gap-1 border-b border-[#ececec] mb-3">
+        <button onClick={() => setTab("customer")} className={`px-3 py-1.5 text-xs border-b-2 ${tab === "customer" ? "border-[#b02a2a] text-[#b02a2a] font-semibold" : "border-transparent text-[#666]"}`} data-testid="od-msg-tab-customer">Cliente {order.customer?.name ? `· ${order.customer.name}` : ""}</button>
+        <button onClick={() => setTab("rider")} className={`px-3 py-1.5 text-xs border-b-2 ${tab === "rider" ? "border-[#b02a2a] text-[#b02a2a] font-semibold" : "border-transparent text-[#666]"}`} disabled={!order.rider_id} data-testid="od-msg-tab-rider">Livreur {order.rider_name ? `· ${order.rider_name}` : ""}</button>
+      </div>
+      {!partyId ? (
+        <div className="text-xs text-[#999] py-6 text-center">Aucun {tab === "customer" ? "cliente" : "livreur"} assigné à cette commande.</div>
+      ) : (
+        <>
+          <div className="max-h-72 overflow-y-auto space-y-2 mb-3 p-2 bg-[#fafafa] rounded-lg" data-testid="od-msg-list">
+            {messages.length === 0 ? (
+              <div className="text-xs text-[#999] py-4 text-center">Pas encore de message. Commencez la conversation.</div>
+            ) : messages.map(m => (
+              <div key={m.id} className={`flex ${m.from_kind === "store" ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${m.from_kind === "store" ? "bg-[#b02a2a] text-white" : "bg-white border border-[#ececec]"}`}>
+                  <div className="whitespace-pre-wrap break-words">{m.text}</div>
+                  <div className={`text-[9px] mt-1 ${m.from_kind === "store" ? "text-white/70" : "text-[#999]"}`}>{m.from_name} · {dateTimeFmt(m.at)}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input className="dina-input flex-1" placeholder={`Message à ${partyName}…`} value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} data-testid="od-msg-input"/>
+            <button onClick={send} disabled={sending || !text.trim()} className="dina-btn-primary !min-h-[36px]" data-testid="od-msg-send"><Send size={13}/>Envoyer</button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

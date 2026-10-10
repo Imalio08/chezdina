@@ -1,5 +1,21 @@
 # Chez Dina — PRD
 
+### Vague V — Historique stock, Chat commande, Feuille de route PDF (Feb 2026) ✅
+**Historique stock enrichi automatiquement**
+- Nouveau helper `_record_stock_mov(product_id, size, delta, reason, actor, ref)` dans `server.py` qui écrit dans `db.stock_movements`.
+- Instrumentation : POS/panier partagé (`-qty`, reason="Vente panier partagé", ref=code), création commande en ligne (`-qty`, "Commande en ligne"), ajustement manuel (déjà en place, uniformisé avec `qty`).
+- Nouveau endpoint `GET /api/stock-movements?product_id=X` : retourne la liste triée par date desc. ProductDetail → section "Historique stock" se peuple automatiquement.
+- Vérifié : ajustement +5 d'un produit → 1 entrée dans `/stock-movements?product_id=X` avec reason + by + at.
+
+**Chat intégré à la fiche commande**
+- OrderDetail.jsx : nouveau composant `OrderMessages` avec 2 onglets (Cliente · Livreur), ouvre automatiquement une conversation via `/api/messages/open` (customer_id ou rider_id + order_id), affiche l'historique via `/api/messages/conversations/{id}`, envoi via `/api/messages/send`. Bulle droite rouge pour la boutique, bulle gauche blanche pour l'interlocuteur. Entrée = envoi.
+- Fallback propre si pas de cliente/livreur assigné.
+
+**Feuille de route livreur (PDF du jour)**
+- Nouvelle fonction `downloadRiderRoutePDF(rider, orders, business)` dans `pdfInvoice.js` : PDF A4 avec entête logo + Livreur + Date + Zone + Nb livraisons + Total COD + Total déjà payé, tableau Commande/Cliente/Adresse/Tél/Paiement/Montant (COD en rouge), zones signatures Livreur + Visa gérante.
+- Bouton "Feuille de route (jour)" ajouté dans l'entête de RiderDetail → filtre les commandes du jour (`created_at` ou `delivery_date` = aujourd'hui) et génère le PDF via jsPDF. Toast "(N livraisons)".
+
+
 ### Vague U — 3 fiches détail + vérif catalogue (Feb 2026) ✅
 **3 nouvelles pages de détail routées** :
 - `/app/frontend/src/pages/console/RiderDetail.jsx` → `/console/livreurs/:id` : profil livreur + 6 KPI (score, livraisons, en cours, note, encaissé COD, taux à temps) + 4 sections (pointages avec selfies, journées de livraison, dernières commandes cliquables, avis clientes).

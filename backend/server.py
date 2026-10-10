@@ -1423,6 +1423,32 @@ async def stock_movements(user: dict = Depends(get_user)):
     rows = await db.stock_adjustments.find({}).sort("created_at", -1).to_list(200)
     return clean(rows)
 
+
+# ---------- Stock movements log (sales, deliveries, POs, adjustments) ----------
+async def _record_stock_mov(product_id: str, size, delta: int, reason: str, actor_name: str = None, ref: str = None):
+    """Append a line to db.stock_movements so ProductDetail → Historique stock
+    always has an auditable trail (POS sale, order creation, PO reception, adjust)."""
+    if not product_id or not delta:
+        return
+    await db.stock_movements.insert_one({
+        "id": new_id(),
+        "product_id": product_id,
+        "size": size,
+        "qty": int(delta),
+        "reason": reason,
+        "ref": ref,
+        "by": actor_name,
+        "at": now_iso(),
+    })
+
+
+@api.get("/stock-movements")
+async def stock_movements_list(product_id: str = None, user: dict = Depends(get_user)):
+    """Return the full stock-movement log, optionally filtered to a single product."""
+    q = {"product_id": product_id} if product_id else {}
+    rows = await db.stock_movements.find(q).sort("at", -1).to_list(500)
+    return clean(rows)
+
 @api.get("/stock/adjustment-requests")
 async def stock_adj_requests(user: dict = Depends(get_user)):
     rows = await db.stock_adjustment_requests.find({}).sort("created_at", -1).to_list(100)
@@ -3064,9 +3090,11 @@ async def confirm_shared_cart(sid: str, body: Dict[str, Any]):
     }
     await db.orders.insert_one(doc)
     for it in items:
-        await db.products.update_one({"id": it["product_id"]}, {"$inc": {"stock": -int(it.get("qty",1))}})
+        qty = int(it.get("qty", 1))
+        await db.products.update_one({"id": it["product_id"]}, {"$inc": {"stock": -qty}})
         if it.get("size"):
-            await db.products.update_one({"id": it["product_id"]}, {"$inc": {f"stock_by_size.{it['size']}": -int(it.get("qty",1))}})
+            await db.products.update_one({"id": it["product_id"]}, {"$inc": {f"stock_by_size.{it['size']}": -qty}})
+        await _record_stock_mov(it["product_id"], it.get("size"), -qty, "Vente panier partagé", sc.get("created_by_name"), code)
     await db.shared_carts.update_one({"id": sid}, {"$set": {"confirmed": True, "confirmed_at": now_iso(), "order_id": doc["id"]}})
     return {"ok": True, "code": code, "order_id": doc["id"]}
 
@@ -3726,6 +3754,7 @@ async def public_create_order(body: OrderIn):
         await db.products.update_one({"id": it.product_id}, {"$inc": {"stock": -it.qty}})
         if it.size:
             await db.products.update_one({"id": it.product_id}, {"$inc": {f"stock_by_size.{it.size}": -it.qty}})
+        await _record_stock_mov(it.product_id, it.size, -it.qty, "Commande en ligne", body.customer.get("name") if body.customer else None, code)
     if body.customer and body.customer.get("id"):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}, "$inc":{"loyalty_points": int(total/500)}})
     await db.orders.insert_one(doc)
@@ -5163,7 +5192,7 @@ async def stock_adjust(body: Dict[str,Any], user: dict = Depends(get_user)):
     if not pid or delta == 0: raise HTTPException(400)
     if user.get("role") == "admin":
         await db.products.update_one({"id": pid}, {"$inc": {"stock": delta}})
-        await db.stock_movements.insert_one({"id":new_id(),"product_id":pid,"delta":delta,"reason":reason,"by":user.get("name"),"at":now_iso()})
+        await db.stock_movements.insert_one({"id":new_id(),"product_id":pid,"delta":delta,"qty":delta,"reason":reason or "Ajustement manuel","by":user.get("name"),"at":now_iso()})
         await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"stock.adjust","entity_id":pid,"after":{"delta":delta,"reason":reason},"at":now_iso()})
         return {"ok": True, "applied": True}
     doc = {"id": new_id(), "kind": "stock_adjust", "requested_by_id": user.get("id"), "requested_by_name": user.get("name"),

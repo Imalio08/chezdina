@@ -155,6 +155,65 @@ export function downloadPackingSlipPDF(order, business = {}) {
   doc.save(`fiche-colis-${order.code || "chez-dina"}.pdf`);
 }
 
+export function downloadRiderRoutePDF(rider, orders, business = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const today = new Date().toLocaleDateString("fr-FR");
+  let y = header(doc, business, "FEUILLE DE ROUTE", [
+    `Livreur : ${rider.name || "—"}`,
+    `Date : ${today}`,
+    `Zone : ${rider.zone || "Toutes zones"}`,
+    `Nb livraisons : ${orders.length}`,
+  ]);
+  // Summary stats
+  const totalCod = orders.filter(o => o.payment_method === "cod").reduce((s, o) => s + (o.total || 0), 0);
+  const totalPaid = orders.filter(o => o.payment_method !== "cod").reduce((s, o) => s + (o.total || 0), 0);
+  doc.setFontSize(10); doc.setFont("helvetica", "bold");
+  doc.text(`Total COD à encaisser : ${fcfa(totalCod)}`, 15, y);
+  doc.text(`Déjà payé (ne pas encaisser) : ${fcfa(totalPaid)}`, 15, y + 5);
+  y += 12;
+  // Table header
+  const w = 210;
+  doc.setFillColor(255, 245, 245);
+  doc.rect(15, y, w - 30, 8, "F");
+  doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+  doc.text("#", 18, y + 5.5);
+  doc.text("Commande / Cliente / Adresse", 26, y + 5.5);
+  doc.text("Tél", 130, y + 5.5);
+  doc.text("Paiement", 160, y + 5.5);
+  doc.text("Montant", w - 18, y + 5.5, { align: "right" });
+  y += 10;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  orders.forEach((o, i) => {
+    const addr = o.delivery_address || o.address || "";
+    const label = `${o.code}  ·  ${o.customer?.name || "—"}`;
+    const addrLines = doc.splitTextToSize(addr, 100);
+    doc.text(String(i + 1), 18, y + 4);
+    doc.text(label, 26, y + 4);
+    addrLines.forEach((ln, k) => doc.text(ln, 26, y + 4 + (k + 1) * 4));
+    doc.text(String(o.customer?.phone || "—"), 130, y + 4);
+    const pay = o.payment_method === "cod" ? "COD" : (o.payment_status === "paye" ? "Payé" : "—");
+    if (pay === "COD") doc.setTextColor(176, 42, 42);
+    doc.text(pay, 160, y + 4);
+    doc.setTextColor(0, 0, 0);
+    doc.text(fcfa(o.total), w - 18, y + 4, { align: "right" });
+    const h = 4 * (1 + addrLines.length) + 3;
+    y += h;
+    doc.setDrawColor(236, 236, 236);
+    doc.line(15, y, w - 15, y);
+    doc.setDrawColor(0, 0, 0);
+    y += 1;
+    if (y > 275) { doc.addPage(); y = 20; }
+  });
+  // Footer
+  y += 6;
+  doc.setFont("helvetica", "normal"); doc.setFontSize(9);
+  doc.text("Signature livreur :", 15, y);
+  doc.line(55, y, 110, y);
+  doc.text("Visa gérante :", 120, y);
+  doc.line(155, y, 195, y);
+  doc.save(`feuille-route-${rider.name?.replace(/\s/g, "_") || "livreur"}-${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
 export async function fetchBusinessForPdf(api) {
   try {
     const r = await api.get("/public/site");
