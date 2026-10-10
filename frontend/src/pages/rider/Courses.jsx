@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Phone, MessageCircle, Navigation, ChevronRight, X, MapPin } from "lucide-react";
 import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
 import { SlotBadge } from "@/components/delivery/SlotPicker";
+import OrderThread from "@/components/shared/OrderThread";
 
 const FILTERS = [
   { v: "all", label: "Toutes", k: null },
@@ -122,6 +123,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
   const [templates, setTemplates] = useState([]);
   const [showWa, setShowWa] = useState(false);
   const [postpone, setPostpone] = useState(false);
+  const [chat, setChat] = useState(false);
   useEffect(() => { api.get("/delivery-templates").then(r => setTemplates(r.data.wa_templates || [])).catch(() => { }); }, []);
   const phone = order.customer?.phone?.replace(/\D/g, "") || "";
   const callPhone = () => { api.post(`/orders/${order.id}/contact-log`, { kind: "call" }).catch(() => { }); window.location.href = `tel:${phone}`; };
@@ -177,6 +179,8 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
             {order.status !== "livree" && <button onClick={() => setPostpone(true)} className="dina-btn-secondary !min-h-[44px] text-xs" data-testid="status-reschedule">Reporter</button>}
           </div>
           {postpone && <PostponeForm onCancel={() => setPostpone(false)} onConfirm={(date, reason) => onStatus(order.id, "reportee", reason || "Reportée", date)}/>}
+          <button onClick={() => setChat(c => !c)} className="dina-btn-secondary w-full !min-h-[44px] text-xs" data-testid="rider-msg-store"><MessageCircle size={14}/>{chat ? "Masquer les messages" : "Message boutique"}</button>
+          {chat && <div className="dina-card-white p-3" data-testid="rider-order-chat"><OrderThread orderId={order.id} party="rider" me="rider" height="max-h-60" quickReplies={["Je suis en route", "Cliente injoignable", "Livraison effectuée", "Adresse introuvable"]}/></div>}
         </div>
         {showWa && (
           <div className="fixed inset-0 bg-black/70 grid place-items-end z-[80]" onClick={() => setShowWa(false)}>

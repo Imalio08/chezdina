@@ -301,7 +301,85 @@ async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
         "read_by": [c["id"]],
     }
     await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso()}})
+    if conv.get("order_code"):
+        await _notify_reply(conv, c.get("name"), "cliente", msg["text"])
     return {"ok": True, "message": msg}
+
+
+# ---------- Order-scoped threads (shared by the whole team) ----------
+async def _notify_reply(conv: Dict[str, Any], who: str, role: str, text: str) -> None:
+    await db.notifications.insert_one({
+        "id": new_id(), "type": "order_message", "title": f"Message {role} · {conv.get('order_code')}",
+        "msg": f"{who} : {(text or '')[:70]}", "color": "#5867fd", "at": now_iso(),
+        "link": f"/console/commandes/{conv.get('order_code')}?focus=order-messages",
+    })
+
+
+async def _order_thread(o: Dict[str, Any], party: str) -> Dict[str, Any]:
+    if party not in ("customer", "rider"):
+        raise HTTPException(400, "Fil inconnu")
+    key = f"order:{o['id']}|{party}"
+    conv = await db.conversations.find_one({"key": key})
+    if party == "customer":
+        cust = o.get("customer") or {}
+        if not cust.get("id"):
+            raise HTTPException(400, "Cette cliente n'a pas de compte · utilisez WhatsApp")
+        other = {"kind": "customer", "id": cust["id"], "name": cust.get("name")}
+    else:
+        if not o.get("rider_id"):
+            raise HTTPException(400, "Aucun livreur assigné")
+        other = {"kind": "rider", "id": o["rider_id"], "name": o.get("rider_name")}
+    participants = [{"kind": "store", "id": "store", "name": f"Chez Dina · {o.get('code')}"}, other]
+    if conv:
+        if conv.get("participants") != participants:
+            await db.conversations.update_one({"id": conv["id"]}, {"$set": {"participants": participants}})
+            conv["participants"] = participants
+        return conv
+    conv = {
+        "id": new_id(), "key": key, "kind": f"commande_{'cliente' if party == 'customer' else 'livreur'}",
+        "order_id": o["id"], "order_code": o.get("code"), "closed": False, "archived": False, "pinned": False,
+        "participants": participants, "messages": [], "created_at": now_iso(), "updated_at": now_iso(),
+    }
+    await db.conversations.insert_one(conv)
+    return conv
+
+
+async def _order_for(oid: str, party: str, user: dict) -> Dict[str, Any]:
+    o = await db.orders.find_one({"$or": [{"id": oid}, {"code": oid}]})
+    if not o:
+        raise HTTPException(404, "Commande introuvable")
+    if user.get("role") == "rider" and (party != "rider" or o.get("rider_id") != user["id"]):
+        raise HTTPException(403, "Accès refusé")
+    return o
+
+
+@router.get("/orders/{oid}/thread/{party}")
+async def get_order_thread(oid: str, party: str, user: dict = Depends(get_user)):
+    conv = await _order_thread(await _order_for(oid, party, user), party)
+    msgs = conv.get("messages") or []
+    if any(user["id"] not in (m.get("read_by") or []) for m in msgs):
+        for m in msgs:
+            if user["id"] not in (m.get("read_by") or []):
+                m.setdefault("read_by", []).append(user["id"])
+        await db.conversations.update_one({"id": conv["id"]}, {"$set": {"messages": msgs}})
+    return clean(conv)
+
+
+@router.post("/orders/{oid}/thread/{party}/send")
+async def send_order_thread(oid: str, party: str, body: Dict[str, Any], user: dict = Depends(get_user)):
+    text = str(body.get("text") or "").strip()[:5000]
+    if not text:
+        raise HTTPException(400, "Message vide")
+    conv = await _order_thread(await _order_for(oid, party, user), party)
+    if conv.get("closed"):
+        raise HTTPException(400, "Conversation fermée")
+    is_rider = user.get("role") == "rider"
+    msg = {"id": new_id(), "at": now_iso(), "from_id": user["id"], "from_name": user.get("name"),
+           "from_kind": "rider" if is_rider else "store", "text": text, "read_by": [user["id"]], "reactions": {}}
+    await db.conversations.update_one({"id": conv["id"]}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}})
+    if is_rider:
+        await _notify_reply(conv, user.get("name"), "livreur", text)
+    return {"ok": True, "conversation_id": conv["id"], "message": msg}
 
 
 # ---------- Broadcast (owner/manager) ----------

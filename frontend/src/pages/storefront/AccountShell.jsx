@@ -572,9 +572,9 @@ function MessagesPage() {
     <div className="grid md:grid-cols-[260px_1fr] gap-4 min-h-[70vh]" data-testid="messages-page">
       <div className="dina-card-white p-2 overflow-y-auto">
         {threads.map(t => {
-          const other = (t.participants || []).find(p => p.id !== customer.id) || {};
-          const last = (t.messages || [])[t.messages?.length - 1];
-          const unread = (t.messages || []).filter(m => !(m.read_by || []).includes(customer.id)).length;
+          const other = t.with || (t.participants || []).find(p => p.id !== customer.id) || {};
+          const last = t.last_message || (t.messages || [])[t.messages?.length - 1];
+          const unread = t.unread ?? (t.messages || []).filter(m => !(m.read_by || []).includes(customer.id)).length;
           return (
             <button key={t.id} onClick={() => nav(t.id)} className={`w-full text-left p-2.5 rounded-lg hover:bg-[#fff5f5] ${id === t.id ? "bg-[#fff5f5]" : ""}`} data-testid={`thread-${t.id}`}>
               <div className="flex gap-2 items-start">
