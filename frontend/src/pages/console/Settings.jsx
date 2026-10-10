@@ -815,7 +815,8 @@ function SyncCard() {
     setBusy(true); setResult(null);
     try {
       const r = await api.post("/admin/sync/import", { source_url: src, token: code, pin });
-      setResult(r.data); toast.success("Synchronisation terminée · reconnectez-vous");
+      setResult(r.data); toast.success("Synchronisation terminée · reconnexion…");
+      setTimeout(() => { localStorage.removeItem("dina_token"); window.location.href = "/login"; }, 3000);
     } catch (e) { toast.error(e.response?.data?.detail || "Erreur de synchronisation"); }
     finally { setBusy(false); }
   };

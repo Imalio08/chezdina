@@ -1030,6 +1030,12 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_64 (100%). Nécessite un redéploiement pour la production.
 
 
+## 2026-10-10 — Synchronisation prévisualisation → production
+- Cause : la base de production (séparée) contenait l'ancien catalogue (120 produits dont 79 vêtements) et d'anciens réglages ; republier ne migre pas les données.
+- routers/sync.py : POST /api/admin/sync/export-token (admin, code 2 h), GET /api/admin/sync/export (en-tête X-Sync-Token ou ?token, dump gzip), POST /api/admin/sync/import {source_url, token, pin} (remplace toute la base, journal sync_history). UI : Paramètres › Données › « Synchroniser avec une autre version », déconnexion automatique après import.
+- Testé : iteration_65 (backend 10/10, frontend E2E) + vérification en-tête token.
+
+
 
 
 
