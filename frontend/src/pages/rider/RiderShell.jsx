@@ -96,19 +96,13 @@ export default function RiderShell() {
     localStorage.setItem("rider_theme", theme);
   }, [theme]);
 
-  // Rider PWA manifest: install from /rider launches /rider (not /boutique).
+  // Manifest is owned by BrandingBootstrapper (route-aware); remember this device runs the rider app.
   useEffect(() => {
-    const base = process.env.REACT_APP_BACKEND_URL || "";
-    const bust = cms?.updated_at ? `?v=${encodeURIComponent(cms.updated_at)}` : "";
-    const href = `${base}/api/public/manifest-rider.webmanifest${bust}`;
-    const original = document.querySelector('link[rel="manifest"]');
-    const originalHref = original ? original.getAttribute("href") : null;
-    if (original) original.setAttribute("href", href);
+    localStorage.setItem("dina_app", "rider");
     const originalTheme = document.querySelector('meta[name="theme-color"]');
     const prevTheme = originalTheme ? originalTheme.getAttribute("content") : null;
     if (originalTheme && cms?.primary_color) originalTheme.setAttribute("content", cms.primary_color);
     return () => {
-      if (original && originalHref != null) original.setAttribute("href", originalHref);
       if (originalTheme && prevTheme != null) originalTheme.setAttribute("content", prevTheme);
     };
   }, [cms?.updated_at, cms?.primary_color]);
