@@ -149,6 +149,9 @@ export default function OrderDetail() {
 function OrderMessages({ order }) {
   const [tab, setTab] = useState("customer");
   const [last, setLast] = useState("");
+  useEffect(() => {
+    api.post(`/orders/${order.id}/threads/read`).then(() => window.dispatchEvent(new Event("dina:unread-refresh"))).catch(() => {});
+  }, [order.id]);
   const phone = (order.customer?.phone || "").replace(/\D/g, "");
   const first = order.customer?.name?.split(" ")[0] || "";
   const replies = tab === "customer"

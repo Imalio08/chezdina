@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { fcfa, dateFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { useCustomer } from "@/context/CustomerContext";
+import { MessagePhotos, PhotoLightbox, PhotoButton } from "@/components/shared/OrderThread";
 import {
   User, Package, MessageSquare, Star, Ticket, Heart, Eye, Gift, UserPlus, Wallet,
   MapPin, Settings, Shield, LogOut, Camera, Phone, MessageCircle, Download,
@@ -543,6 +544,8 @@ function MessagesPage() {
   const [threads, setThreads] = useState([]);
   const [active, setActive] = useState(null);
   const [text, setText] = useState("");
+  const [photo, setPhoto] = useState(null);
+  const [zoom, setZoom] = useState(null);
   const { customer } = useCustomer();
 
   const loadThreads = async () => { try { const r = await api.get("/public/account/threads"); setThreads(r.data); } catch {} };
@@ -559,9 +562,9 @@ function MessagesPage() {
   useEffect(() => { loadActive(); const t = setInterval(loadActive, 5000); return () => clearInterval(t); }, [id]);
 
   const send = async () => {
-    if (!text.trim() || !id) return;
-    try { await api.post("/public/account/messages/send", { conversation_id: id, text }); setText(""); loadActive(); }
-    catch { toast.error("Erreur"); }
+    if ((!text.trim() && !photo) || !id) return;
+    try { await api.post("/public/account/messages/send", { conversation_id: id, text, attachments: photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [] }); setText(""); setPhoto(null); loadActive(); }
+    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
   };
 
   if (!threads.length && !id) {
@@ -597,10 +600,13 @@ function MessagesPage() {
             <div className="flex-1 overflow-y-auto space-y-2 py-2">
               {(active.messages || []).map((m, i) => {
                 const mine = m.from_id === customer.id;
-                return <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`${mine ? "bg-[#b02a2a] text-white" : "bg-[#f5f5f5]"} rounded-xl px-3 py-2 max-w-[70%]`}><div className="text-sm">{m.text}</div><div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{dateFmt(m.at)}</div></div></div>;
+                return <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`${mine ? "bg-[#b02a2a] text-white" : "bg-[#f5f5f5]"} rounded-xl px-3 py-2 max-w-[70%]`}><MessagePhotos m={m} onOpen={setZoom}/>{m.text && <div className="text-sm">{m.text}</div>}<div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{m.from_name && !mine ? `${m.from_name} · ` : ""}{dateFmt(m.at)}</div></div></div>;
               })}
             </div>
+            <PhotoLightbox src={zoom} onClose={() => setZoom(null)}/>
+            {photo && <div className="relative inline-block mb-2 self-start" data-testid="msg-photo-preview"><img src={photo} alt="Aperçu" className="h-20 rounded-lg"/><button onClick={() => setPhoto(null)} className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full px-1.5 text-xs">×</button></div>}
             <div className="flex gap-2 border-t border-[#ececec] pt-2">
+              <PhotoButton onPick={setPhoto} testid="msg-photo-btn"/>
               <input className="dina-input flex-1" placeholder="Votre message…" value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} data-testid="msg-input"/>
               <button onClick={send} className="dina-btn-primary !min-h-[40px]" data-testid="msg-send">Envoyer</button>
             </div>

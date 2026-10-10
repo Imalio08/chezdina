@@ -167,6 +167,17 @@ export function downloadPackingSlipPDF(order, business = {}) {
 
 export function downloadRiderRoutePDF(rider, orders, business = {}) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  drawRiderRoute(doc, rider, orders, business);
+  doc.save(`feuille-route-${rider.name?.replace(/\s/g, "_") || "livreur"}-${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+export function downloadAllRiderRoutesPDF(groups, business = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  groups.forEach((g, i) => { if (i) doc.addPage(); drawRiderRoute(doc, g.rider, g.orders, business); });
+  doc.save(`feuilles-route-${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+function drawRiderRoute(doc, rider, orders, business = {}) {
   const today = new Date().toLocaleDateString("fr-FR");
   let y = header(doc, business, "FEUILLE DE ROUTE", [
     `Livreur : ${rider.name || "—"}`,
@@ -221,7 +232,6 @@ export function downloadRiderRoutePDF(rider, orders, business = {}) {
   doc.line(55, y, 110, y);
   doc.text("Visa gérante :", 120, y);
   doc.line(155, y, 195, y);
-  doc.save(`feuille-route-${rider.name?.replace(/\s/g, "_") || "livreur"}-${new Date().toISOString().slice(0,10)}.pdf`);
 }
 
 export async function fetchBusinessForPdf(api) {

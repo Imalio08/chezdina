@@ -5,6 +5,7 @@ import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Pencil, Boxes, TrendingUp, History, Image as ImageIcon } from "lucide-react";
 import SmartImage from "@/components/shared/SmartImage";
+import { SlidersHorizontal, X as XIcon } from "lucide-react";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -13,6 +14,8 @@ export default function ProductDetail() {
   const [movements, setMovements] = useState([]);
   const [sales, setSales] = useState([]);
   const [editId, setEditId] = useState(null);
+  const [adjOpen, setAdjOpen] = useState(false);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     (async () => {
@@ -29,7 +32,7 @@ export default function ProductDetail() {
         setSales(prodSales.slice(0, 30));
       } catch { toast.error("Erreur chargement"); }
     })();
-  }, [id]);
+  }, [id, reload]);
 
   if (!product) return <div className="text-center py-12 text-sm text-[#666]">Chargement…</div>;
 
@@ -57,7 +60,11 @@ export default function ProductDetail() {
               <div className="font-serif text-3xl">{product.name}</div>
               <div className="text-xs text-[#666] mt-1">SKU {product.sku || "—"} · {product.material || "—"}</div>
             </div>
-            <button onClick={() => nav(`/console/produits?edit=${product.id}`)} className="dina-btn-primary !min-h-[36px]" data-testid="product-edit"><Pencil size={13}/>Modifier</button>
+            <div className="flex gap-2">
+              <button onClick={() => setAdjOpen(true)} className="dina-btn-secondary !min-h-[36px]" data-testid="product-adjust-stock"><SlidersHorizontal size={13}/>Ajuster stock</button>
+              <button onClick={() => nav(`/console/produits?edit=${product.id}`)} className="dina-btn-primary !min-h-[36px]" data-testid="product-edit"><Pencil size={13}/>Modifier</button>
+            </div>
+            {adjOpen && <AdjustStockModal product={product} onClose={() => setAdjOpen(false)} onDone={() => { setAdjOpen(false); setReload(r => r + 1); }}/>}
           </div>
           <p className="text-sm text-[#444] leading-relaxed">{product.description || "—"}</p>
           <div className="flex items-center gap-4 flex-wrap">
@@ -100,6 +107,49 @@ export default function ProductDetail() {
             </div>
           ))}
         </Section>
+      </div>
+    </div>
+  );
+}
+
+const ADJ_REASONS = ["Réception hors bon de commande", "Casse / défaut", "Retour cliente", "Erreur d'inventaire", "Cadeau / échantillon", "Autre"];
+
+function AdjustStockModal({ product, onClose, onDone }) {
+  const sizes = product.sizes || [];
+  const [size, setSize] = useState(sizes[0] || "");
+  const [dir, setDir] = useState(1);
+  const [qty, setQty] = useState(1);
+  const [reason, setReason] = useState(ADJ_REASONS[0]);
+  const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  const current = size ? Number(product.stock_by_size?.[size] || 0) : Number(product.stock || 0);
+  const submit = async () => {
+    const n = parseInt(qty, 10);
+    if (!n || n < 1) return toast.error("Quantité invalide");
+    if (dir < 0 && n > current) return toast.error(`Stock insuffisant (${current} disponible)`);
+    setBusy(true);
+    try {
+      const r = await api.post("/stock/adjustment-requests", { product_id: product.id, product_name: product.name, size: size || null, qty_delta: dir * n, reason: note ? `${reason} — ${note}` : reason });
+      toast.success(r.data.status === "approved" ? "Stock ajusté" : "Demande envoyée à la propriétaire pour approbation");
+      onDone();
+    } catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
+    finally { setBusy(false); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onClose}>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-5 w-full max-w-sm space-y-3" onClick={e => e.stopPropagation()} data-testid="adjust-stock-modal">
+        <div className="flex items-center justify-between"><div className="font-serif text-xl">Ajuster le stock</div><button onClick={onClose}><XIcon size={18}/></button></div>
+        {sizes.length > 0 && <div><label className="text-xs uppercase text-[#666] font-semibold">Taille</label>
+          <select className="dina-input mt-1" value={size} onChange={e => setSize(e.target.value)} data-testid="adjust-size">{sizes.map(s => <option key={s} value={s}>{s} · {product.stock_by_size?.[s] || 0} en stock</option>)}</select></div>}
+        <div className="grid grid-cols-2 gap-2">
+          <button onClick={() => setDir(1)} className={`p-2 rounded-lg border text-sm font-semibold transition-colors ${dir > 0 ? "border-[#1f8a4c] bg-[#e8f6ee] text-[#1f8a4c]" : "border-[#ececec] text-[#666]"}`} data-testid="adjust-in">+ Entrée</button>
+          <button onClick={() => setDir(-1)} className={`p-2 rounded-lg border text-sm font-semibold transition-colors ${dir < 0 ? "border-[#c62828] bg-[#fdecec] text-[#c62828]" : "border-[#ececec] text-[#666]"}`} data-testid="adjust-out">– Sortie</button>
+        </div>
+        <div><label className="text-xs uppercase text-[#666] font-semibold">Quantité</label><input type="number" min="1" className="dina-input mt-1 tabular" value={qty} onChange={e => setQty(e.target.value)} data-testid="adjust-qty"/>
+          <div className="text-[11px] text-[#666] mt-1" data-testid="adjust-preview">Stock : {current} → <b>{current + dir * (parseInt(qty, 10) || 0)}</b></div></div>
+        <div><label className="text-xs uppercase text-[#666] font-semibold">Motif</label><select className="dina-input mt-1" value={reason} onChange={e => setReason(e.target.value)} data-testid="adjust-reason">{ADJ_REASONS.map(r => <option key={r}>{r}</option>)}</select></div>
+        <input className="dina-input" placeholder="Précision (facultative)" value={note} onChange={e => setNote(e.target.value)} data-testid="adjust-note"/>
+        <div className="flex gap-2"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={submit} disabled={busy} className="dina-btn-primary flex-1" data-testid="adjust-submit">{busy ? "…" : "Valider"}</button></div>
       </div>
     </div>
   );

@@ -279,6 +279,15 @@ async def send_message(body: Dict[str, Any], user: dict = Depends(get_user)):
     return await send_message_core(body, user)
 
 
+def _image_attachments(raw) -> List[Dict[str, Any]]:
+    out: List[Dict[str, Any]] = []
+    for a in (raw or [])[:3]:
+        u = str((a or {}).get("url") or "")
+        if (a or {}).get("type") == "image" and len(u) <= 3_000_000 and (u.startswith("data:image/") or u.startswith("https://")):
+            out.append({"type": "image", "url": u, "name": str(a.get("name") or "photo.jpg")[:120], "mime": str(a.get("mime") or "image/jpeg")[:40]})
+    return out
+
+
 # ---------- Customer-side send ----------
 @router.get("/public/account/messages")
 async def customer_messages(c: dict = Depends(get_customer)):
@@ -294,15 +303,18 @@ async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
         raise HTTPException(404)
     if conv.get("closed"):
         raise HTTPException(400, "Conversation fermée")
+    atts = _image_attachments(body.get("attachments"))
+    if not (body.get("text") or "").strip() and not atts:
+        raise HTTPException(400, "Message vide")
     msg = {
         "id": new_id(), "at": now_iso(),
         "from_id": c["id"], "from_name": c.get("name"), "from_kind": "customer",
-        "text": body.get("text", ""), "image": body.get("image"),
+        "text": body.get("text", ""), "image": body.get("image"), "attachments": atts,
         "read_by": [c["id"]],
     }
     await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso()}})
     if conv.get("order_code"):
-        await _notify_reply(conv, c.get("name"), "cliente", msg["text"])
+        await _notify_reply(conv, c.get("name"), "cliente", msg["text"] or "📷 Photo")
     return {"ok": True, "message": msg}
 
 
@@ -368,18 +380,51 @@ async def get_order_thread(oid: str, party: str, user: dict = Depends(get_user))
 @router.post("/orders/{oid}/thread/{party}/send")
 async def send_order_thread(oid: str, party: str, body: Dict[str, Any], user: dict = Depends(get_user)):
     text = str(body.get("text") or "").strip()[:5000]
-    if not text:
+    atts = _image_attachments(body.get("attachments"))
+    if not text and not atts:
         raise HTTPException(400, "Message vide")
     conv = await _order_thread(await _order_for(oid, party, user), party)
     if conv.get("closed"):
         raise HTTPException(400, "Conversation fermée")
     is_rider = user.get("role") == "rider"
     msg = {"id": new_id(), "at": now_iso(), "from_id": user["id"], "from_name": user.get("name"),
-           "from_kind": "rider" if is_rider else "store", "text": text, "read_by": [user["id"]], "reactions": {}}
+           "from_kind": "rider" if is_rider else "store", "text": text, "attachments": atts, "read_by": [user["id"]], "reactions": {}}
     await db.conversations.update_one({"id": conv["id"]}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}})
     if is_rider:
-        await _notify_reply(conv, user.get("name"), "livreur", text)
+        await _notify_reply(conv, user.get("name"), "livreur", text or "📷 Photo")
     return {"ok": True, "conversation_id": conv["id"], "message": msg}
+
+
+@router.get("/orders-messages/unread")
+async def orders_unread(user: dict = Depends(get_user)):
+    if user.get("role") == "rider":
+        return {"count": 0, "by_order": {}}
+    rows = await db.conversations.find({"key": {"$regex": "^order:"}}, {"messages": 1, "order_code": 1}).to_list(3000)
+    by: Dict[str, int] = {}
+    for c in rows:
+        n = sum(1 for m in c.get("messages") or [] if m.get("from_kind") in ("customer", "rider") and user["id"] not in (m.get("read_by") or []))
+        if n:
+            by[c.get("order_code")] = by.get(c.get("order_code"), 0) + n
+    return {"count": sum(by.values()), "by_order": by}
+
+
+@router.post("/orders/{oid}/threads/read")
+async def mark_order_threads_read(oid: str, user: dict = Depends(get_user)):
+    o = await db.orders.find_one({"$or": [{"id": oid}, {"code": oid}]}, {"id": 1})
+    if not o:
+        raise HTTPException(404)
+    for party in ("customer", "rider"):
+        c = await db.conversations.find_one({"key": f"order:{o['id']}|{party}"})
+        if not c:
+            continue
+        msgs = c.get("messages") or []
+        changed = False
+        for m in msgs:
+            if user["id"] not in (m.get("read_by") or []):
+                m.setdefault("read_by", []).append(user["id"]); changed = True
+        if changed:
+            await db.conversations.update_one({"id": c["id"]}, {"$set": {"messages": msgs}})
+    return {"ok": True}
 
 
 # ---------- Broadcast (owner/manager) ----------

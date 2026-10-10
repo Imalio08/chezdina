@@ -114,6 +114,14 @@ export default function ConsoleLayout() {
   const [showQuickActions, setShowQuickActions] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [notifs, setNotifs] = useState([]);
+  const [unreadMsgs, setUnreadMsgs] = useState(0);
+  const { pathname: unreadPath } = useLocation();
+  useEffect(() => {
+    const f = () => api.get("/orders-messages/unread").then(r => setUnreadMsgs(r.data?.count || 0)).catch(() => {});
+    f(); const t = setInterval(f, 20000);
+    window.addEventListener("dina:unread-refresh", f);
+    return () => { clearInterval(t); window.removeEventListener("dina:unread-refresh", f); };
+  }, [unreadPath]);
   const [readIds, setReadIds] = useState(() => new Set(JSON.parse(localStorage.getItem("dina_read_notifs") || "[]")));
   const [openSections, setOpenSections] = useState(() => {
     const saved = JSON.parse(localStorage.getItem("dina_sidebar_open") || "null");
@@ -262,6 +270,7 @@ export default function ConsoleLayout() {
                   >
                     <Icon size={14}/>
                     {!collapsed && <span className="truncate">{label}</span>}
+                    {to === "/console/commandes" && unreadMsgs > 0 && <span className={`${collapsed ? "absolute top-1 right-1 w-2 h-2 p-0" : "ml-auto px-1.5 min-w-[18px]"} bg-[#e53935] text-white text-[10px] font-bold rounded-full text-center leading-[18px]`} title={`${unreadMsgs} message(s) non lu(s)`} data-testid="nav-orders-unread">{collapsed ? "" : unreadMsgs}</span>}
                   </NavLink>
                 ))}
               </div>

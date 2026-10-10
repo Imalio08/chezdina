@@ -1,14 +1,48 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { Send } from "lucide-react";
+import { Send, Camera, X } from "lucide-react";
 import { dateTimeFmt } from "@/lib/format";
+import { compressImage } from "@/lib/imageCompress";
+
+export function MessagePhotos({ m, onOpen }) {
+  const imgs = (m.attachments || []).filter(a => a.type === "image");
+  if (!imgs.length) return null;
+  return <div className="flex flex-wrap gap-1.5 mb-1">{imgs.map((a, i) => <img key={i} src={a.url} alt="Photo" onClick={() => onOpen(a.url)} className="w-36 h-28 object-cover rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity" data-testid="thread-photo"/>)}</div>;
+}
+
+export function PhotoLightbox({ src, onClose }) {
+  if (!src) return null;
+  return (
+    <div className="fixed inset-0 bg-black/85 z-[90] grid place-items-center p-4" onClick={onClose} data-testid="photo-lightbox">
+      <button className="absolute top-4 right-4 text-white" onClick={onClose} data-testid="photo-lightbox-close"><X size={22}/></button>
+      <img src={src} alt="Photo" className="max-w-full max-h-[90vh] rounded-lg"/>
+    </div>
+  );
+}
+
+export function PhotoButton({ onPick, disabled, testid }) {
+  const ref = useRef(null);
+  const pick = async (e) => {
+    const f = e.target.files?.[0]; e.target.value = "";
+    if (!f) return;
+    try { onPick(await compressImage(f)); } catch (err) { toast.error(err.message); }
+  };
+  return (
+    <>
+      <input ref={ref} type="file" accept="image/*" className="hidden" onChange={pick} data-testid={`${testid}-input`}/>
+      <button type="button" onClick={() => ref.current?.click()} disabled={disabled} title="Joindre une photo" className="dina-btn-secondary !min-h-[36px] !px-2.5" data-testid={testid}><Camera size={14}/></button>
+    </>
+  );
+}
 
 // Order-scoped thread shared by the whole team. party: "customer" | "rider"; me: "store" | "rider"
 export default function OrderThread({ orderId, party, me = "store", quickReplies = [], onSent, height = "max-h-72" }) {
   const [conv, setConv] = useState(null);
   const [error, setError] = useState(null);
   const [text, setText] = useState("");
+  const [photo, setPhoto] = useState(null);
+  const [zoom, setZoom] = useState(null);
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
   const count = conv?.messages?.length || 0;
@@ -17,16 +51,18 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
     try { const r = await api.get(`/orders/${orderId}/thread/${party}`); setConv(r.data); setError(null); }
     catch (e) { setError(e.response?.data?.detail || "Messagerie indisponible"); }
   };
-  useEffect(() => { setConv(null); load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [orderId, party]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setConv(null); setPhoto(null); load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [orderId, party]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [count]);
 
   const send = async (value) => {
     const txt = (value ?? text).trim();
-    if (!txt || sending) return;
+    if ((!txt && !photo) || sending) return;
     setSending(true);
     try {
-      const r = await api.post(`/orders/${orderId}/thread/${party}/send`, { text: txt });
-      setText(""); setConv(c => ({ ...c, messages: [...(c?.messages || []), r.data.message] })); onSent?.(txt);
+      const attachments = photo && value === undefined ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [];
+      const r = await api.post(`/orders/${orderId}/thread/${party}/send`, { text: txt, attachments });
+      setText(""); if (attachments.length) setPhoto(null);
+      setConv(c => ({ ...c, messages: [...(c?.messages || []), r.data.message] })); onSent?.(txt);
     } catch (e) { toast.error(e.response?.data?.detail || "Erreur envoi"); }
     finally { setSending(false); }
   };
@@ -37,12 +73,14 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
 
   return (
     <div data-testid={`order-thread-${party}`}>
+      <PhotoLightbox src={zoom} onClose={() => setZoom(null)}/>
       <div ref={listRef} className={`${height} overflow-y-auto space-y-2 mb-3 p-2 bg-[#fafafa] dark:bg-[#141414] rounded-lg scrollbar-thin`} data-testid="od-msg-list">
         {count === 0 ? <div className="text-xs text-[#999] py-4 text-center">Pas encore de message. Commencez la conversation.</div>
         : conv.messages.map(m => (
           <div key={m.id} className={`flex ${mine(m) ? "justify-end" : "justify-start"}`} data-testid={`thread-msg-${m.id}`}>
             <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${mine(m) ? "bg-[#b02a2a] text-white" : "bg-white dark:bg-[#1f1f1f] border border-[#ececec] dark:border-[#2a2a2a]"}`}>
-              <div className="whitespace-pre-wrap break-words">{m.text}</div>
+              <MessagePhotos m={m} onOpen={setZoom}/>
+              {m.text && <div className="whitespace-pre-wrap break-words">{m.text}</div>}
               <div className={`text-[9px] mt-1 ${mine(m) ? "text-white/70" : "text-[#999]"}`}>{m.from_name} · {dateTimeFmt(m.at)}</div>
             </div>
           </div>
@@ -53,9 +91,16 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
           {quickReplies.map((q, i) => <button key={i} onClick={() => send(q)} disabled={sending} className="shrink-0 text-[11px] px-2.5 py-1 rounded-full border border-[#ececec] dark:border-[#2a2a2a] hover:border-[#b02a2a] hover:text-[#b02a2a] transition-colors" data-testid={`quick-reply-${party}-${i}`}>{q}</button>)}
         </div>
       )}
+      {photo && (
+        <div className="relative inline-block mb-2" data-testid="thread-photo-preview">
+          <img src={photo} alt="Aperçu" className="h-20 rounded-lg"/>
+          <button onClick={() => setPhoto(null)} className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full p-0.5" data-testid="thread-photo-remove"><X size={12}/></button>
+        </div>
+      )}
       <div className="flex gap-2">
-        <input className="dina-input flex-1" placeholder="Votre message…" value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} data-testid="od-msg-input"/>
-        <button onClick={() => send()} disabled={sending || !text.trim()} className="dina-btn-primary !min-h-[36px]" data-testid="od-msg-send"><Send size={13}/>Envoyer</button>
+        <PhotoButton onPick={setPhoto} disabled={sending} testid={`thread-photo-btn-${party}`}/>
+        <input className="dina-input flex-1" placeholder={photo ? "Légende (facultative)…" : "Votre message…"} value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} data-testid="od-msg-input"/>
+        <button onClick={() => send()} disabled={sending || (!text.trim() && !photo)} className="dina-btn-primary !min-h-[36px]" data-testid="od-msg-send"><Send size={13}/>{sending ? "…" : "Envoyer"}</button>
       </div>
     </div>
   );

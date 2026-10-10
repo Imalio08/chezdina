@@ -18,7 +18,11 @@ export default function CashSessions() {
   const [rejectFor, setRejectFor] = useState(null);
 
   const load = () => api.get("/cash-sessions").then(r => setSessions(r.data || [])).catch(() => { });
-  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+  useEffect(() => {
+    load(); const t = setInterval(load, 10000);
+    window.addEventListener("focus", load);
+    return () => { clearInterval(t); window.removeEventListener("focus", load); };
+  }, []);
 
 
   const current = sessions.find(s => !s.closed);
@@ -51,7 +55,7 @@ export default function CashSessions() {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <KpiCard label="Sessions" value={kpis.sessions_total} color="#1c1c1c" testid="cash-kpi-total"/>
+        <KpiCard label="Sessions" value={kpis.sessions_total} color="#5867fd" testid="cash-kpi-total"/>
         <KpiCard label="À valider (Owner)" value={kpis.pending} color="#e4991e" testid="cash-kpi-pending"/>
         <KpiCard label="Encaissements espèces cumulés" value={fcfa(kpis.total_cash)} color="#1f8a4c" testid="cash-kpi-cash"/>
         <KpiCard label="Écarts cumulés" value={fcfa(kpis.gap)} color={kpis.gap < 0 ? "#c62828" : kpis.gap > 0 ? "#1f8a4c" : "#666"} testid="cash-kpi-gap"/>

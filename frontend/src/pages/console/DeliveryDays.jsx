@@ -10,6 +10,7 @@ import jsPDF from "jspdf";
 import { VersementCell, missingVersements, OrderDayStatus } from "@/components/delivery/VersementCell";
 import { SlotPickerModal, SlotBadge } from "@/components/delivery/SlotPicker";
 import { ReconcileLineModal } from "@/pages/console/Deliveries";
+import { downloadAllRiderRoutesPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
 /** Build a printable route-sheet PDF for a rider's day: list of orders with addresses, phones, amounts. */
 function printRouteSheetPDF(session, assigned, brand = {}) {
@@ -84,6 +85,19 @@ export default function DeliveryDays() {
     return { open, closed, toCollect };
   }, [sessions]);
 
+  const printAll = async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const byRider = {};
+    sessions.filter(s => s.date === today).forEach(s => {
+      const g = byRider[s.rider_id] || (byRider[s.rider_id] = { rider: { name: s.rider_name, zone: riders.find(r => r.id === s.rider_id)?.zone }, orders: [] });
+      g.orders.push(...(s.orders_detail || []).filter(o => !o.postponed_to && o.status !== "annulee"));
+    });
+    const groups = Object.values(byRider).filter(g => g.orders.length);
+    if (!groups.length) return toast.error("Aucun livreur avec des courses aujourd'hui");
+    downloadAllRiderRoutesPDF(groups, await fetchBusinessForPdf(api));
+    toast.success(`${groups.length} feuille(s) de route générée(s)`);
+  };
+
   if (open) {
     const session = sessions.find(s => s.id === open.id) || open;
     return <DayDetail session={session} orders={orders} riders={riders} onBack={()=>{setOpen(null); load();}} onReload={load}/>;
@@ -93,7 +107,10 @@ export default function DeliveryDays() {
     <div className="space-y-5" data-testid="delivery-days-page">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Journées de livraison</h1><p className="text-sm text-[#666]">Planification quotidienne, affectation, suivi, réconciliation</p></div>
-        <button onClick={()=>setCreateOpen(true)} className="dina-btn-primary !min-h-[40px]" data-testid="dd-create-open"><Plus size={14}/>Créer une journée</button>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={printAll} className="dina-btn-secondary !min-h-[40px]" data-testid="dd-print-all"><Printer size={14}/>Imprimer toutes les feuilles</button>
+          <button onClick={()=>setCreateOpen(true)} className="dina-btn-primary !min-h-[40px]" data-testid="dd-create-open"><Plus size={14}/>Créer une journée</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

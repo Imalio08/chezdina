@@ -1350,9 +1350,12 @@ async def po_blind_receive(pid: str, body: Dict[str, Any], user: dict = Depends(
     # If no gaps, directly increment stock
     if not has_gaps:
         for it in items:
-            if it.get("product_id") and it.get("size"):
-                await db.products.update_one({"id": it["product_id"]},
-                    {"$inc": {f"stock_by_size.{it['size']}": int(it.get("qty_counted", 0)), "stock": int(it.get("qty_counted", 0))}})
+            q = int(it.get("qty_counted", 0))
+            if it.get("product_id") and q:
+                inc = {"stock": q}
+                if it.get("size"): inc[f"stock_by_size.{it['size']}"] = q
+                await db.products.update_one({"id": it["product_id"]}, {"$inc": inc})
+                await _record_stock_mov(it["product_id"], it.get("size"), q, f"Réception {po.get('number')}", user.get("name"), po.get("number"))
     return {"ok": True, "status": status, "gaps": gaps}
 
 @api.post("/purchase-orders/{pid}/validate-gaps")
@@ -1363,10 +1366,12 @@ async def po_validate_gaps(pid: str, body: Dict[str, Any], user: dict = Depends(
     rec = po.get("reception") or {}
     if rec.get("validated"): raise HTTPException(400, "Déjà validé")
     for it in po.get("items", []):
-        if it.get("product_id") and it.get("size"):
-            qty = int(it.get("qty_counted", it.get("qty", 0)))
-            await db.products.update_one({"id": it["product_id"]},
-                {"$inc": {f"stock_by_size.{it['size']}": qty, "stock": qty}})
+        qty = int(it.get("qty_counted", it.get("qty", 0)))
+        if it.get("product_id") and qty:
+            inc = {"stock": qty}
+            if it.get("size"): inc[f"stock_by_size.{it['size']}"] = qty
+            await db.products.update_one({"id": it["product_id"]}, {"$inc": inc})
+            await _record_stock_mov(it["product_id"], it.get("size"), qty, f"Réception {po.get('number')} (écarts validés)", user.get("name"), po.get("number"))
     note = body.get("note") or ""
     await db.purchase_orders.update_one({"id": pid}, {"$set": {
         "status": "recu", "reception.validated": True,
@@ -1481,11 +1486,18 @@ async def stock_adj_request(body: Dict[str,Any], user: dict = Depends(require_ro
         doc["status"] = "approved"
         doc["approved_by"] = user.get("name")
         doc["approved_at"] = now_iso()
-        if doc.get("product_id") and doc.get("size"):
-            await db.products.update_one({"id": doc["product_id"]},
-                {"$inc": {f"stock_by_size.{doc['size']}": doc["qty_delta"], "stock": doc["qty_delta"]}})
+        await _apply_stock_adj(doc, user.get("name"))
     await db.stock_adjustment_requests.insert_one(doc)
     return clean(doc)
+
+async def _apply_stock_adj(doc: Dict[str, Any], actor: str):
+    q = int(doc.get("qty_delta", 0))
+    if not doc.get("product_id") or not q:
+        return
+    inc = {"stock": q}
+    if doc.get("size"): inc[f"stock_by_size.{doc['size']}"] = q
+    await db.products.update_one({"id": doc["product_id"]}, {"$inc": inc})
+    await _record_stock_mov(doc["product_id"], doc.get("size"), q, f"Ajustement · {doc.get('reason') or 'manuel'}", actor, doc.get("id"))
 
 @api.post("/stock/adjustment-requests/{aid}/decide")
 async def stock_adj_decide(aid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
@@ -1495,9 +1507,7 @@ async def stock_adj_decide(aid: str, body: Dict[str,Any], user: dict = Depends(r
     decision = body.get("decision")  # "approve" | "reject"
     note = body.get("note", "")
     if decision == "approve":
-        if doc.get("product_id") and doc.get("size"):
-            await db.products.update_one({"id": doc["product_id"]},
-                {"$inc": {f"stock_by_size.{doc['size']}": int(doc.get("qty_delta",0)), "stock": int(doc.get("qty_delta",0))}})
+        await _apply_stock_adj(doc, user.get("name"))
         await db.stock_adjustment_requests.update_one({"id": aid}, {"$set": {"status":"approved", "approved_by": user.get("name"), "approved_at": now_iso(), "decision_note": note}})
     else:
         await db.stock_adjustment_requests.update_one({"id": aid}, {"$set": {"status":"rejected", "rejected_by": user.get("name"), "rejected_at": now_iso(), "decision_note": note}})
@@ -3424,6 +3434,8 @@ async def seed_demo(user: dict = Depends(require_role("admin"))):
                 "created_at": (datetime.now(timezone.utc)-timedelta(days=rnd.randint(0,60))).isoformat(),
                 "demo_tag": DEMO_TAG})
             created["reviews"] += 1
+    from routers.demo import seed_scenarios
+    created["scenarios"] = await seed_scenarios(user)
     return {"ok": True, "created": created, "message": "Données de démonstration ajoutées"}
 
 @api.delete("/admin/demo-data")
@@ -3433,6 +3445,8 @@ async def delete_demo_data(user: dict = Depends(require_role("admin"))):
     for coll in ["customers","orders","expenses","site_visits","waitlist","abandoned_carts","reviews","suppliers","purchases","delivery_days"]:
         r = await db[coll].delete_many({"demo_tag": DEMO_TAG})
         deleted[coll] = r.deleted_count
+    from routers.demo import purge_scenarios
+    deleted["scenarios"] = await purge_scenarios()
     return {"ok": True, "deleted": deleted}
 
 
