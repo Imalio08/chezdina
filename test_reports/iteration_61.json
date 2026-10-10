@@ -1,0 +1,33 @@
+{
+  "summary": "Iter61 — Messagerie commande (order-scoped threads). Backend: 13/13 PASSED (test_order_messaging.py): GET /api/orders/{oid|code}/thread/{customer|rider} creates/returns shared thread with correct key order:{id}|party and kind commande_{cliente|livreur}; works for both order code and UUID. 400 when order has no rider (rider party) or customer has no account id (customer party). 400 on invalid party. Rider access: 403 when accessing customer party of own order, 403 when accessing rider party of someone else's order (own rider party OK). POST send: text validation (empty → 400), staff message has from_kind=store, rider has from_kind=rider; rider send creates db notification type=order_message with title/msg/link containing /console/commandes/{code}?focus=order-messages. Two different staff (admin + manager Fatou Konaté) see the SAME conversation history (same id, same messages) and can both append — shared thread confirmed. Customer flow: GET /api/public/account/threads returns the commande_cliente thread for the order; POST /api/public/account/messages/send with conversation_id creates order_message notification visible to staff with proper link. Frontend verified on /console/commandes/DN-261005-1044?focus=order-messages: order-messages card renders with od-msg-tab-customer / od-msg-tab-rider tabs, od-msg-list, 4 quick-reply-customer-{i} + 4 quick-reply-rider-{i}, od-msg-input, od-msg-send, WhatsApp badge od-msg-wa on customer tab only. Send works and new message appears instantly in list; rider tab loads (empty thread → 'Pas encore de message'). Notification bell: 3 notif-order_message items present; clicking one navigates to /console/commandes/{code}?focus=order-messages and the order-messages card is rendered (card has data-focus-id=order-messages; useFocusParam adds .focus-flash for 3s then removes — animation runs ~3s). focus-flash class not visible at the +4s assertion point because animation already ended; that is expected per implementation.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Login/Dashboard", "issues": ["Pre-existing hydration warning <span> inside <option> (dev-tool wrapper, carried over since iter56, non-blocking)."]}
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_order_messaging.py",
+    "/app/test_reports/pytest/iter61.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "routers/messagerie.py _order_thread uses a hard-coded participant {kind:'store', id:'store'} — fine as a sentinel but means per-staff read receipts cannot be computed on this virtual participant; current get_order_thread does mark each staff user as reader on messages which is correct, but conv.participants.store is a shared facade.",
+    "_notify_reply inserts a notification on EVERY reply (customer or rider) but there is no de-dup / batching window — a chatty customer could spam the staff notification feed. Consider throttling (e.g. only one unread notification per thread until acknowledged).",
+    "customer_send only triggers _notify_reply if conv.get('order_code') exists — order-scoped threads created via _order_thread do set order_code, but legacy boutique_cliente conversations created via send_message_core do NOT set order_code, so customer replies on legacy threads bypass notifications silently (likely intentional, worth a comment).",
+    "OrderThread.jsx polls every 10s via setInterval — fine; however component resets conv to null on every orderId/party change which flashes 'Chargement…' briefly even when switching tabs on the same order (minor UX).",
+    "No cleanup endpoint for test messages — TEST_* messages accumulate in conversations and notifications collections. Consider adding an admin maintenance endpoint or a Mongo cleanup script."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_order_messaging.py (new)"
+  ],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "100% of testable flows (rider mobile UI could not render courses because rider1 has no orders with assigned_at/created_at within today — seed/time constraint, not a product bug; rider-send flow was fully verified via backend test from rider1 token)"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123!; Manager manager.cocody@dinastore.ci / Manager123!; Rider rider1@dinastore.ci / Rider123! — all working.",
+  "seed_data_creation": "Multiple TEST_* messages inserted into order-scoped conversations for DN-261005-1044 (and 1-2 other orders assigned to rider1): TEST_staff_customer_*, TEST_rider_reply_*, TEST_shared_*, TEST_mgr_*, TEST_for_customer_*, TEST_cust_reply_*, TEST_fe_cust_*. Corresponding notifications of type=order_message also created (visible in bell). Main agent may want to run a cleanup to purge TEST_* messages+notifications before demo.",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "Backend regression: REACT_APP_BACKEND_URL=https://dina-boutique.preview.emergentagent.com python -m pytest backend/tests/test_order_messaging.py -o addopts=''. Fixtures: picks an order assigned to rider1 (rider1@dinastore.ci) with a customer that has an account id to cover both parties. GET /api/customers/{id} returns {customer, orders, metrics} wrapper. Customer login uses /public/customer-login-code with phone + 6-digit access_code (returned by GET /api/customers/{id}). The console login page has NO type=email/type=submit — use page.locator('input').nth(0/1) and getByRole('button', name='Se connecter'). GuidedTour modal ([data-testid='guided-tour']) must be closed via its first inner button before interacting with underlying UI (click intercept). useFocusParam flashes .focus-flash for 3s only — assert within 2s of navigation or inspect data-focus-id presence instead. Rider mobile courses UI requires orders with assigned_at or created_at within today; backend lists older ones only, so /riders/me/today returns 0 for rider1 at test time — tested rider-send flow at API level instead.",
+  "rca of the issue": "N/A — no blocking issues. All backend contract tests and all testable frontend flows pass."
+}

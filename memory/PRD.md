@@ -1000,5 +1000,12 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Notifications : liens directs (commande, produit, cliente/panier, avis ?focus, approbations ?focus, sessions-caisse ?focus, fiche livreur) + notifications stockées en base désormais visibles. Hook useFocusParam (surbrillance).
 - Testé : iteration_60 (backend 13/13, frontend 100%).
 
+## 2026-10-10 — Messagerie commande
+- Fils partagés par commande (Cliente / Livreur) : GET /api/orders/{oid|code}/thread/{customer|rider}, POST …/send. Auteur + date, rafraîchissement 10 s, auto-scroll, réponses rapides, bouton WhatsApp (fil Cliente).
+- Livreur : « Message boutique » dans le détail de course (app livreur). Cliente : fil visible et réponse dans Mon compte › Messages.
+- Réponse cliente/livreur → notification console (type order_message) vers /console/commandes/{code}?focus=order-messages.
+- Testé : iteration_61 (backend 13/13, frontend 100%). Messages TEST_ nettoyés.
+
+
 
 
