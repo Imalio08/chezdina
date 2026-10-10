@@ -1040,6 +1040,17 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_66 (7/7). Requiert republication.
 
 
+## 2026-10-10 — Éditeur d'images + app livreur (connexion, messagerie cliente, itinéraire intégré, échec, adresse d'accès)
+- ImageEditor.jsx (react-easy-crop) : recadrage Original/Carré/4:5/16:9, zoom, rotation, retourner, luminosité/contraste/saturation/netteté, 6 filtres. Branché sur ImageUpload (produits, catégories, logo, site…), photos des messages (console, livreur, cliente), photo profil livreur, preuve de livraison. Hôte global <ImageEditorHost/> dans App.js.
+- /rider/login (RiderLogin.jsx) aux couleurs de l'espace livreur ; ProtectedRider et « Sortir » y renvoient.
+- Signature cliente : zone h-52 fond blanc, trait noir 2.5–5 px.
+- Fil livreur↔cliente (party rider_customer) : bouton « Message » dans la course ; visible côté cliente (Mon compte › Messages) ; compté dans les non-lus livreur.
+- Itinéraire : /rider/carte?route=ID, trajet OSRM + km/min, lien Google Maps de secours ; icône livreur (point bleu pulsé + flèche) ≠ épingles commandes.
+- Formulaire Échec : motifs, note, photo (envoyée dans le fil boutique), option report.
+- Adresse d'accès : rider_cms.access_slug (ex. « livreur ») → /livreur redirige vers /rider ; carte avec copier, WhatsApp, QR (qrcode.react).
+- Testé : iteration_67 (backend 8/8, livreur 100%) + capture éditeur et adresse d'accès.
+
+
 
 
 
