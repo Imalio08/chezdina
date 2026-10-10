@@ -5,6 +5,7 @@ import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Phone, MessageSquare, Truck, Trophy, Clock, MapPin, Star, Package, Printer } from "lucide-react";
 import SmartImage from "@/components/shared/SmartImage";
+import RiderSlotsEditor from "@/components/delivery/RiderSlotsEditor";
 import { downloadRiderRoutePDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
 export default function RiderDetail() {
@@ -88,6 +89,8 @@ export default function RiderDetail() {
         <Kpi label="Encaissé COD" value={fcfa(totalCollected)} color="#b02a2a" testid="rider-kpi-cash"/>
         <Kpi label="Taux à temps" value={`${score.on_time_rate != null ? Math.round(score.on_time_rate * 100) : "—"}%`} color="#1c1c1c" testid="rider-kpi-ontime"/>
       </div>
+
+      <RiderSlotsEditor riderId={id}/>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Section title="Pointages récents" icon={Clock} testid="rider-attendance">

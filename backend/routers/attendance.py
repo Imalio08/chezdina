@@ -61,7 +61,7 @@ async def check_in(body: Dict[str, Any], user: dict = Depends(get_user)):
                 "id": new_id(), "type": "attendance_alert",
                 "title": "Départ sans réconciliation",
                 "msg": f"{user.get('name')} a pointé le départ sans réconcilier ses livraisons",
-                "color": "#c62828", "at": now_iso(), "link": "/console/livraisons",
+                "color": "#c62828", "at": now_iso(), "link": f"/console/livreurs/{user.get('id')}",
             })
     doc = {
         "id": new_id(),

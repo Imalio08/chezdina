@@ -3,6 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
+import useFocusParam from "@/lib/useFocusParam";
 import { CheckCircle, XCircle, Filter, Clock, AlertTriangle, DollarSign, Package, Tag, Receipt } from "lucide-react";
 
 const KIND_LABEL = {
@@ -17,6 +18,7 @@ const KIND_ICON = { discount: Tag, refund: DollarSign, stock_adjustment: Package
 const KIND_COLOR = { discount: "#e4991e", refund: "#c62828", stock_adjustment: "#5867fd", price_change: "#b02a2a", expense: "#5867fd", cash_handover: "#1f8a4c" };
 
 export default function Approvals() {
+  useFocusParam();
   const { user } = useAuth();
   const [approvals, setApprovals] = useState([]);
   const [expenseReqs, setExpenseReqs] = useState([]);
@@ -131,7 +133,7 @@ export default function Approvals() {
           const Icon = KIND_ICON[r.kind] || Clock;
           const color = KIND_COLOR[r.kind] || "#666";
           return (
-            <div key={`${r.source}-${r.id}`} className="dina-card-white p-4" data-testid={`approval-row-${r.id}`}>
+            <div key={`${r.source}-${r.id}`} className="dina-card-white p-4" data-testid={`approval-row-${r.id}`} data-focus-id={r.id}>
               <div className="flex items-start gap-3 flex-wrap">
                 <div className="w-10 h-10 rounded-lg grid place-items-center shrink-0" style={{background: `${color}1a`, color}}><Icon size={16}/></div>
                 <div className="flex-1 min-w-0">

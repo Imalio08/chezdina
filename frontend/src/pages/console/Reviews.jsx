@@ -3,10 +3,12 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import { Star, Check, X, Trash2, MessageSquareReply, Reply } from "lucide-react";
 import { dateFmt } from "@/lib/format";
+import useFocusParam from "@/lib/useFocusParam";
 
 export default function Reviews() {
   const [tab, setTab] = useState("pending");
   const [rows, setRows] = useState([]);
+  useFocusParam();
   const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0 });
   const [replyFor, setReplyFor] = useState(null);
   const [replyText, setReplyText] = useState("");
@@ -59,7 +61,7 @@ export default function Reviews() {
         <div className="font-semibold mb-3">{rows.length} avis affiché(s)</div>
         {rows.length === 0 ? <div className="text-center text-sm text-[#666] py-12">Aucun avis dans cette catégorie</div> :
           <div className="space-y-3">{rows.map(r => (
-            <div key={r.id} className="border border-[#ececec] dark:border-[#2a2a2a] rounded-xl p-4 flex gap-3" data-testid={`review-${r.id}`}>
+            <div key={r.id} className="border border-[#ececec] dark:border-[#2a2a2a] rounded-xl p-4 flex gap-3" data-testid={`review-${r.id}`} data-focus-id={r.id}>
               <div className="w-14 h-14 rounded-lg bg-[#fff5f5] overflow-hidden shrink-0">{r.product_image && <img src={r.product_image} alt="" className="w-full h-full object-cover"/>}</div>
               <div className="flex-1 min-w-0">
                 <div className="text-xs text-[#b02a2a] uppercase tracking-wide">{r.product_name}</div>

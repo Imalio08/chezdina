@@ -3,12 +3,14 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
+import useFocusParam from "@/lib/useFocusParam";
 import { PlayCircle, StopCircle, Shield, HandCoins, CheckCircle, AlertTriangle, Clock, XCircle, X } from "lucide-react";
 
 export default function CashSessions() {
   const { user } = useAuth();
   const isOwner = user?.role === "admin";
   const [sessions, setSessions] = useState([]);
+  useFocusParam();
   const [opening, setOpening] = useState(false);
   const [closingFor, setClosingFor] = useState(null);
   const [handoverFor, setHandoverFor] = useState(null);
@@ -103,7 +105,7 @@ export default function CashSessions() {
             </tr></thead>
             <tbody>{sessions.length === 0 ? <tr><td colSpan={12} className="text-sm text-[#666] text-center py-8">Aucune session</td></tr>
             : sessions.map(s => (
-              <tr key={s.id} data-testid={`cash-row-${s.id}`}>
+              <tr key={s.id} data-testid={`cash-row-${s.id}`} data-focus-id={s.id}>
                 <td className="text-xs font-medium">{s.session_date ? dateFr(s.session_date) : "—"}</td>
                 <td className="text-xs">{dateTimeFmt(s.opened_at)}</td>
                 <td className="text-xs">{s.closed_at ? dateTimeFmt(s.closed_at) : <span className="text-[#1f8a4c]">en cours</span>}</td>

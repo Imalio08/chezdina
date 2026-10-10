@@ -8,6 +8,7 @@ import KPICard from "@/components/shared/KPICard";
 import LiveDeliveryMap from "@/components/delivery/LiveDeliveryMap";
 import jsPDF from "jspdf";
 import { VersementCell, missingVersements, OrderDayStatus } from "@/components/delivery/VersementCell";
+import { SlotPickerModal, SlotBadge } from "@/components/delivery/SlotPicker";
 import { ReconcileLineModal } from "@/pages/console/Deliveries";
 
 /** Build a printable route-sheet PDF for a rider's day: list of orders with addresses, phones, amounts. */
@@ -172,6 +173,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
   const [suggestions, setSuggestions] = useState(null);
   const [locations, setLocations] = useState([]);
   const [reconcileOrder, setReconcileOrder] = useState(null);
+  const [pickSlot, setPickSlot] = useState(false);
   const sid = session.id;
   const dayDate = session.date || new Date().toISOString().slice(0, 10);
   const ready = orders.filter(o => o.mode === "delivery" && (o.status === "prete" || o.status === "confirmee") && !o.rider_id && (!o.rescheduled_for || o.rescheduled_for <= dayDate));
@@ -183,13 +185,19 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
     load(); const t = setInterval(load, 15000); return () => clearInterval(t);
   }, [tab]);
 
-  const addSelectedToSession = async () => {
+  const addSelectedToSession = () => {
     if (!selected.length) return toast.error("Sélectionnez des commandes");
+    setPickSlot(true);
+  };
+  const doAddSelected = async (slotId) => {
+    setPickSlot(false);
     try {
-      for (const oid of selected) await api.patch(`/delivery-sessions/${sid}/add-order`, { order_id: oid });
+      let warning = null;
+      for (const oid of selected) { const r = await api.patch(`/delivery-sessions/${sid}/add-order`, { order_id: oid, slot_id: slotId }); warning = r.data?.warning || warning; }
       toast.success(`${selected.length} commande(s) affectée(s) à ${session.rider_name}`);
+      if (warning) toast.warning(warning);
       setSelected([]); setAssignTo(null); onReload();
-    } catch { toast.error("Erreur affectation"); }
+    } catch (e) { toast.error(e.response?.data?.detail || "Erreur affectation"); }
   };
 
   const askSuggestion = async () => {
@@ -232,6 +240,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
           <b>{missing.length} livraison(s) non versée(s)</b> : {missing.map(o => o.code).join(", ")} — marquez-les « Versé » dans Réconciliation pour pouvoir clôturer.
         </button>
       )}
+      {pickSlot && <SlotPickerModal riderId={session.rider_id} riderName={session.rider_name} count={selected.length} onCancel={() => setPickSlot(false)} onConfirm={doAddSelected}/>}
       {reconcileOrder && <ReconcileLineModal session={session} order={reconcileOrder} onClose={() => setReconcileOrder(null)} onDone={() => { setReconcileOrder(null); onReload(); }}/>}
 
       <div className="flex gap-1 border-b border-[#ececec] dark:border-[#2a2a2a] overflow-x-auto">
@@ -293,7 +302,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
                 <div className="space-y-1.5 max-h-[500px] overflow-y-auto">{assigned.map(o => (
                   <div key={o.id} className="flex items-center gap-2 p-2 border border-[#ececec] dark:border-[#2a2a2a] rounded-lg" data-testid={`assigned-${o.id}`}>
                     <OrderDayStatus order={o} small/>
-                    <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{o.code} · {o.customer?.name}</div><div className="text-xs text-[#666] truncate">{o.delivery_zone} · {fcfa(o.total)}</div></div>
+                    <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{o.code} · {o.customer?.name}</div><div className="text-xs text-[#666] truncate">{o.delivery_zone} · {fcfa(o.total)}</div><SlotBadge order={o}/></div>
                   </div>
                 ))}</div>
               }

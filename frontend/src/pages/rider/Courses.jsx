@@ -4,6 +4,7 @@ import { fcfa, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { Phone, MessageCircle, Navigation, ChevronRight, X, MapPin } from "lucide-react";
 import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
+import { SlotBadge } from "@/components/delivery/SlotPicker";
 
 const FILTERS = [
   { v: "all", label: "Toutes", k: null },
@@ -107,6 +108,7 @@ function OrderCard({ order, onOpen }) {
         <div className="font-semibold text-sm">{(order.customer?.name || "").split(" ")[0]} · {order.delivery_zone}</div>
         <div className="text-[11px] text-[#666] dark:text-[#999] truncate">{order.customer?.quartier || order.note || ""}</div>
         <div className="text-[11px] mt-0.5">{isCod ? <span className="text-[#c62828] font-semibold">COD {fcfa(order.total)}</span> : <span className="text-[#1f8a4c]">Déjà payé</span>}</div>
+        <SlotBadge order={order}/>
       </div>
       <div className="flex flex-col items-end gap-1">
         <span className="dina-chip" style={{ color: statusColor[order.status] }}>{statusLabel[order.status]}</span>
@@ -145,7 +147,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end" onClick={onClose}>
       <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="sticky top-0 bg-white dark:bg-[#1a1a1a] p-4 border-b flex justify-between items-center">
-          <div><div className="font-serif text-lg">{order.code}</div><div className="text-xs text-[#666]">{order.customer?.name} · {order.delivery_zone}</div></div>
+          <div><div className="font-serif text-lg">{order.code}</div><div className="text-xs text-[#666]">{order.customer?.name} · {order.delivery_zone}</div><SlotBadge order={order}/></div>
           <button onClick={onClose}><X size={18} /></button>
         </div>
         <div className="p-4 space-y-3">

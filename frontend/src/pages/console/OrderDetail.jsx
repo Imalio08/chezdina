@@ -5,6 +5,7 @@ import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Download, Printer, MessageCircle, FileText, User, Truck, MapPin, Clock, Send, Eye } from "lucide-react";
 import { InvoicePreviewModal, buildInvoicePreview, shareInvoiceOnWhatsApp } from "@/components/shared/InvoicePreviewModal";
+import { SlotBadge } from "@/components/delivery/SlotPicker";
 import SmartImage from "@/components/shared/SmartImage";
 import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 
@@ -89,6 +90,7 @@ export default function OrderDetail() {
           {order.delivery_zone && <div className="text-xs text-[#666] flex items-center gap-1 mt-1"><MapPin size={11}/>{order.delivery_zone}</div>}
           {order.delivery_address && <div className="text-xs text-[#666] mt-0.5">{order.delivery_address}</div>}
           {order.rider_id && <button onClick={() => nav(`/console/livreurs/${order.rider_id}`)} className="text-xs text-[#5867fd] mt-1 hover:underline">Livreur : {order.rider_name || "—"} →</button>}
+          {order.delivery_slot && <div className="mt-1"><SlotBadge order={order}/></div>}
           {order.delivery_date && <div className="text-xs text-[#666] flex items-center gap-1 mt-1"><Clock size={11}/>{order.delivery_date} · {order.delivery_slot || ""}</div>}
         </InfoCard>
 

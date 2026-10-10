@@ -192,6 +192,72 @@ async def deliveries(user: dict = Depends(get_user)):
     return clean(await db.orders.find(f).sort("created_at", -1).to_list(500))
 
 
+SLOT_ACTIVE = ["confirmee", "prete", "assignee", "en_livraison"]
+
+
+async def _slot_usage(rid: str) -> Dict[str, int]:
+    rows = await db.orders.find({"rider_id": rid, "status": {"$in": SLOT_ACTIVE}, "delivery_slot.id": {"$exists": True}}, {"delivery_slot": 1}).to_list(2000)
+    usage: Dict[str, int] = {}
+    for o in rows:
+        k = o["delivery_slot"]["id"]
+        usage[k] = usage.get(k, 0) + 1
+    return usage
+
+
+async def _apply_slot(oid: str, rid: str, slot_id: Optional[str]) -> Dict[str, Any]:
+    if not slot_id:
+        await db.orders.update_one({"id": oid}, {"$unset": {"delivery_slot": ""}})
+        return {}
+    rider = await db.users.find_one({"id": rid})
+    slot = next((s for s in (rider or {}).get("delivery_slots", []) if s["id"] == slot_id), None)
+    if not slot:
+        raise HTTPException(400, "Créneau introuvable pour ce livreur")
+    cur = await db.orders.find_one({"id": oid}, {"delivery_slot": 1})
+    used = (await _slot_usage(rid)).get(slot_id, 0)
+    if (cur or {}).get("delivery_slot", {}).get("id") == slot_id:
+        used -= 1
+    await db.orders.update_one({"id": oid}, {"$set": {"delivery_slot": {k: slot[k] for k in ("id", "label", "start", "end")}}})
+    cap = int(slot.get("capacity") or 0)
+    if cap and used >= cap:
+        return {"slot_full": True, "warning": f"Créneau « {slot['label']} » complet ({used + 1}/{cap})"}
+    return {"slot_full": False}
+
+
+@router.get("/riders/{rid}/slots")
+async def get_rider_slots(rid: str, user: dict = Depends(get_user)):
+    u = await db.users.find_one({"id": rid})
+    if not u:
+        raise HTTPException(404, "Livreur introuvable")
+    usage = await _slot_usage(rid)
+    slots = sorted(u.get("delivery_slots", []), key=lambda s: s.get("start", ""))
+    return [{**s, "used": usage.get(s["id"], 0)} for s in slots]
+
+
+@router.put("/riders/{rid}/slots")
+async def put_rider_slots(rid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin", "manager"))):
+    u = await db.users.find_one({"id": rid})
+    if not u:
+        raise HTTPException(404, "Livreur introuvable")
+    out = []
+    for s in body.get("slots", []):
+        label = (s.get("label") or "").strip()
+        start, end = s.get("start") or "", s.get("end") or ""
+        try:
+            datetime.strptime(start, "%H:%M"); datetime.strptime(end, "%H:%M")
+        except ValueError:
+            raise HTTPException(400, "Heures invalides (HH:MM)")
+        if not label:
+            raise HTTPException(400, "Nom du créneau requis")
+        if start >= end:
+            raise HTTPException(400, f"« {label} » : l'heure de fin doit être après le début")
+        cap = int(s.get("capacity") or 0)
+        if cap < 1:
+            raise HTTPException(400, f"« {label} » : capacité minimale 1")
+        out.append({"id": s.get("id") or new_id(), "label": label, "start": start, "end": end, "capacity": cap})
+    await db.users.update_one({"id": rid}, {"$set": {"delivery_slots": out}})
+    return out
+
+
 @router.patch("/deliveries/{oid}/assign")
 async def assign_delivery(oid: str, body: AssignIn, user: dict = Depends(require_role("admin", "manager"))):
     o = await db.orders.find_one({"id": oid})
@@ -200,7 +266,8 @@ async def assign_delivery(oid: str, body: AssignIn, user: dict = Depends(require
     tl = o.get("timeline", [])
     tl.append({"status": "assignee", "at": now_iso(), "by": user.get("name"), "note": f"→ {body.rider_name}"})
     await db.orders.update_one({"id": oid}, {"$set": {"rider_id": body.rider_id, "rider_name": body.rider_name, "status": "assignee", "timeline": tl}})
-    return {"ok": True}
+    res = await _apply_slot(oid, body.rider_id, body.slot_id) if body.slot_id else {}
+    return {"ok": True, **res}
 
 
 @router.post("/deliveries/suggest-split")
@@ -296,7 +363,8 @@ async def session_add_order(sid: str, body: Dict[str, Any], user: dict = Depends
         orders.append(oid)
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"orders": orders}})
     await db.orders.update_one({"id": oid}, {"$set": {"rider_id": s["rider_id"], "rider_name": s["rider_name"], "status": "assignee", "session_id": sid}})
-    return {"ok": True}
+    res = await _apply_slot(oid, s["rider_id"], body.get("slot_id")) if "slot_id" in body else {}
+    return {"ok": True, **res}
 
 
 @router.patch("/delivery-sessions/{sid}/reconcile")

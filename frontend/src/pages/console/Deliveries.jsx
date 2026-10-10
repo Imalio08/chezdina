@@ -6,9 +6,13 @@ import { Plus, Check, X, Pencil, Trash2, Printer, Map, Shield, GripVertical, Clo
 import { Link } from "react-router-dom";
 import LeafletMap from "@/components/shared/LeafletMap";
 import { VersementCell, missingVersements, OrderDayStatus } from "@/components/delivery/VersementCell";
+import { SlotPickerModal, SlotBadge } from "@/components/delivery/SlotPicker";
+import { useSearchParams } from "react-router-dom";
 
 export default function Deliveries() {
-  const [tab, setTab] = useState("board");
+  const [sp] = useSearchParams();
+  const [tab, setTab] = useState(sp.get("tab") || "board");
+  const [pendingDrop, setPendingDrop] = useState(null);
   const [orders, setOrders] = useState([]);
   const [riders, setRiders] = useState([]);
   const [sessions, setSessions] = useState([]);
@@ -38,9 +42,12 @@ export default function Deliveries() {
     try { await api.post("/delivery-sessions", { rider_id: r.id, rider_name: r.name }); toast.success(`Journée ouverte pour ${r.name}`); load(); }
     catch { toast.error("Erreur"); }
   };
-  const addToSession = async (sid, oid) => {
-    try { await api.patch(`/delivery-sessions/${sid}/add-order`, { order_id: oid }); toast.success("Commande affectée"); load(); }
-    catch { toast.error("Erreur affectation"); }
+  const addToSession = async (sid, oid, slotId) => {
+    try {
+      const r = await api.patch(`/delivery-sessions/${sid}/add-order`, { order_id: oid, slot_id: slotId });
+      if (r.data?.warning) toast.warning(r.data.warning); else toast.success("Commande affectée");
+      load();
+    } catch (e) { toast.error(e.response?.data?.detail || "Erreur affectation"); }
   };
   const closeSession = async (sid) => {
     if (!confirm("Clôturer la journée ?")) return;
@@ -57,12 +64,14 @@ export default function Deliveries() {
   const onDropToSession = (sid) => (e) => {
     e.preventDefault();
     if (!dragId) return;
-    addToSession(sid, dragId); setDragId(null);
+    const s = sessions.find(x => x.id === sid);
+    setPendingDrop({ sid, oid: dragId, riderId: s?.rider_id, riderName: s?.rider_name }); setDragId(null);
   };
   const allowDrop = (e) => e.preventDefault();
 
   return (
     <div className="space-y-5">
+      {pendingDrop && <SlotPickerModal riderId={pendingDrop.riderId} riderName={pendingDrop.riderName} onCancel={() => setPendingDrop(null)} onConfirm={(slotId) => { const p = pendingDrop; setPendingDrop(null); addToSession(p.sid, p.oid, slotId); }}/>}
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Livraisons</h1><p className="text-sm text-[#666]">Journées livreurs, réconciliation, performance</p></div>
         <div className="flex gap-2">
@@ -147,6 +156,7 @@ export default function Deliveries() {
                             <div className="flex justify-between"><div className="font-semibold">{o.code}</div><OrderDayStatus order={o} small/></div>
                             <div className="text-[11px] text-[#666] truncate">{o.customer?.name}</div>
                             <div className="text-[11px] text-[#666] truncate">{o.delivery_zone}</div>
+                            <SlotBadge order={o}/>
                             <div className="text-[10px] tabular mt-0.5">{o.payment_method === "cod" ? <span className={o.postponed_to ? "line-through text-[#999]" : "text-[#c62828] font-semibold"}>COD {fcfa(o.total)}</span> : <span className="text-[#1f8a4c]">Payé</span>}</div>
                           </div>
                         ))}

@@ -745,7 +745,7 @@ async def deliver_order(oid: str, body: ProofIn, user: dict = Depends(get_user))
             upd = {"delivery_code_attempts": attempts}
             if attempts >= 3:
                 upd["delivery_locked"] = True
-                await db.notifications.insert_one({"id": new_id(), "kind":"alert", "title": f"Commande {o.get('code')} verrouillée - 3 codes erronés", "created_at": now_iso(), "read": False})
+                await db.notifications.insert_one({"id": new_id(), "type": "alert", "title": f"Commande {o.get('code')} verrouillée - 3 codes erronés", "msg": o.get("rider_name") or "", "color": "#c62828", "at": now_iso(), "link": f"/console/commandes/{o.get('code')}"})
             await db.orders.update_one({"id": oid}, {"$set": upd})
             raise HTTPException(401, f"Code invalide ({attempts}/3)")
         proof["code_verified"] = True
@@ -2804,7 +2804,7 @@ async def notifications(user: dict = Depends(get_user)):
             "title": "Nouvelle commande",
             "msg": f"{o.get('code','?')} · {o.get('customer',{}).get('name','?')} · {int(o.get('total',0))} FCFA",
             "at": o.get("created_at"),
-            "link": "/console/commandes",
+            "link": f"/console/commandes/{o.get('code')}",
             "color": "#1f8a4c",
         })
     low_products = await db.products.find({"stock": {"$lt": 5}}).sort("stock", 1).to_list(10)
@@ -2815,7 +2815,7 @@ async def notifications(user: dict = Depends(get_user)):
             "title": "Stock faible",
             "msg": f"{p['name']} · {p['stock']} restant(s)",
             "at": now_iso(),
-            "link": "/console/stock",
+            "link": f"/console/produits/{p['id']}",
             "color": "#e4991e",
         })
     pending_reviews = await db.reviews.find({"status": "pending"}).sort("created_at", -1).to_list(10)
@@ -2826,7 +2826,7 @@ async def notifications(user: dict = Depends(get_user)):
             "title": "Avis à modérer",
             "msg": f"{r.get('rating',0)}★ · {(r.get('comment') or '')[:60]}",
             "at": r.get("created_at"),
-            "link": "/console/avis",
+            "link": f"/console/avis?focus={r['id']}",
             "color": "#b02a2a",
         })
     pending_alerts = await db.stock_alerts.find({"notified": False}).sort("created_at", -1).to_list(10)
@@ -2839,20 +2839,25 @@ async def notifications(user: dict = Depends(get_user)):
             "title": "Alerte retour en stock",
             "msg": f"{pname} · taille {a.get('size','?')} · {a.get('phone','')}",
             "at": a.get("created_at"),
-            "link": "/console/alertes",
+            "link": f"/console/produits/{a.get('product_id')}" if p else "/console/alertes",
             "color": "#e4991e",
         })
     carts = await db.abandoned_carts.find({"recovered": False}).sort("created_at", -1).to_list(5)
     for c in carts:
+        cust = await db.customers.find_one({"phone": c.get("phone")}, {"id": 1}) if c.get("phone") else None
         items.append({
             "id": f"cart-{c['id']}",
             "type": "cart",
             "title": "Panier abandonné",
             "msg": f"{c.get('phone','?')} · {int(c.get('total',0))} FCFA",
             "at": c.get("created_at"),
-            "link": "/console/alertes",
+            "link": f"/console/clients/{cust['id']}" if cust else "/console/paniers-abandonnes",
             "color": "#c62828",
         })
+    stored = await db.notifications.find({"$or": [{"target_user_id": {"$exists": False}}, {"target_user_id": None}, {"target_user_id": user.get("id")}]}).sort("at", -1).to_list(15)
+    for n in stored:
+        items.append({"id": f"db-{n['id']}", "type": n.get("type") or n.get("kind") or "info", "title": n.get("title", "Notification"),
+                      "msg": n.get("msg", ""), "at": n.get("at") or n.get("created_at"), "link": n.get("link"), "color": n.get("color", "#5867fd")})
     items.sort(key=lambda x: x.get("at") or "", reverse=True)
     return items[:30]
 
@@ -5068,7 +5073,7 @@ async def create_approval(body: Dict[str,Any], user: dict = Depends(get_user)):
            "payload": body.get("payload") or {}, "reason": body.get("reason",""), "status":"pending",
            "created_at": now_iso(), "decision_at": None, "decision_by": None, "decision_note": None}
     await db.approval_requests.insert_one(doc)
-    await db.notifications.insert_one({"id":new_id(),"type":"approval","title":f"Demande d'approbation · {body.get('kind')}","msg":f"{user.get('name')} · {body.get('reason','')[:60]}","color":"#e4991e","at":now_iso(),"link":"/console/roles?tab=approvals"})
+    await db.notifications.insert_one({"id":new_id(),"type":"approval","title":f"Demande d'approbation · {body.get('kind')}","msg":f"{user.get('name')} · {body.get('reason','')[:60]}","color":"#e4991e","at":now_iso(),"link":f"/console/approbations?focus={doc['id']}"})
     return clean(doc)
 
 @api.get("/approval-requests")
@@ -5095,7 +5100,7 @@ async def create_expense_request(body: Dict[str,Any], user: dict = Depends(get_u
            "receipt": body.get("receipt"), "requested_by_name": user.get("name"), "requested_by_id": user.get("id"),
            "status":"pending", "created_at": now_iso()}
     await db.expense_requests.insert_one(doc)
-    await db.notifications.insert_one({"id":new_id(),"type":"expense_request","title":"Demande de dépense","msg":f"{user.get('name')} · {body.get('label')} · {int(body.get('amount',0))} FCFA","color":"#e4991e","at":now_iso(),"link":"/console/depenses"})
+    await db.notifications.insert_one({"id":new_id(),"type":"expense_request","title":"Demande de dépense","msg":f"{user.get('name')} · {body.get('label')} · {int(body.get('amount',0))} FCFA","color":"#e4991e","at":now_iso(),"link":f"/console/approbations?focus={doc['id']}"})
     return clean(doc)
 
 @api.get("/expense-requests")
@@ -5138,7 +5143,7 @@ async def declare_handover(sid: str, body: Dict[str,Any], user: dict = Depends(g
         "handover_amount": int(body.get("amount",0)), "handover_at": now_iso(), "handover_by": user.get("name"),
         "handover_note": body.get("note",""), "status": "pending_validation"
     }})
-    await db.notifications.insert_one({"id":new_id(),"type":"handover","title":"Versement en attente","msg":f"{user.get('name')} a déposé {int(body.get('amount',0))} FCFA","color":"#5867fd","at":now_iso(),"link":"/console/sessions-caisse"})
+    await db.notifications.insert_one({"id":new_id(),"type":"handover","title":"Versement en attente","msg":f"{user.get('name')} a déposé {int(body.get('amount',0))} FCFA","color":"#5867fd","at":now_iso(),"link":f"/console/sessions-caisse?focus={sid}"})
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.declare_handover","entity_id":sid,"after":{"amount":body.get("amount")},"at":now_iso()})
     return {"ok": True}
 
@@ -5181,7 +5186,7 @@ async def reject_handover(sid: str, body: Dict[str,Any], user: dict = Depends(re
         "title": "Versement rejeté",
         "msg": f"{user.get('name')} a rejeté votre versement : {reason}",
         "color": "#c62828", "at": now_iso(),
-        "link": "/console/sessions-caisse",
+        "link": f"/console/sessions-caisse?focus={sid}",
         "target_user_id": s.get("opened_by_id"),
     })
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.reject_handover","entity_id":sid,"after":{"reason":reason},"at":now_iso()})

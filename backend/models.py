@@ -179,6 +179,7 @@ class HoldIn(BaseModel):
 class AssignIn(BaseModel):
     rider_id: str
     rider_name: str
+    slot_id: Optional[str] = None
 
 
 class SessionIn(BaseModel):
