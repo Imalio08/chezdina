@@ -1025,6 +1025,11 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Sons WebAudio (lib/notifySound.js) : console (nouvelle notification, réponse cliente/livreur, nouvelle commande) + interrupteur sound-toggle ; app livreur (nouvelle course, message boutique) + toast, réglage Profil. /orders-messages/unread gère le rôle livreur.
 - Testé : iteration_63 (backend 5/5, frontend 100%) ; lecture audio réelle non vérifiable en navigateur automatisé.
 
+## 2026-10-10 — Bug PWA livreur (écran d'accueil ouvrait /boutique)
+- BrandingBootstrapper devient l'unique propriétaire du manifest, selon la route : /rider… (et /login si l'appareil est un appareil livreur, localStorage dina_app) → manifest-rider (start_url /rider, id /rider) ; sinon manifest boutique (id /boutique). Titre/icône Apple « Livreur » sur les pages livreur. Suppression du swap concurrent dans RiderShell.
+- Testé : iteration_64 (100%). Nécessite un redéploiement pour la production.
+
+
 
 
 

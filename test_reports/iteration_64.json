@@ -1,0 +1,32 @@
+{
+  "summary": "Verified PWA manifest fix (BrandingBootstrapper owns manifest, swaps per route). All 6 scenarios from the bug report pass end-to-end on preview URL at mobile viewport 390x844.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "tests_executed": [
+    "GET /api/public/manifest-rider.webmanifest -> start_url=/rider, id=/rider, name='Chez Dina — Livreur' OK",
+    "GET /api/public/manifest.webmanifest -> start_url=/boutique, id=/boutique OK",
+    "Logged-out visit /rider -> redirected to /login, manifest href ends with manifest-rider.webmanifest, localStorage dina_app='rider' OK",
+    "Login rider1@dinastore.ci / Rider123! (pointer unchecked), /rider: single <link rel=manifest> pointing to manifest-rider.webmanifest; apple-mobile-web-app-title='Chez Dina Livreur'; document.title='Chez Dina Livreur'; fetched manifest start_url=/rider id=/rider OK",
+    "After 10s wait and navigation to /rider/carte and /rider/profil, manifest href stays manifest-rider.webmanifest OK",
+    "Visit /boutique (as logged-in rider) -> href switches to manifest.webmanifest, dina_app='store' OK",
+    "Logged in as admin aouattaraesca@gmail.com / Admin123!, visit /console -> uses manifest.webmanifest, dina_app='store' OK",
+    "Admin /boutique also uses manifest.webmanifest OK"
+  ],
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [
+    "Pre-existing (unrelated to this fix): hydration warning on /console Dashboard — <span> is a child of <option> inside PeriodSelector.jsx (preview tooling injects data-* attribute span wrapper into static options). Benign hydration warning but noisy in prod console.",
+    "BrandingBootstrapper.jsx isRiderPath uses localStorage.getItem('dina_app') synchronously, which is fine for /login; good design. Note: the second useEffect that writes dina_app runs on the same render as the rider computation (which is derived at render time from current localStorage before the write). This is correct because 'rider' value depends on the pathname check first; still, consider deriving rider inside the manifest-update effect for clarity."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "test_credentials": "rider1@dinastore.ci / Rider123!; admin aouattaraesca@gmail.com / Admin123!",
+  "seed_data_creation": "None",
+  "retest_needed": false,
+  "main_agent_can_self_test": true,
+  "context_for_next_testing_agent": "PWA manifest swap bug (iteration 64) verified fixed. BrandingBootstrapper is sole owner of <link rel=manifest>, with route-based swap: /rider* OR (/login + localStorage.dina_app==='rider') -> rider manifest; /boutique and /console (and others) -> boutique manifest. Rider sub-pages tested: /rider, /rider/carte, /rider/profil. apple-mobile-web-app-title and document.title correctly include 'Livreur' on rider routes."
+}
