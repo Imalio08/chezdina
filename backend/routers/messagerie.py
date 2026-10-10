@@ -103,7 +103,7 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
 async def close_rider_customer_convs(order_id: str) -> None:
     """Auto-close customer↔rider convos when order becomes 'livree'."""
     await db.conversations.update_many(
-        {"order_id": order_id, "kind": "cliente_livreur"},
+        {"order_id": order_id, "kind": {"$in": ["cliente_livreur", "livreur_cliente"]}},
         {"$set": {"closed": True, "closed_at": now_iso()}},
     )
 
@@ -131,23 +131,9 @@ async def account_open_rider_thread(order_code: str, c: dict = Depends(get_custo
     o = await db.orders.find_one({"code": order_code, "customer.id": c["id"]})
     if not o:
         raise HTTPException(404, "Commande introuvable")
-    rid = o.get("rider_id")
-    if not rid:
+    if not o.get("rider_id"):
         raise HTTPException(400, "Pas de livreur assigné")
-    key = f"c:{c['id']}|r:{rid}"
-    existing = await db.conversations.find_one({"key": key})
-    if existing:
-        return {"id": existing["id"]}
-    r = await db.users.find_one({"id": rid}, {"password_hash": 0, "pin_hash": 0})
-    conv = {
-        "id": new_id(), "key": key, "kind": "cliente_livreur", "order_id": o["id"], "closed": False,
-        "participants": [
-            {"kind": "customer", "id": c["id"], "name": c.get("name")},
-            {"kind": "rider",    "id": rid,     "name": r.get("name") if r else "Livreur"},
-        ],
-        "messages": [], "created_at": now_iso(), "updated_at": now_iso(),
-    }
-    await db.conversations.insert_one(conv)
+    conv = await _order_thread(o, "rider_customer")
     return {"id": conv["id"]}
 
 
@@ -385,6 +371,8 @@ async def send_order_thread(oid: str, party: str, body: Dict[str, Any], user: di
     atts = _image_attachments(body.get("attachments"))
     if not text and not atts:
         raise HTTPException(400, "Message vide")
+    if party == "rider_customer" and user.get("role") != "rider":
+        raise HTTPException(403, "Échange livreur ↔ cliente en lecture seule")
     conv = await _order_thread(await _order_for(oid, party, user), party)
     if conv.get("closed"):
         raise HTTPException(400, "Conversation fermée")

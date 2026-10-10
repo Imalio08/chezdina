@@ -38,7 +38,7 @@ export function PhotoButton({ onPick, disabled, testid }) {
 }
 
 // Order-scoped thread shared by the whole team. party: "customer" | "rider"; me: "store" | "rider"
-export default function OrderThread({ orderId, party, me = "store", quickReplies = [], onSent, height = "max-h-72" }) {
+export default function OrderThread({ orderId, party, me = "store", quickReplies = [], onSent, height = "max-h-72", readOnly = false }) {
   const [conv, setConv] = useState(null);
   const [error, setError] = useState(null);
   const [text, setText] = useState("");
@@ -70,7 +70,8 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
 
   if (error) return <div className="text-xs text-[#999] py-6 text-center" data-testid={`thread-error-${party}`}>{error}</div>;
   if (!conv) return <div className="text-xs text-[#999] py-6 text-center">Chargement…</div>;
-  const mine = (m) => me === "rider" ? m.from_kind === "rider" : m.from_kind === "store";
+  const mine = (m) => (me === "rider" || readOnly) ? m.from_kind === "rider" : m.from_kind === "store";
+  const who = (m) => readOnly ? ({ rider: "Livreur", customer: "Cliente" }[m.from_kind] || "Boutique") + " · " : "";
 
   return (
     <div data-testid={`order-thread-${party}`}>
@@ -82,11 +83,12 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
             <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${mine(m) ? "bg-[#b02a2a] text-white" : "bg-white dark:bg-[#1f1f1f] border border-[#ececec] dark:border-[#2a2a2a]"}`}>
               <MessagePhotos m={m} onOpen={setZoom}/>
               {m.text && <div className="whitespace-pre-wrap break-words">{m.text}</div>}
-              <div className={`text-[9px] mt-1 ${mine(m) ? "text-white/70" : "text-[#999]"}`}>{m.from_name} · {dateTimeFmt(m.at)}</div>
+              <div className={`text-[9px] mt-1 ${mine(m) ? "text-white/70" : "text-[#999]"}`}>{who(m)}{m.from_name} · {dateTimeFmt(m.at)}</div>
             </div>
           </div>
         ))}
       </div>
+      {readOnly ? <div className="text-[10px] text-[#999]" data-testid={`thread-readonly-${party}`}>Lecture seule · échange direct entre le livreur et la cliente.</div> : <>
       {quickReplies.length > 0 && (
         <div className="flex gap-1.5 overflow-x-auto scrollbar-thin pb-2 mb-1">
           {quickReplies.map((q, i) => <button key={i} onClick={() => send(q)} disabled={sending} className="shrink-0 text-[11px] px-2.5 py-1 rounded-full border border-[#ececec] dark:border-[#2a2a2a] hover:border-[#b02a2a] hover:text-[#b02a2a] transition-colors" data-testid={`quick-reply-${party}-${i}`}>{q}</button>)}
@@ -103,6 +105,7 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
         <input className="dina-input flex-1" placeholder={photo ? "Légende (facultative)…" : "Votre message…"} value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} data-testid="od-msg-input"/>
         <button onClick={() => send()} disabled={sending || (!text.trim() && !photo)} className="dina-btn-primary !min-h-[36px]" data-testid="od-msg-send"><Send size={13}/>{sending ? "…" : "Envoyer"}</button>
       </div>
+      </>}
     </div>
   );
 }

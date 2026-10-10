@@ -1058,3 +1058,10 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 
 
 
+
+## 2026-10-10 — Onglet « Livreur ↔ Cliente » (fiche commande)
+- Fiche commande console › Messages : 3e onglet « Livreur ↔ Cliente » (lecture seule, tout le personnel, ne modifie pas les non-lus livreur/cliente).
+- Backend : POST /orders/{id}/thread/rider_customer/send refusé (403) pour le personnel ; le bouton chat cliente (Mon compte) ouvre désormais le même fil commande que le livreur (avant : 2 conversations séparées) ; fermeture auto à la livraison couvre les deux types.
+- Testé : curl (envoi livreur, lecture admin, 403 admin) + capture desktop.
+- Constaté (non corrigé) : console en largeur mobile (390 px) — contenu principal décalé de 260 px, à traiter.
+

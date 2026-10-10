@@ -170,8 +170,9 @@ function OrderMessages({ order }) {
       <div className="flex gap-1 border-b border-[#ececec] dark:border-[#2a2a2a] mb-3">
         <button onClick={() => setTab("customer")} className={`px-3 py-1.5 text-xs border-b-2 ${tab === "customer" ? "border-[#b02a2a] text-[#b02a2a] font-semibold" : "border-transparent text-[#666]"}`} data-testid="od-msg-tab-customer">Cliente {order.customer?.name ? `· ${order.customer.name}` : ""}</button>
         <button onClick={() => setTab("rider")} className={`px-3 py-1.5 text-xs border-b-2 ${tab === "rider" ? "border-[#b02a2a] text-[#b02a2a] font-semibold" : "border-transparent text-[#666]"}`} data-testid="od-msg-tab-rider">Livreur {order.rider_name ? `· ${order.rider_name}` : ""}</button>
+        <button onClick={() => setTab("rider_customer")} className={`px-3 py-1.5 text-xs border-b-2 ${tab === "rider_customer" ? "border-[#b02a2a] text-[#b02a2a] font-semibold" : "border-transparent text-[#666]"}`} data-testid="od-msg-tab-rider-customer">Livreur ↔ Cliente</button>
       </div>
-      <OrderThread orderId={order.id} party={tab} quickReplies={replies} onSent={setLast}/>
+      <OrderThread orderId={order.id} party={tab} quickReplies={tab === "rider_customer" ? [] : replies} onSent={setLast} readOnly={tab === "rider_customer"}/>
       {tab === "customer" && <div className="text-[10px] text-[#999] mt-2">La cliente lit et répond depuis « Mon compte › Messages » sur la boutique. Sans compte, utilisez WhatsApp.</div>}
     </div>
   );
