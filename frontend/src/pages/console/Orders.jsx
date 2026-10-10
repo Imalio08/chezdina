@@ -16,9 +16,16 @@ export default function Orders() {
   const [filter, setFilter] = useState("");
   const [selected, setSelected] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [unread, setUnread] = useState({});
 
   const load = async () => { try { const r = await api.get("/orders"); setOrders(r.data || []); } catch { toast.error("Erreur"); } };
-  useEffect(() => { load(); }, []);
+  const loadUnread = () => api.get("/orders-messages/unread").then(r => setUnread(r.data?.by_order || {})).catch(() => {});
+  useEffect(() => {
+    load(); loadUnread();
+    const t = setInterval(loadUnread, 20000);
+    window.addEventListener("dina:unread-refresh", loadUnread);
+    return () => { clearInterval(t); window.removeEventListener("dina:unread-refresh", loadUnread); };
+  }, []);
 
   const changeStatus = async (id, status) => {
     let payload = { status };
@@ -43,7 +50,8 @@ export default function Orders() {
     if (selected) setSelected({...selected, status: payload.status});
   };
 
-  const filtered = orders.filter(o => !filter || o.status===filter);
+  const filtered = orders.filter(o => !filter || (filter === "unread" ? unread[o.code] > 0 : o.status === filter));
+  const unreadCount = orders.filter(o => unread[o.code] > 0).length;
   const counts = useMemo(() => {
     const by = (fn) => orders.filter(fn).length;
     const total = orders.length || 1;
@@ -105,6 +113,7 @@ export default function Orders() {
 
       <div className="flex gap-2 flex-wrap">
         <button onClick={()=>setFilter("")} className={`dina-chip ${!filter?"!bg-[#1c1c1c] !text-white":""}`}>Tout ({orders.length})</button>
+        <button onClick={()=>setFilter("unread")} className={`dina-chip ${filter==="unread"?"!bg-[#e53935] !text-white !border-[#e53935]":"!text-[#e53935]"}`} data-testid="orders-filter-unread"><span className="w-2 h-2 rounded-full bg-[#e53935]"/>Messages non lus ({unreadCount})</button>
         {STATUSES.map(s=><button key={s} onClick={()=>setFilter(s)} className={`dina-chip ${filter===s?"!bg-[#1c1c1c] !text-white":""}`} data-testid={`orders-filter-${s}`}><span className="status-dot" style={{background:statusColor[s]}}/>{statusLabel[s]} ({orders.filter(o=>o.status===s).length})</button>)}
       </div>
 
@@ -114,7 +123,7 @@ export default function Orders() {
           <tbody>{filtered.length === 0 ? <tr><td colSpan={8} className="text-sm text-[#666] text-center py-8">Aucune commande pour ce filtre</td></tr>
           : filtered.slice(0,200).map(o=>(
             <tr key={o.id} className="hover:bg-[#fafafa] dark:hover:bg-[#141414]" data-testid={`order-row-${o.code}`}>
-              <td className="font-medium cursor-pointer hover:text-[#b02a2a]" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.code}</td>
+              <td className="font-medium cursor-pointer hover:text-[#b02a2a]" onClick={()=>nav(`/console/commandes/${o.code}`)}><span className="inline-flex items-center gap-1.5">{o.code}<UnreadDot n={unread[o.code]} code={o.code}/></span></td>
               <td className="text-[#666] cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{dateTimeFmt(o.created_at)}</td>
               <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.customer?.name||"—"}</td>
               <td className="capitalize cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.channel}</td>
@@ -138,7 +147,7 @@ export default function Orders() {
               <div className="font-semibold text-xs uppercase mb-2" style={{color:statusColor[s]}}>{statusLabel[s]} ({orders.filter(o=>o.status===s).length})</div>
               <div className="space-y-2">{orders.filter(o=>o.status===s).slice(0,10).map(o=>(
                 <div key={o.id} onClick={()=>nav(`/console/commandes/${o.code}`)} className="bg-white rounded-lg border border-[#ececec] p-2 cursor-pointer hover:border-[#b02a2a]">
-                  <div className="text-xs font-medium">{o.code}</div>
+                  <div className="text-xs font-medium flex items-center gap-1.5">{o.code}<UnreadDot n={unread[o.code]} code={o.code}/></div>
                   <div className="text-xs text-[#666]">{o.customer?.name||"—"}</div>
                   <div className="tabular text-sm font-semibold">{fcfa(o.total)}</div>
                 </div>
@@ -153,6 +162,12 @@ export default function Orders() {
     </div>
   );
 }
+
+function UnreadDot({ n, code }) {
+  if (!n) return null;
+  return <span className="relative inline-flex w-2.5 h-2.5" title={`${n} message(s) non lu(s)`} data-testid={`order-unread-${code}`}><span className="absolute inset-0 rounded-full bg-[#e53935] opacity-60 animate-ping"/><span className="relative w-2.5 h-2.5 rounded-full bg-[#e53935]"/></span>;
+}
+
 
 function KpiMini({ label, value, color, onClick, active, compact, testid }) {
   const Tag = onClick ? "button" : "div";

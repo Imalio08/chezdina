@@ -1016,6 +1016,11 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Sessions de caisse : rafraîchissement 10 s + KPI Sessions visible.
 - Testé : iteration_62 (backend 15/15, frontend 100%).
 
+## 2026-10-10 — Points non lus par commande
+- Liste Commandes (table + kanban) : point rouge pulsé à côté du code si messages non lus (survol = nombre), rafraîchi 20 s ; filtre « Messages non lus (n) ». Disparaît après ouverture de la fiche.
+- Vérifié par capture (point, filtre, effacement).
+
+
 
 
 
