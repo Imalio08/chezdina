@@ -989,4 +989,10 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Icône œil (Commandes, tiroir, fiche commande) : aperçu PDF facture dans une fenêtre + Télécharger + WhatsApp (partage natif avec PDF joint si supporté, sinon téléchargement + wa.me).
 - Testé : iteration_58 (backend 7/7, frontend 100%). Données TEST_ nettoyées.
 
+## 2026-10-10 — Commandes reportées + Préparation Tableau/Kanban
+- Report avec date (console ou livreur via sélecteur) : reste dans la journée d'origine « Reportée au JJ/MM », exclue du « À collecter »/livrées/encaissé et de la clôture ; retirée du livreur (status confirmee, rescheduled_for) ; réapparaît à affecter seulement à partir de la date (DeliveryDays + Board d'affectation).
+- Préparation : vues Cartes / Tableau / Kanban (mémorisées), Kanban 4 colonnes avec glisser-déposer, dépôt sur « Prêtes » ouvre le scan obligatoire.
+- Testé : iteration_59 (backend 100%, frontend OK) ; 2 écarts du Board d'affectation corrigés ensuite. Données TEST_ nettoyées.
+
+
 

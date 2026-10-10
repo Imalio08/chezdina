@@ -48,7 +48,8 @@ export default function Deliveries() {
     catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
   };
 
-  const toShip = orders.filter(o => ["prete", "confirmee", "nouvelle"].includes(o.status) && !o.rider_id);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const toShip = orders.filter(o => ["prete", "confirmee", "nouvelle"].includes(o.status) && !o.rider_id && (!o.rescheduled_for || o.rescheduled_for <= todayIso));
   const openSessions = sessions.filter(s => !s.closed);
 
   // Drag & Drop handlers
@@ -143,10 +144,10 @@ export default function Deliveries() {
                         {items.length === 0 && <div className="text-[11px] text-[#999] text-center py-6 border-2 border-dashed border-[#ececec] dark:border-[#2a2a2a] rounded-lg">Glissez-déposez une commande ici</div>}
                         {items.map(o => (
                           <div key={o.id} className="border border-[#ececec] dark:border-[#2a2a2a] rounded-lg p-2 text-xs">
-                            <div className="flex justify-between"><div className="font-semibold">{o.code}</div><span className="dina-chip" style={{ color: statusColor[o.status], fontSize: 9 }}>{statusLabel[o.status]}</span></div>
+                            <div className="flex justify-between"><div className="font-semibold">{o.code}</div><OrderDayStatus order={o} small/></div>
                             <div className="text-[11px] text-[#666] truncate">{o.customer?.name}</div>
                             <div className="text-[11px] text-[#666] truncate">{o.delivery_zone}</div>
-                            <div className="text-[10px] tabular mt-0.5">{o.payment_method === "cod" ? <span className="text-[#c62828] font-semibold">COD {fcfa(o.total)}</span> : <span className="text-[#1f8a4c]">Payé</span>}</div>
+                            <div className="text-[10px] tabular mt-0.5">{o.payment_method === "cod" ? <span className={o.postponed_to ? "line-through text-[#999]" : "text-[#c62828] font-semibold"}>COD {fcfa(o.total)}</span> : <span className="text-[#1f8a4c]">Payé</span>}</div>
                           </div>
                         ))}
                       </div>
