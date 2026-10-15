@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { AlertTriangle, Receipt, Package, Truck, Clock, ShoppingCart, Star, Zap } from "lucide-react";
 
+const waitFmt = (m) => m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m/60)} h` : `${Math.floor(m/1440)} j`;
+
 const CARDS = [
   { key:"nouvelles", label:"À confirmer", icon:Receipt, color:"#e4991e", desc:"Nouvelles commandes en attente" },
   { key:"preparation", label:"À préparer", icon:Package, color:"#5867fd", desc:"Confirmées ou en préparation" },
@@ -36,7 +38,7 @@ export default function ActionItems() {
               data-testid={`action-${c.key}`}>
               <div className="flex items-center justify-between mb-1.5">
                 <div className="w-7 h-7 rounded-lg grid place-items-center shrink-0" style={{background:`${c.color}1a`,color:c.color}}><c.icon size={13}/></div>
-                {d.wait_min > 10 && <span className="text-[9px] text-[#c62828] font-bold">⏱{d.wait_min}min</span>}
+                {d.wait_min > 10 && <span className="text-[9px] text-[#c62828] font-bold flex items-center gap-0.5" title="Attente de la plus ancienne" data-testid={`action-${c.key}-wait`}><Clock size={9}/>{waitFmt(d.wait_min)}</span>}
               </div>
               <div className="font-serif text-2xl tabular leading-none" style={{color: empty?"#999":c.color}}>{d.count}</div>
               <div className="text-[10px] uppercase tracking-wider text-[#666] font-semibold mt-1 truncate">{c.label}</div>

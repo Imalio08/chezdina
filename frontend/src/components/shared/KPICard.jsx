@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { Info, ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import { ResponsiveContainer, AreaChart, Area, Tooltip } from "recharts";
+import { fcfaCompact, numCompact } from "@/lib/format";
 
 export default function KPICard({
   label,
@@ -29,7 +30,7 @@ export default function KPICard({
   };
   let dir = deltaDirection, pct = null, abs = null;
   if (dir === "auto" || !dir) {
-    const num = toNum(value);
+    const num = toNum(valueFull ?? value);
     const prevNum = toNum(previousValue);
     if (!Number.isNaN(num) && !Number.isNaN(prevNum)) {
       if (prevNum === 0 && num === 0) {
@@ -53,6 +54,7 @@ export default function KPICard({
   const Arrow = dir === "up" ? ArrowUpRight : dir === "down" ? ArrowDownRight : Minus;
 
   const sparkData = (sparkline || []).map((v,i)=>({ x: i, y: v }));
+  const fmtAbs = (a) => `${a>0?"+":""}${valueFull ? fcfaCompact(a) : numCompact(a)}`;
 
   return (
     <div className={`dina-card-white p-4 relative ${hero?"lg:col-span-2":""}`} data-testid={testid || `kpi-${label.toLowerCase().replace(/\s+/g,"-")}`}>
@@ -80,12 +82,12 @@ export default function KPICard({
           <Arrow size={11}/>
           <span className="font-semibold tabular">
             {pct !== null && Number.isFinite(pct)
-              ? `${pct>0?"+":""}${pct.toFixed(1)}%`
+              ? `${pct>0?"+":""}${pct.toFixed(1).replace(".", ",")} %`
               : (abs !== null && Number.isFinite(abs)
-                  ? `${abs>0?"+":""}${Math.round(abs).toLocaleString("fr-FR").replace(/,/g," ")}`
+                  ? fmtAbs(abs)
                   : (deltaLabel || ""))}
           </span>
-          {abs !== null && Number.isFinite(abs) && pct !== null && Number.isFinite(pct) && <span className="text-[10px] text-[#666] ml-1">· {abs>0?"+":""}{Math.round(abs).toLocaleString("fr-FR").replace(/,/g," ")}</span>}
+          {abs !== null && Number.isFinite(abs) && pct !== null && Number.isFinite(pct) && <span className="text-[10px] text-[#666] ml-1" title={valueFull ? `${abs>0?"+":""}${Math.round(abs).toLocaleString("fr-FR")} FCFA` : undefined}>· {fmtAbs(abs)}</span>}
         </div>
       )}
       {deltaLabel && dir === "flat" && <div className="text-xs text-[#666]">{deltaLabel}</div>}
