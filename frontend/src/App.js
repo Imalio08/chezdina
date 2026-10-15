@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
 import api from "@/lib/api";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -131,6 +131,22 @@ function SlugRedirect() {
   return miss ? <Navigate to="/console" replace /> : <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  return null;
+}
+
+const MQ = "(max-width: 640px)";
+function AppToaster() {
+  const [mobile, setMobile] = useState(() => window.matchMedia(MQ).matches);
+  useEffect(() => {
+    const m = window.matchMedia(MQ); const f = (e) => setMobile(e.matches);
+    m.addEventListener("change", f); return () => m.removeEventListener("change", f);
+  }, []);
+  return <Toaster position={mobile ? "top-center" : "top-right"} richColors closeButton={mobile} duration={mobile ? 4500 : 4000} visibleToasts={mobile ? 2 : 3} toastOptions={{ className: "dina-toast" }} />;
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -138,7 +154,8 @@ export default function App() {
       <AppProvider>
         <CustomerProvider>
         <BrowserRouter>
-          <Toaster position="top-right" richColors />
+          <AppToaster />
+          <ScrollToTop />
           <ImageEditorHost />
           <PdfPreviewHost />
           <BrandingBootstrapper />

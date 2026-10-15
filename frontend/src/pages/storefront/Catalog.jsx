@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { reveal } from "@/lib/reveal";
 import { Link, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
@@ -20,6 +21,12 @@ export default function Catalog() {
   const [oocSent, setOocSent] = useState(false);
   const [oocSending, setOocSending] = useState(false);
   const cat = sp.get("category") || "all";
+  const gridRef = useRef(null);
+  const firstRun = useRef(true);
+  useEffect(() => {
+    if (firstRun.current) { firstRun.current = false; return; }
+    if (gridRef.current) reveal(gridRef.current, { flash: false, block: "start" });
+  }, [filters, sort]);
 
   useEffect(() => { setQ(sp.get("q") || ""); setOocSent(false); }, [sp]);
   useEffect(() => {
@@ -85,7 +92,7 @@ export default function Catalog() {
       )}
 
       <div className="text-xs text-[#666] mb-3">{filtered.length} produit{filtered.length>1?"s":""}</div>
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div ref={gridRef} className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 scroll-mt-24" data-testid="catalog-grid">
         {filtered.map(p => <ProductCardV2 key={p.id} product={p}/>)}
       </div>
 

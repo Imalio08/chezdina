@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Routes, Route, Link, NavLink, useNavigate, useParams, Outlet, useLocation } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateFmt, statusLabel, statusColor } from "@/lib/format";
+import { reveal } from "@/lib/reveal";
 import { toast } from "sonner";
 import { useCustomer } from "@/context/CustomerContext";
 import { MessagePhotos, PhotoLightbox } from "@/components/shared/OrderThread";
@@ -51,7 +52,8 @@ export default function AccountShell() {
       <div className="lg:hidden">
         {isRoot ? (
           <MobileMenu onLogout={logout} />
-        ) : (
+        ) : (<>
+          <Link to="/boutique/compte" className="inline-flex items-center gap-1 text-sm text-[#666] mb-3 -mt-2" data-testid="account-back-menu"><ArrowLeft size={14}/> Mon compte</Link>
           <Routes>
             <Route index element={<Overview />} />
             <Route path="commandes" element={<OrdersPage />} />
@@ -70,7 +72,7 @@ export default function AccountShell() {
             <Route path="preferences" element={<Preferences />} />
             <Route path="securite" element={<Security />} />
           </Routes>
-        )}
+        </>)}
       </div>
 
       {/* Desktop: side menu + content */}
@@ -332,10 +334,10 @@ function Overview() {
       {showEdit === "address" && <AddressModal initial={defaultAddr || { default: true }} onClose={() => setShowEdit(null)} onSave={async (v) => {
         try {
           if (v.id) await api.patch(`/public/account/addresses/${v.id}`, { ...v, default: true }); else await api.post("/public/account/addresses", { ...v, default: true });
-          await refresh(); setShowEdit(null); toast.success("Adresse enregistrée");
-        } catch { toast.error("Erreur"); }
+          await refresh(); setShowEdit(null); toast.success("Adresse enregistrée"); reveal('[data-testid="card-address"]');
+        } catch { toast.error("L'adresse n'a pas pu être enregistrée · réessayez"); }
       }}/>}
-      {showEdit && showEdit !== "address" && <EditModal mode={showEdit} customer={customer} onClose={() => setShowEdit(null)} onSaved={(c) => { setCustomer(c); setShowEdit(null); }}/>}
+      {showEdit && showEdit !== "address" && <EditModal mode={showEdit} customer={customer} onClose={() => setShowEdit(null)} onSaved={(c) => { const m = showEdit; setCustomer(c); setShowEdit(null); reveal(`[data-testid="card-${m}"]`); }}/>}
     </div>
   );
 }
@@ -362,17 +364,19 @@ function EditModal({ mode, customer, onClose, onSaved }) {
     shoe_size: customer.shoe_size || "", clothing_size: customer.clothing_size || "",
     communication_prefs: customer.communication_prefs || { whatsapp: true, sms: true, email: false, newsletter: false },
   });
+  const [saving, setSaving] = useState(false);
   const save = async () => {
     if (mode === "info" && (f.name || "").trim().length < 2) return toast.error("Nom requis");
+    setSaving(true);
     try {
       const patch = mode === "prefs" ? { communication_prefs: f.communication_prefs } : { name: f.name.trim(), email: f.email, birthday: f.birthday, shoe_size: f.shoe_size, clothing_size: f.clothing_size };
       const r = await api.patch("/public/account/update", patch);
-      onSaved(r.data); toast.success("Enregistré");
-    } catch { toast.error("Erreur"); }
+      onSaved(r.data); toast.success(mode === "prefs" ? "Préférences enregistrées" : "Profil mis à jour");
+    } catch { toast.error("La modification n'a pas pu être enregistrée · réessayez"); } finally { setSaving(false); }
   };
   return (
     <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4" onClick={onClose} data-testid="edit-modal">
-      <div className="bg-white rounded-t-2xl sm:rounded-xl p-5 w-full sm:max-w-md" onClick={e=>e.stopPropagation()}>
+      <div className="bg-white rounded-t-2xl sm:rounded-xl p-5 w-full sm:max-w-md max-h-[92vh] overflow-y-auto safe-bottom" onClick={e=>e.stopPropagation()}>
         <div className="flex justify-between mb-4"><div className="font-serif text-xl">{mode === "prefs" ? "Préférences" : "Mes informations"}</div><button onClick={onClose}><X size={16}/></button></div>
         {mode === "info" && (
           <div className="space-y-2">
@@ -399,7 +403,7 @@ function EditModal({ mode, customer, onClose, onSaved }) {
             ))}
           </div>
         )}
-        <div className="flex gap-2 mt-5"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={save} className="dina-btn-primary flex-1" data-testid="edit-save">Enregistrer</button></div>
+        <div className="flex gap-2 mt-5"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={save} disabled={saving} className="dina-btn-primary flex-1" data-testid="edit-save">{saving ? "Enregistrement…" : "Enregistrer"}</button></div>
       </div>
     </div>
   );
@@ -647,7 +651,11 @@ function MessagesPage() {
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState(null);
   const [zoom, setZoom] = useState(null);
+  const [sending, setSending] = useState(false);
+  const listRef = useRef(null);
   const { customer } = useCustomer();
+  const msgCount = active?.messages?.length || 0;
+  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [msgCount, id]);
 
   const loadThreads = async () => { try { const r = await api.get("/public/account/threads"); setThreads(r.data); } catch {} };
   const loadActive = async () => {
@@ -663,9 +671,10 @@ function MessagesPage() {
   useEffect(() => { loadActive(); const t = setInterval(loadActive, 5000); return () => clearInterval(t); }, [id]);
 
   const send = async () => {
-    if ((!text.trim() && !photo) || !id) return;
-    try { await api.post("/public/account/messages/send", { conversation_id: id, text, attachments: photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [] }); setText(""); setPhoto(null); loadActive(); }
-    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
+    if ((!text.trim() && !photo) || !id || sending) return;
+    setSending(true);
+    try { await api.post("/public/account/messages/send", { conversation_id: id, text, attachments: photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [] }); setText(""); setPhoto(null); await loadActive(); }
+    catch (e) { toast.error(e.response?.data?.detail || "Message non envoyé · réessayez"); } finally { setSending(false); }
   };
 
   if (!threads.length && !id) {
@@ -699,7 +708,7 @@ function MessagesPage() {
         {id && <button onClick={() => nav("/boutique/compte/messages")} className="md:hidden text-xs text-[#666] flex items-center gap-1 mb-2" data-testid="msg-back"><ArrowLeft size={12}/>Conversations</button>}
         {!active ? <div className="m-auto text-sm text-[#666]">Sélectionnez une conversation</div> : (
           <>
-            <div className="flex-1 overflow-y-auto space-y-2 py-2 max-h-[60vh]">
+            <div ref={listRef} className="flex-1 overflow-y-auto space-y-2 py-2 max-h-[55vh] md:max-h-[60vh]" data-testid="msg-list">
               {(active.messages || []).map((m, i) => {
                 const mine = m.from_id === customer.id;
                 return <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`${mine ? "bg-[#b02a2a] text-white" : "bg-[#f5f5f5]"} rounded-xl px-3 py-2 max-w-[80%]`}><MessagePhotos m={m} onOpen={setZoom}/>{m.text && <RichText text={m.text} className="text-sm"/>}<div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{m.from_name && !mine ? `${m.from_name} · ` : ""}{dateFmt(m.at)}</div></div></div>;
@@ -709,7 +718,8 @@ function MessagesPage() {
             {photo && <div className="relative inline-block mb-2 self-start" data-testid="msg-photo-preview"><img src={photo} alt="Aperçu" className="h-20 rounded-lg"/><button onClick={() => setPhoto(null)} className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full px-1.5 text-xs">×</button></div>}
             {active.closed ? <div className="text-xs text-[#999] text-center border-t border-[#ececec] pt-2">Conversation fermée après la livraison</div> : (
               <div className="border-t border-[#ececec] pt-2">
-                <RichComposer value={text} onChange={setText} onSend={send} onPhoto={setPhoto} canSend={!!(text.trim() || photo)} testid="msg"/>
+                <RichComposer value={text} onChange={setText} onSend={send} onPhoto={setPhoto} canSend={!sending && !!(text.trim() || photo)} testid="msg"/>
+                {sending && <div className="text-[11px] text-[#666] mt-1" data-testid="msg-sending">Envoi…</div>}
               </div>
             )}
           </>
@@ -724,12 +734,14 @@ function ReviewsPending() {
   const [list, setList] = useState([]);
   const [rating, setRating] = useState({});
   const [comment, setComment] = useState({});
+  const [busy, setBusy] = useState(null);
   const load = async () => { try { const r = await api.get("/public/account/reviews-pending"); setList(r.data); } catch {} };
   useEffect(() => { load(); }, []);
   const submit = async (p) => {
     const r = rating[p.product_id] || 5;
-    try { await api.post("/public/account/reviews", { product_id: p.product_id, rating: r, comment: comment[p.product_id] || "" }); toast.success("Avis envoyé"); load(); }
-    catch { toast.error("Erreur"); }
+    setBusy(p.product_id);
+    try { await api.post("/public/account/reviews", { product_id: p.product_id, rating: r, comment: comment[p.product_id] || "" }); toast.success("Merci, votre avis est envoyé"); load(); }
+    catch { toast.error("Votre avis n'a pas pu être envoyé · réessayez"); } finally { setBusy(null); }
   };
   if (!list.length) return <EmptyState icon={Star} title="Aucun avis à donner" subtitle="Les produits livrés apparaîtront ici après livraison"/>;
   return (
@@ -749,7 +761,7 @@ function ReviewsPending() {
                 ))}
               </div>
               <textarea className="dina-input mt-2" rows={2} placeholder="Un petit mot (optionnel)…" value={comment[p.product_id]||""} onChange={e=>setComment({...comment,[p.product_id]:e.target.value})}/>
-              <button onClick={()=>submit(p)} className="dina-btn-primary mt-2 !min-h-[36px]" data-testid={`submit-${p.product_id}`}>Évaluer</button>
+              <button onClick={()=>submit(p)} disabled={busy === p.product_id} className="dina-btn-primary mt-2 !min-h-[36px]" data-testid={`submit-${p.product_id}`}>{busy === p.product_id ? "Envoi…" : "Évaluer"}</button>
             </div>
           </div>
         </div>
@@ -801,7 +813,7 @@ function Loyalty() {
     const n = Number(pts || w.points);
     if (n < w.min_points || n > w.points) return toast.error(`Entre ${w.min_points} et ${w.points} points`);
     setBusy(true);
-    try { const r = await api.post("/public/account/wallet/convert", { points: n, key: `${Date.now()}-${n}` }); setW(r.data); setPts(""); refresh(); toast.success(`${n} points convertis en ${fcfa(n * w.point_value)}`); }
+    try { const r = await api.post("/public/account/wallet/convert", { points: n, key: `${Date.now()}-${n}` }); setW(r.data); setPts(""); refresh(); toast.success(`${n} points convertis en ${fcfa(n * w.point_value)}`, { description: "Montant ajouté à votre porte-monnaie" }); reveal('[data-testid="loyalty-points"]'); }
     catch (e) { toast.error(e.response?.data?.detail || "Erreur"); } finally { setBusy(false); }
   };
   return (
@@ -897,11 +909,17 @@ function Addresses() {
   const load = async () => { try { const r = await api.get("/public/account/addresses"); setList(r.data || []); } catch {} };
   useEffect(() => { load(); }, []);
   const save = async (f) => {
-    try { if (f.id) await api.patch(`/public/account/addresses/${f.id}`, f); else await api.post("/public/account/addresses", f); toast.success("Adresse enregistrée"); setEditing(null); load(); refresh(); }
-    catch { toast.error("Erreur"); }
+    try {
+      const before = list.map(a => a.id);
+      let hid = f.id;
+      if (f.id) await api.patch(`/public/account/addresses/${f.id}`, f);
+      else { const r = await api.post("/public/account/addresses", f); hid = (r.data?.addresses || []).find(a => !before.includes(a.id))?.id; }
+      toast.success("Adresse enregistrée"); setEditing(null); await load(); refresh();
+      if (hid) reveal(`[data-testid="addr-${hid}"]`);
+    } catch { toast.error("L'adresse n'a pas pu être enregistrée · réessayez"); }
   };
-  const makeDefault = async (a) => { try { await api.patch(`/public/account/addresses/${a.id}`, { default: true }); load(); refresh(); toast.success("Adresse par défaut mise à jour"); } catch { toast.error("Erreur"); } };
-  const del = async (id) => { if (!window.confirm("Supprimer cette adresse ?")) return; try { await api.delete(`/public/account/addresses/${id}`); load(); refresh(); } catch {} };
+  const makeDefault = async (a) => { try { await api.patch(`/public/account/addresses/${a.id}`, { default: true }); await load(); refresh(); toast.success("Adresse par défaut mise à jour"); reveal(`[data-testid="addr-${a.id}"]`); } catch { toast.error("Impossible de modifier l'adresse par défaut · réessayez"); } };
+  const del = async (id) => { if (!window.confirm("Supprimer cette adresse ?")) return; try { await api.delete(`/public/account/addresses/${id}`); load(); refresh(); toast.success("Adresse supprimée"); } catch { toast.error("Suppression impossible · réessayez"); } };
 
   return (
     <div className="space-y-3" data-testid="addresses">
@@ -968,14 +986,15 @@ function NotificationsPage() {
 function Preferences() {
   const { customer, setCustomer } = useCustomer();
   const [v, setV] = useState(customer.communication_prefs || { whatsapp: true, sms: true, email: false, newsletter: false });
-  const save = async () => { try { const r = await api.patch("/public/account/update", { communication_prefs: v }); setCustomer(r.data); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
+  const [saving, setSaving] = useState(false);
+  const save = async () => { setSaving(true); try { const r = await api.patch("/public/account/update", { communication_prefs: v }); setCustomer(r.data); toast.success("Préférences enregistrées"); } catch { toast.error("Les préférences n'ont pas pu être enregistrées · réessayez"); } finally { setSaving(false); } };
   return (
     <div className="dina-card-white p-5 space-y-3" data-testid="preferences">
       <div className="font-serif text-xl">Préférences de communication</div>
       {["whatsapp","sms","email","newsletter"].map(k => (
         <label key={k} className="flex items-center gap-2"><input type="checkbox" checked={!!v[k]} onChange={e=>setV({...v, [k]: e.target.checked})}/> {k === "whatsapp" ? "WhatsApp" : k === "newsletter" ? "Newsletter promotions" : k.toUpperCase()}</label>
       ))}
-      <button onClick={save} className="dina-btn-primary">Enregistrer</button>
+      <button onClick={save} disabled={saving} className="dina-btn-primary" data-testid="prefs-save">{saving ? "Enregistrement…" : "Enregistrer"}</button>
     </div>
   );
 }
@@ -989,7 +1008,7 @@ function Security() {
     if (n1 !== n2) return toast.error("Les codes ne correspondent pas");
     if (n1.length !== 6) return toast.error("6 chiffres");
     setLoading(true);
-    try { await api.post("/public/account/change-code", { old_code, new_code: n1 }); toast.success("Code changé"); setOld(""); setN1(""); setN2(""); }
+    try { await api.post("/public/account/change-code", { old_code, new_code: n1 }); toast.success("Votre code a été changé"); setOld(""); setN1(""); setN2(""); }
     catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
     finally { setLoading(false); }
   };

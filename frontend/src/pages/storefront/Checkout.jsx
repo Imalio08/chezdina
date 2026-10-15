@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
+import { reveal } from "@/lib/reveal";
 import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalLink } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { useCustomer } from "@/context/CustomerContext";
@@ -112,8 +113,8 @@ export default function Checkout() {
 
   const checkout = async () => {
     if (!cart.length) return toast.error("Panier vide");
-    if (!name || !phone) return toast.error("Nom et téléphone requis");
-    if (customer && choice === "new" && !validAddress(draft)) return toast.error("Indiquez la zone et au moins un détail d'adresse (quartier, rue, repère ou GPS)");
+    if (!name || !phone) { reveal(`[data-testid="checkout-${!name ? "name" : "phone"}"]`); return toast.error("Nom et téléphone requis"); }
+    if (customer && choice === "new" && !validAddress(draft)) { reveal('[data-testid="address-fields"]'); return toast.error("Indiquez la zone et au moins un détail d'adresse (quartier, rue, repère ou GPS)"); }
     if (submitting) return;
     setSubmitting(true);
     try {
@@ -132,7 +133,7 @@ export default function Checkout() {
       } else {
         clearCart(); nav(`/suivi/${data.code}`);
       }
-    } catch { toast.error("Erreur commande"); } finally { setSubmitting(false); }
+    } catch (e) { const d = e.response?.data?.detail; toast.error(typeof d === "string" ? d : "La commande n'a pas pu être envoyée · vérifiez votre connexion et réessayez"); } finally { setSubmitting(false); }
   };
 
   const copyRef = (text) => { navigator.clipboard?.writeText(text); toast.success("Copié"); };

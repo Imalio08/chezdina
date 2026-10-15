@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { Heart, Zap } from "lucide-react";
 import { fcfa } from "@/lib/format";
 import api from "@/lib/api";
@@ -20,6 +20,7 @@ export function toggleFavorite(id) {
 export default function ProductCardV2({ product, flashEndsAt }) {
   const [favs, setFavsState] = useState(getFavs());
   const [showSizes, setShowSizes] = useState(false);
+  const navTo = useNavigate();
   useEffect(() => { const h = () => setFavsState(getFavs()); window.addEventListener("favs-changed", h); return () => window.removeEventListener("favs-changed", h); }, []);
   const fav = favs.includes(product.id);
   const discount = product.compare_at ? Math.round((1 - product.price / product.compare_at) * 100) : 0;
@@ -38,7 +39,7 @@ export default function ProductCardV2({ product, flashEndsAt }) {
     const cart = JSON.parse(localStorage.getItem("dina_cart") || "[]");
     cart.push({ product_id: product.id, name: product.name, image: product.image, price: product.price, size, color: colors[0], qty: 1, key: `${product.id}-${size}-${Date.now()}` });
     localStorage.setItem("dina_cart", JSON.stringify(cart));
-    toast.success(`Ajouté : ${product.name} · ${size}`);
+    toast.success("Ajouté au panier", { description: `${product.name} · ${size}`, action: { label: "Voir le panier", onClick: () => navTo("/boutique/checkout") } });
     setShowSizes(false);
     window.dispatchEvent(new Event("cart-changed"));
   };

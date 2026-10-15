@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateFmt } from "@/lib/format";
 import { useApp } from "@/context/AppContext";
@@ -33,6 +33,7 @@ export default function ProductPage() {
   const [deliveryEst, setDeliveryEst] = useState(null);
   const [deliveryZone, setDeliveryZone] = useState("Cocody");
   const { addToCart } = useApp();
+  const navTo = useNavigate();
 
   useEffect(() => {
     api.get(`/public/product/${id}`).then(r => {
@@ -75,7 +76,7 @@ export default function ProductPage() {
     ? Array.from(new Set((p.colors || []).filter(c => (size ? availableColorsForSize(p, size).includes(c) : (p.variants || []).some(v => v.enabled && v.color === c)))))
     : (p.colors || []);
 
-  const add = () => { if(!canAdd) return toast.error("Rupture pour cette taille"); addToCart(p,1,size,color); track("add_to_cart", { product_id: p.id, value: p.price, size, color }); toast.success("Ajouté au panier"); };
+  const add = () => { if(!canAdd) return toast.error("Rupture pour cette taille"); addToCart(p,1,size,color); track("add_to_cart", { product_id: p.id, value: p.price, size, color }); toast.success("Ajouté au panier", { description: `${p.name}${size ? ` · ${size}` : ""}`, action: { label: "Voir le panier", onClick: () => navTo("/boutique/checkout") } }); };
   const wa = () => {
     const msg = `Bonjour Chez Dina 💕 Je souhaite commander :\n• ${p.name}\n• Taille : ${size||"à préciser"}\n• Couleur : ${color||"à préciser"}\n• Prix : ${fcfa(p.price)}\n\nMerci de me confirmer la disponibilité et les frais de livraison vers ${deliveryZone}.`;
     window.open(`https://wa.me/2250777926179?text=${encodeURIComponent(msg)}`,"_blank");
@@ -206,7 +207,7 @@ function AlertMeForm({ productId, size, onClose }) {
       await api.post("/public/stock-alert", { product_id: productId, size: size || null, phone });
       toast.success("Nous vous préviendrons par WhatsApp dès le retour en stock !");
       onClose();
-    } catch { toast.error("Erreur"); } finally { setLoading(false); }
+    } catch { toast.error("Envoi impossible · vérifiez votre connexion et réessayez"); } finally { setLoading(false); }
   };
   return (
     <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
@@ -232,7 +233,7 @@ function ReviewForm({ productId, onClose, onDone }) {
       await api.post("/public/reviews", { product_id: productId, rating, comment, customer_name: name });
       toast.success("Merci pour votre avis !");
       onDone();
-    } catch { toast.error("Erreur"); } finally { setLoading(false); }
+    } catch { toast.error("Envoi impossible · vérifiez votre connexion et réessayez"); } finally { setLoading(false); }
   };
   return (
     <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>

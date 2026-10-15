@@ -185,3 +185,15 @@ img, video, canvas, svg { max-width: 100%; }
 @supports (padding: env(safe-area-inset-bottom)) { .safe-bottom { padding-bottom: env(safe-area-inset-bottom); } }
 @media (max-width: 639px) { h1.font-serif.text-3xl { font-size: 1.6rem; line-height: 2rem; } .dina-btn-primary, .dina-btn-secondary { padding: 8px 12px; } }
 
+@keyframes dinaFlash { 0% { box-shadow: 0 0 0 0 rgba(176,42,42,.55); } 35% { box-shadow: 0 0 0 6px rgba(176,42,42,.22); } 100% { box-shadow: 0 0 0 0 rgba(176,42,42,0); } }
+.dina-flash { animation: dinaFlash 1.5s ease-out; }
+@media (max-width: 640px) {
+  [data-sonner-toaster][data-y-position="top"] { top: calc(env(safe-area-inset-top, 0px) + 10px) !important; }
+  [data-sonner-toast].dina-toast { padding: 16px 18px !important; border-radius: 16px !important; font-size: 16px !important; box-shadow: 0 12px 32px rgba(0,0,0,.22) !important; min-height: 64px; }
+  [data-sonner-toast].dina-toast [data-title] { font-size: 16px; font-weight: 600; line-height: 1.3; }
+  [data-sonner-toast].dina-toast [data-description] { font-size: 14px; }
+  [data-sonner-toast].dina-toast [data-icon] { width: 22px; height: 22px; }
+  [data-sonner-toast].dina-toast [data-icon] svg { width: 22px; height: 22px; }
+  [data-sonner-toast].dina-toast [data-button] { height: 36px !important; padding: 0 14px !important; font-size: 14px !important; border-radius: 10px !important; }
+}
+
