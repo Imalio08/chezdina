@@ -33,3 +33,9 @@
 - Magasinière : statut de commande limité à en_preparation / prete. Community manager : PATCH /api/site limité à theme, menu, footer, social, seo, sections, hero, logo, favicon.
 - /api/dashboard/role + RoleDashboard (ventes du jour de la vendeuse via created_by_id) ; menus rbac.js ; menu « Créer » filtré et masqué s'il est vide ; assistant IA masqué pour ces rôles ; colonnes et tuiles coût / marge / dépensé masquées ; boutons d'édition retirés pour les rôles en lecture seule.
 - Tests : iteration_77 (manques) → iteration_78 (faille d'héritage trouvée) → corrigée, pytest 65/65.
+
+## 2026-10-15 — Correctifs PIN pointage & formulaire cliente Caisse
+- Pointage : le PIN était toujours refusé depuis la console (get_user retire pin_hash) → lecture du pin_hash en base, PIN normalisé en chiffres, message « Code PIN incorrect pour ce compte ». Doublons bloqués (409 « Arrivée/Départ déjà pointé », départ sans arrivée refusé).
+- Caisse : POSSessionGuard revérifiait la session toutes les 30 s en affichant un écran de chargement → toute la Caisse (formulaire + panier) était démontée. Revérification désormais silencieuse ; le formulaire ne se ferme plus en cliquant à côté ; téléphone normalisé (+225 + 10 chiffres) ; messages d'erreur explicites, données conservées.
+- Tests : iteration_79 100 % (5/5 backend, UI avec attente de 70 s).
+

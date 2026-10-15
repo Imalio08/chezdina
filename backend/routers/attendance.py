@@ -40,6 +40,12 @@ async def check_in(body: Dict[str, Any], user: dict = Depends(get_user)):
         if not pin_hash or not bcrypt.checkpw(pin.encode(), pin_hash.encode()):
             raise HTTPException(401, "Code PIN incorrect pour ce compte")
     today = datetime.now(timezone.utc).date().isoformat()
+    last = await db.attendance.find_one({"user_id": user["id"], "day": today}, {"kind": 1}, sort=[("at", -1)])
+    last_kind = {"in": "arrival", "out": "departure"}.get((last or {}).get("kind"), (last or {}).get("kind"))
+    if last_kind == kind:
+        raise HTTPException(409, "Arrivée déjà pointée" if kind == "arrival" else "Départ déjà pointé")
+    if kind == "departure" and not last:
+        raise HTTPException(409, "Pointez d'abord votre arrivée")
     now = datetime.now(timezone.utc)
     biz = await db.business.find_one({"id": "main"}) or {}
     hours = (biz.get("working_hours") or {}).get(user.get("role", "")) or {"open": "08:00", "tolerance_min": 10}

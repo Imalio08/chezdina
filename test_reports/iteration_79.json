@@ -1,0 +1,34 @@
+{
+  "summary": "Retested bugs 13 (attendance punch PIN) and 14 (POS 'Nouvelle cliente' modal closing by itself). Both are FIXED. Backend: new tests/test_punch_pin_pos.py, 5/5 pass. For admin, gérante, vendeuse and stock, a wrong PIN returns 401 'Code PIN incorrect pour ce compte' and nothing is recorded, for both arrival and departure. The correct PIN returns 200 for arrival and for departure, and GET /attendance/me shows the change. UI (Playwright, getUserMedia stubbed with a canvas stream): manager 2222, agent1 3333 and stock 4444 passed the PunchGate. Then header topbar-punch, departure selected by default, wrong PIN gives the toast 'Code PIN incorrect pour ce compte' and the modal stays open. Correct PIN gives 'Départ pointé' and the chip shows 'Terminé'. Admin 1234: wrong PIN rejected, correct PIN gives 'Arrivée pointée'. POS: added a product to the cart, opened pos-new-customer, typed slowly into first name, last name, phone, quartier and repère, then waited 70s (2 background /cash-sessions checks seen). The modal stayed open, all values and the cart (1 article, 36 500 FCFA) were preserved, and clicking the backdrop did not close it. Submitting with an empty first name gives the toast 'Prénom, nom et téléphone requis', the modal stays open and the other fields are kept. A valid TEST_ submit gives the toast 'Cliente TEST_Awa Guard créée', the modal closes, the customer is attached in the cart panel and the cart is unchanged. Regression: with no open session the guard shows on first load, and opening a session from the guard (Fatou, PIN 2222) shows the POS.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/attendance/check-in", "issue": "The server only checks the PIN when one is sent. A request with no PIN (or a non-digit PIN, which becomes empty) returns 200, so a direct API call skips the PIN check. PunchGate arrival also sends no PIN. If the PIN is meant to be mandatory, it is only enforced in AttendancePunchModal."},
+      {"endpoint": "POST /api/attendance/check-in", "issue": "Duplicate punches are not prevented. A second arrival or departure on the same day is inserted again; the UI disables these buttons, but the API does not block them."},
+      {"endpoint": "POST /api/customers (from PosNewCustomer)", "issue": "The phone format is not validated. Typing at the start of the prefilled '+225 ' saved the phone '0799887766+225 '."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PosNewCustomer phone input", "issue": "The '+225 ' prefill plus no normalisation means a caret at the start gives a malformed phone like '0799887766+225'. Suggest normalising and validating the phone before saving.", "selector": "[data-testid='nc-phone']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": ["/app/backend/tests/test_punch_pin_pos.py", "/app/test_reports/pytest/pytest_iter79.xml"],
+  "action_items": [
+    "Optional: make the PIN mandatory server-side in check-in, or document that it is optional.",
+    "Optional: reject a duplicate arrival or departure for the same day.",
+    "Optional: normalise and validate the phone in PosNewCustomer (strip a misplaced +225, check the CI format)."
+  ],
+  "critical_code_review_comments": [
+    "POSSessionGuard: a silent check that fails keeps the previous state (good). A silent check that finds the session closed still unmounts the POS, which is the expected lock behaviour.",
+    "PosNewCustomer: the duplicate check uses GET /customers?q=phone; on a match it attaches the existing customer. This is OK."
+  ],
+  "updated_files": ["/app/backend/tests/test_punch_pin_pos.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "None kept. The TEST_Awa Guard customer was deleted. Today's attendance rows for the admin, manager, agent1 and stock users were deleted. To test the guard, the existing open session 36f814ab was temporarily set to closed=True; it was restored afterwards and the session opened during the test was deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_punch_pin_pos.py -n 0 (it needs no attendance rows today for the 4 users; delete them first). For the camera in Playwright, stub navigator.mediaDevices.getUserMedia with canvas.captureStream() via context.add_init_script. The staff login inputs have no type=email; use input:visible nth(0)/nth(1). To test the POS guard, set cash session 36f814ab closed=True in the DB, then restore it."
+}

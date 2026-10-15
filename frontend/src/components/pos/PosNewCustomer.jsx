@@ -20,21 +20,25 @@ export default function PosNewCustomer({ onCreated, onClose }) {
   const upd = (k,v) => setF(p => ({...p, [k]:v}));
   const save = async () => {
     if (!f.first_name || !f.last_name || !f.phone) return toast.error("Prénom, nom et téléphone requis");
+    let digits = f.phone.replace(/\D/g, "");
+    if (digits.startsWith("225") && digits.length > 10) digits = digits.slice(3);
+    if (digits.length !== 10) return toast.error("Numéro invalide · 10 chiffres attendus (ex. 07 07 00 00 00)");
+    const phone = `+225 ${digits}`;
     const name = `${f.first_name.trim()} ${f.last_name.trim()}`;
     const address = [f.commune, f.quartier, f.repere].filter(Boolean).join(" · ");
     setLoading(true);
     try {
       // Duplicate check
-      const dup = await api.get(`/customers?q=${encodeURIComponent(f.phone.replace(/\s/g,""))}`);
+      const dup = await api.get(`/customers?q=${encodeURIComponent(digits)}`);
       if (dup.data?.length) {
-        const found = dup.data.find(c => (c.phone||"").replace(/\s/g,"") === f.phone.replace(/\s/g,""));
+        const found = dup.data.find(c => (c.phone||"").replace(/\D/g,"").endsWith(digits));
         if (found) {
           toast.success(`Cliente existante rattachée : ${found.name}`);
           onCreated(found); return;
         }
       }
       const { data } = await api.post("/customers", {
-        name, phone: f.phone, email: f.email || null, address,
+        name, phone, email: f.email || null, address,
         shoe_size: f.shoe_size || null, clothing_size: f.clothing_size || null,
         birthday: f.birthday || null,
         notes: `Source: ${f.source}${f.referral_code?` · Parrain: ${f.referral_code}`:""}${f.wa_consent?" · WhatsApp OK":""}`,
