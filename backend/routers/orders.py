@@ -55,7 +55,7 @@ async def create_order(body: OrderIn, user: dict = Depends(get_user)):
         "subtotal": sub, "total": total,
         "status": "livree" if body.mode == "store" else "nouvelle",
         "payment_status": "paye" if body.payment_method in ("cash", "wave") and body.mode == "store" else "en_attente",
-        "created_at": now_iso(), "created_by": user.get("name"),
+        "created_at": now_iso(), "created_by": user.get("name"), "created_by_id": user.get("id"),
         "timeline": [{"status": "nouvelle" if body.mode != "store" else "livree", "at": now_iso(), "by": user.get("name", "système")}],
     }
     for it in body.items:

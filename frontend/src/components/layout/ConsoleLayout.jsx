@@ -220,8 +220,9 @@ export default function ConsoleLayout() {
     setSearch(v);
     if (v.length < 2) { setSearchResults(null); return; }
     try {
-      const [p, o, c] = await Promise.all([api.get(`/products?q=${encodeURIComponent(v)}`), api.get(`/orders?q=${encodeURIComponent(v)}`), api.get(`/customers?q=${encodeURIComponent(v)}`)]);
-      setSearchResults({ products: p.data.slice(0,4), orders: o.data.slice(0,4), customers: c.data.slice(0,4) });
+      const get = (u) => api.get(u).then(r => r.data).catch(() => []);
+      const [p, o, c] = await Promise.all([get(`/products?q=${encodeURIComponent(v)}`), get(`/orders?q=${encodeURIComponent(v)}`), get(`/customers?q=${encodeURIComponent(v)}`)]);
+      setSearchResults({ products: p.slice(0,4), orders: o.slice(0,4), customers: c.slice(0,4) });
     } catch { setSearchResults(null); }
   };
   const go = (path) => { setSearchResults(null); setSearch(""); nav(path); };

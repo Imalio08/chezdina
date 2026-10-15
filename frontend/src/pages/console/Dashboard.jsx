@@ -7,6 +7,9 @@ import { AreaChart, Area, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, Pi
 import PeriodSelector from "@/components/shared/PeriodSelector";
 import KPICard from "@/components/shared/KPICard";
 import ActionItems from "@/components/dashboard/ActionItems";
+import RoleDashboard from "@/components/dashboard/RoleDashboard";
+import { useAuth } from "@/context/AuthContext";
+import { LIMITED_ROLES } from "@/lib/rbac";
 
 const COLORS = ["#b02a2a","#f4b12c","#0021cc","#1f8a4c","#5867fd","#d94848","#e4991e","#1c1c1c"];
 const STATUS_COLORS = { orders: "#5867fd", delivered: "#1f8a4c", cancelled: "#c62828", deferred: "#e4991e" };
@@ -43,6 +46,11 @@ function DetailModal({ kind, period, onClose }) {
 }
 
 export default function Dashboard() {
+  const { user } = useAuth();
+  return LIMITED_ROLES.includes(user?.role) ? <RoleDashboard /> : <FullDashboard />;
+}
+
+function FullDashboard() {
   const [preset, setPreset] = useState("last30");
   const [comparison, setComparison] = useState("prev");
   const [custom, setCustom] = useState({ from:"", to:"" });

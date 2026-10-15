@@ -5698,6 +5698,9 @@ from routers.notify import router as notify_router  # noqa: E402
 app.include_router(notify_router)
 from routers.wallet import router as wallet_router  # noqa: E402
 app.include_router(wallet_router)
+from role_access import router as role_router, LimitedRoleFieldFilter  # noqa: E402
+app.include_router(role_router)
+app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:
     app.add_middleware(CORSMiddleware, allow_credentials=False, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])

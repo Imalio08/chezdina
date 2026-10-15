@@ -11,56 +11,63 @@
 export const ROLE_LABELS = {
   admin: "Propriétaire",
   manager: "Gérante",
+  sales: "Vendeuse",
+  stock_keeper: "Magasinière",
+  community_manager: "Community manager",
   rider: "Livreur",
 };
 
 // All active role options exposed in staff forms.
-export const ACTIVE_ROLES = ["admin", "manager", "rider"];
+export const ACTIVE_ROLES = ["admin", "manager", "sales", "stock_keeper", "community_manager", "rider"];
+export const LIMITED_ROLES = ["sales", "stock_keeper", "community_manager"];
+
+const M = "manager", S = "sales", K = "stock_keeper", C = "community_manager";
 
 // Explicit per-path access list (role keys allowed). "admin" is always implied.
+// The server enforces the same split (backend/role_access.py).
 export const PATH_ROLES = {
-  // Operations — Gérante
-  "/console": ["manager"],
-  "/console/pos": ["manager"],
-  "/console/commandes": ["manager"],
-  "/console/preparation": ["manager"],
-  "/console/sessions-caisse": ["manager"],
-  "/console/liste-attente": ["manager"],
-  "/console/paniers-abandonnes": ["manager"],
-  "/console/livraisons": ["manager"],
-  "/console/journees-livraison": ["manager"],
-  "/console/livreurs": ["manager"],
-  "/console/zones": ["manager"],
-  "/console/produits": ["manager"],
-  "/console/marques": ["manager"],
-  "/console/categories": ["manager"],
-  "/console/fournisseurs": ["manager"],
-  "/console/achats": ["manager"],
-  "/console/stock": ["manager"],
-  "/console/clients": ["manager"],
-  "/console/messagerie": ["manager"],
-  "/console/segments": ["manager"],
-  "/console/promotions": ["manager"],
-  "/console/campagnes": ["manager"],
-  "/console/campagnes-whatsapp": ["manager"],
-  "/console/fidelite": ["manager"],
-  "/console/parrainage": ["manager"],
-  "/console/avis": ["manager"],
-  "/console/statistiques": ["manager"],
-  "/console/pointage": ["manager"],
-  "/console/manuel": ["manager"],
-  "/console/depenses": ["manager"],       // enregistre les dépenses, pas validation
-  "/console/encaissements": ["manager"],  // enregistre les encaissements
-  "/console/facturation": ["manager"],
-  "/console/fiches-colis": ["manager"],
-  "/console/alertes": ["manager"],
+  // Operations
+  "/console": [M, S, K, C],
+  "/console/pos": [M, S],
+  "/console/commandes": [M, S],
+  "/console/preparation": [M, S, K],
+  "/console/sessions-caisse": [M],
+  "/console/liste-attente": [M, S],
+  "/console/paniers-abandonnes": [M, S],
+  "/console/livraisons": [M],
+  "/console/journees-livraison": [M],
+  "/console/livreurs": [M],
+  "/console/zones": [M],
+  "/console/produits": [M, S, K, C],
+  "/console/marques": [M, K],
+  "/console/categories": [M, K],
+  "/console/fournisseurs": [M, K],
+  "/console/achats": [M, K],
+  "/console/stock": [M, S, K],
+  "/console/clients": [M, S, C],
+  "/console/messagerie": [M, S, C],
+  "/console/segments": [M, C],
+  "/console/promotions": [M, C],
+  "/console/campagnes": [M, C],
+  "/console/campagnes-whatsapp": [M, C],
+  "/console/fidelite": [M, C],
+  "/console/parrainage": [M, C],
+  "/console/avis": [M, C],
+  "/console/statistiques": [M],
+  "/console/pointage": [M, S, K, C],
+  "/console/manuel": [M, S, K, C],
+  "/console/depenses": [M],       // enregistre les dépenses, pas validation
+  "/console/encaissements": [M],  // enregistre les encaissements
+  "/console/facturation": [M],
+  "/console/fiches-colis": [M, K],
+  "/console/alertes": [M, K],
+  "/console/site": [C],
 
   // Supervision & finances — Propriétaire uniquement (duty segregation)
   "/console/finances": [],
   "/console/resultat": [],
   "/console/equipe": [],
   "/console/presence": [],
-  "/console/site": [],
   "/console/livreur-app": [],
   "/console/integrations": [],
   "/console/parametres": [],

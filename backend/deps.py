@@ -82,8 +82,12 @@ async def get_user(request: Request):
     for k in ("_id", "password_hash", "pin_hash"):
         user.pop(k, None)
     path = request.url.path
+    request.state.role = user.get("role")
     if user.get("role") == "rider" and not path.startswith(RIDER_PREFIXES):
         raise HTTPException(403, "Accès réservé à l'équipe de la boutique")
+    from role_access import api_allowed
+    if not api_allowed(user.get("role"), request.method, path):
+        raise HTTPException(403, "Accès non autorisé pour votre rôle")
     if not path.startswith(PUNCH_FREE) and await punch_required(user):
         raise HTTPException(428, "Pointage d'arrivée requis")
     return user

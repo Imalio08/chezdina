@@ -43,6 +43,9 @@ async def create_product(body: ProductIn, user: dict = Depends(require_role("adm
 async def update_product(pid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin", "manager", "stock_keeper"))):
     body.pop("id", None)
     body.pop("_id", None)
+    if user.get("role") not in ("admin", "manager"):
+        for k in ("cost", "cost_price", "purchase_price"):
+            body.pop(k, None)
     if "stock_by_size" in body and body["stock_by_size"]:
         body["stock"] = sum(body["stock_by_size"].values())
     await db.products.update_one({"id": pid}, {"$set": body})
