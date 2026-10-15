@@ -139,6 +139,14 @@ def _customer_session(c: dict, response: Response) -> dict:
     return {"customer": clean(c), "token": token}
 
 
+async def _unique_ref_code() -> str:
+    for n in (4, 4, 4, 5, 5, 6):
+        code = f"DINA-{random.randint(10 ** (n - 1), 10 ** n - 1)}"
+        if not await db.customers.find_one({"referral_code": code}, {"_id": 1}):
+            return code
+    return f"DINA-{new_id()[:8].upper()}"
+
+
 WEAK_PINS = {"123456", "654321", "000000", "111111", "222222", "333333", "444444", "555555", "666666", "777777", "888888", "999999", "121212"}
 
 
@@ -168,7 +176,7 @@ async def cust_signup(body: CustomerSignupIn, response: Response):
     c = {
         "id": new_id(), "name": name, "phone": body.phone.strip(), "email": email, "created_at": now_iso(),
         "wallet": 0, "loyalty_points": 0, "tier": "Bronze", "status": "active", "source": "site_web",
-        "referral_code": f"DINA-{random.randint(1000, 9999)}", "access_code": pin, "addresses": [],
+        "referral_code": await _unique_ref_code(), "access_code": pin, "addresses": [],
         "communication_prefs": {"whatsapp": True, "sms": True, "email": bool(email), "newsletter": False},
         "visitor_id": (body.visitor_id or "")[:64] or None,
     }

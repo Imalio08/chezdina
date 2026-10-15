@@ -80,7 +80,7 @@ export default function AccountShell() {
             {MENU.map(m => (
               <NavLink
                 key={m.to}
-                to={m.to}
+                to={`/boutique/compte${m.to ? `/${m.to}` : ""}`}
                 end={m.end}
                 className={({isActive}) => `flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${isActive ? "bg-[#fff5f5] text-[#b02a2a] font-semibold" : "text-[#1c1c1c] hover:bg-[#fafafa]"}`}
                 data-testid={`menu-${m.to || "overview"}`}
@@ -123,7 +123,7 @@ function MobileMenu({ onLogout }) {
   return (
     <div className="dina-card-white divide-y divide-[#f0f0f0]">
       {MENU.map(m => (
-        <Link key={m.to} to={m.to} className="flex items-center gap-3 px-4 py-3 hover:bg-[#fafafa]">
+        <Link key={m.to} to={`/boutique/compte${m.to ? `/${m.to}` : ""}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[#fafafa]">
           <m.icon size={16} className="text-[#666]" />
           <span className="flex-1">{m.label}</span>
           <ChevronRight size={14} className="text-[#999]" />
@@ -782,17 +782,20 @@ function RecentlyViewed() {
 
 function useWallet() {
   const [w, setW] = useState(null);
-  const load = () => api.get("/public/account/wallet").then(r => setW(r.data)).catch(() => {});
+  const load = () => api.get("/public/account/wallet").then(r => setW(r.data)).catch(() => setW({ error: true }));
   useEffect(() => { load(); }, []);
   return [w, setW, load];
 }
 
+const LoadError = ({ retry }) => <div className="dina-card-white p-6 text-center text-sm text-[#666]" data-testid="account-load-error">Impossible de charger vos données. <button onClick={retry} className="text-[#b02a2a] underline">Réessayer</button> ou reconnectez-vous.</div>;
+
 function Loyalty() {
   const { customer, refresh } = useCustomer();
-  const [w, setW] = useWallet();
+  const [w, setW, reloadW] = useWallet();
   const [pts, setPts] = useState("");
   const [busy, setBusy] = useState(false);
   if (!w) return <div className="dina-card-white p-6 text-sm text-[#666]">Chargement…</div>;
+  if (w.error) return <LoadError retry={reloadW}/>;
   const convertible = w.points >= w.min_points;
   const convert = async () => {
     const n = Number(pts || w.points);
@@ -830,8 +833,10 @@ const REF_STATUS = { inscrite: ["Inscrite", "#5867fd"], premiere_commande: ["1re
 
 function Referral() {
   const [d, setD] = useState(null);
-  useEffect(() => { api.get("/public/account/referral").then(r => setD(r.data)).catch(() => {}); }, []);
+  const loadRef = () => api.get("/public/account/referral").then(r => setD(r.data)).catch(() => setD({ error: true }));
+  useEffect(() => { loadRef(); }, []); // eslint-disable-line
   if (!d) return <div className="dina-card-white p-6 text-sm text-[#666]">Chargement…</div>;
+  if (d.error) return <LoadError retry={loadRef}/>;
   const link = `${window.location.origin}/boutique/invitation/${d.code}`;
   const msg = `Je t'invite chez Chez Dina 👗 Crée ton compte avec mon lien et reçois ${fcfa(d.rules.filleul)} sur ta première commande : ${link}`;
   const copy = (t) => { navigator.clipboard?.writeText(t); toast.success("Copié !"); };
@@ -867,12 +872,13 @@ function Referral() {
 }
 
 function WalletPage() {
-  const [w] = useWallet();
+  const [w, , reloadW] = useWallet();
   if (!w) return <div className="dina-card-white p-6 text-sm text-[#666]">Chargement…</div>;
+  if (w.error) return <LoadError retry={reloadW}/>;
   return (
     <div className="space-y-3" data-testid="wallet-page">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="dina-card-white p-4 col-span-2 sm:col-span-1"><div className="text-[11px] uppercase text-[#666]">Disponible</div><div className="font-serif text-3xl text-[#b02a2a]" data-testid="wallet-balance">{fcfa(w.balance)}</div></div>
+        <div className="dina-card-white p-4 col-span-2 sm:col-span-1"><div className="text-[11px] uppercase text-[#666]">Disponible</div><div className="font-serif text-2xl sm:text-3xl text-[#b02a2a] whitespace-nowrap" data-testid="wallet-balance">{fcfa(w.balance)}</div></div>
         <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">En attente</div><div className="font-serif text-xl text-[#e4991e]" data-testid="wallet-pending">{fcfa(w.pending)}</div></div>
         <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">Total gagné</div><div className="font-serif text-xl text-[#1f8a4c]" data-testid="wallet-earned">{fcfa(w.earned_total)}</div></div>
         <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">Utilisé</div><div className="font-serif text-xl" data-testid="wallet-used">{fcfa(w.used_total)}</div></div>

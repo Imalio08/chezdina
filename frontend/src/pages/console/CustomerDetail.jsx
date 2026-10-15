@@ -7,13 +7,13 @@ import { ChevronLeft, Phone, MessageSquare, Copy, Send, X } from "lucide-react";
 import SmartImage from "@/components/shared/SmartImage";
 import { WalletLedger } from "@/components/shared/WalletLedger";
 
-function ConsoleWallet({ cid }) {
+function ConsoleWallet({ cid, onChange }) {
   const [w, setW] = useState(null);
   const [f, setF] = useState({ amount: "", reason: "", source: "promotion" });
   const load = () => api.get(`/customers/${cid}/wallet`).then(r => setW(r.data)).catch(() => {});
   useEffect(() => { load(); }, [cid]); // eslint-disable-line
   const adjust = async () => {
-    try { await api.post(`/customers/${cid}/wallet/adjust`, { amount: Number(f.amount), reason: f.reason, source: f.source }); toast.success("Porte-monnaie mis à jour"); setF({ amount: "", reason: "", source: "promotion" }); load(); }
+    try { await api.post(`/customers/${cid}/wallet/adjust`, { amount: Number(f.amount), reason: f.reason, source: f.source }); toast.success("Porte-monnaie mis à jour"); setF({ amount: "", reason: "", source: "promotion" }); load(); onChange?.(); }
     catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
   };
   if (!w) return <div className="dina-card-white p-4 text-sm text-[#666]">Chargement…</div>;
@@ -98,7 +98,7 @@ export default function CustomerDetail() {
 
       {tab === "overview" && <Overview c={c} orders={orders} metrics={metrics} />}
       {tab === "orders" && <OrdersList orders={orders} />}
-      {tab === "payments" && <Payments c={c} orders={orders} />}
+      {tab === "payments" && <Payments c={c} orders={orders} onChange={load} />}
       {tab === "favorites" && <SimpleList title="Favoris" items={c.favorites_list || []} />}
       {tab === "recent" && <SimpleList title="Vus récemment" items={c.recently_viewed || []} />}
       {tab === "frequent" && <SimpleList title="Produits souvent consultés" items={c.often_viewed || []} />}
@@ -134,13 +134,13 @@ function OrdersList({ orders }) {
       <tbody>{orders.map(o => <tr key={o.id}><td className="font-mono text-xs">{o.code}</td><td className="text-xs text-[#666]">{dateFmt(o.created_at)}</td><td className="text-xs">{(o.items || []).length}</td><td><span className="dina-chip text-[10px] capitalize">{o.status}</span></td><td className="text-right tabular font-semibold">{fcfa(o.total)}</td></tr>)}</tbody></table></div>;
 }
 
-function Payments({ c, orders }) {
+function Payments({ c, orders, onChange }) {
   const methods = {};
   orders.forEach(o => { const m = o.payment_method || "cod"; methods[m] = (methods[m] || 0) + (o.total || 0); });
   return (
     <div className="grid lg:grid-cols-2 gap-4">
       <div className="dina-card-white p-4"><div className="font-semibold mb-3">Méthodes utilisées</div>{Object.entries(methods).map(([k, v]) => <div key={k} className="flex justify-between text-sm py-1"><span className="capitalize">{k}</span><span className="tabular font-semibold">{fcfa(v)}</span></div>)}</div>
-      <ConsoleWallet cid={c.id}/>
+      <ConsoleWallet cid={c.id} onChange={onChange}/>
     </div>
   );
 }

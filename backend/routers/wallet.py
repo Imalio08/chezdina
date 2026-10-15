@@ -4,7 +4,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pymongo import ReturnDocument
 
-from deps import db, get_user, get_customer, require_role, clean, new_id, now_iso
+from deps import db, require_role, get_customer, clean, new_id, now_iso
 
 router = APIRouter(prefix="/api", tags=["wallet"])
 CANCELLED = ("annulee", "retournee", "refusee", "echouee")
@@ -207,7 +207,7 @@ async def track_open(code: str, body: Dict[str, Any]):
 
 # ---------- Console ----------
 @router.get("/customers/{cid}/wallet")
-async def customer_wallet(cid: str, user: dict = Depends(get_user)):
+async def customer_wallet(cid: str, user: dict = Depends(require_role("admin", "manager", "sales", "cashier"))):
     return await _summary(cid)
 
 
@@ -221,8 +221,8 @@ async def adjust_wallet(cid: str, body: Dict[str, Any], user: dict = Depends(req
     if len(reason) < 3:
         raise HTTPException(400, "Motif obligatoire")
     tx = await move(cid, amount, "credit" if amount > 0 else "correction", source, reason, f"adj:{new_id()}", body.get("order_code"), user.get("name"))
-    await db.audit_log.insert_one({"id": new_id(), "at": now_iso(), "user": user.get("name"), "user_id": user["id"], "action": "wallet_adjust",
-                                   "customer_id": cid, "amount": amount, "reason": reason, "source": source})
+    await db.audit_log.insert_one({"id": new_id(), "at": now_iso(), "user_name": user.get("name"), "user_id": user["id"], "action": "wallet.adjust",
+                                   "entity_id": cid, "before": {}, "after": {"amount": amount, "reason": reason, "source": source}})
     return {"ok": True, "tx": clean(tx)}
 
 

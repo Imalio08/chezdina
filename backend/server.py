@@ -3812,6 +3812,16 @@ async def public_create_order(body: OrderIn, request: Request):
            "subtotal": sub, "total": total, "status": initial_status, "payment_status": initial_payment,
            "deposit_required": deposit_amount, "deposit_paid": 0, "deposit_tx_ref": None, "deposit_paid_at": None,
            "created_at": now_iso(), "timeline":[{"status": initial_status, "at":now_iso(),"by":"boutique en ligne"}]}
+    try:
+        await db.orders.insert_one(doc)
+    except Exception:
+        if wallet_used:
+            from routers.wallet import move
+            await move(logged["id"], wallet_used, "credit", "remboursement", f"Commande {code} non créée · porte-monnaie restitué", f"refund:{oid}", code)
+        dup = await db.orders.find_one({"checkout_key": body.checkout_key}) if body.checkout_key else None
+        if dup:
+            return {"code": dup["code"], "id": dup["id"], "status": dup["status"], "deposit_required": dup.get("deposit_required", 0), "wallet_used": dup.get("wallet_used", 0), "total": dup.get("total")}
+        raise HTTPException(500, "Commande non enregistrée · réessayez")
     for it in body.items:
         await db.products.update_one({"id": it.product_id}, {"$inc": {"stock": -it.qty}})
         if it.size:
@@ -3819,7 +3829,6 @@ async def public_create_order(body: OrderIn, request: Request):
         await _record_stock_mov(it.product_id, it.size, -it.qty, "Commande en ligne", body.customer.get("name") if body.customer else None, code)
     if body.customer and body.customer.get("id"):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}})
-    await db.orders.insert_one(doc)
     from routers.notify import notify_staff
     await notify_staff("Nouvelle commande en ligne", f"{code} · {(body.customer or {}).get('name') or ''} · {int(total)} FCFA", f"/console/commandes/{code}")
     return {"code": code, "id": doc["id"], "status": initial_status, "deposit_required": deposit_amount, "wallet_used": wallet_used, "total": total}
@@ -5689,7 +5698,11 @@ from routers.notify import router as notify_router  # noqa: E402
 app.include_router(notify_router)
 from routers.wallet import router as wallet_router  # noqa: E402
 app.include_router(wallet_router)
-app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
+_cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
+if "*" in _cors:
+    app.add_middleware(CORSMiddleware, allow_credentials=False, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
+else:
+    app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=_cors, allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")
 async def shutdown(): client.close()

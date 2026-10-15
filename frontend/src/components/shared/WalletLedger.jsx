@@ -11,7 +11,7 @@ export function WalletLedger({ rows, testid = "wallet-history" }) {
   return (
     <div className="divide-y divide-[#f0f0f0] dark:divide-[#2a2a2a]" data-testid={testid}>
       {rows.filter(r => r.status !== "validated").map(r => {
-        const [st, col] = STATUS[r.status] || [r.status, "#666"];
+        const [st, col] = r.amount < 0 && r.status === "available" ? ["Débité", "#c62828"] : (STATUS[r.status] || [r.status, "#666"]);
         return (
           <div key={r.id} className="py-2.5 flex items-start gap-3" data-testid={`wallet-tx-${r.id}`}>
             <div className="flex-1 min-w-0">

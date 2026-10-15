@@ -227,7 +227,7 @@ export default function Checkout() {
             <div className="my-2 p-3 rounded-lg border border-[#ececec] bg-white space-y-2" data-testid="checkout-wallet">
               <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={useWallet} onChange={e => setUseWallet(e.target.checked)} data-testid="checkout-wallet-toggle"/>Utiliser mon porte-monnaie</label>
               <div className="text-xs text-[#666]">Disponible : <b data-testid="checkout-wallet-balance">{fcfa(walletBal)}</b> · utilisable jusqu'à {fcfa(walletMax)} (articles)</div>
-              {useWallet && <div className="flex gap-2 items-center"><input type="number" min={0} max={walletMax} className="dina-input !min-h-[36px] flex-1" value={walletAmt} onChange={e => setWalletAmt(e.target.value)} data-testid="checkout-wallet-amount"/><button type="button" onClick={() => setWalletAmt(walletMax)} className="dina-chip" data-testid="checkout-wallet-max">Max</button></div>}
+              {useWallet && <div className="flex gap-2 items-center"><input type="number" min={0} max={walletMax} className="dina-input !min-h-[36px] flex-1" value={walletAmt} onChange={e => setWalletAmt(e.target.value === "" ? "" : Math.max(0, Math.min(Number(e.target.value), walletMax)))} data-testid="checkout-wallet-amount"/><button type="button" onClick={() => setWalletAmt(walletMax)} className="dina-chip" data-testid="checkout-wallet-max">Max</button></div>}
             </div>
           )}
           {walletUsed > 0 && <div className="flex justify-between text-[#1f8a4c]"><span>Porte-monnaie</span><span className="tabular" data-testid="checkout-wallet-used">−{fcfa(walletUsed)}</span></div>}

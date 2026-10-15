@@ -1,6 +1,6 @@
 export const fcfa = (n) => {
   const v = Math.round(Number(n || 0));
-  return v.toLocaleString("en-US") + " FCFA";
+  return v.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") + " FCFA";
 };
 // Compact FCFA — "77,4 M FCFA" · "2,1 Md FCFA" · "12,5 k FCFA". Use full fcfa() for tooltip.
 export const fcfaCompact = (n) => {

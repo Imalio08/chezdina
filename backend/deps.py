@@ -92,19 +92,21 @@ def require_role(*roles):
 
 
 async def get_customer(request: Request):
-    token = request.cookies.get("customer_token")
-    if not token:
-        h = request.headers.get("Authorization", "")
-        if h.startswith("Bearer "):
-            token = h[7:]
-    if not token:
-        raise HTTPException(401, "Non authentifié")
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALG])
-    except Exception:
-        raise HTTPException(401, "Session expirée")
-    if payload.get("kind") != "customer":
-        raise HTTPException(401, "Token invalide")
+    def _decode(tok):
+        try:
+            p = jwt.decode(tok, JWT_SECRET, algorithms=[JWT_ALG])
+            return p if p.get("kind") == "customer" else None
+        except Exception:
+            return None
+    h = request.headers.get("Authorization", "")
+    payload = _decode(h[7:]) if h.startswith("Bearer ") else None
+    if not payload:
+        token = request.cookies.get("customer_token")
+        if not token:
+            raise HTTPException(401, "Non authentifié")
+        payload = _decode(token)
+        if not payload:
+            raise HTTPException(401, "Session expirée")
     c = await db.customers.find_one({"id": payload["sub"]})
     if not c:
         raise HTTPException(401, "Compte introuvable")
