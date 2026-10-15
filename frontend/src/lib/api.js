@@ -14,4 +14,9 @@ api.interceptors.request.use((cfg) => {
   return cfg;
 });
 
+api.interceptors.response.use((r) => r, (err) => {
+  if (err?.response?.status === 428) window.dispatchEvent(new Event("punch-required"));
+  return Promise.reject(err);
+});
+
 export default api;

@@ -8,9 +8,9 @@ import IconPicker from "@/components/shared/IconPicker";
 import SaveButton from "@/components/shared/SaveButton";
 
 const SECTION_TYPES = [
-  { v: "hero", label: "Hero (mosaïque défilante)", icon: ImageIcon, defaults: { tagline: "Nouvelle collection", title: "Vos talons,", highlight: "votre allure.", subtitle: "Description…", cta_label: "Découvrir", cta_link: "/boutique/catalog", mosaic: [] } },
+  { v: "hero", label: "Hero (mosaïque défilante)", icon: ImageIcon, defaults: { tagline: "Nouvelle collection", title: "Vos talons,", highlight: "votre allure.", subtitle: "Description…", cta_label: "Découvrir", cta_link: "/catalog", mosaic: [] } },
   { v: "product_grid", label: "Grille produits", icon: Grid3x3, defaults: { title: "Nos coups de cœur", eyebrow: "Nouveautés", limit: 8, source: "featured" } },
-  { v: "banner", label: "Bannière image + CTA", icon: Megaphone, defaults: { title: "Soldes d'été", subtitle: "-30% sur la collection", image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1600", cta_label: "Profiter", cta_link: "/boutique/catalog" } },
+  { v: "banner", label: "Bannière image + CTA", icon: Megaphone, defaults: { title: "Soldes d'été", subtitle: "-30% sur la collection", image: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1600", cta_label: "Profiter", cta_link: "/catalog" } },
   { v: "trust_strip", label: "Bandeau confiance", icon: Shield, defaults: { items: [{ icon: "truck", title: "Livraison 24h", text: "Partout à Abidjan." }, { icon: "shield", title: "Paiement à la livraison", text: "Espèces ou Wave." }, { icon: "whatsapp", title: "Conseillère", text: "0777 92 61 79" }] } },
   { v: "text_block", label: "Bloc texte", icon: FileText, defaults: { eyebrow: "À propos", title: "Chez Dina", text: "Boutique femme de Cocody Angré 7e…" } },
   { v: "newsletter", label: "Inscription WhatsApp", icon: Sparkles, defaults: { title: "Restez dans la boucle", subtitle: "Nouveautés & ventes flash sur WhatsApp." } },
@@ -67,7 +67,7 @@ export default function SectionBuilder() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Apparence du site</h1><p className="text-sm text-[#666]">Glissez-déposez pour réordonner, cliquez pour éditer, (dés)activez à la volée</p></div>
         <div className="flex gap-2">
-          <Link to="/boutique" target="_blank" className="dina-btn-secondary !min-h-[40px]" data-testid="section-preview"><ExternalLink size={13} />Prévisualiser</Link>
+          <Link to="/" target="_blank" className="dina-btn-secondary !min-h-[40px]" data-testid="section-preview"><ExternalLink size={13} />Prévisualiser</Link>
           <button onClick={() => setShowAdd(true)} className="dina-btn-secondary !min-h-[40px]" data-testid="section-add"><Plus size={13} />Ajouter</button>
           <SaveButton loading={saving} onClick={save} testid="section-save"/>
         </div>

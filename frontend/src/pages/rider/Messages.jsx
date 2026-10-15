@@ -24,7 +24,7 @@ function Inbox() {
   const pick = (t) => { setTab(t); sessionStorage.setItem("rider_inbox_tab", t); };
   const writeStore = async () => {
     setOpening(true);
-    try { const r = await api.post("/rider/conversations/store"); nav(`/rider/messages/${r.data.id}`); }
+    try { const r = await api.post("/rider/conversations/store"); nav(`/riders/messages/${r.data.id}`); }
     catch { toast.error("Impossible d'ouvrir la conversation · réessayez"); } finally { setOpening(false); }
   };
   if (!list) return <div className="text-center text-sm text-[#666] py-10">Chargement…</div>;
@@ -46,7 +46,7 @@ function Inbox() {
       </div>
       {!shown.length && <div className="text-center text-sm text-[#666] py-12" data-testid="rider-inbox-empty"><MessageSquare size={36} className="mx-auto text-[#ccc] mb-2"/>{tab === "clientes" ? "Aucun message de cliente pour le moment" : "Aucun message de la boutique pour le moment"}</div>}
       {shown.map(c => (
-        <button key={c.id} onClick={() => nav(`/rider/messages/${c.id}`)} className="w-full text-left bg-white dark:bg-[#1a1a1a] rounded-xl p-3 border border-[#ececec] dark:border-[#2a2a2a] flex gap-3" data-testid={`rider-conv-${c.id}`}>
+        <button key={c.id} onClick={() => nav(`/riders/messages/${c.id}`)} className="w-full text-left bg-white dark:bg-[#1a1a1a] rounded-xl p-3 border border-[#ececec] dark:border-[#2a2a2a] flex gap-3" data-testid={`rider-conv-${c.id}`}>
           <div className="w-9 h-9 rounded-full bg-[color:var(--rider-accent)] text-[color:var(--rider-primary)] font-bold text-sm grid place-items-center shrink-0">{(c.with?.name || "?")[0]}</div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
@@ -89,9 +89,9 @@ function Conversation({ id }) {
     <div className="bg-white dark:bg-[#1a1a1a] rounded-xl border border-[#ececec] dark:border-[#2a2a2a] p-3 flex flex-col h-[calc(100dvh-170px)]" data-testid="rider-conversation">
       <PhotoLightbox src={zoom} onClose={() => setZoom(null)}/>
       <div className="flex items-center gap-2 pb-2 border-b border-[#f0f0f0] dark:border-[#2a2a2a]">
-        <button onClick={() => nav("/rider/messages")} className="p-1" data-testid="rider-conv-back"><ArrowLeft size={16}/></button>
+        <button onClick={() => nav("/riders/messages")} className="p-1" data-testid="rider-conv-back"><ArrowLeft size={16}/></button>
         <div className="min-w-0 flex-1"><div className="font-semibold text-sm truncate">{other?.name || "…"}</div><div className="text-[10px] text-[#999] uppercase">{conv ? kindLabel(conv) : ""}{conv?.order_code ? ` · ${conv.order_code}` : ""}</div></div>
-        {conv?.order_code && <button onClick={() => nav(`/rider?course=${conv.order_code}`)} className="text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-full border border-[#ececec] dark:border-[#2a2a2a] shrink-0" data-testid="rider-conv-open-course"><Package size={12}/>Voir la course</button>}
+        {conv?.order_code && <button onClick={() => nav(`/riders?course=${conv.order_code}`)} className="text-[11px] flex items-center gap-1 px-2.5 py-1 rounded-full border border-[#ececec] dark:border-[#2a2a2a] shrink-0" data-testid="rider-conv-open-course"><Package size={12}/>Voir la course</button>}
       </div>
       <div ref={listRef} className="flex-1 overflow-y-auto py-2 space-y-2">
         {count === 0 ? <div className="text-xs text-[#999] text-center py-6">Pas encore de message</div> : conv.messages.map(m => {

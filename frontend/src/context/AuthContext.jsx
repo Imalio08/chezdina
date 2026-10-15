@@ -22,6 +22,11 @@ export function AuthProvider({ children }) {
       }
     })();
   }, []);
+  useEffect(() => {
+    const f = () => setUser(u => (u && u.role !== "admin" && u.role !== "rider") ? { ...u, punch_required: true } : u);
+    window.addEventListener("punch-required", f);
+    return () => window.removeEventListener("punch-required", f);
+  }, []);
 
   const login = async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });

@@ -153,7 +153,7 @@ function POSInner() {
   };
 
   const shareProduct = (p) => {
-    const link = `${window.location.origin}/boutique/product/${p.id}`;
+    const link = `${window.location.origin}/product/${p.id}`;
     if (customer?.phone) {
       const digits = customer.phone.replace(/\D/g,"");
       const txt = `Bonjour ${customer.name}, voilà le produit : ${p.name} à ${fcfa(p.price)}\n${link}`;

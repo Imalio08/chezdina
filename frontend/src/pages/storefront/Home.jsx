@@ -90,7 +90,7 @@ export default function Home() {
         <div className="grid grid-cols-3 md:grid-cols-6 gap-3" data-testid="categories">
           {categories.slice(0, 6).map(c => {
             const img = products.find(p => p.category === c)?.image;
-            return <Link key={c} to={`/boutique/catalog?cat=${encodeURIComponent(c)}`} className="group">
+            return <Link key={c} to={`/catalog?cat=${encodeURIComponent(c)}`} className="group">
               <div className="aspect-square bg-[#fff5f5] dark:bg-[#2a1818] rounded-xl overflow-hidden"><SmartImage src={img} alt={c} fallbackText={c} className="w-full h-full object-cover group-hover:scale-105 transition" /></div>
               <div className="text-center text-xs mt-1.5 font-semibold">{c}</div>
             </Link>;
@@ -98,10 +98,10 @@ export default function Home() {
         </div>
       </section>
 
-      <Row title="Bons plans" eyebrow="Promotions" products={bonsPlans} link="/boutique/bons-plans" />
-      <Row title="Nouveautés" eyebrow="Fraîchement arrivé" products={nouveautes} link="/boutique/catalog?sort=new" />
+      <Row title="Bons plans" eyebrow="Promotions" products={bonsPlans} link="/bons-plans" />
+      <Row title="Nouveautés" eyebrow="Fraîchement arrivé" products={nouveautes} link="/catalog?sort=new" />
 
-      {categories.slice(0, 4).map(c => <Row key={c} title={c} products={byCat(c)} link={`/boutique/catalog?cat=${encodeURIComponent(c)}`} />)}
+      {categories.slice(0, 4).map(c => <Row key={c} title={c} products={byCat(c)} link={`/catalog?cat=${encodeURIComponent(c)}`} />)}
 
       {lookbook.length > 0 && lookbook[0].product_ids?.length > 0 && (
         <section className="max-w-7xl mx-auto px-4 py-10">
@@ -147,7 +147,7 @@ function HeroCarousel({ props }) {
           {props.tagline && <div className="text-xs uppercase tracking-widest text-[#b02a2a] font-semibold mb-3">{props.tagline}</div>}
           <h1 className="font-serif text-4xl md:text-6xl leading-[1.05]">{props.title}<br /><span className="italic text-[#b02a2a]">{props.highlight}</span></h1>
           <p className="text-[#666] dark:text-[#aaa] mt-4 max-w-md leading-relaxed">{props.subtitle}</p>
-          <Link to={props.cta_link || "/boutique/catalog"} className="dina-btn-primary mt-5 inline-flex" data-testid="hero-cta">{props.cta_label || "J'achète"} <ChevronRight size={16} /></Link>
+          <Link to={props.cta_link || "/catalog"} className="dina-btn-primary mt-5 inline-flex" data-testid="hero-cta">{props.cta_label || "J'achète"} <ChevronRight size={16} /></Link>
         </div>
         {images.length > 0 && (
           <div className="grid grid-cols-2 gap-3 h-[520px] md:h-[560px] overflow-hidden" data-testid="hero-mosaic">

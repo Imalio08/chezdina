@@ -76,7 +76,7 @@ export default function Rider() {
         <div><div className="font-serif text-xl">Chez Dina · Livreurs</div><div className="text-xs text-[#999]">{user?.name}</div></div>
         <div className="flex items-center gap-2">
           <button onClick={alertManager} className="bg-[#b02a2a] px-2 py-1 rounded text-[11px] flex items-center gap-1" data-testid="rider-contact-manager" title="Contacter la gérante"><MessageCircle size={11}/>Gérante</button>
-          <button onClick={async()=>{await logout(); nav("/login");}} className="text-[#999]" data-testid="rider-logout"><LogOut size={18}/></button>
+          <button onClick={async()=>{await logout(); nav("/riders/connexion");}} className="text-[#999]" data-testid="rider-logout"><LogOut size={18}/></button>
         </div>
       </header>
 

@@ -19,7 +19,7 @@ export default function Promotions() {
         {items.map(p => {
           const pct = Math.round(((p.compare_at_price - p.price) / p.compare_at_price) * 100);
           return (
-            <Link key={p.id} to={`/boutique/product/${p.id}`} className="block relative" data-testid={`promo-${p.id}`}>
+            <Link key={p.id} to={`/product/${p.id}`} className="block relative" data-testid={`promo-${p.id}`}>
               <div className="aspect-[3/4] bg-[#fff5f5] rounded overflow-hidden"><img src={p.image || p.images?.[0]} alt={p.name} className="w-full h-full object-cover"/></div>
               <span className="absolute top-2 left-2 bg-[#b02a2a] text-white text-xs font-bold px-2 py-1 rounded">-{pct}%</span>
               <div className="mt-2 text-sm font-medium truncate">{p.name}</div>

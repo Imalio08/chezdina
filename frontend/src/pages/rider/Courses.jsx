@@ -191,7 +191,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(prefill)}`, "_blank");
     setShowWa(false);
   };
-  const itinerary = () => navTo(`/rider/carte?route=${order.id}`);
+  const itinerary = () => navTo(`/riders/carte?route=${order.id}`);
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end" onClick={onClose}>

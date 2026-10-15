@@ -13,7 +13,7 @@ from deps import (
     db, JWT_SECRET, JWT_ALG,
     hash_pw, verify_pw, make_token, make_customer_token,
     new_id, now_iso, gen_access_code, clean,
-    get_user, get_customer, norm_phone,
+    get_user, get_customer, norm_phone, punch_required,
 )
 from models import (
     LoginIn, PinIn, CustomerIn, CustomerLoginIn, CustomerLoginCodeIn,
@@ -41,6 +41,7 @@ async def login(body: LoginIn, response: Response):
     response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60 * 60 * 24 * 7, path="/")
     for k in ("_id", "password_hash", "pin_hash"):
         u.pop(k, None)
+    u["punch_required"] = await punch_required(u)
     return {"user": u, "token": token}
 
 
@@ -52,13 +53,14 @@ async def login_pin(body: PinIn, response: Response):
             response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60 * 60 * 24 * 7, path="/")
             for k in ("_id", "password_hash", "pin_hash"):
                 u.pop(k, None)
+            u["punch_required"] = await punch_required(u)
             return {"user": u, "token": token}
     raise HTTPException(401, "PIN invalide")
 
 
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_user)):
-    return user
+    return {**user, "punch_required": await punch_required(user)}
 
 
 @router.post("/auth/me/tour-done")

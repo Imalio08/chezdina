@@ -64,9 +64,9 @@ export default function StorefrontLayout() {
         .then(r => {
           const d = r.data || {};
           const items = [
-            ...(d.products || []).map(p => ({ type: "produit", id: p.id, name: p.name, image: p.image, link: `/boutique/product/${p.id}` })),
-            ...(d.categories || []).map(c => ({ type: "catégorie", name: c, link: `/boutique/catalog?category=${encodeURIComponent(c)}` })),
-            ...(d.brands || []).map(b => ({ type: "marque", name: b, link: `/boutique/catalog?brand=${encodeURIComponent(b)}` })),
+            ...(d.products || []).map(p => ({ type: "produit", id: p.id, name: p.name, image: p.image, link: `/product/${p.id}` })),
+            ...(d.categories || []).map(c => ({ type: "catégorie", name: c, link: `/catalog?category=${encodeURIComponent(c)}` })),
+            ...(d.brands || []).map(b => ({ type: "marque", name: b, link: `/catalog?brand=${encodeURIComponent(b)}` })),
           ];
           setSugg(items);
         })
@@ -77,7 +77,7 @@ export default function StorefrontLayout() {
 
   const submit = (e) => {
     e?.preventDefault?.();
-    if (q.trim()) nav(`/boutique/catalog?q=${encodeURIComponent(q.trim())}`);
+    if (q.trim()) nav(`/catalog?q=${encodeURIComponent(q.trim())}`);
     setOpen(false);
   };
 
@@ -86,7 +86,7 @@ export default function StorefrontLayout() {
       <div className="bg-[#b02a2a] text-white text-center text-xs py-1.5">Livraison 24h à Abidjan · Paiement à la livraison · WhatsApp 0777 92 61 79</div>
       <header className="sticky top-0 z-30 bg-white dark:bg-[#141414] border-b border-[#ececec] dark:border-[#2a2a2a]">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 h-16 sm:h-20 flex items-center gap-1.5 sm:gap-3 md:gap-4">
-          <Link to="/boutique" className="flex items-center gap-2 shrink-0" data-testid="storefront-logo">
+          <Link to="/" className="flex items-center gap-2 shrink-0" data-testid="storefront-logo">
             {site.logo ? (
               <>
                 <img src={site.logo} alt={brandName} className="h-9 sm:h-11 max-w-[90px] sm:max-w-[120px] object-contain" data-testid="storefront-logo-img"/>
@@ -100,11 +100,11 @@ export default function StorefrontLayout() {
             )}
           </Link>
           <nav className="hidden lg:flex items-center gap-5 text-sm text-[#1c1c1c] dark:text-[#f0f0f0] ml-2">
-            <Link to="/boutique/catalog" data-testid="nav-catalog">Catalogue</Link>
-            <Link to="/boutique/catalog?category=Talons">Talons</Link>
-            <Link to="/boutique/catalog?category=Sandales">Sandales</Link>
-            <Link to="/boutique/catalog?category=Sacs à main">Sacs</Link>
-            <Link to="/boutique/catalog?category=Pochettes">Pochettes</Link>
+            <Link to="/catalog" data-testid="nav-catalog">Catalogue</Link>
+            <Link to="/catalog?category=Talons">Talons</Link>
+            <Link to="/catalog?category=Sandales">Sandales</Link>
+            <Link to="/catalog?category=Sacs à main">Sacs</Link>
+            <Link to="/catalog?category=Pochettes">Pochettes</Link>
           </nav>
           <form onSubmit={submit} className="flex-1 min-w-0 max-w-xl relative" data-testid="storefront-search-form">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999] pointer-events-none" />
@@ -161,13 +161,13 @@ export default function StorefrontLayout() {
               </button>
               {userMenu && (
                 <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-lg py-1 z-40" data-testid="user-dropdown" onClick={() => setUserMenu(false)}>
-                  <Link to="/boutique/compte" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-account"><User size={14}/>Mon compte</Link>
-                  <Link to="/boutique/compte/commandes" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-orders"><Package size={14}/>Mes commandes</Link>
-                  <Link to="/boutique/compte/messages" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-messages"><MessageSquare size={14}/>Messages</Link>
-                  <Link to="/boutique/compte/favoris" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-favorites"><Heart size={14}/>Favoris</Link>
-                  <Link to="/boutique/compte/bons-achat" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-vouchers"><Ticket size={14}/>Bons d'achat</Link>
+                  <Link to="/compte" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-account"><User size={14}/>Mon compte</Link>
+                  <Link to="/compte/commandes" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-orders"><Package size={14}/>Mes commandes</Link>
+                  <Link to="/compte/messages" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-messages"><MessageSquare size={14}/>Messages</Link>
+                  <Link to="/compte/favoris" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-favorites"><Heart size={14}/>Favoris</Link>
+                  <Link to="/compte/bons-achat" className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid="menu-vouchers"><Ticket size={14}/>Bons d'achat</Link>
                   <div className="border-t border-[#f0f0f0] dark:border-[#2a2a2a] my-1"></div>
-                  <button onClick={() => { logout(); nav("/boutique"); }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm text-[#c62828]" data-testid="menu-logout-header"><LogOut size={14}/>Déconnexion</button>
+                  <button onClick={() => { logout(); nav("/"); }} className="w-full flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm text-[#c62828]" data-testid="menu-logout-header"><LogOut size={14}/>Déconnexion</button>
                 </div>
               )}
             </div>
@@ -176,14 +176,14 @@ export default function StorefrontLayout() {
               <button onClick={() => setUserMenu(!userMenu)} className="w-9 h-9 grid place-items-center" data-testid="storefront-account" aria-label="Mon compte"><User size={18}/></button>
               {userMenu && (
                 <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-lg p-2 z-40 space-y-1" data-testid="guest-dropdown" onClick={() => setUserMenu(false)}>
-                  <Link to="/boutique/compte" className="dina-btn-primary w-full !min-h-[38px] text-sm justify-center" data-testid="guest-login">Se connecter</Link>
-                  <Link to="/boutique/compte?mode=inscription" className="dina-btn-secondary w-full !min-h-[38px] text-sm justify-center" data-testid="guest-signup">Créer un compte</Link>
+                  <Link to="/compte" className="dina-btn-primary w-full !min-h-[38px] text-sm justify-center" data-testid="guest-login">Se connecter</Link>
+                  <Link to="/compte?mode=inscription" className="dina-btn-secondary w-full !min-h-[38px] text-sm justify-center" data-testid="guest-signup">Créer un compte</Link>
                   <div className="text-[10px] text-[#999] text-center pt-1">Suivi de commandes, adresses, fidélité</div>
                 </div>
               )}
             </div>
           )}
-          <Link to="/boutique/checkout" className="relative w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-cart">
+          <Link to="/checkout" className="relative w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-cart">
             <ShoppingBag size={18}/>
             {count>0 && <span className="absolute -top-1 -right-1 bg-[#b02a2a] text-white text-[10px] font-bold rounded-full w-4 h-4 grid place-items-center">{count}</span>}
           </Link>
@@ -205,8 +205,8 @@ export default function StorefrontLayout() {
             <p>{biz.tagline || "Mode féminine · Abidjan."}<br/>Livraison partout en Côte d'Ivoire.</p>
             <div className="mt-3 text-xs">WhatsApp Business<br/><strong className="text-[#1c1c1c] dark:text-[#f0f0f0]">{biz.whatsapp || "+225 07 77 92 61 79"}</strong></div>
           </div>
-          <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/boutique/catalog">Catalogue</Link></li><li><Link to="/boutique/nouveautes">Nouveautés</Link></li><li><Link to="/boutique/promotions">Promotions</Link></li><li><Link to="/boutique/guide-tailles">Guide des tailles</Link></li></ul></div>
-          <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Aide</div><ul className="space-y-1"><li><Link to="/boutique/livraison-retours">Livraison & retours</Link></li><li><Link to="/boutique/suivi-commande">Suivi de commande</Link></li><li><Link to="/boutique/contact">Contact</Link></li></ul></div>
+          <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Boutique</div><ul className="space-y-1"><li><Link to="/catalog">Catalogue</Link></li><li><Link to="/nouveautes">Nouveautés</Link></li><li><Link to="/promotions">Promotions</Link></li><li><Link to="/guide-tailles">Guide des tailles</Link></li></ul></div>
+          <div><div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Aide</div><ul className="space-y-1"><li><Link to="/livraison-retours">Livraison & retours</Link></li><li><Link to="/suivi-commande">Suivi de commande</Link></li><li><Link to="/contact">Contact</Link></li></ul></div>
           <div>
             <div className="font-semibold text-[#1c1c1c] dark:text-[#f0f0f0] mb-2">Suivez-nous</div>
             <ul className="space-y-2">

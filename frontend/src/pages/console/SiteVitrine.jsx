@@ -54,7 +54,7 @@ export default function SiteVitrine() {
           <h1 className="font-serif text-3xl">Site vitrine</h1>
           <p className="text-sm text-[#666]">Apparence, contenu, pages, SEO et aperçu</p>
         </div>
-        <a href="/boutique" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-site">
+        <a href="/" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-site">
           <ExternalLink size={14}/>Voir le site
         </a>
       </div>
@@ -92,7 +92,7 @@ function ApparenceTab() {
 
   const save = async () => {
     setSaving(true);
-    try { await api.patch("/site", { theme }); toast.success("Apparence enregistrée — rechargez /boutique"); } 
+    try { await api.patch("/site", { theme }); toast.success("Apparence enregistrée — rechargez la boutique"); } 
     catch { toast.error("Erreur"); } finally { setSaving(false); }
   };
 
@@ -295,7 +295,7 @@ function MenuSub() {
   const save = async () => { try { await api.patch("/site", { menu: items }); toast.success("Enregistré"); } catch { toast.error("Erreur"); } };
   const update = (i, patch) => { const n = [...items]; n[i] = { ...n[i], ...patch }; setItems(n); };
   const remove = (i) => setItems(items.filter((_, k) => k !== i));
-  const add = () => setItems([...items, { label: "Nouveau", link: "/boutique/catalog" }]);
+  const add = () => setItems([...items, { label: "Nouveau", link: "/catalog" }]);
   return (
     <div className="dina-card-white p-5 space-y-2" data-testid="menu-editor">
       <div className="font-serif text-xl mb-2">Menu principal</div>
@@ -316,11 +316,11 @@ function MenuSub() {
 }
 
 const DEFAULT_MENU = [
-  { label: "Catalogue", link: "/boutique/catalog" },
-  { label: "Talons & Chaussures", link: "/boutique/catalog?category=Chaussures" },
-  { label: "Robes", link: "/boutique/catalog?category=Robes" },
-  { label: "Sacs", link: "/boutique/catalog?category=Sacs" },
-  { label: "Accessoires", link: "/boutique/catalog?category=Accessoires" },
+  { label: "Catalogue", link: "/catalog" },
+  { label: "Talons & Chaussures", link: "/catalog?category=Chaussures" },
+  { label: "Robes", link: "/catalog?category=Robes" },
+  { label: "Sacs", link: "/catalog?category=Sacs" },
+  { label: "Accessoires", link: "/catalog?category=Accessoires" },
 ];
 
 function FooterSub() {
@@ -438,7 +438,7 @@ function SeoTab() {
 /* ========= Aperçu ========= */
 function ApercuTab() {
   const [mode, setMode] = useState("desktop");
-  const url = `${window.location.origin}/boutique`;
+  const url = `${window.location.origin}/`;
   const copy = () => {
     try { navigator.clipboard.writeText(url).then(() => toast.success("Lien copié !")).catch(() => toast.info(url)); }
     catch { toast.info(url); }

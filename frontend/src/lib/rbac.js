@@ -87,6 +87,6 @@ export function canAccess(role, pathname) {
 
 /** Returns the landing page for the given role (fallback = /console). */
 export function landingFor(role) {
-  if (role === "rider") return "/rider";
+  if (role === "rider") return "/riders";
   return "/console";
 }

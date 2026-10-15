@@ -29,11 +29,11 @@ const RIDER_ICONS = {
 const ICON_NAMES = Object.keys(RIDER_ICONS);
 
 const DEFAULT_TABS = [
-  { key: "courses",     to: "/rider",             icon: "Package", label: "Courses",     visible: true, builtin: true },
-  { key: "carte",       to: "/rider/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
-  { key: "historique",  to: "/rider/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
-  { key: "performance", to: "/rider/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
-  { key: "profil",      to: "/rider/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
+  { key: "courses",     to: "/riders",             icon: "Package", label: "Courses",     visible: true, builtin: true },
+  { key: "carte",       to: "/riders/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
+  { key: "historique",  to: "/riders/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
+  { key: "performance", to: "/riders/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
+  { key: "profil",      to: "/riders/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
 ];
 const DEFAULTS = {
   logo: "",
@@ -93,7 +93,7 @@ function useRiderCms() {
 }
 
 /* ============================ Root ============================ */
-const RESERVED = ["rider", "boutique", "console", "login", "scan", "suivi", "api"];
+const RESERVED = ["rider", "riders", "boutique", "console", "login", "scan", "suivi", "api", "catalog", "product", "checkout", "compte", "account", "invitation", "bons-plans", "nouveautes", "promotions", "guide-tailles", "livraison-retours", "suivi-commande", "contact", "panier-partage", "noter"];
 
 function AccessCard({ ctx }) {
   const [slug, setSlug] = useState(ctx.cms.access_slug || "");
@@ -116,7 +116,7 @@ function AccessCard({ ctx }) {
           <button onClick={save} className="dina-btn-primary !min-h-[34px] text-xs" data-testid="rider-access-save">Enregistrer</button></div>
         <div className="text-xs font-mono break-all" data-testid="rider-access-url">{url}</div>
         <div className="flex gap-2 flex-wrap"><button onClick={copy} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid="rider-access-copy">Copier</button><button onClick={share} className="dina-btn-secondary !min-h-[32px] text-xs !text-[#1f8a4c]" data-testid="rider-access-wa">Envoyer par WhatsApp</button></div>
-        <div className="text-[11px] text-[#999]">/rider reste toujours valable. Les livreurs se connectent sur {window.location.host}/rider/login.</div>
+        <div className="text-[11px] text-[#999]">/riders reste toujours valable. Les livreurs se connectent sur {window.location.host}/riders/connexion.</div>
       </div>
     </div>
   );
@@ -135,7 +135,7 @@ export default function LivreurApp() {
           <h1 className="font-serif text-3xl">App Livreur</h1>
           <p className="text-sm text-[#666]">Identité, onglets, annonces, aide et aperçu de l'espace livreur</p>
         </div>
-        <a href="/rider" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-rider">
+        <a href="/riders" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-rider">
           <ExternalLink size={14}/> Voir l'app livreur
         </a>
       </div>
@@ -436,10 +436,10 @@ function ApercuTab({ ctx }) {
 
           {/* Live iframe */}
           <div className="rounded-[32px] border-8 border-[#1a1a1a] shadow-xl w-[320px] overflow-hidden bg-white">
-            <div className="text-[10px] uppercase tracking-wider text-[#999] px-2 py-1 bg-[#fafafa] border-b">Live · /rider</div>
+            <div className="text-[10px] uppercase tracking-wider text-[#999] px-2 py-1 bg-[#fafafa] border-b">Live · /riders</div>
             <iframe
               key={iframeKey}
-              src="/rider"
+              src="/riders"
               title="Aperçu livreur"
               className="w-full h-[520px] bg-white"
               data-testid="rider-preview-iframe"

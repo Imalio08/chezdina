@@ -27,11 +27,11 @@ DEFAULT_RIDER_CMS: Dict[str, Any] = {
         "content": "Appelez votre gérante · +225 07 77 92 61 79 · ou utilisez la messagerie interne.",
     },
     "tabs": [
-        {"key": "courses", "to": "/rider", "icon": "Package", "label": "Courses", "visible": True, "builtin": True},
-        {"key": "carte", "to": "/rider/carte", "icon": "Map", "label": "Carte", "visible": True, "builtin": True},
-        {"key": "historique", "to": "/rider/historique", "icon": "History", "label": "Historique", "visible": True, "builtin": True},
-        {"key": "performance", "to": "/rider/performance", "icon": "Trophy", "label": "Performance", "visible": True, "builtin": True},
-        {"key": "profil", "to": "/rider/profil", "icon": "User", "label": "Profil", "visible": True, "builtin": True},
+        {"key": "courses", "to": "/riders", "icon": "Package", "label": "Courses", "visible": True, "builtin": True},
+        {"key": "carte", "to": "/riders/carte", "icon": "Map", "label": "Carte", "visible": True, "builtin": True},
+        {"key": "historique", "to": "/riders/historique", "icon": "History", "label": "Historique", "visible": True, "builtin": True},
+        {"key": "performance", "to": "/riders/performance", "icon": "Trophy", "label": "Performance", "visible": True, "builtin": True},
+        {"key": "profil", "to": "/riders/profil", "icon": "User", "label": "Profil", "visible": True, "builtin": True},
     ],
 }
 
@@ -73,7 +73,7 @@ async def rider_cms_update(body: Dict[str, Any], user: dict = Depends(require_ro
     ann, old = merged.get("announcement") or {}, current.get("announcement") or {}
     if ann.get("enabled") and ann.get("text") and (ann.get("text") != old.get("text") or not old.get("enabled")):
         from routers.notify import notify_riders
-        await notify_riders("Nouvelle annonce de la boutique", ann["text"], "/rider", f"ann:{now_iso()[:19]}")
+        await notify_riders("Nouvelle annonce de la boutique", ann["text"], "/riders", f"ann:{now_iso()[:19]}")
     return {"ok": True, "rider_cms": clean(merged)}
 
 

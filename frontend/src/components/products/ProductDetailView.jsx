@@ -29,7 +29,7 @@ export default function ProductDetailView({ productId, onBack, onEdit }) {
     api.get(`/public/product/${productId}`).then(r => setP(r.data));
   };
   const share = () => {
-    const link = `${window.location.origin}/boutique/product/${p.id}`;
+    const link = `${window.location.origin}/product/${p.id}`;
     navigator.clipboard?.writeText(link); toast.success("Lien produit copié");
   };
   const duplicate = async () => {

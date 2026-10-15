@@ -34,7 +34,7 @@ export default function SiteAppearance() {
     <div className="space-y-5">
       <div className="flex justify-between items-center flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Apparence du site</h1><p className="text-sm text-[#666]">Édite les blocs vitrine sans toucher au JSON</p></div>
-        <a href="/boutique" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-site"><ExternalLink size={14}/>Voir le site</a>
+        <a href="/" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-site"><ExternalLink size={14}/>Voir le site</a>
       </div>
 
       <div className="flex gap-1 border-b border-[#ececec] dark:border-[#2a2a2a] overflow-x-auto">

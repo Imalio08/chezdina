@@ -261,7 +261,7 @@ export default function ConsoleLayout() {
         </div>
         {!collapsed && (
           <div className="px-5 pt-3">
-            <a href="/boutique" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-[#b02a2a] hover:text-white" data-testid="view-storefront-link"><Store size={12}/>Voir le site vitrine →</a>
+            <a href="/" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-[#b02a2a] hover:text-white" data-testid="view-storefront-link"><Store size={12}/>Voir le site vitrine →</a>
           </div>
         )}
         <nav className={`flex-1 overflow-y-auto scrollbar-thin ${collapsed ? "px-1" : "px-2"} py-3`}>
@@ -318,8 +318,8 @@ export default function ConsoleLayout() {
           {showUserMenu && (
             <div className="mt-2 bg-[#2a2a2a] rounded-lg p-1 space-y-0.5" data-testid="user-menu">
               <button onClick={()=>{setTheme(theme==="light"?"dark":"light"); setShowUserMenu(false);}} className="w-full text-left px-3 py-2 text-xs rounded hover:bg-[#333] flex items-center gap-2" data-testid="menu-theme">{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}Mode {theme==="light"?"sombre":"clair"}</button>
-              <button onClick={()=>{nav("/login"); setShowUserMenu(false);}} className="w-full text-left px-3 py-2 text-xs rounded hover:bg-[#333] flex items-center gap-2" data-testid="menu-switch">↻ Changer d'utilisateur</button>
-              <button onClick={async()=>{await logout(); nav("/login");}} className="w-full text-left px-3 py-2 text-xs rounded hover:bg-[#333] flex items-center gap-2 text-[#ff6b6b]" data-testid="logout-button"><LogOut size={12}/>Déconnexion</button>
+              <button onClick={()=>{nav("/console/connexion"); setShowUserMenu(false);}} className="w-full text-left px-3 py-2 text-xs rounded hover:bg-[#333] flex items-center gap-2" data-testid="menu-switch">↻ Changer d'utilisateur</button>
+              <button onClick={async()=>{await logout(); nav("/console/connexion");}} className="w-full text-left px-3 py-2 text-xs rounded hover:bg-[#333] flex items-center gap-2 text-[#ff6b6b]" data-testid="logout-button"><LogOut size={12}/>Déconnexion</button>
             </div>
           )}
         </div>

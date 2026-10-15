@@ -81,7 +81,42 @@ async def get_user(request: Request):
         raise HTTPException(401, "Introuvable")
     for k in ("_id", "password_hash", "pin_hash"):
         user.pop(k, None)
+    path = request.url.path
+    if user.get("role") == "rider" and not path.startswith(RIDER_PREFIXES):
+        raise HTTPException(403, "Accès réservé à l'équipe de la boutique")
+    if not path.startswith(PUNCH_FREE) and await punch_required(user):
+        raise HTTPException(428, "Pointage d'arrivée requis")
     return user
+
+
+RIDER_PREFIXES = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in", "/api/business", "/api/deliveries",
+                  "/api/delivery-templates", "/api/me/", "/api/notifications", "/api/orders-messages", "/api/orders/",
+                  "/api/rider", "/api/users/me", "/api/push/", "/api/public/")
+PUNCH_FREE = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in")
+_punch_cfg = {"at": 0.0, "roles": set()}
+
+
+def reset_punch_cache():
+    _punch_cfg["at"] = 0.0
+
+
+async def _punch_roles() -> set:
+    import time
+    if time.time() - _punch_cfg["at"] > 60:
+        biz = await db.business.find_one({"id": "main"}, {"attendance_config": 1}) or {}
+        cfg = biz.get("attendance_config") or {}
+        roles = set(cfg.get("enabled_roles") or ["manager", "sales", "stock_keeper", "community_manager"]) if cfg.get("enabled", True) else set()
+        _punch_cfg.update(at=time.time(), roles=roles - {"admin", "rider"})
+    return _punch_cfg["roles"]
+
+
+async def punch_required(user: dict) -> bool:
+    """Console staff (not admin / rider) must have an open arrival punch today."""
+    if user.get("role") in ("admin", "rider") or user.get("role") not in await _punch_roles():
+        return False
+    today = datetime.now(timezone.utc).date().isoformat()
+    last = await db.attendance.find_one({"user_id": user["id"], "day": today}, {"kind": 1}, sort=[("at", -1)])
+    return not last or last.get("kind") not in ("arrival", "in")
 
 def require_role(*roles):
     async def dep(user: dict = Depends(get_user)):

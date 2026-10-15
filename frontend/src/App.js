@@ -106,19 +106,27 @@ import BrandingBootstrapper from "@/components/BrandingBootstrapper";
 import { ImageEditorHost } from "@/components/shared/ImageEditor";
 import { PdfPreviewHost } from "@/components/shared/PdfPreview";
 import RiderLogin from "@/pages/rider/RiderLogin";
+import PunchGate from "@/components/shared/PunchGate";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
-  if (!user) return <Navigate to="/login" replace />;
-  if (user.role === "rider") return <Navigate to="/rider" replace />;
+  if (!user) return <Navigate to="/console/connexion" replace />;
+  if (user.role === "rider") return <Navigate to="/riders" replace />;
+  if (user.punch_required) return <PunchGate />;
   return children;
 }
 function ProtectedRider({ children }) {
   const { user, loading } = useAuth();
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
-  if (!user) return <Navigate to="/rider/login" replace />;
+  if (!user) return <Navigate to="/riders/connexion" replace />;
+  if (user.role !== "rider") return <Navigate to="/console" replace />;
   return children;
+}
+// Old URLs (/boutique/…, /rider/…) keep working: strip / swap the prefix, keep query + hash.
+function Legacy({ from, to }) {
+  const { pathname, search, hash } = useLocation();
+  return <Navigate to={`${(to + pathname.slice(from.length)) || "/"}${search}${hash}`} replace />;
 }
 function SlugRedirect() {
   const { slug } = useParams();
@@ -126,10 +134,10 @@ function SlugRedirect() {
   useEffect(() => {
     api.get("/public/rider-cms").then(r => {
       const s = (r.data?.access_slug || "").toLowerCase();
-      if (s && s === slug.toLowerCase()) window.location.replace("/rider"); else setMiss(true);
+      if (s && s === slug.toLowerCase()) window.location.replace("/riders"); else setMiss(true);
     }).catch(() => setMiss(true));
   }, [slug]);
-  return miss ? <Navigate to="/console" replace /> : <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
+  return miss ? <Navigate to="/" replace /> : <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
 }
 
 function ScrollToTop() {
@@ -162,12 +170,16 @@ export default function App() {
           <BrandingBootstrapper />
           <SubdomainRouter />
           <Routes>
-            <Route path="/login" element={<Login />} />
+            <Route path="/console/connexion" element={<Login />} />
+            <Route path="/login" element={<Legacy from="/login" to="/console/connexion" />} />
             <Route path="/scan" element={<ScanRedirect />} />
             <Route path="/suivi/:code" element={<Tracking />} />
-            <Route path="/boutique/panier-partage/:id" element={<SharedCart />} />
-            <Route path="/rider/login" element={<RiderLogin />} />
-            <Route path="/rider" element={<ProtectedRider><RiderShell /></ProtectedRider>}>
+            <Route path="/panier-partage/:id" element={<SharedCart />} />
+            <Route path="/riders/connexion" element={<RiderLogin />} />
+            <Route path="/rider/login" element={<Navigate to="/riders/connexion" replace />} />
+            <Route path="/rider/*" element={<Legacy from="/rider" to="/riders" />} />
+            <Route path="/boutique/*" element={<Legacy from="/boutique" to="" />} />
+            <Route path="/riders" element={<ProtectedRider><RiderShell /></ProtectedRider>}>
               <Route index element={<ErrorBoundary><RiderCourses /></ErrorBoundary>} />
               <Route path="carte" element={<ErrorBoundary><RiderCarte /></ErrorBoundary>} />
               <Route path="historique" element={<ErrorBoundary><RiderHistorique /></ErrorBoundary>} />
@@ -177,7 +189,7 @@ export default function App() {
               <Route path="messages/:id" element={<ErrorBoundary><RiderMessages /></ErrorBoundary>} />
               <Route path="notifications" element={<ErrorBoundary><RiderNotifications /></ErrorBoundary>} />
             </Route>
-            <Route path="/boutique" element={<StorefrontLayout />}>
+            <Route path="/" element={<StorefrontLayout />}>
               <Route index element={<><OpeningHoursBanner/><Home /></>} />
               <Route path="catalog" element={<Catalog />} />
               <Route path="product/:id" element={<ProductPage />} />
@@ -191,7 +203,7 @@ export default function App() {
               <Route path="guide-tailles" element={<GuideTailles />} />
               <Route path="livraison-retours" element={<LivraisonRetours />} />
               <Route path="suivi-commande" element={<Suivi />} />
-              <Route path="suivi" element={<Navigate to="/boutique/suivi-commande" replace />} />
+              <Route path="suivi" element={<Navigate to="/suivi-commande" replace />} />
               <Route path="contact" element={<Contact />} />
             </Route>
             <Route path="/console" element={<Protected><ConsoleLayout /></Protected>}>
@@ -247,7 +259,7 @@ export default function App() {
               <Route path="presence" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
               <Route path="apparence" element={<Navigate to="/console/site?tab=apparence" replace/>} />
               <Route path="accueil" element={<Navigate to="/console/site?tab=accueil" replace/>} />
-              <Route path="apercu" element={<Navigate to="/boutique" replace/>} />
+              <Route path="apercu" element={<Navigate to="/" replace/>} />
               <Route path="finances" element={<ErrorBoundary><Finances/></ErrorBoundary>} />
               <Route path="statistiques" element={<ErrorBoundary><Statistiques/></ErrorBoundary>} />
               <Route path="segments" element={<ErrorBoundary><Segments/></ErrorBoundary>} />
@@ -262,9 +274,8 @@ export default function App() {
             </Route>
             <Route path="/noter/:code" element={<ErrorBoundary><Rate/></ErrorBoundary>} />
             <Route path="/console/livreur" element={<ProtectedRider><ErrorBoundary><Rider /></ErrorBoundary></ProtectedRider>} />
-            <Route path="/" element={<Navigate to="/console" replace />} />
             <Route path="/:slug" element={<SlugRedirect />} />
-            <Route path="*" element={<Navigate to="/console" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
         </CustomerProvider>

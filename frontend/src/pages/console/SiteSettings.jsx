@@ -29,7 +29,7 @@ export default function SiteSettings() {
     <div className="space-y-5">
       <div className="flex justify-between items-center">
         <div><h1 className="font-serif text-3xl">Site vitrine</h1><p className="text-sm text-[#666]">Configuration du site public — textes, visuels, horaires</p></div>
-        <a href="/boutique" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-site"><ExternalLink size={14}/>Voir le site</a>
+        <a href="/" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-site"><ExternalLink size={14}/>Voir le site</a>
       </div>
 
       <div className="dina-card-white p-5">

@@ -6,7 +6,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 export default function RiderLogin() {
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const nav = useNavigate();
   const [cms, setCms] = useState({});
   const [site, setSite] = useState({});
@@ -26,8 +26,8 @@ export default function RiderLogin() {
     setBusy(true);
     try {
       const u = await login(email.trim(), password);
-      if (u?.role !== "rider") toast.message("Compte non livreur · redirection vers la console");
-      nav(u?.role === "rider" ? "/rider" : "/console", { replace: true });
+      if (u?.role !== "rider") { await logout(); toast.error("Cet espace est réservé aux livreurs · l'équipe se connecte sur /console"); return; }
+      nav("/riders", { replace: true });
     } catch (err) { toast.error(err.response?.data?.detail || "Identifiants invalides"); }
     finally { setBusy(false); }
   };

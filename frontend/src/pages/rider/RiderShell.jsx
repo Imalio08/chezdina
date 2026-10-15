@@ -47,7 +47,7 @@ export default function RiderShell() {
           const fresh = items.filter(x => !x.read && !seenNotifs.current.has(x.id));
           if (fresh.length) playChime(fresh.some(x => x.type !== "message") ? "order" : "message");
           fresh.slice(0, 3).forEach(x => toast(x.title, { id: x.id, description: x.msg, action: x.link ? { label: "Ouvrir", onClick: () => openNotif(x) } : undefined }));
-          if (fresh.length > 3) toast(`${fresh.length - 3} autre(s) notification(s)`, { action: { label: "Voir", onClick: () => nav("/rider/notifications") } });
+          if (fresh.length > 3) toast(`${fresh.length - 3} autre(s) notification(s)`, { action: { label: "Voir", onClick: () => nav("/riders/notifications") } });
         }
         seenNotifs.current = new Set([...(seenNotifs.current || []), ...items.map(x => x.id)]);
       } catch { /* offline · rattrapé au prochain passage */ }
@@ -93,17 +93,17 @@ export default function RiderShell() {
   // Build dynamic tab list from CMS config, fallback to defaults
   const tabs = useMemo(() => {
     const defaults = [
-      { key: "courses",     to: "/rider",             icon: "Package", label: "Courses",     visible: true, builtin: true },
-      { key: "carte",       to: "/rider/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
-      { key: "historique",  to: "/rider/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
-      { key: "performance", to: "/rider/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
-      { key: "profil",      to: "/rider/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
+      { key: "courses",     to: "/riders",             icon: "Package", label: "Courses",     visible: true, builtin: true },
+      { key: "carte",       to: "/riders/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
+      { key: "historique",  to: "/riders/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
+      { key: "performance", to: "/riders/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
+      { key: "profil",      to: "/riders/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
     ];
     const raw = (cms?.tabs && Array.isArray(cms.tabs) && cms.tabs.length) ? cms.tabs : defaults;
     const list = raw.filter(t => t.visible !== false);
-    if (!list.some(t => t.key === "messages" || t.to === "/rider/messages")) {
+    if (!list.some(t => t.key === "messages" || t.to === "/riders/messages")) {
       const i = list.findIndex(t => t.key === "courses");
-      list.splice(i + 1, 0, { key: "messages", to: "/rider/messages", icon: "MessageCircle", label: "Messages", visible: true, builtin: true });
+      list.splice(i + 1, 0, { key: "messages", to: "/riders/messages", icon: "MessageCircle", label: "Messages", visible: true, builtin: true });
     }
     return list;
   }, [cms]);
@@ -291,7 +291,7 @@ export default function RiderShell() {
                 {(() => { const list = feed.items.filter(n => feedFilter === "all" || !n.read).slice(0, 15); return list.length === 0
                   ? <div className="text-xs text-[#666] text-center py-6" data-testid="rider-notif-panel-empty">{feedFilter === "unread" ? "Aucune notification non lue" : "Aucune notification"}</div>
                   : <div className="space-y-1">{list.map(n => <NotifItem key={n.id} n={n} onOpen={openNotif}/>)}</div>; })()}
-                <button onClick={() => { setShowFeed(false); nav("/rider/notifications"); }} className="w-full text-xs mt-2 py-2 rounded-lg border border-[#ececec] dark:border-[#2a2a2a]" data-testid="rider-notif-see-all">Voir tout l'historique</button>
+                <button onClick={() => { setShowFeed(false); nav("/riders/notifications"); }} className="w-full text-xs mt-2 py-2 rounded-lg border border-[#ececec] dark:border-[#2a2a2a]" data-testid="rider-notif-see-all">Voir tout l'historique</button>
               </div>
             )}
           </div>
@@ -309,7 +309,7 @@ export default function RiderShell() {
               <Clock size={12}/>{punchLabel}
             </button>
           )}
-          <button onClick={() => { logout(); nav("/rider/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout" aria-label="Sortir"><LogOut size={15} /><span className="hidden sm:inline">Sortir</span></button>
+          <button onClick={() => { logout(); nav("/riders/connexion"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout" aria-label="Sortir"><LogOut size={15} /><span className="hidden sm:inline">Sortir</span></button>
         </div>
       </div>
 
@@ -354,8 +354,8 @@ export default function RiderShell() {
               </a>
             );
           }
-          const to = t.to || `/rider/${t.key || ""}`;
-          const end = to === "/rider";
+          const to = (t.to || `/riders/${t.key || ""}`).replace(/^\/rider(?=\/|$|\?)/, "/riders");
+          const end = to === "/riders";
           return (
             <NavLink
               key={t.key || to}
@@ -365,7 +365,7 @@ export default function RiderShell() {
               className={({ isActive }) => `relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${isActive ? "text-[color:var(--rider-primary)]" : "text-[#666] dark:text-[#999]"}`}
             >
               <Icon size={18} /><span className={`block max-w-full truncate px-0.5 ${tabs.length > 5 ? "text-[9px]" : ""}`}>{label}</span>
-              {to === "/rider/messages" && msgUnread > 0 && <span className="absolute top-1 left-1/2 ml-1.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-tab-messages-badge">{msgUnread}</span>}
+              {to === "/riders/messages" && msgUnread > 0 && <span className="absolute top-1 left-1/2 ml-1.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-tab-messages-badge">{msgUnread}</span>}
             </NavLink>
           );
         })}

@@ -76,7 +76,7 @@ export default function ProductPage() {
     ? Array.from(new Set((p.colors || []).filter(c => (size ? availableColorsForSize(p, size).includes(c) : (p.variants || []).some(v => v.enabled && v.color === c)))))
     : (p.colors || []);
 
-  const add = () => { if(!canAdd) return toast.error("Rupture pour cette taille"); addToCart(p,1,size,color); track("add_to_cart", { product_id: p.id, value: p.price, size, color }); toast.success("Ajouté au panier", { description: `${p.name}${size ? ` · ${size}` : ""}`, action: { label: "Voir le panier", onClick: () => navTo("/boutique/checkout") } }); };
+  const add = () => { if(!canAdd) return toast.error("Rupture pour cette taille"); addToCart(p,1,size,color); track("add_to_cart", { product_id: p.id, value: p.price, size, color }); toast.success("Ajouté au panier", { description: `${p.name}${size ? ` · ${size}` : ""}`, action: { label: "Voir le panier", onClick: () => navTo("/checkout") } }); };
   const wa = () => {
     const msg = `Bonjour Chez Dina 💕 Je souhaite commander :\n• ${p.name}\n• Taille : ${size||"à préciser"}\n• Couleur : ${color||"à préciser"}\n• Prix : ${fcfa(p.price)}\n\nMerci de me confirmer la disponibilité et les frais de livraison vers ${deliveryZone}.`;
     window.open(`https://wa.me/2250777926179?text=${encodeURIComponent(msg)}`,"_blank");
@@ -86,7 +86,7 @@ export default function ProductPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
-      <Link to="/boutique/catalog" className="text-xs text-[#666] inline-flex items-center gap-1 mb-4"><ChevronLeft size={12}/>Retour catalogue</Link>
+      <Link to="/catalog" className="text-xs text-[#666] inline-flex items-center gap-1 mb-4"><ChevronLeft size={12}/>Retour catalogue</Link>
       <div className="grid md:grid-cols-2 gap-10">
         <div>
           <div className="relative aspect-[4/5] bg-[#fff5f5] rounded-2xl overflow-hidden group">

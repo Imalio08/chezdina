@@ -641,7 +641,7 @@ def _wa_message_for_status(order: dict, status: str) -> Optional[str]:
     if status == "en_livraison":
         return f"{base}\nVotre colis {code} est en livraison. {'À encaisser : ' + str(total) + ' FCFA.' if is_cod else ''} 📍"
     if status == "livree":
-        return f"{base}\nMerci pour votre commande {code} ! 💐\nNous serions ravies d'avoir votre avis en 10s : https://chezdina.ci/noter/{code}"
+        return f"{base}\nMerci pour votre commande {code} ! 💐\nNous serions ravies d'avoir votre avis en 10s : https://chezdina.net/noter/{code}"
     if status == "echouee":
         return f"{base}\nNous avons rencontré un souci avec votre colis {code}. Nous vous recontactons rapidement pour reprogrammer. Pardon pour la gêne 🙏"
     if status == "annulee":
@@ -937,7 +937,7 @@ MANUAL_MODULES_SEED = [
          ]},
      ]},
     {"number": 5, "title": "Livraison", "icon": "Truck", "description": "Journées, affectation aux livreurs, preuve, réconciliation",
-     "roles": ["admin","manager","rider"], "path_hints": ["/console/livraisons","/rider"],
+     "roles": ["admin","manager","rider"], "path_hints": ["/console/livraisons","/riders"],
      "sections": [
          {"id":"s1","heading":"Créer une journée de livraison","blocks":[
              {"type":"steps","items":["Livraisons > Nouvelle journée","Choisissez la date et le livreur","Glissez les commandes à livrer","Validez la tournée"]},
@@ -1008,7 +1008,7 @@ MANUAL_MODULES_SEED = [
      "roles": ["admin","manager"], "path_hints":["/console/site"],
      "sections":[
          {"id":"s1","heading":"Changer l'apparence du site","blocks":[
-             {"type":"steps","items":["Site vitrine > Apparence","Choisissez vos couleurs (ou un preset)","Sélectionnez la police","Enregistrez — rechargez /boutique pour voir"]},
+             {"type":"steps","items":["Site vitrine > Apparence","Choisissez vos couleurs (ou un preset)","Sélectionnez la police","Enregistrez — rechargez la boutique pour voir"]},
          ]},
          {"id":"s2","heading":"Éditer l'accueil","blocks":[
              {"type":"text","content":"L'accueil est composé de sections modulaires : hero mosaïque, bons plans, catégories, ventes flash. Ajoutez vos images (upload uniquement)."},
@@ -1029,7 +1029,7 @@ MANUAL_MODULES_SEED = [
          ]},
      ]},
     {"number": 16, "title": "Espace livreur (téléphone)", "icon": "Smartphone", "description": "App livreur : journée, remise, preuve, score",
-     "roles": ["admin","manager","rider"], "path_hints":["/rider"],
+     "roles": ["admin","manager","rider"], "path_hints":["/riders"],
      "sections":[
          {"id":"s1","heading":"Démarrer ma journée","blocks":[
              {"type":"steps","items":["Ouvrez /rider sur votre téléphone","Connectez-vous avec votre PIN à 4 chiffres","Autorisez la géolocalisation","Consultez vos commandes du jour"]},
@@ -2895,7 +2895,7 @@ DEFAULT_SECTIONS = [
         "highlight": "votre allure.",
         "subtitle": "Chaussures, robes, sacs et accessoires pour la femme ivoirienne. Livraison partout en Côte d'Ivoire.",
         "cta_label": "Découvrir la collection",
-        "cta_link": "/boutique/catalog",
+        "cta_link": "/catalog",
         "mosaic": [
             "https://images.unsplash.com/photo-1543163521-1bf539c55dd2?w=800",
             "https://images.unsplash.com/photo-1709809081557-78f803ce93a0?w=800",
@@ -3099,7 +3099,7 @@ async def pos_create_shared_cart(body: Dict[str, Any], user: dict = Depends(get_
         "confirmed": False, "confirmed_at": None, "order_id": None,
     }
     await db.shared_carts.insert_one(doc)
-    return {"id": doc["id"], "link": f"/boutique/panier-partage/{doc['id']}", "expires_at": doc["expires_at"]}
+    return {"id": doc["id"], "link": f"/panier-partage/{doc['id']}", "expires_at": doc["expires_at"]}
 
 @api.get("/public/shared-cart/{sid}")
 async def public_shared_cart(sid: str):
@@ -3315,7 +3315,7 @@ async def _notify_waitlist(product_id: str, size: Optional[str] = None):
     rows = await db.waitlist.find(f).to_list(200)
     p = await db.products.find_one({"id": product_id})
     if not p: return
-    link = f"https://chezdina.ci/boutique/product/{product_id}"
+    link = f"https://chezdina.net/product/{product_id}"
     for w in rows:
         phone = w.get("phone") or ""
         pd = "".join(c for c in phone if c.isdigit())
@@ -3413,7 +3413,7 @@ async def seed_demo(user: dict = Depends(require_role("admin"))):
             created["expenses"] += 1
     # Storefront visits (90 days)
     if await db.site_visits.count_documents({}) < 300:
-        pages = ["/boutique","/boutique/catalog","/boutique/product/x","/boutique/bons-plans","/boutique/compte"]
+        pages = ["/","/catalog","/product/x","/bons-plans","/compte"]
         for i in range(500):
             await db.site_visits.insert_one({"id": new_id(), "page": rnd.choice(pages), "zone": rnd.choice(zones),
                 "device": rnd.choice(["mobile","mobile","mobile","desktop","tablet"]),
@@ -4778,7 +4778,7 @@ async def manual_reseed(user: dict = Depends(require_role("admin"))):
                     "Site vitrine > Apparence",
                     "Choisir un preset ou personnaliser couleurs",
                     "Sélectionner la police d'affichage et de corps",
-                    "Enregistrer — rechargez /boutique pour voir",
+                    "Enregistrer — rechargez la boutique pour voir",
                 ]},
             ]},
          ]},
@@ -4859,7 +4859,7 @@ async def manual_reseed(user: dict = Depends(require_role("admin"))):
         {"number": 15, "title": "Espace livreur", "icon": "Smartphone",
          "description": "Application mobile livreur : journée, preuves, score",
          "roles": ["admin","manager","rider"],
-         "path_hints": ["/rider"],
+         "path_hints": ["/riders"],
          "sections": [
             {"id": "s15-start", "heading": "Démarrer ma journée (livreur)",
              "blocks": [
@@ -5396,7 +5396,7 @@ async def abandoned_relaunch(body: RelaunchOfferIn, user: dict = Depends(require
                .replace("{produits}", ", ".join(it.get("name","") for it in a.get("items",[])))
                .replace("{code}", code or "")
                .replace("{date_fin}", (body.ends_at or "")[:10])
-               .replace("{lien_panier}", "https://chezdina.ci/boutique/panier"))
+               .replace("{lien_panier}", "https://chezdina.net/checkout"))
         if "whatsapp" in body.channels or "both" in body.channels:
             await db.whatsapp_outbox.insert_one({"id":new_id(),"phone":phone,"phone_digits":pd,"message":msg,
                 "link":f"https://wa.me/{pd}?text={_url_quote(msg)}","kind":"cart_relaunch","cart_id":a["id"],

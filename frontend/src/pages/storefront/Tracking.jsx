@@ -7,14 +7,14 @@ export default function Tracking() {
   const { code } = useParams();
   const [o, setO] = useState(null); const [err, setErr] = useState("");
   useEffect(()=>{api.get(`/orders/track/${code}`).then(r=>setO(r.data)).catch(()=>setErr("Introuvable"));},[code]);
-  if (err) return <div className="min-h-screen grid place-items-center text-sm">Commande introuvable. <Link to="/boutique" className="underline ml-1">Boutique</Link></div>;
+  if (err) return <div className="min-h-screen grid place-items-center text-sm">Commande introuvable. <Link to="/" className="underline ml-1">Boutique</Link></div>;
   if (!o) return <div className="min-h-screen grid place-items-center text-sm">Chargement…</div>;
   const steps = ["nouvelle","confirmee","en_preparation","prete","en_livraison","livree"];
   const current = steps.indexOf(o.status);
   return (
     <div className="min-h-screen bg-[#f5f5f5] py-10 px-4">
       <div className="max-w-xl mx-auto">
-        <Link to="/boutique" className="text-xs text-[#666]">← Retour boutique</Link>
+        <Link to="/" className="text-xs text-[#666]">← Retour boutique</Link>
         <div className="bg-white rounded-2xl p-6 mt-4 border border-[#ececec]">
           <div className="text-xs uppercase text-[#666] tracking-widest">Suivi de commande</div>
           <div className="font-serif text-2xl mt-1">{o.code}</div>

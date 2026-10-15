@@ -39,14 +39,14 @@ export default function ProductCardV2({ product, flashEndsAt }) {
     const cart = JSON.parse(localStorage.getItem("dina_cart") || "[]");
     cart.push({ product_id: product.id, name: product.name, image: product.image, price: product.price, size, color: colors[0], qty: 1, key: `${product.id}-${size}-${Date.now()}` });
     localStorage.setItem("dina_cart", JSON.stringify(cart));
-    toast.success("Ajouté au panier", { description: `${product.name} · ${size}`, action: { label: "Voir le panier", onClick: () => navTo("/boutique/checkout") } });
+    toast.success("Ajouté au panier", { description: `${product.name} · ${size}`, action: { label: "Voir le panier", onClick: () => navTo("/checkout") } });
     setShowSizes(false);
     window.dispatchEvent(new Event("cart-changed"));
   };
 
   return (
     <div className="group relative" data-testid={`card-${product.id}`}>
-      <Link to={`/boutique/product/${product.id}`} className="block">
+      <Link to={`/product/${product.id}`} className="block">
         <div className="relative aspect-[3/4] bg-[#fff5f5] dark:bg-[#2a1818] rounded-xl overflow-hidden">
           <SmartImage src={product.image} alt={product.name} fallbackText={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
           {product.images?.[1] && <SmartImage src={product.images[1]} alt="" fallbackText={product.name} className="hidden md:block absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition" />}
@@ -61,7 +61,7 @@ export default function ProductCardV2({ product, flashEndsAt }) {
       </Link>
       <div className="mt-2">
         {product.brand && <div className="text-[10px] text-[#999] uppercase tracking-wide">{product.brand}</div>}
-        <Link to={`/boutique/product/${product.id}`} className="text-sm font-medium line-clamp-2 min-h-[2.5em]">{product.name}</Link>
+        <Link to={`/product/${product.id}`} className="text-sm font-medium line-clamp-2 min-h-[2.5em]">{product.name}</Link>
         {colors.length > 0 && (
           <div className="flex items-center gap-1 mt-1">
             {colors.slice(0, 4).map((c, i) => <span key={i} className="w-3.5 h-3.5 rounded-full border border-[#ececec] dark:border-[#2a2a2a]" title={c} style={{ background: cssColor(c) }} />)}

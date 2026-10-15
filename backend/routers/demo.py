@@ -232,7 +232,7 @@ async def seed_scenarios(user: Dict[str, Any]) -> Dict[str, Any]:
                              ("Soldes week-end -20%", "scheduled", {"targets": 300, "sent": 0, "delivered": 0, "read": 0, "clicked": 0, "orders": 0, "revenue": 0}),
                              ("Fête des mères", "sent", {"targets": 280, "sent": 280, "delivered": 271, "read": 198, "clicked": 64, "orders": 17, "revenue": 512000})]:
         await put("campaigns", {"id": new_id(), "name": name, "channels": ["whatsapp", "inapp"], "target_type": "all", "segment_ids": None,
-            "customer_ids": None, "text": f"Bonjour {{prenom}}, découvrez « {name} » chez Chez Dina !", "image": None, "link": "/boutique",
+            "customer_ids": None, "text": f"Bonjour {{prenom}}, découvrez « {name} » chez Chez Dina !", "image": None, "link": "/",
             "offer": None, "scheduled_at": (now + timedelta(days=1)).isoformat() if st == "scheduled" else None,
             "created_at": _ago(days=3), "created_by": user.get("name"), "status": st, "stats": stats_})
 

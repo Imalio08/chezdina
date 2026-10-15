@@ -126,7 +126,7 @@ export default function Carte() {
               <a href={`tel:${selected.customer?.phone?.replace(/\D/g, "")}`} className="dina-btn-secondary !min-h-[40px] text-[10px] flex-col gap-0"><Phone size={12} />Appel</a>
               <a href={`https://wa.me/${selected.customer?.phone?.replace(/\D/g, "") || ""}`} target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px] text-[10px] flex-col gap-0"><MessageCircle size={12} />WA</a>
               <button onClick={() => { setRouteTo(selected.id); setSelected(null); }} className="dina-btn-secondary !min-h-[40px] text-[10px] flex-col gap-0" data-testid="map-selected-route"><Navigation size={12} />Itinéraire</button>
-              <Link to="/rider" className="dina-btn-primary !min-h-[40px] text-[10px] flex-col gap-0"><Package size={12} />Ouvrir</Link>
+              <Link to="/riders" className="dina-btn-primary !min-h-[40px] text-[10px] flex-col gap-0"><Package size={12} />Ouvrir</Link>
             </div>
           </div>
         </div>

@@ -36,7 +36,7 @@ export default function ScanRedirect() {
         // Admin staff → console/produits with highlight; public → storefront
         const dest = user
           ? `/console/produits?highlight=${product.id}${size ? `&size=${encodeURIComponent(size)}` : ""}${color ? `&color=${encodeURIComponent(color)}` : ""}`
-          : `/boutique/product/${product.id}${size || color ? `?${new URLSearchParams({ ...(size && { size }), ...(color && { color }) }).toString()}` : ""}`;
+          : `/product/${product.id}${size || color ? `?${new URLSearchParams({ ...(size && { size }), ...(color && { color }) }).toString()}` : ""}`;
         setTimeout(() => nav(dest, { replace: true }), 600);
       } catch (e) {
         setState({ loading: false, error: "Erreur lecture catalogue", product: null });
@@ -58,7 +58,7 @@ export default function ScanRedirect() {
         {!state.loading && state.error && <>
           <div className="font-serif text-xl mb-1">{state.error}</div>
           <div className="text-sm text-[#666] mb-4">Vérifiez que le QR appartient bien au catalogue Chez Dina.</div>
-          <button onClick={() => nav(user ? "/console" : "/boutique")} className="dina-btn-primary">Retour</button>
+          <button onClick={() => nav(user ? "/console" : "/")} className="dina-btn-primary">Retour</button>
         </>}
         {!state.loading && state.product && <>
           <div className="font-serif text-xl mb-1">{state.product.name}</div>

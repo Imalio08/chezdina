@@ -43,11 +43,11 @@ export default function SearchBar() {
                 </div>
               )}
               {res.categories?.length > 0 && (
-                <div className="p-3 border-b border-[#f5f5f5] dark:border-[#2a2a2a]"><div className="text-[10px] uppercase text-[#999] mb-1">Catégories</div>{res.categories.map(c => <Link key={c} to={`/boutique/catalog?cat=${encodeURIComponent(c)}`} onClick={() => { addRecent(c); setOpen(false); }} className="block py-1 text-sm hover:text-[#b02a2a]">{c}</Link>)}</div>
+                <div className="p-3 border-b border-[#f5f5f5] dark:border-[#2a2a2a]"><div className="text-[10px] uppercase text-[#999] mb-1">Catégories</div>{res.categories.map(c => <Link key={c} to={`/catalog?cat=${encodeURIComponent(c)}`} onClick={() => { addRecent(c); setOpen(false); }} className="block py-1 text-sm hover:text-[#b02a2a]">{c}</Link>)}</div>
               )}
               {res.products?.length > 0 && (
                 <div className="p-2">{res.products.map(p => (
-                  <Link key={p.id} to={`/boutique/product/${p.id}`} onClick={() => { addRecent(p.name); setOpen(false); }} className="flex gap-2 items-center p-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] rounded-lg" data-testid={`search-prod-${p.id}`}>
+                  <Link key={p.id} to={`/product/${p.id}`} onClick={() => { addRecent(p.name); setOpen(false); }} className="flex gap-2 items-center p-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] rounded-lg" data-testid={`search-prod-${p.id}`}>
                     <img src={p.image} alt="" className="w-10 h-12 object-cover rounded" />
                     <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{p.name}</div><div className="text-[11px] text-[#999]">{p.brand}</div></div>
                     <div className="tabular text-sm font-bold text-[#b02a2a]">{fcfa(p.price)}</div>

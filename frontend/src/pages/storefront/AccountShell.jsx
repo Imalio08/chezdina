@@ -75,7 +75,7 @@ export default function AccountShell() {
   if (loading) return <div className="max-w-md mx-auto px-4 py-10 text-center text-sm text-[#666]">Chargement…</div>;
   if (!customer) return <LoginGate />;
   const firstName = (customer.name || "").split(" ")[0];
-  const isRoot = location.pathname === "/boutique/compte" || location.pathname === "/boutique/compte/";
+  const isRoot = location.pathname === "/compte" || location.pathname === "/compte/";
   return (
     <div className="max-w-6xl mx-auto px-4 py-6" data-testid="account-shell">
       <NotifWatcher/>
@@ -86,7 +86,7 @@ export default function AccountShell() {
         isRoot ? (
           <MobileMenu onLogout={logout} />
         ) : (<>
-          <Link to="/boutique/compte" className="inline-flex items-center gap-1 text-sm text-[#666] mb-3 -mt-2" data-testid="account-back-menu"><ArrowLeft size={14}/> Mon compte</Link>
+          <Link to="/compte" className="inline-flex items-center gap-1 text-sm text-[#666] mb-3 -mt-2" data-testid="account-back-menu"><ArrowLeft size={14}/> Mon compte</Link>
           {ACCOUNT_ROUTES}
         </>)
       )}
@@ -98,7 +98,7 @@ export default function AccountShell() {
             {MENU.map(m => (
               <NavLink
                 key={m.to}
-                to={`/boutique/compte${m.to ? `/${m.to}` : ""}`}
+                to={`/compte${m.to ? `/${m.to}` : ""}`}
                 end={m.end}
                 className={({isActive}) => `flex items-center gap-2 px-3 py-2 rounded-lg text-sm ${isActive ? "bg-[#fff5f5] text-[#b02a2a] font-semibold" : "text-[#1c1c1c] hover:bg-[#fafafa]"}`}
                 data-testid={`menu-${m.to || "overview"}`}
@@ -124,7 +124,7 @@ function MobileMenu({ onLogout }) {
   return (
     <div className="dina-card-white divide-y divide-[#f0f0f0]">
       {MENU.map(m => (
-        <Link key={m.to} to={`/boutique/compte/${m.to || "profil"}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[#fafafa]" data-testid={`mobile-menu-${m.to || "profil"}`}>
+        <Link key={m.to} to={`/compte/${m.to || "profil"}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[#fafafa]" data-testid={`mobile-menu-${m.to || "profil"}`}>
           <m.icon size={16} className="text-[#666]" />
           <span className="flex-1">{m.label}</span>
           <ChevronRight size={14} className="text-[#999]" />
@@ -169,7 +169,7 @@ function LoginForm({ onSwitch }) {
       const r = await api.post("/public/customer-login-code", { phone, code });
       loginDone({ token: r.data.token, customer: r.data.customer });
       toast.success(`Bonjour ${r.data.customer.name.split(" ")[0]} 👋`);
-      nav("/boutique/compte");
+      nav("/compte");
     } catch (e) { toast.error(errText(e)); }
     finally { setLoading(false); }
   };
@@ -212,7 +212,7 @@ function SignupForm({ onSwitch }) {
       localStorage.removeItem(REF_KEY);
       loginDone({ token: r.data.token, customer: r.data.customer });
       toast.success(`Bienvenue ${r.data.customer.name.split(" ")[0]} 🎉 Votre compte est créé`);
-      nav("/boutique/compte");
+      nav("/compte");
     } catch (e) { toast.error(errText(e)); }
     finally { setLoading(false); }
   };
@@ -299,7 +299,7 @@ function Overview() {
             <div className="font-medium">{defaultAddr.label || "Adresse principale"}{defaultAddr.lat ? <span className="ml-2 text-[10px] text-[#1f8a4c]">● GPS</span> : null}</div>
             <div className="text-[#666] mt-1">{addressLine(defaultAddr)}</div>
             <div className="text-[#666]">{defaultAddr.zone}</div>
-            <Link to="/boutique/compte/adresses" className="text-xs text-[#b02a2a] underline mt-2 inline-block" data-testid="card-address-all">Gérer mes adresses</Link>
+            <Link to="/compte/adresses" className="text-xs text-[#b02a2a] underline mt-2 inline-block" data-testid="card-address-all">Gérer mes adresses</Link>
           </div>
         ) : (
           <EmptyLine text="Aucune adresse enregistrée" cta={<button onClick={() => setShowEdit("address")} className="text-[#b02a2a] text-sm underline" data-testid="card-address-add">Ajouter</button>}/>
@@ -688,7 +688,7 @@ function MessagesPage() {
           const last = t.last_message || (t.messages || [])[t.messages?.length - 1];
           const unread = t.unread ?? (t.messages || []).filter(m => !(m.read_by || []).includes(customer.id)).length;
           return (
-            <button key={t.id} onClick={() => nav(`/boutique/compte/messages/${t.id}`)} className={`w-full text-left p-2.5 rounded-lg hover:bg-[#fff5f5] ${id === t.id ? "bg-[#fff5f5]" : ""}`} data-testid={`thread-${t.id}`}>
+            <button key={t.id} onClick={() => nav(`/compte/messages/${t.id}`)} className={`w-full text-left p-2.5 rounded-lg hover:bg-[#fff5f5] ${id === t.id ? "bg-[#fff5f5]" : ""}`} data-testid={`thread-${t.id}`}>
               <div className="flex gap-2 items-start">
                 <div className="w-8 h-8 rounded-full bg-[#fde8e8] text-[#b02a2a] font-semibold text-xs grid place-items-center shrink-0">{other.name?.[0] || "?"}</div>
                 <div className="flex-1 min-w-0">
@@ -704,7 +704,7 @@ function MessagesPage() {
         })}
       </div>
       <div className={`dina-card-white p-3 flex flex-col ${id ? "" : "hidden md:flex"}`}>
-        {id && <button onClick={() => nav("/boutique/compte/messages")} className="md:hidden text-xs text-[#666] flex items-center gap-1 mb-2" data-testid="msg-back"><ArrowLeft size={12}/>Conversations</button>}
+        {id && <button onClick={() => nav("/compte/messages")} className="md:hidden text-xs text-[#666] flex items-center gap-1 mb-2" data-testid="msg-back"><ArrowLeft size={12}/>Conversations</button>}
         {!active ? <div className="m-auto text-sm text-[#666]">Sélectionnez une conversation</div> : (
           <>
             <div ref={listRef} className="flex-1 overflow-y-auto space-y-2 py-2 max-h-[55vh] md:max-h-[60vh]" data-testid="msg-list">
@@ -781,14 +781,14 @@ function Favorites() {
   const [list, setList] = useState([]);
   useEffect(() => { api.get("/public/account/favorites").then(r=>setList(r.data || [])).catch(()=>setList([])); }, []);
   if (!list.length) return <EmptyState icon={Heart} title="Aucun favori" subtitle="Cliquez sur le cœur pour ajouter"/>;
-  return <div className="grid grid-cols-2 md:grid-cols-3 gap-3">{list.map(p => <Link key={p.id} to={`/boutique/product/${p.id}`} className="dina-card-white p-3"><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium truncate">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link>)}</div>;
+  return <div className="grid grid-cols-2 md:grid-cols-3 gap-3">{list.map(p => <Link key={p.id} to={`/product/${p.id}`} className="dina-card-white p-3"><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium truncate">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link>)}</div>;
 }
 
 function RecentlyViewed() {
   const [list, setList] = useState([]);
   useEffect(() => { api.get("/public/account/recently-viewed").then(r=>setList(r.data || [])).catch(()=>setList([])); }, []);
   if (!list.length) return <EmptyState icon={Eye} title="Aucun produit vu" subtitle="Les produits consultés apparaîtront ici"/>;
-  return <div className="grid grid-cols-2 md:grid-cols-3 gap-3">{list.map(p => <Link key={p.id} to={`/boutique/product/${p.id}`} className="dina-card-white p-3"><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium truncate">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link>)}</div>;
+  return <div className="grid grid-cols-2 md:grid-cols-3 gap-3">{list.map(p => <Link key={p.id} to={`/product/${p.id}`} className="dina-card-white p-3"><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium truncate">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link>)}</div>;
 }
 
 function useWallet() {
@@ -848,7 +848,7 @@ function Referral() {
   useEffect(() => { loadRef(); }, []); // eslint-disable-line
   if (!d) return <div className="dina-card-white p-6 text-sm text-[#666]">Chargement…</div>;
   if (d.error) return <LoadError retry={loadRef}/>;
-  const link = `${window.location.origin}/boutique/invitation/${d.code}`;
+  const link = `${window.location.origin}/invitation/${d.code}`;
   const msg = `Je t'invite chez Chez Dina 👗 Crée ton compte avec mon lien et reçois ${fcfa(d.rules.filleul)} sur ta première commande : ${link}`;
   const copy = (t) => { navigator.clipboard?.writeText(t); toast.success("Copié !"); };
   const share = async () => { if (navigator.share) { try { await navigator.share({ title: "Chez Dina", text: msg }); } catch {} } else window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank"); };
@@ -895,7 +895,7 @@ function WalletPage() {
         <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">Utilisé</div><div className="font-serif text-xl" data-testid="wallet-used">{fcfa(w.used_total)}</div></div>
       </div>
       {Object.keys(w.by_source).length > 0 && <div className="dina-card-white p-4 flex flex-wrap gap-2 text-xs">{Object.entries(w.by_source).map(([k, v]) => <span key={k} className="dina-chip">{SOURCE_LABEL[k] || k} · {fcfa(v)}</span>)}</div>}
-      <div className="dina-card-white p-4 text-xs text-[#666]">Utilisable sur les articles de vos commandes (hors frais de livraison), tout ou partie, sans date limite. Cumulable avec les promotions. Crédit interne non retirable en argent. Si une commande est annulée, le montant utilisé vous est rendu. <Link to="/boutique/compte/fidelite" className="text-[#b02a2a] underline">Convertir mes points</Link> · <Link to="/boutique/compte/parrainage" className="text-[#b02a2a] underline">Inviter une amie</Link></div>
+      <div className="dina-card-white p-4 text-xs text-[#666]">Utilisable sur les articles de vos commandes (hors frais de livraison), tout ou partie, sans date limite. Cumulable avec les promotions. Crédit interne non retirable en argent. Si une commande est annulée, le montant utilisé vous est rendu. <Link to="/compte/fidelite" className="text-[#b02a2a] underline">Convertir mes points</Link> · <Link to="/compte/parrainage" className="text-[#b02a2a] underline">Inviter une amie</Link></div>
       <div className="dina-card-white p-4"><div className="font-semibold mb-1">Historique</div><WalletLedger rows={w.history}/></div>
     </div>
   );
@@ -1030,7 +1030,7 @@ function EmptyState({ icon: Icon, title, subtitle }) {
       <Icon size={48} className="mx-auto text-[#ccc] mb-3"/>
       <div className="font-serif text-xl mb-1">{title}</div>
       <div className="text-sm text-[#666] mb-4">{subtitle}</div>
-      <Link to="/boutique/catalog" className="dina-btn-primary inline-flex" data-testid="empty-continue">Continuer mes achats</Link>
+      <Link to="/catalog" className="dina-btn-primary inline-flex" data-testid="empty-continue">Continuer mes achats</Link>
     </div>
   );
 }

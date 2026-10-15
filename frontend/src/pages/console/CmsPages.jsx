@@ -66,7 +66,7 @@ export default function CmsPages() {
             <div className="flex items-center justify-between">
               <div><div className="text-xs text-[#666]">/{editing.slug}</div><div className="font-serif text-xl">{editing.title}</div></div>
               <div className="flex gap-2">
-                <Link to={`/boutique/page/${editing.slug}`} target="_blank" className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="pages-preview"><Eye size={12} />Voir</Link>
+                <Link to={`/page/${editing.slug}`} target="_blank" className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="pages-preview"><Eye size={12} />Voir</Link>
                 <button onClick={() => del(editing.slug)} className="text-[#c62828] p-2"><Trash2 size={14} /></button>
                 <SaveButton loading={saving} onClick={save} testid="pages-save" size="sm"/>
               </div>

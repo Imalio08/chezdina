@@ -59,7 +59,7 @@ export default function BonsPlans() {
             <div key={p.id} className="dina-card-white p-4 flex items-center gap-4" data-testid={`promo-banner-${p.code}`}>
               <Flame className="text-[#b02a2a]" />
               <div className="flex-1"><div className="font-semibold">{p.code} · {p.type === "percent" ? `-${p.value}%` : "Livraison offerte"}</div><div className="text-xs text-[#666]">Jusqu'au {new Date(p.ends_at).toLocaleDateString("fr-FR")}</div></div>
-              <Link to={`/boutique/catalog?promo=${p.code}`} className="dina-btn-primary !min-h-[36px] text-xs">Voir les produits</Link>
+              <Link to={`/catalog?promo=${p.code}`} className="dina-btn-primary !min-h-[36px] text-xs">Voir les produits</Link>
             </div>
           ))}
         </div>

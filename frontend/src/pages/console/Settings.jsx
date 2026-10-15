@@ -528,11 +528,11 @@ const RIDER_ICONS = [
   "Star", "Heart", "Home", "SettingsIcon",
 ];
 const DEFAULT_RIDER_TABS = [
-  { key: "courses",     to: "/rider",             icon: "Package", label: "Courses",     visible: true, builtin: true },
-  { key: "carte",       to: "/rider/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
-  { key: "historique",  to: "/rider/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
-  { key: "performance", to: "/rider/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
-  { key: "profil",      to: "/rider/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
+  { key: "courses",     to: "/riders",             icon: "Package", label: "Courses",     visible: true, builtin: true },
+  { key: "carte",       to: "/riders/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
+  { key: "historique",  to: "/riders/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
+  { key: "performance", to: "/riders/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
+  { key: "profil",      to: "/riders/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
 ];
 const DEFAULT_RIDER_CMS = {
   logo: "",
@@ -816,7 +816,7 @@ function SyncCard() {
     try {
       const r = await api.post("/admin/sync/import", { source_url: src, token: code, pin });
       setResult(r.data); toast.success("Synchronisation terminée · reconnexion…");
-      setTimeout(() => { localStorage.removeItem("dina_token"); window.location.href = "/login"; }, 3000);
+      setTimeout(() => { localStorage.removeItem("dina_token"); window.location.href = "/console/connexion"; }, 3000);
     } catch (e) { toast.error(e.response?.data?.detail || "Erreur de synchronisation"); }
     finally { setBusy(false); }
   };

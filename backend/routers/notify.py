@@ -49,7 +49,7 @@ async def notify(kind: str, target_id: str, title: str, msg: str, link: str, nty
 
 
 def course_link(code: Optional[str]) -> str:
-    return f"/rider?course={code}" if code else "/rider"
+    return f"/riders?course={code}" if code else "/riders"
 
 
 async def notify_riders(title: str, msg: str, link: str, event_key: str) -> None:
@@ -64,7 +64,7 @@ async def rider_assigned(o: Dict[str, Any], rider_id: str, prev_rider: Optional[
     stamp = new_id()[:8]
     if prev_rider:
         await notify("rider", prev_rider, f"Course {code} retirée", "Cette livraison a été réaffectée à un autre livreur.",
-                     "/rider", "delivery", code, f"unassign:{o['id']}:{stamp}")
+                     "/riders", "delivery", code, f"unassign:{o['id']}:{stamp}")
     c = o.get("customer") or {}
     await notify("rider", rider_id, "Nouvelle course attribuée", f"{code} · {c.get('name') or ''} · {o.get('delivery_zone') or ''}",
                  course_link(code), "delivery", code, f"assign:{o['id']}:{rider_id}:{stamp}")
@@ -101,13 +101,13 @@ async def order_status_event(o: Dict[str, Any], status: str, by_rider: bool, rid
     cid = (o.get("customer") or {}).get("id")
     if cid and status in STATUS_FR:
         await notify("customer", cid, f"Commande {code}", f"Votre commande est {STATUS_FR[status]}.",
-                     f"/boutique/compte/commandes/{code}", "order", code, key)
+                     f"/compte/commandes/{code}", "order", code, key)
     rid = rider_id or o.get("rider_id")
     if rid and not by_rider and status not in ("assignee", "livree"):
         label = {"annulee": "annulée par la boutique", "reportee": "reportée par la boutique"}.get(status, STATUS_FR.get(status, status))
         gone = not o.get("rider_id")
         await notify("rider", rid, f"Course {code} {('retirée' if gone else 'mise à jour')}", f"Nouveau statut : {label}",
-                     "/rider" if gone else course_link(code), "delivery", code, key)
+                     "/riders" if gone else course_link(code), "delivery", code, key)
 
 
 async def _save_sub(kind: str, owner_id: str, body: Dict[str, Any]) -> Dict[str, Any]:

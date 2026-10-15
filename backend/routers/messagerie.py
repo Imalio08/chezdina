@@ -110,9 +110,9 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
         )
     preview = msg["text"][:80] or "📷 Pièce jointe"
     if cust_id:
-        await notify("customer", cust_id, "Nouveau message de la boutique", preview, f"/boutique/compte/messages/{conv['id']}", "message")
+        await notify("customer", cust_id, "Nouveau message de la boutique", preview, f"/compte/messages/{conv['id']}", "message")
     if rider_id:
-        await notify("rider", rider_id, f"Message de {user.get('name') or 'la boutique'}", preview, f"/rider/messages/{conv['id']}", "message", conv["id"], f"msg:{msg['id']}")
+        await notify("rider", rider_id, f"Message de {user.get('name') or 'la boutique'}", preview, f"/riders/messages/{conv['id']}", "message", conv["id"], f"msg:{msg['id']}")
     return {"ok": True, "conversation_id": conv["id"], "message": msg}
 
 
@@ -318,7 +318,7 @@ async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
     preview = (msg["text"] or "📷 Photo")[:80]
     rider = next((p for p in conv.get("participants") or [] if p.get("kind") == "rider"), None)
     if conv.get("kind") == "livreur_cliente" and rider:
-        await notify("rider", rider["id"], f"Message de {c.get('name') or 'la cliente'}", preview, f"/rider/messages/{conv_id}", "message", conv_id, f"msg:{msg['id']}")
+        await notify("rider", rider["id"], f"Message de {c.get('name') or 'la cliente'}", preview, f"/riders/messages/{conv_id}", "message", conv_id, f"msg:{msg['id']}")
     elif conv.get("order_code"):
         await _notify_reply(conv, c.get("name"), "cliente", preview)
     else:
@@ -413,13 +413,13 @@ async def _after_order_msg(conv: Dict[str, Any], party: str, user: dict, preview
     parts = {p.get("kind"): p for p in conv.get("participants") or []}
     if user.get("role") == "rider":
         if party == "rider_customer" and parts.get("customer"):
-            await notify("customer", parts["customer"]["id"], "Message de votre livreur", preview[:80], f"/boutique/compte/messages/{conv['id']}", "message")
+            await notify("customer", parts["customer"]["id"], "Message de votre livreur", preview[:80], f"/compte/messages/{conv['id']}", "message")
         else:
             await _notify_reply(conv, user.get("name"), "livreur", preview)
     elif party == "customer" and parts.get("customer"):
-        await notify("customer", parts["customer"]["id"], f"Message de la boutique · {code}", preview[:80], f"/boutique/compte/messages/{conv['id']}", "message")
+        await notify("customer", parts["customer"]["id"], f"Message de la boutique · {code}", preview[:80], f"/compte/messages/{conv['id']}", "message")
     elif party == "rider" and parts.get("rider"):
-        await notify("rider", parts["rider"]["id"], f"Message de la boutique · {code}", preview[:80], f"/rider/messages/{conv['id']}", "message", conv["id"])
+        await notify("rider", parts["rider"]["id"], f"Message de la boutique · {code}", preview[:80], f"/riders/messages/{conv['id']}", "message", conv["id"])
 
 
 # ---------- Rider inbox (all conversations involving the rider) ----------

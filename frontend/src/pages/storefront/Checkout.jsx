@@ -181,7 +181,7 @@ export default function Checkout() {
               <div className="min-w-0"><div className="font-medium truncate">{name}</div><div className="text-[#666] text-xs">{phone}</div></div>
             </div>
           ) : (<>
-          <div className="text-xs text-[#666]">Déjà cliente ? <a href="/boutique/compte" className="text-[#b02a2a] underline" data-testid="checkout-login-link">Connectez-vous</a> pour ne rien ressaisir.</div>
+          <div className="text-xs text-[#666]">Déjà cliente ? <a href="/compte" className="text-[#b02a2a] underline" data-testid="checkout-login-link">Connectez-vous</a> pour ne rien ressaisir.</div>
           <input className="dina-input" placeholder="Nom complet" value={name} onChange={e=>setName(e.target.value)} data-testid="checkout-name"/>
           <input className="dina-input" placeholder="+225 XX XX XX XX XX" value={phone} onChange={e=>setPhone(e.target.value)} data-testid="checkout-phone"/>
           </>)}

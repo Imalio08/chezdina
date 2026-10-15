@@ -185,7 +185,7 @@ export default function Customers() {
 function AccessCodeModal({ data, onClose }) {
   const copy = () => { navigator.clipboard.writeText(data.code); toast.success("Copié"); };
   const digits = (data.phone || "").replace(/\D/g, "");
-  const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(`Bonjour ${data.name?.split(" ")[0] || ""}, bienvenue Chez Dina 💕 Votre code d'accès temporaire : ${data.code}. Connectez-vous sur https://chezdina.ci/boutique/account et changez-le dès que possible.`)}`;
+  const waUrl = `https://wa.me/${digits}?text=${encodeURIComponent(`Bonjour ${data.name?.split(" ")[0] || ""}, bienvenue Chez Dina 💕 Votre code d'accès temporaire : ${data.code}. Connectez-vous sur https://chezdina.net/compte et changez-le dès que possible.`)}`;
   return (
     <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="access-code-modal">

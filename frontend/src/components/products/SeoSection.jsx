@@ -12,7 +12,7 @@ function slugify(s) {
 export default function SeoSection({ f, upd }) {
   const [loading, setLoading] = useState(false);
   const [slugEdited, setSlugEdited] = useState(!!f.slug);
-  const url = `chezdina.ci/boutique/product/${f.slug || slugify(f.name) || "votre-produit"}`;
+  const url = `chezdina.net/product/${f.slug || slugify(f.name) || "votre-produit"}`;
 
   // auto-slug when name changes (if user hasn't manually edited)
   React.useEffect(() => {
@@ -74,7 +74,7 @@ export default function SeoSection({ f, upd }) {
       <div>
         <label className="text-[10px] uppercase font-semibold text-[#666]">URL du produit</label>
         <div className="flex items-center gap-1 dina-input !p-0 overflow-hidden">
-          <span className="pl-3 text-xs text-[#999] font-mono shrink-0">chezdina.ci/boutique/product/</span>
+          <span className="pl-3 text-xs text-[#999] font-mono shrink-0">chezdina.net/product/</span>
           <input className="flex-1 bg-transparent !border-0 !shadow-none px-1 py-2 text-xs font-mono focus:outline-none" value={f.slug || ""} onChange={e => { setSlugEdited(true); upd("slug", slugify(e.target.value)); }} placeholder="auto-généré" data-testid="seo-slug" />
         </div>
       </div>
@@ -105,7 +105,7 @@ export default function SeoSection({ f, upd }) {
             <div className="p-2">
               <div className="text-[11px] font-semibold line-clamp-2 leading-tight">{f.seo_title || f.name || "Titre"}</div>
               <div className="text-[10px] text-[#8696a0] line-clamp-2 mt-0.5">{f.seo_description || "La description…"}</div>
-              <div className="text-[9px] text-[#8696a0] mt-0.5 uppercase">chezdina.ci</div>
+              <div className="text-[9px] text-[#8696a0] mt-0.5 uppercase">chezdina.net</div>
             </div>
           </div>
         </div>

@@ -92,7 +92,7 @@ function LoginForm({ onDone }) {
         <br />
         <a href="https://wa.me/2250777926179" target="_blank" rel="noreferrer" className="text-[#b02a2a] underline">0777 92 61 79</a>
       </div>
-      <Link to="/boutique" className="dina-btn-secondary w-full mt-4">Retour boutique</Link>
+      <Link to="/" className="dina-btn-secondary w-full mt-4">Retour boutique</Link>
     </div>
   );
 }
@@ -141,14 +141,14 @@ function Dashboard({ data, onLogout }) {
         <div className="flex items-center gap-3 p-4 bg-[#fff5f5] rounded-lg">
           <button onClick={() => copy(c.referral_code)} className="font-mono text-2xl text-[#b02a2a] font-bold tracking-wide" data-testid="account-ref-code">{c.referral_code}</button>
           <button onClick={() => copy(c.referral_code)} className="ml-auto dina-btn-secondary !min-h-[36px] text-xs"><Copy size={12} />Copier</button>
-          <a href={`https://wa.me/?text=${encodeURIComponent(`Salut 💕 Utilise mon code ${c.referral_code} sur chezdina.ci et on reçoit un bonus toutes les deux !`)}`} target="_blank" rel="noreferrer" className="dina-btn-primary !min-h-[36px] text-xs">Partager</a>
+          <a href={`https://wa.me/?text=${encodeURIComponent(`Salut 💕 Utilise mon code ${c.referral_code} sur chezdina.net et on reçoit un bonus toutes les deux !`)}`} target="_blank" rel="noreferrer" className="dina-btn-primary !min-h-[36px] text-xs">Partager</a>
         </div>
       </div>
 
       <div className="dina-card-white p-6">
         <div className="font-serif text-xl mb-3 flex items-center gap-2"><Package size={16} />Mes commandes ({orders.length})</div>
         {orders.length === 0
-          ? <div className="text-sm text-[#666] text-center py-6">Aucune commande pour le moment.<br /><Link to="/boutique/catalog" className="text-[#b02a2a] underline">Explorer la collection</Link></div>
+          ? <div className="text-sm text-[#666] text-center py-6">Aucune commande pour le moment.<br /><Link to="/catalog" className="text-[#b02a2a] underline">Explorer la collection</Link></div>
           : <div className="space-y-2">
             {orders.slice(0, 20).map(o => (
               <Link key={o.id} to={`/suivi/${o.code}`} className="flex items-center gap-3 p-3 border border-[#ececec] rounded-lg hover:bg-[#fff5f5] transition" data-testid={`account-order-${o.code}`}>

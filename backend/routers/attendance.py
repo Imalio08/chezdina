@@ -31,8 +31,8 @@ async def check_in(body: Dict[str, Any], user: dict = Depends(get_user)):
     method = body.get("method", "phone")  # phone | tablet
     selfie = body.get("selfie")
     pin = (body.get("pin") or "").strip()
-    if not selfie:
-        raise HTTPException(400, "Selfie requis (caméra avant)")
+    if not selfie or not str(selfie).startswith("data:image/") or len(str(selfie)) < 1000:
+        raise HTTPException(400, "Photo de pointage requise (caméra avant) · réessayez")
     if pin:
         import bcrypt
         pin_hash = user.get("pin_hash")
@@ -190,4 +190,6 @@ async def update_attendance_config(body: Dict[str, Any], user: dict = Depends(re
         "enabled_roles": list(body.get("enabled_roles") or ["manager", "sales", "stock_keeper", "community_manager", "rider"]),
     }
     await db.business.update_one({"id": "main"}, {"$set": {"attendance_config": cfg}}, upsert=True)
+    from deps import reset_punch_cache
+    reset_punch_cache()
     return {"ok": True, "attendance_config": cfg}
