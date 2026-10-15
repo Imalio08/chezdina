@@ -6,8 +6,30 @@ import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
 import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalLink } from "lucide-react";
 import { track } from "@/lib/analytics";
+import { useCustomer } from "@/context/CustomerContext";
+import { DELIVERY_ZONES as ZONES, AddressFields, emptyAddress, validAddress, toPayload, addressLine } from "@/components/storefront/AddressForm";
 
-const ZONES = {"Cocody":1500,"Riviera":2000,"Angré":2000,"Plateau":1000,"Marcory":1500,"Zone 4":1500,"Treichville":1500,"Koumassi":2000,"Yopougon":2500,"Abobo":3000,"Adjamé":1500,"Port-Bouët":2500,"Bingerville":3000,"Songon":3500,"Grand-Bassam":5000};
+function AddressChooser({ addresses, choice, setChoice, draft, setDraft, saveNew, setSaveNew }) {
+  return (
+    <div className="space-y-2" data-testid="checkout-address-chooser">
+      {addresses.map(a => (
+        <label key={a.id} className={`flex gap-3 p-3 rounded-lg border cursor-pointer ${choice === a.id ? "border-[#b02a2a] bg-[#fff5f5]" : "border-[#ececec]"}`} data-testid={`checkout-addr-${a.id}`}>
+          <input type="radio" checked={choice === a.id} onChange={() => setChoice(a.id)} className="mt-1"/>
+          <div className="min-w-0 text-sm"><div className="font-medium">{a.label || "Adresse"}{a.default ? " · par défaut" : ""}{a.lat ? <span className="ml-1 text-[10px] text-[#1f8a4c]">● GPS</span> : null}</div><div className="text-[#666] break-words">{a.zone} · {addressLine(a)}</div></div>
+        </label>
+      ))}
+      <label className={`flex gap-3 p-3 rounded-lg border cursor-pointer ${choice === "new" ? "border-[#b02a2a] bg-[#fff5f5]" : "border-[#ececec]"}`} data-testid="checkout-addr-new">
+        <input type="radio" checked={choice === "new"} onChange={() => setChoice("new")}/><span className="text-sm font-medium">{addresses.length ? "Ajouter une nouvelle adresse" : "Adresse de livraison"}</span>
+      </label>
+      {choice === "new" && (
+        <div className="p-3 border border-[#ececec] rounded-lg">
+          <AddressFields v={draft} setV={setDraft} showDefault={false}/>
+          <label className="flex items-center gap-2 text-sm mt-2"><input type="checkbox" checked={saveNew} onChange={e => setSaveNew(e.target.checked)} data-testid="checkout-save-address"/>Enregistrer cette adresse dans mon compte</label>
+        </div>
+      )}
+    </div>
+  );
+}
 const ABIDJAN = { lat: 5.3600, lng: -4.0083 };
 
 export default function Checkout() {
@@ -25,6 +47,24 @@ export default function Checkout() {
   const [submitting, setSubmitting] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState(null);
   const nav = useNavigate();
+  const { customer, refresh } = useCustomer();
+  const addresses = customer?.addresses || [];
+  const [choice, setChoice] = useState("new");
+  const [draft, setDraft] = useState(emptyAddress());
+  const [saveNew, setSaveNew] = useState(true);
+  useEffect(() => {
+    if (!customer) return;
+    setName(n => n || customer.name || ""); setPhone(p => p || customer.phone || "");
+    const def = addresses.find(a => a.default) || addresses[0];
+    if (def) setChoice(c => c === "new" ? def.id : c);
+  }, [customer?.id]); // eslint-disable-line
+  const picked = customer && choice !== "new" ? addresses.find(a => a.id === choice) : null;
+  useEffect(() => {
+    const a = picked || (customer ? draft : null);
+    if (!a) return;
+    if (a.zone && ZONES[a.zone] !== undefined) setZone(a.zone);
+    setAddr(addressLine(a)); setCoords(a.lat ? { lat: a.lat, lng: a.lng } : null);
+  }, [choice, draft, customer?.id]); // eslint-disable-line
 
   useEffect(() => { api.get("/public/payment-config").then(r => setPaymentConfig(r.data)).catch(() => {}); track("checkout_started", { value: 0 }); }, []);
   useEffect(() => {
@@ -65,12 +105,14 @@ export default function Checkout() {
   const checkout = async () => {
     if (!cart.length) return toast.error("Panier vide");
     if (!name || !phone) return toast.error("Nom et téléphone requis");
+    if (customer && choice === "new" && !validAddress(draft)) return toast.error("Indiquez la zone et au moins un détail d'adresse (quartier, rue, repère ou GPS)");
     if (submitting) return;
     setSubmitting(true);
     try {
+      if (customer && choice === "new" && saveNew) { await api.post("/public/account/addresses", toPayload(draft)).catch(() => {}); refresh(); }
       const { data } = await api.post("/public/orders", {
         items: cart.map(x=>({product_id:x.product_id,name:x.name,size:x.size,color:x.color,qty:x.qty,price:x.price,image:x.image})),
-        customer: { name, phone, address: addr, lat: coords?.lat, lng: coords?.lng },
+        customer: { ...(customer ? { id: customer.id } : {}), name, phone, address: addr, lat: coords?.lat, lng: coords?.lng },
         channel: "boutique", payment_method: method, delivery_zone: zone, delivery_fee: fee, mode: "delivery",
       });
       toast.success("Commande créée !");
@@ -90,7 +132,7 @@ export default function Checkout() {
 
   return (
     <>
-    <div className="max-w-5xl mx-auto px-4 py-8 grid md:grid-cols-[1fr_380px] gap-8">
+    <div className="max-w-5xl mx-auto px-4 py-8 grid md:grid-cols-[1fr_340px] lg:grid-cols-[1fr_380px] gap-6 lg:gap-8">
       <div>
         <h1 className="font-serif text-3xl mb-5">Panier & Livraison</h1>
         {cart.length === 0 ? <div className="text-sm text-[#666] py-10 text-center dina-card">Votre panier est vide.</div> : (
@@ -122,8 +164,17 @@ export default function Checkout() {
 
         <div className="dina-card p-5 space-y-3">
           <div className="font-semibold">Informations de livraison</div>
+          {customer ? (
+            <div className="flex items-center gap-3 p-3 rounded-lg bg-[#fff5f5] text-sm" data-testid="checkout-customer-card">
+              <div className="w-9 h-9 rounded-full bg-[#fde8e8] text-[#b02a2a] font-semibold grid place-items-center shrink-0">{(customer.name || "?")[0]}</div>
+              <div className="min-w-0"><div className="font-medium truncate">{name}</div><div className="text-[#666] text-xs">{phone}</div></div>
+            </div>
+          ) : (<>
+          <div className="text-xs text-[#666]">Déjà cliente ? <a href="/boutique/compte" className="text-[#b02a2a] underline" data-testid="checkout-login-link">Connectez-vous</a> pour ne rien ressaisir.</div>
           <input className="dina-input" placeholder="Nom complet" value={name} onChange={e=>setName(e.target.value)} data-testid="checkout-name"/>
           <input className="dina-input" placeholder="+225 XX XX XX XX XX" value={phone} onChange={e=>setPhone(e.target.value)} data-testid="checkout-phone"/>
+          </>)}
+          {customer ? <AddressChooser addresses={addresses} choice={choice} setChoice={setChoice} draft={draft} setDraft={setDraft} saveNew={saveNew} setSaveNew={setSaveNew}/> : <>
           <select className="dina-input" value={zone} onChange={e=>setZone(e.target.value)} data-testid="checkout-zone">{Object.keys(ZONES).map(z=><option key={z}>{z}</option>)}</select>
           <textarea className="dina-input" placeholder="Adresse ou point de repère (ex: en face de la pharmacie Bellecôte)" value={addr} onChange={e=>setAddr(e.target.value)} data-testid="checkout-address"/>
 
@@ -147,6 +198,7 @@ export default function Checkout() {
               <div className="mt-2 text-[11px] text-[#666] bg-[#fff5f5] rounded-lg p-2.5 flex items-start gap-2"><MapPin size={12} className="mt-0.5 text-[#b02a2a]"/>Autorisez la géolocalisation pour que notre livreur vous trouve en 2 minutes.</div>
             )}
           </div>
+          </>}
 
           <div className="font-semibold pt-2">Paiement</div>
           <div className="grid grid-cols-2 gap-2">

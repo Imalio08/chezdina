@@ -42,6 +42,7 @@ import RiderCarte from "@/pages/rider/Carte";
 import RiderHistorique from "@/pages/rider/Historique";
 import RiderPerformance from "@/pages/rider/Performance";
 import RiderProfil from "@/pages/rider/Profil";
+import RiderMessages from "@/pages/rider/Messages";
 import BonsPlans from "@/pages/storefront/BonsPlans";
 import WhatsAppCampaigns from "@/pages/console/WhatsAppCampaigns";
 import Referrals from "@/pages/console/Referrals";
@@ -153,6 +154,8 @@ export default function App() {
               <Route path="historique" element={<ErrorBoundary><RiderHistorique /></ErrorBoundary>} />
               <Route path="performance" element={<ErrorBoundary><RiderPerformance /></ErrorBoundary>} />
               <Route path="profil" element={<ErrorBoundary><RiderProfil /></ErrorBoundary>} />
+              <Route path="messages" element={<ErrorBoundary><RiderMessages /></ErrorBoundary>} />
+              <Route path="messages/:id" element={<ErrorBoundary><RiderMessages /></ErrorBoundary>} />
             </Route>
             <Route path="/boutique" element={<StorefrontLayout />}>
               <Route index element={<><OpeningHoursBanner/><Home /></>} />

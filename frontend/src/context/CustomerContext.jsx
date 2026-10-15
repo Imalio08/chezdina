@@ -7,11 +7,12 @@ export const useCustomer = () => useContext(Ctx);
 const KEY = "dina_customer";
 
 function readLocal() {
-  try { return JSON.parse(sessionStorage.getItem(KEY) || "null"); } catch { return null; }
+  try { return JSON.parse(localStorage.getItem(KEY) || sessionStorage.getItem(KEY) || "null"); } catch { return null; }
 }
 function writeLocal(data) {
-  if (data) sessionStorage.setItem(KEY, JSON.stringify(data));
-  else sessionStorage.removeItem(KEY);
+  sessionStorage.removeItem(KEY);
+  if (data) localStorage.setItem(KEY, JSON.stringify(data));
+  else localStorage.removeItem(KEY);
 }
 
 export function CustomerProvider({ children }) {

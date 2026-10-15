@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { Send, Camera, X } from "lucide-react";
+import { Camera, X } from "lucide-react";
 import { dateTimeFmt } from "@/lib/format";
 import { compressImage } from "@/lib/imageCompress";
 import { editImage } from "@/components/shared/ImageEditor";
+import { RichComposer, RichText } from "@/components/shared/RichComposer";
 
 export function MessagePhotos({ m, onOpen }) {
   const imgs = (m.attachments || []).filter(a => a.type === "image");
@@ -82,7 +83,7 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
           <div key={m.id} className={`flex ${mine(m) ? "justify-end" : "justify-start"}`} data-testid={`thread-msg-${m.id}`}>
             <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${mine(m) ? "bg-[#b02a2a] text-white" : "bg-white dark:bg-[#1f1f1f] border border-[#ececec] dark:border-[#2a2a2a]"}`}>
               <MessagePhotos m={m} onOpen={setZoom}/>
-              {m.text && <div className="whitespace-pre-wrap break-words">{m.text}</div>}
+              {m.text && <RichText text={m.text}/>}
               <div className={`text-[9px] mt-1 ${mine(m) ? "text-white/70" : "text-[#999]"}`}>{who(m)}{m.from_name} · {dateTimeFmt(m.at)}</div>
             </div>
           </div>
@@ -100,11 +101,8 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
           <button onClick={() => setPhoto(null)} className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full p-0.5" data-testid="thread-photo-remove"><X size={12}/></button>
         </div>
       )}
-      <div className="flex gap-2">
-        <PhotoButton onPick={setPhoto} disabled={sending} testid={`thread-photo-btn-${party}`}/>
-        <input className="dina-input flex-1" placeholder={photo ? "Légende (facultative)…" : "Votre message…"} value={text} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} data-testid="od-msg-input"/>
-        <button onClick={() => send()} disabled={sending || (!text.trim() && !photo)} className="dina-btn-primary !min-h-[36px]" data-testid="od-msg-send"><Send size={13}/>{sending ? "…" : "Envoyer"}</button>
-      </div>
+      <RichComposer value={text} onChange={setText} onSend={() => send()} onPhoto={setPhoto} sending={sending} canSend={!!(text.trim() || photo)}
+        placeholder={photo ? "Légende (facultative)…" : "Votre message…"} testid={`thread-composer-${party}`}/>
       </>}
     </div>
   );

@@ -4,17 +4,22 @@ import api from "@/lib/api";
 import { fcfa, dateFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { useCustomer } from "@/context/CustomerContext";
-import { MessagePhotos, PhotoLightbox, PhotoButton } from "@/components/shared/OrderThread";
+import { MessagePhotos, PhotoLightbox } from "@/components/shared/OrderThread";
+import { RichComposer, RichText } from "@/components/shared/RichComposer";
+import { AddressModal, addressLine } from "@/components/storefront/AddressForm";
+import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
+import { playChime } from "@/lib/notifySound";
 import {
   User, Package, MessageSquare, Star, Ticket, Heart, Eye, Gift, UserPlus, Wallet,
   MapPin, Settings, Shield, LogOut, Camera, Phone, MessageCircle, Download,
-  ChevronRight, Pencil, Plus, Check, X, AlertCircle, ArrowLeft, Clock
+  ChevronRight, Pencil, Plus, Check, X, AlertCircle, ArrowLeft, Clock, Bell
 } from "lucide-react";
 
 const MENU = [
   { to: "", label: "Mon compte", icon: User, end: true },
   { to: "commandes", label: "Mes commandes", icon: Package },
   { to: "messages", label: "Messages", icon: MessageSquare },
+  { to: "notifications", label: "Notifications", icon: Bell },
   { to: "avis", label: "Avis à donner", icon: Star },
   { to: "bons-achat", label: "Bons d'achat", icon: Ticket },
   { to: "favoris", label: "Favoris", icon: Heart },
@@ -36,6 +41,7 @@ export default function AccountShell() {
   const isRoot = location.pathname === "/boutique/compte" || location.pathname === "/boutique/compte/";
   return (
     <div className="max-w-6xl mx-auto px-4 py-6" data-testid="account-shell">
+      <NotifWatcher/>
       <div className="font-serif text-2xl mb-5">Bonjour, {firstName} 👋</div>
 
       {/* Mobile: show menu as list on root, hide on sub-route */}
@@ -49,6 +55,7 @@ export default function AccountShell() {
             <Route path="commandes/:code" element={<OrderDetail />} />
             <Route path="messages" element={<MessagesPage />} />
             <Route path="messages/:id" element={<MessagesPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
             <Route path="avis" element={<ReviewsPending />} />
             <Route path="bons-achat" element={<Vouchers />} />
             <Route path="favoris" element={<Favorites />} />
@@ -90,6 +97,7 @@ export default function AccountShell() {
             <Route path="commandes/:code" element={<OrderDetail />} />
             <Route path="messages" element={<MessagesPage />} />
             <Route path="messages/:id" element={<MessagesPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
             <Route path="avis" element={<ReviewsPending />} />
             <Route path="bons-achat" element={<Vouchers />} />
             <Route path="favoris" element={<Favorites />} />
@@ -123,8 +131,28 @@ function MobileMenu({ onLogout }) {
   );
 }
 
-/* -------- Login gate -------- */
+/* -------- Login / signup gate -------- */
 function LoginGate() {
+  const location = useLocation();
+  const modeOf = () => new URLSearchParams(location.search).get("mode") === "inscription" ? "signup" : "login";
+  const [mode, setMode] = useState(modeOf);
+  useEffect(() => { setMode(modeOf()); }, [location.search]); // eslint-disable-line
+  return (
+    <div className="max-w-md mx-auto px-4 py-8 sm:py-10" data-testid="account-gate">
+      <div className="w-16 h-16 rounded-full bg-[#fde8e8] text-[#b02a2a] font-serif text-3xl font-bold grid place-items-center mx-auto mb-3">D</div>
+      <h1 className="font-serif text-3xl mb-4 text-center">Mon compte</h1>
+      <div className="grid grid-cols-2 gap-1 p-1 bg-[#f5f5f5] rounded-xl mb-4">
+        <button onClick={() => setMode("login")} className={`py-2 rounded-lg text-sm ${mode === "login" ? "bg-white shadow font-semibold" : "text-[#666]"}`} data-testid="gate-tab-login">Se connecter</button>
+        <button onClick={() => setMode("signup")} className={`py-2 rounded-lg text-sm ${mode === "signup" ? "bg-white shadow font-semibold" : "text-[#666]"}`} data-testid="gate-tab-signup">Créer un compte</button>
+      </div>
+      {mode === "login" ? <LoginForm onSwitch={() => setMode("signup")}/> : <SignupForm onSwitch={() => setMode("login")}/>}
+    </div>
+  );
+}
+
+const errText = (e) => { const d = e.response?.data?.detail; return typeof d === "string" ? d : Array.isArray(d) ? d.map(x => x.msg).join(" ") : "Erreur"; };
+
+function LoginForm({ onSwitch }) {
   const nav = useNavigate();
   const { loginDone } = useCustomer();
   const [phone, setPhone] = useState("+225 ");
@@ -138,26 +166,65 @@ function LoginGate() {
       loginDone({ token: r.data.token, customer: r.data.customer });
       toast.success(`Bonjour ${r.data.customer.name.split(" ")[0]} 👋`);
       nav("/boutique/compte");
-    } catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
+    } catch (e) { toast.error(errText(e)); }
     finally { setLoading(false); }
   };
   return (
-    <div className="max-w-md mx-auto px-4 py-10">
-      <div className="w-16 h-16 rounded-full bg-[#fde8e8] text-[#b02a2a] font-serif text-3xl font-bold grid place-items-center mx-auto mb-3">D</div>
-      <h1 className="font-serif text-3xl mb-2 text-center">Mon compte</h1>
-      <p className="text-sm text-[#666] text-center mb-5">Entrez votre numéro et votre code secret à 6 chiffres.</p>
-      <div className="dina-card-white p-5 space-y-3">
-        <input className="dina-input" placeholder="+225 07 XX XX XX XX" value={phone} onChange={e=>setPhone(e.target.value)} data-testid="account-phone"/>
-        <input type="password" inputMode="numeric" maxLength={6} className="dina-input tracking-[0.5em] text-center text-xl" placeholder="••••••" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,""))} data-testid="account-code"/>
-        <button onClick={submit} disabled={loading} className="dina-btn-primary w-full" data-testid="account-login">{loading ? "Connexion…" : "Se connecter"}</button>
+    <div className="dina-card-white p-5 space-y-3">
+      <p className="text-sm text-[#666]">Entrez votre numéro et votre code PIN à 6 chiffres.</p>
+      <input className="dina-input" inputMode="tel" placeholder="+225 07 XX XX XX XX" value={phone} onChange={e=>setPhone(e.target.value)} data-testid="account-phone"/>
+      <input type="password" inputMode="numeric" maxLength={6} className="dina-input tracking-[0.5em] text-center text-xl" placeholder="••••••" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,""))} onKeyDown={e => e.key === "Enter" && submit()} data-testid="account-code"/>
+      <button onClick={submit} disabled={loading} className="dina-btn-primary w-full" data-testid="account-login">{loading ? "Connexion…" : "Se connecter"}</button>
+      <div className="text-xs text-center text-[#666]">Nouvelle cliente ? <button onClick={onSwitch} className="text-[#b02a2a] underline" data-testid="gate-go-signup">Créer mon compte</button></div>
+      <div className="text-[11px] text-center text-[#999]">Code oublié ? Écrivez-nous sur WhatsApp, l'équipe vous en génère un nouveau.</div>
+    </div>
+  );
+}
+
+function SignupForm({ onSwitch }) {
+  const nav = useNavigate();
+  const { loginDone } = useCustomer();
+  const [f, setF] = useState({ name: "", phone: "+225 ", email: "", pin: "", pin2: "", referral_code: new URLSearchParams(window.location.search).get("ref") || "" });
+  const [loading, setLoading] = useState(false);
+  const set = (k, fn = (x) => x) => (e) => setF({ ...f, [k]: fn(e.target.value) });
+  const digits = (x) => x.replace(/\D/g, "").slice(0, 6);
+  const submit = async () => {
+    if (f.name.trim().length < 2) return toast.error("Indiquez votre nom");
+    if (f.phone.replace(/\D/g, "").length < 10) return toast.error("Numéro de téléphone invalide");
+    if (f.pin.length !== 6) return toast.error("Code PIN à 6 chiffres");
+    if (f.pin !== f.pin2) return toast.error("Les deux codes PIN ne correspondent pas");
+    setLoading(true);
+    try {
+      const r = await api.post("/public/customer-signup", { name: f.name, phone: f.phone, email: f.email || null, pin: f.pin, referral_code: f.referral_code || null });
+      loginDone({ token: r.data.token, customer: r.data.customer });
+      toast.success(`Bienvenue ${r.data.customer.name.split(" ")[0]} 🎉 Votre compte est créé`);
+      nav("/boutique/compte");
+    } catch (e) { toast.error(errText(e)); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="dina-card-white p-5 space-y-3" data-testid="signup-form">
+      <input className="dina-input" placeholder="Nom et prénom" value={f.name} onChange={set("name")} data-testid="signup-name"/>
+      <input className="dina-input" inputMode="tel" placeholder="+225 07 XX XX XX XX" value={f.phone} onChange={set("phone")} data-testid="signup-phone"/>
+      <input className="dina-input" type="email" placeholder="E-mail (facultatif)" value={f.email} onChange={set("email")} data-testid="signup-email"/>
+      <div className="grid grid-cols-2 gap-2">
+        <input type="password" inputMode="numeric" className="dina-input tracking-[0.3em] text-center" placeholder="Code PIN" value={f.pin} onChange={set("pin", digits)} data-testid="signup-pin"/>
+        <input type="password" inputMode="numeric" className="dina-input tracking-[0.3em] text-center" placeholder="Confirmer" value={f.pin2} onChange={set("pin2", digits)} data-testid="signup-pin2"/>
       </div>
+      <p className="text-[11px] text-[#666] -mt-1">6 chiffres, à garder secret. Évitez 123456 ou 000000.</p>
+      <div>
+        <input className="dina-input uppercase" placeholder="Code de parrainage (facultatif)" value={f.referral_code} onChange={set("referral_code", x => x.toUpperCase())} data-testid="signup-referral"/>
+        <p className="text-[11px] text-[#666] mt-1">Invitée par une marraine ? Saisissez son code pour recevoir votre bonus de bienvenue.</p>
+      </div>
+      <button onClick={submit} disabled={loading} className="dina-btn-primary w-full" data-testid="signup-submit">{loading ? "Création…" : "Créer mon compte"}</button>
+      <div className="text-xs text-center text-[#666]">Déjà cliente ? <button onClick={onSwitch} className="text-[#b02a2a] underline" data-testid="gate-go-login">Se connecter</button></div>
     </div>
   );
 }
 
 /* -------- Overview (4 cards) -------- */
 function Overview() {
-  const { customer, setCustomer } = useCustomer();
+  const { customer, setCustomer, refresh } = useCustomer();
   const [showEdit, setShowEdit] = useState(null); // "info" | "address" | "prefs"
   const fileRef = useRef(null);
   const defaultAddr = (customer.addresses || []).find(a => a.default) || (customer.addresses || [])[0];
@@ -207,17 +274,18 @@ function Overview() {
       <Card title="Adresse par défaut" icon={MapPin} onEdit={() => setShowEdit("address")} testId="card-address">
         {defaultAddr ? (
           <div className="text-sm">
-            <div className="font-medium">{defaultAddr.label || "Adresse principale"}</div>
-            <div className="text-[#666] mt-1">{defaultAddr.address}</div>
+            <div className="font-medium">{defaultAddr.label || "Adresse principale"}{defaultAddr.lat ? <span className="ml-2 text-[10px] text-[#1f8a4c]">● GPS</span> : null}</div>
+            <div className="text-[#666] mt-1">{addressLine(defaultAddr)}</div>
             <div className="text-[#666]">{defaultAddr.zone}</div>
+            <Link to="/boutique/compte/adresses" className="text-xs text-[#b02a2a] underline mt-2 inline-block" data-testid="card-address-all">Gérer mes adresses</Link>
           </div>
         ) : (
-          <EmptyLine text="Aucune adresse enregistrée" cta={<Link to="../adresses" className="text-[#b02a2a] text-sm underline">Ajouter</Link>}/>
+          <EmptyLine text="Aucune adresse enregistrée" cta={<button onClick={() => setShowEdit("address")} className="text-[#b02a2a] text-sm underline" data-testid="card-address-add">Ajouter</button>}/>
         )}
       </Card>
 
       {/* Wallet + points */}
-      <Card title="Porte-monnaie et points" icon={Wallet} onEdit={() => {}} testId="card-wallet">
+      <Card title="Porte-monnaie et points" icon={Wallet} testId="card-wallet">
         <div className="grid grid-cols-2 gap-3">
           <div className="p-3 bg-[#fff5f5] rounded-lg">
             <div className="text-[10px] uppercase text-[#666]">Solde</div>
@@ -240,7 +308,13 @@ function Overview() {
         </div>
       </Card>
 
-      {showEdit && <EditModal mode={showEdit} customer={customer} onClose={() => setShowEdit(null)} onSaved={(c) => { setCustomer(c); setShowEdit(null); }}/>}
+      {showEdit === "address" && <AddressModal initial={defaultAddr || { default: true }} onClose={() => setShowEdit(null)} onSave={async (v) => {
+        try {
+          if (v.id) await api.patch(`/public/account/addresses/${v.id}`, { ...v, default: true }); else await api.post("/public/account/addresses", { ...v, default: true });
+          await refresh(); setShowEdit(null); toast.success("Adresse enregistrée");
+        } catch { toast.error("Erreur"); }
+      }}/>}
+      {showEdit && showEdit !== "address" && <EditModal mode={showEdit} customer={customer} onClose={() => setShowEdit(null)} onSaved={(c) => { setCustomer(c); setShowEdit(null); }}/>}
     </div>
   );
 }
@@ -263,29 +337,35 @@ function Card({ title, icon: Icon, onEdit, children, testId }) {
 
 function EditModal({ mode, customer, onClose, onSaved }) {
   const [f, setF] = useState({
-    name: customer.name, email: customer.email || "",
+    name: customer.name, email: customer.email || "", birthday: customer.birthday || "",
     shoe_size: customer.shoe_size || "", clothing_size: customer.clothing_size || "",
     communication_prefs: customer.communication_prefs || { whatsapp: true, sms: true, email: false, newsletter: false },
   });
   const save = async () => {
+    if (mode === "info" && (f.name || "").trim().length < 2) return toast.error("Nom requis");
     try {
-      const patch = mode === "prefs" ? { communication_prefs: f.communication_prefs } : { name: f.name, email: f.email, shoe_size: f.shoe_size, clothing_size: f.clothing_size };
+      const patch = mode === "prefs" ? { communication_prefs: f.communication_prefs } : { name: f.name.trim(), email: f.email, birthday: f.birthday, shoe_size: f.shoe_size, clothing_size: f.clothing_size };
       const r = await api.patch("/public/account/update", patch);
       onSaved(r.data); toast.success("Enregistré");
     } catch { toast.error("Erreur"); }
   };
   return (
-    <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl p-5 w-full max-w-md" onClick={e=>e.stopPropagation()}>
-        <div className="flex justify-between mb-4"><div className="font-serif text-xl">Modifier</div><button onClick={onClose}><X size={16}/></button></div>
-        {(mode === "info" || mode === "address") && (
+    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 sm:p-4" onClick={onClose} data-testid="edit-modal">
+      <div className="bg-white rounded-t-2xl sm:rounded-xl p-5 w-full sm:max-w-md" onClick={e=>e.stopPropagation()}>
+        <div className="flex justify-between mb-4"><div className="font-serif text-xl">{mode === "prefs" ? "Préférences" : "Mes informations"}</div><button onClick={onClose}><X size={16}/></button></div>
+        {mode === "info" && (
           <div className="space-y-2">
-            <input className="dina-input" placeholder="Nom" value={f.name} onChange={e=>setF({...f,name:e.target.value})} data-testid="edit-name"/>
-            <input className="dina-input" placeholder="Email" value={f.email} onChange={e=>setF({...f,email:e.target.value})}/>
+            <label className="text-[11px] uppercase text-[#666] font-semibold">Nom et prénom</label>
+            <input className="dina-input" value={f.name} onChange={e=>setF({...f,name:e.target.value})} data-testid="edit-name"/>
+            <label className="text-[11px] uppercase text-[#666] font-semibold">E-mail</label>
+            <input className="dina-input" type="email" placeholder="facultatif" value={f.email} onChange={e=>setF({...f,email:e.target.value})} data-testid="edit-email"/>
+            <label className="text-[11px] uppercase text-[#666] font-semibold">Date d'anniversaire</label>
+            <input className="dina-input" type="date" value={f.birthday} onChange={e=>setF({...f,birthday:e.target.value})} data-testid="edit-birthday"/>
             <div className="grid grid-cols-2 gap-2">
-              <input className="dina-input" placeholder="Pointure" value={f.shoe_size} onChange={e=>setF({...f,shoe_size:e.target.value})}/>
-              <input className="dina-input" placeholder="Taille vêtement" value={f.clothing_size} onChange={e=>setF({...f,clothing_size:e.target.value})}/>
+              <input className="dina-input" placeholder="Pointure" value={f.shoe_size} onChange={e=>setF({...f,shoe_size:e.target.value})} data-testid="edit-shoe"/>
+              <input className="dina-input" placeholder="Taille vêtement" value={f.clothing_size} onChange={e=>setF({...f,clothing_size:e.target.value})} data-testid="edit-clothing"/>
             </div>
+            <p className="text-[11px] text-[#999]">Votre numéro ({customer.phone}) sert d'identifiant · pour le changer, contactez la boutique.</p>
           </div>
         )}
         {mode === "prefs" && (
@@ -572,14 +652,14 @@ function MessagesPage() {
   }
 
   return (
-    <div className="grid md:grid-cols-[260px_1fr] gap-4 min-h-[70vh]" data-testid="messages-page">
-      <div className="dina-card-white p-2 overflow-y-auto">
+    <div className="grid md:grid-cols-[260px_1fr] gap-4 md:min-h-[70vh]" data-testid="messages-page">
+      <div className={`dina-card-white p-2 overflow-y-auto ${id ? "hidden md:block" : ""}`}>
         {threads.map(t => {
           const other = t.with || (t.participants || []).find(p => p.id !== customer.id) || {};
           const last = t.last_message || (t.messages || [])[t.messages?.length - 1];
           const unread = t.unread ?? (t.messages || []).filter(m => !(m.read_by || []).includes(customer.id)).length;
           return (
-            <button key={t.id} onClick={() => nav(t.id)} className={`w-full text-left p-2.5 rounded-lg hover:bg-[#fff5f5] ${id === t.id ? "bg-[#fff5f5]" : ""}`} data-testid={`thread-${t.id}`}>
+            <button key={t.id} onClick={() => nav(`/boutique/compte/messages/${t.id}`)} className={`w-full text-left p-2.5 rounded-lg hover:bg-[#fff5f5] ${id === t.id ? "bg-[#fff5f5]" : ""}`} data-testid={`thread-${t.id}`}>
               <div className="flex gap-2 items-start">
                 <div className="w-8 h-8 rounded-full bg-[#fde8e8] text-[#b02a2a] font-semibold text-xs grid place-items-center shrink-0">{other.name?.[0] || "?"}</div>
                 <div className="flex-1 min-w-0">
@@ -594,22 +674,23 @@ function MessagesPage() {
           );
         })}
       </div>
-      <div className="dina-card-white p-3 flex flex-col">
+      <div className={`dina-card-white p-3 flex flex-col ${id ? "" : "hidden md:flex"}`}>
+        {id && <button onClick={() => nav("/boutique/compte/messages")} className="md:hidden text-xs text-[#666] flex items-center gap-1 mb-2" data-testid="msg-back"><ArrowLeft size={12}/>Conversations</button>}
         {!active ? <div className="m-auto text-sm text-[#666]">Sélectionnez une conversation</div> : (
           <>
-            <div className="flex-1 overflow-y-auto space-y-2 py-2">
+            <div className="flex-1 overflow-y-auto space-y-2 py-2 max-h-[60vh]">
               {(active.messages || []).map((m, i) => {
                 const mine = m.from_id === customer.id;
-                return <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`${mine ? "bg-[#b02a2a] text-white" : "bg-[#f5f5f5]"} rounded-xl px-3 py-2 max-w-[70%]`}><MessagePhotos m={m} onOpen={setZoom}/>{m.text && <div className="text-sm">{m.text}</div>}<div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{m.from_name && !mine ? `${m.from_name} · ` : ""}{dateFmt(m.at)}</div></div></div>;
+                return <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`${mine ? "bg-[#b02a2a] text-white" : "bg-[#f5f5f5]"} rounded-xl px-3 py-2 max-w-[80%]`}><MessagePhotos m={m} onOpen={setZoom}/>{m.text && <RichText text={m.text} className="text-sm"/>}<div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{m.from_name && !mine ? `${m.from_name} · ` : ""}{dateFmt(m.at)}</div></div></div>;
               })}
             </div>
             <PhotoLightbox src={zoom} onClose={() => setZoom(null)}/>
             {photo && <div className="relative inline-block mb-2 self-start" data-testid="msg-photo-preview"><img src={photo} alt="Aperçu" className="h-20 rounded-lg"/><button onClick={() => setPhoto(null)} className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full px-1.5 text-xs">×</button></div>}
-            <div className="flex gap-2 border-t border-[#ececec] pt-2">
-              <PhotoButton onPick={setPhoto} testid="msg-photo-btn"/>
-              <input className="dina-input flex-1" placeholder="Votre message…" value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} data-testid="msg-input"/>
-              <button onClick={send} className="dina-btn-primary !min-h-[40px]" data-testid="msg-send">Envoyer</button>
-            </div>
+            {active.closed ? <div className="text-xs text-[#999] text-center border-t border-[#ececec] pt-2">Conversation fermée après la livraison</div> : (
+              <div className="border-t border-[#ececec] pt-2">
+                <RichComposer value={text} onChange={setText} onSend={send} onPhoto={setPhoto} canSend={!!(text.trim() || photo)} testid="msg"/>
+              </div>
+            )}
           </>
         )}
       </div>
@@ -718,53 +799,79 @@ function WalletPage() {
 }
 
 function Addresses() {
+  const { refresh } = useCustomer();
   const [list, setList] = useState([]);
   const [editing, setEditing] = useState(null);
   const load = async () => { try { const r = await api.get("/public/account/addresses"); setList(r.data || []); } catch {} };
   useEffect(() => { load(); }, []);
   const save = async (f) => {
-    try { if (f.id) await api.patch(`/public/account/addresses/${f.id}`, f); else await api.post("/public/account/addresses", f); toast.success("Enregistré"); setEditing(null); load(); }
+    try { if (f.id) await api.patch(`/public/account/addresses/${f.id}`, f); else await api.post("/public/account/addresses", f); toast.success("Adresse enregistrée"); setEditing(null); load(); refresh(); }
     catch { toast.error("Erreur"); }
   };
-  const del = async (id) => { if (!window.confirm("Supprimer ?")) return; try { await api.delete(`/public/account/addresses/${id}`); load(); } catch {} };
+  const makeDefault = async (a) => { try { await api.patch(`/public/account/addresses/${a.id}`, { default: true }); load(); refresh(); toast.success("Adresse par défaut mise à jour"); } catch { toast.error("Erreur"); } };
+  const del = async (id) => { if (!window.confirm("Supprimer cette adresse ?")) return; try { await api.delete(`/public/account/addresses/${id}`); load(); refresh(); } catch {} };
 
   return (
     <div className="space-y-3" data-testid="addresses">
       <button onClick={()=>setEditing({})} className="dina-btn-primary !min-h-[36px]" data-testid="address-new"><Plus size={14}/> Nouvelle adresse</button>
-      {list.length === 0 && <EmptyState icon={MapPin} title="Aucune adresse" subtitle="Ajoutez vos adresses de livraison"/>}
+      {list.length === 0 && <div className="dina-card-white p-8 text-center text-sm text-[#666]" data-testid="addresses-empty"><MapPin size={36} className="mx-auto text-[#ccc] mb-2"/>Ajoutez votre domicile, votre bureau ou toute autre adresse de livraison.</div>}
       {list.map(a => (
         <div key={a.id} className="dina-card-white p-4 flex gap-3 items-start" data-testid={`addr-${a.id}`}>
-          <div className="flex-1">
-            <div className="font-medium flex items-center gap-2">{a.label || "Adresse"} {a.default && <span className="text-[10px] uppercase bg-[#1f8a4c] text-white px-1.5 py-0.5 rounded">Par défaut</span>}</div>
-            <div className="text-sm text-[#666]">{a.address}</div>
+          <MapPin size={16} className="text-[#b02a2a] mt-0.5 shrink-0"/>
+          <div className="flex-1 min-w-0">
+            <div className="font-medium flex items-center gap-2 flex-wrap">{a.label || "Adresse"} {a.default && <span className="text-[10px] uppercase bg-[#1f8a4c] text-white px-1.5 py-0.5 rounded">Par défaut</span>}{a.lat ? <span className="text-[10px] text-[#1f8a4c]">● GPS</span> : null}</div>
+            <div className="text-sm text-[#666] break-words">{addressLine(a)}</div>
             <div className="text-xs text-[#999]">{a.zone}</div>
+            {!a.default && <button onClick={() => makeDefault(a)} className="text-xs text-[#b02a2a] underline mt-1" data-testid={`addr-make-default-${a.id}`}>Définir par défaut</button>}
           </div>
-          <button onClick={()=>setEditing(a)} className="text-[#666]"><Pencil size={14}/></button>
-          <button onClick={()=>del(a.id)} className="text-[#c62828]"><X size={14}/></button>
+          <button onClick={()=>setEditing(a)} className="text-[#666] p-1" data-testid={`addr-edit-${a.id}`}><Pencil size={14}/></button>
+          <button onClick={()=>del(a.id)} className="text-[#c62828] p-1" data-testid={`addr-delete-${a.id}`}><X size={14}/></button>
         </div>
       ))}
-      {editing && <AddressForm f={editing} onClose={()=>setEditing(null)} onSave={save}/>}
+      {editing && <AddressModal initial={editing} onClose={()=>setEditing(null)} onSave={save}/>}
     </div>
   );
 }
 
-function AddressForm({ f, onClose, onSave }) {
-  const [v, setV] = useState({ label: f.label || "", address: f.address || "", zone: f.zone || "", default: f.default || false, id: f.id });
+/* -------- Notifications (in-app feed + push opt-in) -------- */
+function NotifWatcher() {
+  const last = useRef(null);
+  useEffect(() => {
+    const tick = () => api.get("/public/account/notifications").then(r => {
+      const top = r.data.items?.[0];
+      if (last.current && top && top.id !== last.current && !top.read) { playChime(top.type === "message" ? "message" : "notif"); toast(top.title, { description: top.msg }); }
+      last.current = top?.id || "none";
+    }).catch(() => {});
+    tick(); const t = setInterval(tick, 20000);
+    if (pushGranted()) enablePush("/public/account/push/subscribe", true).catch(() => {});
+    return () => clearInterval(t);
+  }, []);
+  return null;
+}
+
+function NotificationsPage() {
+  const nav = useNavigate();
+  const [d, setD] = useState({ items: [], unread: 0 });
+  const [pushOn, setPushOn] = useState(pushGranted());
+  useEffect(() => { api.get("/public/account/notifications").then(r => { setD(r.data); if (r.data.unread) api.post("/public/account/notifications/read").catch(() => {}); }).catch(() => {}); }, []);
+  const activate = async () => { const r = await enablePush("/public/account/push/subscribe").catch(() => ({ ok: false })); if (r.ok) { setPushOn(true); toast.success("Notifications activées sur cet appareil"); } else toast.error(pushErrorText(r.reason)); };
   return (
-    <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-xl p-5 w-full max-w-md" onClick={e=>e.stopPropagation()}>
-        <div className="flex justify-between mb-4"><div className="font-serif text-xl">Adresse</div><button onClick={onClose}><X size={16}/></button></div>
-        <div className="space-y-2">
-          <input className="dina-input" placeholder="Libellé (Maison, Bureau…)" value={v.label} onChange={e=>setV({...v,label:e.target.value})} data-testid="addr-label"/>
-          <textarea className="dina-input" rows={2} placeholder="Adresse complète" value={v.address} onChange={e=>setV({...v,address:e.target.value})} data-testid="addr-address"/>
-          <input className="dina-input" placeholder="Zone (Cocody, Yopougon…)" value={v.zone} onChange={e=>setV({...v,zone:e.target.value})} data-testid="addr-zone"/>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={v.default} onChange={e=>setV({...v,default:e.target.checked})}/> Définir par défaut</label>
-        </div>
-        <div className="flex gap-2 mt-4"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={()=>onSave(v)} className="dina-btn-primary flex-1" data-testid="addr-save">Enregistrer</button></div>
+    <div className="space-y-3" data-testid="notifications-page">
+      <div className="dina-card-white p-4 flex items-center gap-3 flex-wrap">
+        <Bell size={18} className="text-[#b02a2a]"/>
+        <div className="flex-1 min-w-[180px] text-sm">{pushOn ? "Notifications activées sur cet appareil." : "Recevez une alerte sur votre téléphone : réponse du livreur ou de la boutique, avancement de votre commande."}</div>
+        {!pushOn && <button onClick={activate} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="push-enable">Activer</button>}
       </div>
+      {d.items.length === 0 ? <div className="dina-card-white p-8 text-center text-sm text-[#666]" data-testid="notifications-empty">Aucune notification pour le moment</div> : d.items.map(n => (
+        <button key={n.id} onClick={() => n.link && nav(n.link)} className={`dina-card-white p-4 w-full text-left flex gap-3 ${n.read ? "" : "border-l-4 !border-l-[#b02a2a]"}`} data-testid={`notification-${n.id}`}>
+          <div className="flex-1 min-w-0"><div className="font-semibold text-sm">{n.title}</div><div className="text-sm text-[#666] break-words">{n.msg}</div></div>
+          <div className="text-[10px] text-[#999] shrink-0">{dateFmt(n.at)}</div>
+        </button>
+      ))}
     </div>
   );
 }
+
 
 function Preferences() {
   const { customer, setCustomer } = useCustomer();

@@ -267,6 +267,10 @@ async def assign_delivery(oid: str, body: AssignIn, user: dict = Depends(require
     tl.append({"status": "assignee", "at": now_iso(), "by": user.get("name"), "note": f"→ {body.rider_name}"})
     await db.orders.update_one({"id": oid}, {"$set": {"rider_id": body.rider_id, "rider_name": body.rider_name, "status": "assignee", "timeline": tl}})
     res = await _apply_slot(oid, body.rider_id, body.slot_id) if body.slot_id else {}
+    from routers.notify import notify
+    if o.get("rider_id") and o.get("rider_id") != body.rider_id:
+        await notify("rider", o["rider_id"], f"Course {o.get('code')} retirée", "Cette livraison a été réaffectée.", "/rider", "delivery")
+    await notify("rider", body.rider_id, "Nouvelle course", f"{o.get('code')} · {(o.get('customer') or {}).get('name') or ''} · {o.get('delivery_zone') or ''}", "/rider", "delivery")
     return {"ok": True, **res}
 
 

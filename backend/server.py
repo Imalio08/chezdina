@@ -720,6 +720,8 @@ async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get
     if prev != body.status:
         fresh = await db.orders.find_one({"id": oid})
         await _enqueue_wa(fresh, body.status, user.get("name"))
+        from routers.notify import order_status_event
+        await order_status_event(fresh, upd["status"], user.get("role") == "rider")
     return {"ok": True}
 
 # ---------- Rider upgrades ----------
@@ -3751,7 +3753,15 @@ async def public_product(pid: str):
     return clean(p)
 
 @api.post("/public/orders")
-async def public_create_order(body: OrderIn):
+async def public_create_order(body: OrderIn, request: Request):
+    try:
+        logged = await get_customer(request)
+    except HTTPException:
+        logged = None
+    if body.customer and body.customer.get("id") and (not logged or logged["id"] != body.customer["id"]):
+        body.customer.pop("id", None)
+    if logged:
+        body.customer = {**(body.customer or {}), "id": logged["id"]}
     sub = sum(it.qty * it.price for it in body.items)
     total = sub + body.delivery_fee - body.discount
     code = gen_code()
@@ -3789,6 +3799,8 @@ async def public_create_order(body: OrderIn):
     if body.customer and body.customer.get("id"):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}, "$inc":{"loyalty_points": int(total/500)}})
     await db.orders.insert_one(doc)
+    from routers.notify import notify_staff
+    await notify_staff("Nouvelle commande en ligne", f"{code} · {(body.customer or {}).get('name') or ''} · {int(total)} FCFA", f"/console/commandes/{code}")
     return {"code": code, "id": doc["id"], "status": initial_status, "deposit_required": deposit_amount}
 
 @api.get("/public/payment-config")
@@ -5650,6 +5662,8 @@ app.include_router(rider_cms_router)
 app.include_router(messagerie_router)
 app.include_router(pwa_router)
 app.include_router(sync_router)
+from routers.notify import router as notify_router  # noqa: E402
+app.include_router(notify_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")

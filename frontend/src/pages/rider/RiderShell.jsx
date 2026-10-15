@@ -9,6 +9,8 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
+import { MessageSquare, Bell } from "lucide-react";
+import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
 
 // Icons available for custom rider tabs
 const ICONS = {
@@ -26,6 +28,27 @@ export default function RiderShell() {
   const [showHelp, setShowHelp] = useState(false);
   const [annDismissed, setAnnDismissed] = useState(() => localStorage.getItem("rider_ann_dismissed") || "");
   const seenRef = useRef(null);
+  const [msgUnread, setMsgUnread] = useState(0);
+  const [feed, setFeed] = useState({ items: [], unread: 0 });
+  const [showFeed, setShowFeed] = useState(false);
+  const lastNotif = useRef(null);
+  useEffect(() => {
+    const poll = async () => {
+      try {
+        const [c, n] = await Promise.all([api.get("/rider/conversations"), api.get("/me/notifications")]);
+        setMsgUnread((c.data || []).reduce((s, x) => s + (x.unread || 0), 0));
+        setFeed(n.data);
+        const top = n.data.items?.[0];
+        if (lastNotif.current && top && top.id !== lastNotif.current && !top.read) { playChime(top.type === "message" ? "message" : "order"); toast(top.title, { description: top.msg }); }
+        lastNotif.current = top?.id || "none";
+      } catch { /* offline */ }
+    };
+    poll(); const iv = setInterval(poll, 15000);
+    if (pushGranted()) enablePush("/push/subscribe", true).catch(() => {});
+    return () => clearInterval(iv);
+  }, []);
+  const openFeed = () => { setShowFeed(!showFeed); if (feed.unread) { api.post("/me/notifications/read").catch(() => {}); setFeed(f => ({ ...f, unread: 0 })); } };
+  const activatePush = async () => { const r = await enablePush("/push/subscribe").catch(() => ({ ok: false })); if (r.ok) toast.success("Notifications activées sur ce téléphone"); else toast.error(pushErrorText(r.reason)); };
   useEffect(() => {
     if (user?.prefs?.sound === "off" && !localStorage.getItem("dina_sound")) setSoundEnabled(false);
     const check = async () => {
@@ -37,7 +60,7 @@ export default function RiderShell() {
         if (prev) {
           const fresh = [...ids].filter(id => !prev.ids.has(id)).length;
           if (fresh > 0) { playChime("order"); toast.success(`${fresh} nouvelle(s) course(s) affectée(s)`); }
-          else if (unread > prev.unread) { playChime("message"); toast("Nouveau message de la boutique"); }
+          else if (unread > prev.unread) { /* handled by notifications feed */ }
         }
         seenRef.current = { ids, unread };
       } catch { /* offline */ }
@@ -235,6 +258,24 @@ export default function RiderShell() {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
+          <button onClick={() => nav("/rider/messages")} className="relative p-1.5 text-[#666] dark:text-[#999]" data-testid="rider-messages-btn" aria-label="Messages">
+            <MessageSquare size={17}/>{msgUnread > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-messages-badge">{msgUnread}</span>}
+          </button>
+          <div className="relative">
+            <button onClick={openFeed} className="relative p-1.5 text-[#666] dark:text-[#999]" data-testid="rider-notif-btn" aria-label="Notifications">
+              <Bell size={17}/>{feed.unread > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-notif-badge">{feed.unread}</span>}
+            </button>
+            {showFeed && (
+              <div className="absolute right-0 top-9 w-80 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 z-50 max-h-[70vh] overflow-y-auto" data-testid="rider-notif-panel">
+                {!pushGranted() && <button onClick={activatePush} className="w-full text-xs mb-2 py-2 rounded-lg bg-[color:var(--rider-accent)] text-[color:var(--rider-primary)] font-semibold" data-testid="rider-push-enable">Activer les notifications sur ce téléphone</button>}
+                {feed.items.length === 0 ? <div className="text-xs text-[#666] text-center py-6">Aucune notification</div> : feed.items.map(n => (
+                  <button key={n.id} onClick={() => { setShowFeed(false); if (n.link) nav(n.link); }} className="w-full text-left p-2 rounded-lg hover:bg-[#fafafa] dark:hover:bg-[#242424]" data-testid={`rider-notif-${n.id}`}>
+                    <div className="text-xs font-semibold">{n.title}</div><div className="text-[11px] text-[#666] break-words">{n.msg}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {help?.enabled && (
             <button onClick={() => setShowHelp(true)} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-help-btn">
               <HelpCircle size={13}/>Aide

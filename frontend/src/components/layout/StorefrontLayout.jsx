@@ -172,7 +172,16 @@ export default function StorefrontLayout() {
               )}
             </div>
           ) : (
-            <Link to="/boutique/compte" className="w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-account"><User size={18}/></Link>
+            <div className="relative shrink-0">
+              <button onClick={() => setUserMenu(!userMenu)} className="w-9 h-9 grid place-items-center" data-testid="storefront-account" aria-label="Mon compte"><User size={18}/></button>
+              {userMenu && (
+                <div className="absolute right-0 top-full mt-1 w-56 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-lg p-2 z-40 space-y-1" data-testid="guest-dropdown" onClick={() => setUserMenu(false)}>
+                  <Link to="/boutique/compte" className="dina-btn-primary w-full !min-h-[38px] text-sm justify-center" data-testid="guest-login">Se connecter</Link>
+                  <Link to="/boutique/compte?mode=inscription" className="dina-btn-secondary w-full !min-h-[38px] text-sm justify-center" data-testid="guest-signup">Créer un compte</Link>
+                  <div className="text-[10px] text-[#999] text-center pt-1">Suivi de commandes, adresses, fidélité</div>
+                </div>
+              )}
+            </div>
           )}
           <Link to="/boutique/checkout" className="relative w-9 h-9 grid place-items-center shrink-0" data-testid="storefront-cart">
             <ShoppingBag size={18}/>

@@ -16,6 +16,8 @@ import GuidedTour from "@/components/console/GuidedTour";
 import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
 import { canAccess, landingFor } from "@/lib/rbac";
 import { playChime, soundEnabled, setSoundEnabled } from "@/lib/notifySound";
+import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
+import { toast } from "sonner";
 import { Volume2, VolumeX } from "lucide-react";
 
 const SECTIONS = [
@@ -393,6 +395,7 @@ export default function ConsoleLayout() {
                   <span className="font-semibold text-sm">Notifications{notifs.length>0 && <span className="text-xs text-[#666] font-normal ml-1">({notifs.length})</span>}</span>
                   <div className="flex items-center gap-2">{unreadCount>0 && <button onClick={markAllRead} className="text-xs text-[#b02a2a] hover:underline" data-testid="notifs-mark-read">Tout lu</button>}<button onClick={()=>setShowNotif(false)}><X size={14}/></button></div>
                 </div>
+                {!pushGranted() && <button onClick={async () => { const r = await enablePush("/push/subscribe").catch(() => ({ ok: false })); if (r.ok) toast.success("Notifications push activées sur cet appareil"); else toast.error(pushErrorText(r.reason)); }} className="w-full text-xs mb-2 py-2 rounded-lg bg-[#fff5f5] text-[#b02a2a] font-semibold" data-testid="console-push-enable">Activer les notifications push sur cet appareil</button>}
                 {notifs.length===0 ? <div className="text-sm text-[#666] text-center py-6">Aucune notification 🎉</div> : notifs.map(n => {
                   const unread = !readIds.has(n.id);
                   return (

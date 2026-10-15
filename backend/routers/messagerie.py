@@ -18,6 +18,7 @@ from deps import (
     db, get_user, get_customer, require_role,
     clean, new_id, now_iso,
 )
+from routers.notify import notify, notify_staff
 
 router = APIRouter(prefix="/api", tags=["messagerie"])
 
@@ -97,6 +98,11 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
             {"id": conv["id"]},
             {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}},
         )
+    preview = msg["text"][:80] or "📷 Pièce jointe"
+    if cust_id:
+        await notify("customer", cust_id, "Nouveau message de la boutique", preview, f"/boutique/compte/messages/{conv['id']}", "message")
+    if rider_id:
+        await notify("rider", rider_id, "Message de la boutique", preview, f"/rider/messages/{conv['id']}", "message")
     return {"ok": True, "conversation_id": conv["id"], "message": msg}
 
 
@@ -298,9 +304,16 @@ async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
         "text": body.get("text", ""), "image": body.get("image"), "attachments": atts,
         "read_by": [c["id"]],
     }
-    await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso()}})
-    if conv.get("order_code"):
-        await _notify_reply(conv, c.get("name"), "cliente", msg["text"] or "📷 Photo")
+    await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}})
+    preview = (msg["text"] or "📷 Photo")[:80]
+    rider = next((p for p in conv.get("participants") or [] if p.get("kind") == "rider"), None)
+    if conv.get("kind") == "livreur_cliente" and rider:
+        await notify("rider", rider["id"], f"Message de {c.get('name') or 'la cliente'}", preview, f"/rider/messages/{conv_id}", "message")
+    elif conv.get("order_code"):
+        await _notify_reply(conv, c.get("name"), "cliente", preview)
+    else:
+        await db.notifications.insert_one({"id": new_id(), "type": "message", "title": f"Message de {c.get('name')}", "msg": preview, "color": "#5867fd", "at": now_iso(), "link": "/console/messagerie"})
+        await notify_staff(f"Message de {c.get('name')}", preview, "/console/messagerie")
     return {"ok": True, "message": msg}
 
 
@@ -311,6 +324,7 @@ async def _notify_reply(conv: Dict[str, Any], who: str, role: str, text: str) ->
         "msg": f"{who} : {(text or '')[:70]}", "color": "#5867fd", "at": now_iso(),
         "link": f"/console/commandes/{conv.get('order_code')}?focus=order-messages",
     })
+    await notify_staff(f"Message {role} · {conv.get('order_code')}", f"{who} : {(text or '')[:70]}", f"/console/commandes/{conv.get('order_code')}")
 
 
 async def _order_thread(o: Dict[str, Any], party: str) -> Dict[str, Any]:
@@ -380,9 +394,74 @@ async def send_order_thread(oid: str, party: str, body: Dict[str, Any], user: di
     msg = {"id": new_id(), "at": now_iso(), "from_id": user["id"], "from_name": user.get("name"),
            "from_kind": "rider" if is_rider else "store", "text": text, "attachments": atts, "read_by": [user["id"]], "reactions": {}}
     await db.conversations.update_one({"id": conv["id"]}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}})
-    if is_rider:
-        await _notify_reply(conv, user.get("name"), "livreur", text or "📷 Photo")
+    await _after_order_msg(conv, party, user, text or "📷 Photo")
     return {"ok": True, "conversation_id": conv["id"], "message": msg}
+
+
+async def _after_order_msg(conv: Dict[str, Any], party: str, user: dict, preview: str) -> None:
+    code = conv.get("order_code")
+    parts = {p.get("kind"): p for p in conv.get("participants") or []}
+    if user.get("role") == "rider":
+        if party == "rider_customer" and parts.get("customer"):
+            await notify("customer", parts["customer"]["id"], "Message de votre livreur", preview[:80], f"/boutique/compte/messages/{conv['id']}", "message")
+        else:
+            await _notify_reply(conv, user.get("name"), "livreur", preview)
+    elif party == "customer" and parts.get("customer"):
+        await notify("customer", parts["customer"]["id"], f"Message de la boutique · {code}", preview[:80], f"/boutique/compte/messages/{conv['id']}", "message")
+    elif party == "rider" and parts.get("rider"):
+        await notify("rider", parts["rider"]["id"], f"Message de la boutique · {code}", preview[:80], f"/rider/messages/{conv['id']}", "message")
+
+
+# ---------- Rider inbox (all conversations involving the rider) ----------
+@router.get("/rider/conversations")
+async def rider_conversations(user: dict = Depends(get_user)):
+    rows = await db.conversations.find({"participants.id": user["id"]}).sort("updated_at", -1).to_list(200)
+    out = []
+    for r in rows:
+        msgs = r.get("messages") or []
+        other = next((p for p in r.get("participants") or [] if p.get("id") != user["id"]), {})
+        out.append({"id": r["id"], "kind": r.get("kind"), "order_code": r.get("order_code"), "closed": r.get("closed", False),
+                    "with": other, "last_message": msgs[-1] if msgs else None, "updated_at": r.get("updated_at"),
+                    "unread": sum(1 for m in msgs if user["id"] not in (m.get("read_by") or []))})
+    return clean(out)
+
+
+@router.get("/rider/conversations/{cid}")
+async def rider_conversation(cid: str, user: dict = Depends(get_user)):
+    conv = await db.conversations.find_one({"id": cid, "participants.id": user["id"]})
+    if not conv:
+        raise HTTPException(404, "Conversation introuvable")
+    msgs = conv.get("messages") or []
+    if any(user["id"] not in (m.get("read_by") or []) for m in msgs):
+        for m in msgs:
+            if user["id"] not in (m.get("read_by") or []):
+                m.setdefault("read_by", []).append(user["id"])
+        await db.conversations.update_one({"id": cid}, {"$set": {"messages": msgs}})
+    return clean(conv)
+
+
+@router.post("/rider/conversations/{cid}/send")
+async def rider_conversation_send(cid: str, body: Dict[str, Any], user: dict = Depends(get_user)):
+    conv = await db.conversations.find_one({"id": cid, "participants.id": user["id"]})
+    if not conv:
+        raise HTTPException(404, "Conversation introuvable")
+    if conv.get("closed"):
+        raise HTTPException(400, "Conversation fermée")
+    text = str(body.get("text") or "").strip()[:5000]
+    atts = _image_attachments(body.get("attachments"))
+    if not text and not atts:
+        raise HTTPException(400, "Message vide")
+    msg = {"id": new_id(), "at": now_iso(), "from_id": user["id"], "from_name": user.get("name"), "from_kind": "rider",
+           "text": text, "attachments": atts, "read_by": [user["id"]], "reactions": {}}
+    await db.conversations.update_one({"id": cid}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}})
+    key = conv.get("key") or ""
+    party = "rider_customer" if conv.get("kind") == "livreur_cliente" else "rider"
+    if key.startswith("order:"):
+        await _after_order_msg(conv, party, user, text or "📷 Photo")
+    else:
+        await db.notifications.insert_one({"id": new_id(), "type": "message", "title": f"Message livreur · {user.get('name')}", "msg": (text or "📷 Photo")[:80], "color": "#5867fd", "at": now_iso(), "link": "/console/messagerie"})
+        await notify_staff(f"Message livreur · {user.get('name')}", (text or "📷 Photo")[:80], "/console/messagerie")
+    return {"ok": True, "message": msg}
 
 
 @router.get("/orders-messages/unread")
