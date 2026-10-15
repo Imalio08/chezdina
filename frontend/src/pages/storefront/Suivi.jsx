@@ -17,7 +17,7 @@ export default function Suivi() {
   const [myOrders, setMyOrders] = useState([]);
 
   useEffect(() => {
-    if (customer) api.get("/public/account/orders").then(r => setMyOrders(r.data || [])).catch(() => {});
+    if (customer) api.get("/public/account/orders-split").then(r => { const d = r.data || {}; setMyOrders([...(d.in_progress || []), ...(d.delivered || []), ...(d.cancelled || [])].sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""))); }).catch(() => {});
   }, [customer]);
 
   const track = async (c = code, ph = phone) => {

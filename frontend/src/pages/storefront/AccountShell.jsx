@@ -36,9 +36,42 @@ const MENU = [
   { to: "securite", label: "Sécurité", icon: Shield },
 ];
 
+const ACCOUNT_ROUTES = (
+  <Routes>
+    <Route index element={<Overview />} />
+    <Route path="profil" element={<Overview />} />
+    <Route path="commandes" element={<OrdersPage />} />
+    <Route path="commandes/:code" element={<OrderDetail />} />
+    <Route path="messages" element={<MessagesPage />} />
+    <Route path="messages/:id" element={<MessagesPage />} />
+    <Route path="notifications" element={<NotificationsPage />} />
+    <Route path="avis" element={<ReviewsPending />} />
+    <Route path="bons-achat" element={<Vouchers />} />
+    <Route path="favoris" element={<Favorites />} />
+    <Route path="vus-recemment" element={<RecentlyViewed />} />
+    <Route path="fidelite" element={<Loyalty />} />
+    <Route path="parrainage" element={<Referral />} />
+    <Route path="porte-monnaie" element={<WalletPage />} />
+    <Route path="adresses" element={<Addresses />} />
+    <Route path="preferences" element={<Preferences />} />
+    <Route path="securite" element={<Security />} />
+  </Routes>
+);
+
+const DESKTOP_MQ = "(min-width: 1024px)";
+function useIsDesktop() {
+  const [d, setD] = useState(() => window.matchMedia(DESKTOP_MQ).matches);
+  useEffect(() => {
+    const m = window.matchMedia(DESKTOP_MQ); const f = (e) => setD(e.matches);
+    m.addEventListener("change", f); return () => m.removeEventListener("change", f);
+  }, []);
+  return d;
+}
+
 export default function AccountShell() {
   const { customer, loading, logout } = useCustomer();
   const location = useLocation();
+  const desktop = useIsDesktop();
   if (loading) return <div className="max-w-md mx-auto px-4 py-10 text-center text-sm text-[#666]">Chargement…</div>;
   if (!customer) return <LoginGate />;
   const firstName = (customer.name || "").split(" ")[0];
@@ -49,34 +82,17 @@ export default function AccountShell() {
       <div className="font-serif text-2xl mb-5">Bonjour, {firstName} 👋</div>
 
       {/* Mobile: show menu as list on root, hide on sub-route */}
-      <div className="lg:hidden">
-        {isRoot ? (
+      {!desktop && (
+        isRoot ? (
           <MobileMenu onLogout={logout} />
         ) : (<>
           <Link to="/boutique/compte" className="inline-flex items-center gap-1 text-sm text-[#666] mb-3 -mt-2" data-testid="account-back-menu"><ArrowLeft size={14}/> Mon compte</Link>
-          <Routes>
-            <Route index element={<Overview />} />
-            <Route path="commandes" element={<OrdersPage />} />
-            <Route path="commandes/:code" element={<OrderDetail />} />
-            <Route path="messages" element={<MessagesPage />} />
-            <Route path="messages/:id" element={<MessagesPage />} />
-            <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="avis" element={<ReviewsPending />} />
-            <Route path="bons-achat" element={<Vouchers />} />
-            <Route path="favoris" element={<Favorites />} />
-            <Route path="vus-recemment" element={<RecentlyViewed />} />
-            <Route path="fidelite" element={<Loyalty />} />
-            <Route path="parrainage" element={<Referral />} />
-            <Route path="porte-monnaie" element={<WalletPage />} />
-            <Route path="adresses" element={<Addresses />} />
-            <Route path="preferences" element={<Preferences />} />
-            <Route path="securite" element={<Security />} />
-          </Routes>
-        </>)}
-      </div>
+          {ACCOUNT_ROUTES}
+        </>)
+      )}
 
       {/* Desktop: side menu + content */}
-      <div className="hidden lg:grid grid-cols-[260px_1fr] gap-6">
+      {desktop && <div className="grid grid-cols-[260px_1fr] gap-6">
         <aside className="dina-card-white p-3 h-fit sticky top-24" data-testid="account-side-menu">
           <nav className="space-y-0.5">
             {MENU.map(m => (
@@ -96,26 +112,9 @@ export default function AccountShell() {
           </nav>
         </aside>
         <main className="min-w-0">
-          <Routes>
-            <Route index element={<Overview />} />
-            <Route path="commandes" element={<OrdersPage />} />
-            <Route path="commandes/:code" element={<OrderDetail />} />
-            <Route path="messages" element={<MessagesPage />} />
-            <Route path="messages/:id" element={<MessagesPage />} />
-            <Route path="notifications" element={<NotificationsPage />} />
-            <Route path="avis" element={<ReviewsPending />} />
-            <Route path="bons-achat" element={<Vouchers />} />
-            <Route path="favoris" element={<Favorites />} />
-            <Route path="vus-recemment" element={<RecentlyViewed />} />
-            <Route path="fidelite" element={<Loyalty />} />
-            <Route path="parrainage" element={<Referral />} />
-            <Route path="porte-monnaie" element={<WalletPage />} />
-            <Route path="adresses" element={<Addresses />} />
-            <Route path="preferences" element={<Preferences />} />
-            <Route path="securite" element={<Security />} />
-          </Routes>
+          {ACCOUNT_ROUTES}
         </main>
-      </div>
+      </div>}
     </div>
   );
 }
@@ -125,7 +124,7 @@ function MobileMenu({ onLogout }) {
   return (
     <div className="dina-card-white divide-y divide-[#f0f0f0]">
       {MENU.map(m => (
-        <Link key={m.to} to={`/boutique/compte${m.to ? `/${m.to}` : ""}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[#fafafa]">
+        <Link key={m.to} to={`/boutique/compte/${m.to || "profil"}`} className="flex items-center gap-3 px-4 py-3 hover:bg-[#fafafa]" data-testid={`mobile-menu-${m.to || "profil"}`}>
           <m.icon size={16} className="text-[#666]" />
           <span className="flex-1">{m.label}</span>
           <ChevronRight size={14} className="text-[#999]" />

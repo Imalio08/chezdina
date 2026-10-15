@@ -1,7 +1,7 @@
 // Bring the result of an action into view (smooth scroll if off-screen) and flash it briefly.
 export function reveal(target, { flash = true, block = "center" } = {}) {
   setTimeout(() => {
-    const el = typeof target === "string" ? document.querySelector(target) : target;
+    const el = typeof target === "string" ? [...document.querySelectorAll(target)].find(e => e.offsetParent) : target;
     if (!el) return;
     const r = el.getBoundingClientRect();
     if (r.top < 70 || r.bottom > window.innerHeight) el.scrollIntoView({ behavior: "smooth", block });

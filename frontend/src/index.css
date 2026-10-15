@@ -194,6 +194,7 @@ img, video, canvas, svg { max-width: 100%; }
   [data-sonner-toast].dina-toast [data-description] { font-size: 14px; }
   [data-sonner-toast].dina-toast [data-icon] { width: 22px; height: 22px; }
   [data-sonner-toast].dina-toast [data-icon] svg { width: 22px; height: 22px; }
+  [data-sonner-toast].dina-toast [data-close-button] { left: auto !important; right: 0 !important; transform: translate(35%, -35%) !important; width: 26px !important; height: 26px !important; }
   [data-sonner-toast].dina-toast [data-button] { height: 36px !important; padding: 0 14px !important; font-size: 14px !important; border-radius: 10px !important; }
 }
 

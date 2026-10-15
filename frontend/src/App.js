@@ -189,6 +189,7 @@ export default function App() {
               <Route path="guide-tailles" element={<GuideTailles />} />
               <Route path="livraison-retours" element={<LivraisonRetours />} />
               <Route path="suivi-commande" element={<Suivi />} />
+              <Route path="suivi" element={<Navigate to="/boutique/suivi-commande" replace />} />
               <Route path="contact" element={<Contact />} />
             </Route>
             <Route path="/console" element={<Protected><ConsoleLayout /></Protected>}>
