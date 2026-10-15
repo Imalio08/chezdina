@@ -71,7 +71,7 @@ export default function Suivi() {
           )}
           <div className="space-y-2">
             {(res.timeline || []).map((t, i) => (
-              <div key={i} className="flex gap-2 text-sm"><Package size={12} className="mt-0.5 text-[#b02a2a]"/><div><div className="font-semibold">{statusLabel[t.status] || t.status}</div><div className="text-xs text-[#666]">{new Date(t.at).toLocaleString("fr-FR")} · {t.by}{t.note ? ` — ${t.note}` : ""}</div></div></div>
+              <div key={i} className="flex gap-2 text-sm"><Package size={12} className="mt-0.5 text-[#b02a2a] shrink-0"/><div><div className="font-semibold">{statusLabel[t.status] || t.status}</div><div className="text-xs text-[#666]">{new Date(t.at).toLocaleString("fr-FR")} · {t.by}{t.note ? ` — ${t.note}` : ""}</div></div></div>
             ))}
           </div>
         </div>

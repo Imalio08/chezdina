@@ -1,0 +1,24 @@
+{
+  "summary": "RETEST of the iteration 72 mobile UX fixes (frontend only, Playwright at 390x844, 768x1024 and 1920x1080). All 4 fixes plus the toast close button and the regressions pass. (1) On mobile, /boutique/compte shows the menu; mobile-menu-profil opens /boutique/compte/profil with card-info, card-address, card-wallet and card-prefs visible and the '← Mon compte' back link. card-info-edit → edit-save shows 'Enregistrement…', then the toast 'Profil mis à jour'; the card-info flash is visible (vis:true) and the new name is shown. card-address-edit (empty → zone + quartier) → addr-save shows the toast 'Adresse enregistrée', and card-address updates and flashes in view. At 768, the root page shows the mobile menu. (2) No duplicated data-testids on desktop or mobile. On desktop Addresses, both the new address and 'Définir par défaut' flash the VISIBLE addr-<id> card and show their toasts, with no duplicate API calls. Resizing 1920→390→1920 switches between the side menu and the back link and keeps the Addresses page. (3) Suivi as Awa shows 'Mes commandes récentes' with 4 my-order-CODE buttons. Clicking DN-261006-9041 and then DN-260920-1032 tracks the exact code each time (no stale state), and track-result is scrolled to top=96. (4) /boutique/suivi redirects to /boutique/suivi-commande. Toast close button is at the top-right corner of the toast (x 356-382 at 390 wide), no longer over the logo. Regressions: desktop side menu (commandes, fidelite, porte-monnaie, preferences, overview) works; messages thread polling happens once (3 messages calls in 10.5s, 5s interval); loyalty page loads (142 pts); the checkout qty input is 56px wide with no horizontal overflow.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Suivi track-result timeline (mobile)", "issues": ["The Package icons in the timeline shrink to different sizes when the text wraps over several lines (the 'Confirmée' rows with long Wave notes). Add shrink-0 to the icon. Cosmetic."]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": ["Optional: add shrink-0 to the Package icon in the Suivi.jsx timeline rows."],
+  "critical_code_review_comments": [
+    "AccountShell.jsx is still over 1000 lines; consider splitting the sub-pages into modules.",
+    "ACCOUNT_ROUTES is a module-level JSX constant; this works, but the subtree remounts when the layout changes at 1024px, so in-progress form state is lost on rotate or resize. Acceptable."
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "100% of the requested retest flows"},
+  "seed_data_creation": "Created TEST_Mobile73 (+225 07 00 00 73 73, id d01b3808-...) with 2 TEST_ addresses; deleted via DELETE /api/customers/{id} (login now returns 404). Awa used read-only (Suivi, messages, loyalty); no messages sent.",
+  "retest_needed": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "The storefront catalog is at /boutique/catalog and tracking at /boutique/suivi-commande (/boutique/suivi redirects). AccountShell now renders one Routes tree (matchMedia 1024px), so ':visible' locators are no longer needed. To track flashes, use a MutationObserver on the dina-flash class. Customer login uses account-phone/account-code/account-login.",
+  "rca of the issue": "N/A - all previously reported issues verified fixed."
+}
