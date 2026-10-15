@@ -267,10 +267,8 @@ async def assign_delivery(oid: str, body: AssignIn, user: dict = Depends(require
     tl.append({"status": "assignee", "at": now_iso(), "by": user.get("name"), "note": f"→ {body.rider_name}"})
     await db.orders.update_one({"id": oid}, {"$set": {"rider_id": body.rider_id, "rider_name": body.rider_name, "status": "assignee", "timeline": tl}})
     res = await _apply_slot(oid, body.rider_id, body.slot_id) if body.slot_id else {}
-    from routers.notify import notify
-    if o.get("rider_id") and o.get("rider_id") != body.rider_id:
-        await notify("rider", o["rider_id"], f"Course {o.get('code')} retirée", "Cette livraison a été réaffectée.", "/rider", "delivery")
-    await notify("rider", body.rider_id, "Nouvelle course", f"{o.get('code')} · {(o.get('customer') or {}).get('name') or ''} · {o.get('delivery_zone') or ''}", "/rider", "delivery")
+    from routers.notify import rider_assigned
+    await rider_assigned(o, body.rider_id, o.get("rider_id"))
     return {"ok": True, **res}
 
 
@@ -362,12 +360,17 @@ async def session_add_order(sid: str, body: Dict[str, Any], user: dict = Depends
     s = await db.delivery_sessions.find_one({"id": sid})
     if not s:
         raise HTTPException(404)
+    prev_rider = ((await db.orders.find_one({"id": oid}, {"rider_id": 1})) or {}).get("rider_id")
     orders = s.get("orders", [])
     if oid not in orders:
         orders.append(oid)
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"orders": orders}})
     await db.orders.update_one({"id": oid}, {"$set": {"rider_id": s["rider_id"], "rider_name": s["rider_name"], "status": "assignee", "session_id": sid}})
     res = await _apply_slot(oid, s["rider_id"], body.get("slot_id")) if "slot_id" in body else {}
+    o = await db.orders.find_one({"id": oid})
+    if o and prev_rider != s["rider_id"]:
+        from routers.notify import rider_assigned
+        await rider_assigned(o, s["rider_id"], prev_rider)
     return {"ok": True, **res}
 
 

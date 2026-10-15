@@ -6,7 +6,8 @@ import { Phone, MessageCircle, Navigation, ChevronRight, X, MapPin, Send } from 
 import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
 import { SlotBadge } from "@/components/delivery/SlotPicker";
 import OrderThread, { PhotoButton } from "@/components/shared/OrderThread";
-import { useNavigate as useNav } from "react-router-dom";
+import { useNavigate as useNav, useSearchParams } from "react-router-dom";
+import { notifsChanged } from "@/pages/rider/Notifications";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
 
 const FAIL_REASONS = ["Cliente absente", "Cliente injoignable", "Refus de la commande", "Adresse introuvable", "Autre"];
@@ -58,9 +59,18 @@ export default function Courses() {
   const [of, setOf] = useState({ ...EMPTY_FILTERS });
   const [open, setOpen] = useState(null); // order detail
   const [proof, setProof] = useState(null);
+  const [sp, setSp] = useSearchParams();
+  const want = sp.get("course");
 
-  const load = () => api.get("/riders/me/today").then(r => setD(r.data)).catch(() => toast.error("Erreur"));
-  useEffect(() => { load(); const t = setInterval(load, 30000); return () => clearInterval(t); }, []);
+  const load = () => api.get("/riders/me/today").then(r => { setD(r.data); setOpen(prev => prev ? ((r.data.orders || []).find(x => x.id === prev.id) || prev) : prev); }).catch(() => toast.error("Courses indisponibles · vérifiez votre connexion"));
+  useEffect(() => { load(); const t = setInterval(load, 30000); window.addEventListener("rider-notifs-changed", load); return () => { clearInterval(t); window.removeEventListener("rider-notifs-changed", load); }; }, []); // eslint-disable-line
+  const openCourse = (o) => { setOpen(o); api.post("/me/notifications/read", { ref: o.code }).then(r => { if (r.data?.updated) notifsChanged(); }).catch(() => {}); };
+  useEffect(() => {
+    if (!want || !d) return;
+    const o = (d.orders || []).find(x => x.code === want);
+    if (o) openCourse(o); else toast.error(`La course ${want} n'est plus dans votre liste`);
+    sp.delete("course"); setSp(sp, { replace: true });
+  }, [want, d]); // eslint-disable-line
 
   const match = (o) => {
     if (filter === "all") return true;
@@ -106,7 +116,7 @@ export default function Courses() {
 
       <div className="space-y-2">
         {filtered.length === 0 && <div className="text-center text-sm text-[#666] py-10">Aucune course</div>}
-        {filtered.map(o => <OrderCard key={o.id} order={o} onOpen={() => setOpen(o)} />)}
+        {filtered.map(o => <OrderCard key={o.id} order={o} onOpen={() => openCourse(o)} />)}
       </div>
 
       {open && <OrderDetail order={open} onClose={() => setOpen(null)} onStatus={changeStatus} onDeliver={confirmDeliver} />}

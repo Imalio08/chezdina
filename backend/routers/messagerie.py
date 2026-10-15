@@ -18,7 +18,7 @@ from deps import (
     db, get_user, get_customer, require_role,
     clean, new_id, now_iso,
 )
-from routers.notify import notify, notify_staff
+from routers.notify import notify, notify_staff, mark_ref_read
 
 router = APIRouter(prefix="/api", tags=["messagerie"])
 
@@ -34,6 +34,12 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
     rider_id = body.get("rider_id")
     order_id = body.get("order_id")
     kind = body.get("kind", "boutique_cliente")
+    existing = await db.conversations.find_one({"id": body["conversation_id"]}) if body.get("conversation_id") else None
+    if existing and not existing.get("key", "").startswith("order:"):
+        pk = {p.get("kind"): p.get("id") for p in existing.get("participants") or []}
+        cust_id, rider_id = pk.get("customer"), pk.get("rider")
+    else:
+        existing = None
     parts: List[str] = []
     if cust_id:
         parts.append(f"c:{cust_id}")
@@ -43,8 +49,7 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
         raise HTTPException(400, "customer_id ou rider_id requis")
     parts.append(f"s:{user['id']}")
     key = _conv_key(parts)
-    conv = await db.conversations.find_one({"key": key})
-    # Validate attachments to prevent javascript: URL injection
+    conv = existing or await db.conversations.find_one({"key": key})
     allowed_types = {"image", "video", "audio", "file"}
     safe_attachments: List[Dict[str, Any]] = []
     for a in (body.get("attachments") or [])[:10]:
@@ -102,7 +107,7 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
     if cust_id:
         await notify("customer", cust_id, "Nouveau message de la boutique", preview, f"/boutique/compte/messages/{conv['id']}", "message")
     if rider_id:
-        await notify("rider", rider_id, "Message de la boutique", preview, f"/rider/messages/{conv['id']}", "message")
+        await notify("rider", rider_id, f"Message de {user.get('name') or 'la boutique'}", preview, f"/rider/messages/{conv['id']}", "message", conv["id"], f"msg:{msg['id']}")
     return {"ok": True, "conversation_id": conv["id"], "message": msg}
 
 
@@ -308,7 +313,7 @@ async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
     preview = (msg["text"] or "📷 Photo")[:80]
     rider = next((p for p in conv.get("participants") or [] if p.get("kind") == "rider"), None)
     if conv.get("kind") == "livreur_cliente" and rider:
-        await notify("rider", rider["id"], f"Message de {c.get('name') or 'la cliente'}", preview, f"/rider/messages/{conv_id}", "message")
+        await notify("rider", rider["id"], f"Message de {c.get('name') or 'la cliente'}", preview, f"/rider/messages/{conv_id}", "message", conv_id, f"msg:{msg['id']}")
     elif conv.get("order_code"):
         await _notify_reply(conv, c.get("name"), "cliente", preview)
     else:
@@ -409,7 +414,7 @@ async def _after_order_msg(conv: Dict[str, Any], party: str, user: dict, preview
     elif party == "customer" and parts.get("customer"):
         await notify("customer", parts["customer"]["id"], f"Message de la boutique · {code}", preview[:80], f"/boutique/compte/messages/{conv['id']}", "message")
     elif party == "rider" and parts.get("rider"):
-        await notify("rider", parts["rider"]["id"], f"Message de la boutique · {code}", preview[:80], f"/rider/messages/{conv['id']}", "message")
+        await notify("rider", parts["rider"]["id"], f"Message de la boutique · {code}", preview[:80], f"/rider/messages/{conv['id']}", "message", conv["id"])
 
 
 # ---------- Rider inbox (all conversations involving the rider) ----------
@@ -437,7 +442,22 @@ async def rider_conversation(cid: str, user: dict = Depends(get_user)):
             if user["id"] not in (m.get("read_by") or []):
                 m.setdefault("read_by", []).append(user["id"])
         await db.conversations.update_one({"id": cid}, {"$set": {"messages": msgs}})
+    await mark_ref_read("rider" if user.get("role") == "rider" else "staff", user["id"], cid)
     return clean(conv)
+
+
+@router.post("/rider/conversations/store")
+async def rider_open_store(user: dict = Depends(get_user)):
+    if user.get("role") != "rider":
+        raise HTTPException(403, "Réservé aux livreurs")
+    key = _conv_key([f"r:{user['id']}", "store:main"])
+    conv = await db.conversations.find_one({"key": key})
+    if not conv:
+        conv = {"id": new_id(), "key": key, "kind": "boutique_livreur", "closed": False, "archived": False, "pinned": False,
+                "participants": [{"kind": "store", "id": "store", "name": "Chez Dina · Gérante"}, {"kind": "rider", "id": user["id"], "name": user.get("name")}],
+                "messages": [], "created_at": now_iso(), "updated_at": now_iso()}
+        await db.conversations.insert_one(conv)
+    return {"id": conv["id"]}
 
 
 @router.post("/rider/conversations/{cid}/send")

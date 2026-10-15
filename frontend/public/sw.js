@@ -14,6 +14,8 @@ self.addEventListener("push", (event) => {
     icon: data.icon || "/favicon.ico",
     badge: data.badge || "/favicon.ico",
     data: { url: data.url || "/" },
+    tag: data.tag || undefined,
+    renotify: !!data.tag,
     vibrate: [200, 100, 200],
   };
   event.waitUntil(self.registration.showNotification(title, options));
@@ -22,8 +24,14 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = event.notification.data?.url || "/";
-  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
-    for (const c of list) { if (c.url.includes(url) && "focus" in c) return c.focus(); }
-    if (self.clients.openWindow) return self.clients.openWindow(url);
+  const target = new URL(url, self.location.origin).href;
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(async (list) => {
+    const app = url.split("?")[0].split("/")[1] || "";
+    const same = list.find((c) => new URL(c.url).pathname.split("/")[1] === app) || list[0];
+    if (same && "focus" in same) {
+      if (same.url !== target && "navigate" in same) { try { await same.navigate(target); } catch { /* cross-scope */ } }
+      return same.focus();
+    }
+    if (self.clients.openWindow) return self.clients.openWindow(target);
   }));
 });

@@ -11,6 +11,8 @@ import api from "@/lib/api";
 import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
 import { MessageSquare, Bell } from "lucide-react";
 import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
+import { NotifItem, useOpenNotif, markAllRead, FilterTabs } from "@/pages/rider/Notifications";
+import { CheckCheck } from "lucide-react";
 
 // Icons available for custom rider tabs
 const ICONS = {
@@ -31,23 +33,34 @@ export default function RiderShell() {
   const [msgUnread, setMsgUnread] = useState(0);
   const [feed, setFeed] = useState({ items: [], unread: 0 });
   const [showFeed, setShowFeed] = useState(false);
-  const lastNotif = useRef(null);
+  const [feedFilter, setFeedFilter] = useState("all");
+  const seenNotifs = useRef(null);
+  const openNotif = useOpenNotif(() => setShowFeed(false));
   useEffect(() => {
     const poll = async () => {
       try {
         const [c, n] = await Promise.all([api.get("/rider/conversations"), api.get("/me/notifications")]);
         setMsgUnread((c.data || []).reduce((s, x) => s + (x.unread || 0), 0));
         setFeed(n.data);
-        const top = n.data.items?.[0];
-        if (lastNotif.current && top && top.id !== lastNotif.current && !top.read) { playChime(top.type === "message" ? "message" : "order"); toast(top.title, { description: top.msg }); }
-        lastNotif.current = top?.id || "none";
-      } catch { /* offline */ }
+        const items = n.data.items || [];
+        if (seenNotifs.current) {
+          const fresh = items.filter(x => !x.read && !seenNotifs.current.has(x.id));
+          if (fresh.length) playChime(fresh.some(x => x.type !== "message") ? "order" : "message");
+          fresh.slice(0, 3).forEach(x => toast(x.title, { id: x.id, description: x.msg, action: x.link ? { label: "Ouvrir", onClick: () => openNotif(x) } : undefined }));
+          if (fresh.length > 3) toast(`${fresh.length - 3} autre(s) notification(s)`, { action: { label: "Voir", onClick: () => nav("/rider/notifications") } });
+        }
+        seenNotifs.current = new Set([...(seenNotifs.current || []), ...items.map(x => x.id)]);
+      } catch { /* offline · rattrapé au prochain passage */ }
     };
     poll(); const iv = setInterval(poll, 15000);
+    const onVis = () => { if (document.visibilityState === "visible") poll(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("online", poll);
+    window.addEventListener("rider-notifs-changed", poll);
     if (pushGranted()) enablePush("/push/subscribe", true).catch(() => {});
-    return () => clearInterval(iv);
-  }, []);
-  const openFeed = () => { setShowFeed(!showFeed); if (feed.unread) { api.post("/me/notifications/read").catch(() => {}); setFeed(f => ({ ...f, unread: 0 })); } };
+    return () => { clearInterval(iv); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("online", poll); window.removeEventListener("rider-notifs-changed", poll); };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const openFeed = () => setShowFeed(s => !s);
   const activatePush = async () => { const r = await enablePush("/push/subscribe").catch(() => ({ ok: false })); if (r.ok) toast.success("Notifications activées sur ce téléphone"); else toast.error(pushErrorText(r.reason)); };
   useEffect(() => {
     if (user?.prefs?.sound === "off" && !localStorage.getItem("dina_sound")) setSoundEnabled(false);
@@ -59,7 +72,7 @@ export default function RiderShell() {
         const prev = seenRef.current;
         if (prev) {
           const fresh = [...ids].filter(id => !prev.ids.has(id)).length;
-          if (fresh > 0) { playChime("order"); toast.success(`${fresh} nouvelle(s) course(s) affectée(s)`); }
+          if (fresh > 0) { /* announced by the notifications feed */ }
           else if (unread > prev.unread) { /* handled by notifications feed */ }
         }
         seenRef.current = { ids, unread };
@@ -87,7 +100,12 @@ export default function RiderShell() {
       { key: "profil",      to: "/rider/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
     ];
     const raw = (cms?.tabs && Array.isArray(cms.tabs) && cms.tabs.length) ? cms.tabs : defaults;
-    return raw.filter(t => t.visible !== false);
+    const list = raw.filter(t => t.visible !== false);
+    if (!list.some(t => t.key === "messages" || t.to === "/rider/messages")) {
+      const i = list.findIndex(t => t.key === "courses");
+      list.splice(i + 1, 0, { key: "messages", to: "/rider/messages", icon: "MessageCircle", label: "Messages", visible: true, builtin: true });
+    }
+    return list;
   }, [cms]);
 
   // CMS colors — expose as CSS variables
@@ -266,13 +284,17 @@ export default function RiderShell() {
               <Bell size={17}/>{feed.unread > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-notif-badge">{feed.unread}</span>}
             </button>
             {showFeed && (
-              <div className="absolute right-0 top-9 w-80 max-w-[calc(100vw-1.5rem)] bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 z-50 max-h-[70vh] overflow-y-auto" data-testid="rider-notif-panel">
+              <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-14 sm:top-9 sm:w-96 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 z-50 max-h-[75vh] overflow-y-auto" data-testid="rider-notif-panel">
+                <div className="flex items-center justify-between gap-2 px-1 pb-2">
+                  <div className="font-semibold text-sm">Notifications</div>
+                  {feed.unread > 0 && <button onClick={markAllRead} className="text-[11px] flex items-center gap-1 text-[color:var(--rider-primary)] font-semibold" data-testid="rider-notif-read-all"><CheckCheck size={13}/>Tout marquer comme lu</button>}
+                </div>
+                <div className="px-1 pb-2"><FilterTabs value={feedFilter} onChange={setFeedFilter} unread={feed.unread}/></div>
                 {!pushGranted() && <button onClick={activatePush} className="w-full text-xs mb-2 py-2 rounded-lg bg-[color:var(--rider-accent)] text-[color:var(--rider-primary)] font-semibold" data-testid="rider-push-enable">Activer les notifications sur ce téléphone</button>}
-                {feed.items.length === 0 ? <div className="text-xs text-[#666] text-center py-6">Aucune notification</div> : feed.items.map(n => (
-                  <button key={n.id} onClick={() => { setShowFeed(false); if (n.link) nav(n.link); }} className="w-full text-left p-2 rounded-lg hover:bg-[#fafafa] dark:hover:bg-[#242424]" data-testid={`rider-notif-${n.id}`}>
-                    <div className="text-xs font-semibold">{n.title}</div><div className="text-[11px] text-[#666] break-words">{n.msg}</div>
-                  </button>
-                ))}
+                {(() => { const list = feed.items.filter(n => feedFilter === "all" || !n.read).slice(0, 15); return list.length === 0
+                  ? <div className="text-xs text-[#666] text-center py-6" data-testid="rider-notif-panel-empty">{feedFilter === "unread" ? "Aucune notification non lue" : "Aucune notification"}</div>
+                  : <div className="space-y-1">{list.map(n => <NotifItem key={n.id} n={n} onOpen={openNotif}/>)}</div>; })()}
+                <button onClick={() => { setShowFeed(false); nav("/rider/notifications"); }} className="w-full text-xs mt-2 py-2 rounded-lg border border-[#ececec] dark:border-[#2a2a2a]" data-testid="rider-notif-see-all">Voir tout l'historique</button>
               </div>
             )}
           </div>
@@ -343,9 +365,10 @@ export default function RiderShell() {
               to={to}
               end={end}
               data-testid={`rider-tab-${(t.key || label).toString().toLowerCase()}`}
-              className={({ isActive }) => `flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${isActive ? "text-[color:var(--rider-primary)]" : "text-[#666] dark:text-[#999]"}`}
+              className={({ isActive }) => `relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${isActive ? "text-[color:var(--rider-primary)]" : "text-[#666] dark:text-[#999]"}`}
             >
               <Icon size={18} /><span>{label}</span>
+              {to === "/rider/messages" && msgUnread > 0 && <span className="absolute top-1 left-1/2 ml-1.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-tab-messages-badge">{msgUnread}</span>}
             </NavLink>
           );
         })}

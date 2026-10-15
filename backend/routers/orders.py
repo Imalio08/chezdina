@@ -92,6 +92,8 @@ async def update_order(oid: str, body: Dict[str, Any], user: dict = Depends(get_
         body["subtotal"] = sub
         body["total"] = sub + body.get("delivery_fee", o.get("delivery_fee", 0)) - body.get("discount", o.get("discount", 0))
     await db.orders.update_one({"id": oid}, {"$set": body})
+    from routers.notify import order_edited
+    await order_edited(o, await db.orders.find_one({"id": oid}))
     return {"ok": True}
 
 

@@ -70,6 +70,10 @@ async def rider_cms_update(body: Dict[str, Any], user: dict = Depends(require_ro
         {"$set": {"id": "main", "rider_cms": merged, "updated_at": now_iso()}},
         upsert=True,
     )
+    ann, old = merged.get("announcement") or {}, current.get("announcement") or {}
+    if ann.get("enabled") and ann.get("text") and (ann.get("text") != old.get("text") or not old.get("enabled")):
+        from routers.notify import notify_riders
+        await notify_riders("Nouvelle annonce de la boutique", ann["text"], "/rider", f"ann:{now_iso()[:19]}")
     return {"ok": True, "rider_cms": clean(merged)}
 
 

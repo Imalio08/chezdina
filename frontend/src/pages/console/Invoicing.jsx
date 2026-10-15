@@ -60,8 +60,8 @@ export default function Invoicing() {
         <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={()=>setPreview(null)}>
           <div className="bg-white rounded-2xl p-8 w-full max-w-lg font-sora" onClick={e=>e.stopPropagation()}>
             <div className="text-center mb-4">
-              {biz.logo ? <img src={biz.logo} alt="Logo" className="h-14 w-14 mx-auto rounded-full object-cover bg-[#fde8e8]"/> : <div className="w-14 h-14 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{(biz.name || "CD").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase() || "CD"}</div>}
-              <div className="font-serif text-2xl mt-2">{biz.name || "Chez Dina"}</div><div className="text-xs text-[#666]">{biz.address || "Cocody Angré"} · {biz.phone || "+225 07 77 92 61 79"}</div>
+              {brand.logo ? <img src={brand.logo} alt="Logo" className="h-14 w-14 mx-auto rounded-full object-cover bg-[#fde8e8]"/> : <div className="w-14 h-14 mx-auto rounded-full bg-[#fde8e8] grid place-items-center font-serif text-[#b02a2a] font-bold">{(brand.name || "CD").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase() || "CD"}</div>}
+              <div className="font-serif text-2xl mt-2">{brand.name || "Chez Dina"}</div><div className="text-xs text-[#666]">{brand.address || "Cocody Angré"} · {brand.phone || "+225 07 77 92 61 79"}</div>
             </div>
             <div className="border-t border-dashed my-3"/>
             <div className="text-sm space-y-1 mb-3"><div className="font-semibold">Facture {preview.number}</div><div className="text-[#666]">{dateFmt(preview.created_at)}</div><div className="text-[#666]">Cliente : {preview.customer?.name}</div></div>

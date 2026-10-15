@@ -212,7 +212,7 @@ export default function Messagerie() {
     try {
       await api.post("/messages/send", {
         [other.kind === "customer" ? "customer_id" : "rider_id"]: other.id,
-        text, attachments, kind: active.kind, order_id: active.order_id,
+        text, attachments, kind: active.kind, order_id: active.order_id, conversation_id: active.id,
       });
       setText(""); setAttachments([]); setEmojiOpen(false); load();
     } catch { toast.error("Erreur d'envoi"); }
