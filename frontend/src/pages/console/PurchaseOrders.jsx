@@ -137,11 +137,11 @@ export default function PurchaseOrders() {
       {kpis && (
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-2">
           <Kpi label="Bons du mois" v={kpis.this_month} c="#5867fd" />
-          <Kpi label="Acheté mois" v={fcfa(kpis.total_month)} c="#b02a2a" small />
+          {kpis.total_month != null && <Kpi label="Acheté mois" v={fcfa(kpis.total_month)} c="#b02a2a" small />}
           <Kpi label="En attente" v={kpis.pending} c="#e4991e" />
           <Kpi label="Reçus partiel." v={kpis.partial} c="#e4991e" />
-          <Kpi label="Montant dû" v={fcfa(kpis.due)} c="#c62828" small />
-          <Kpi label="Marge prévue" v={`${kpis.avg_expected_margin}%`} c="#1f8a4c" />
+          {kpis.due != null && <Kpi label="Montant dû" v={fcfa(kpis.due)} c="#c62828" small />}
+          {kpis.avg_expected_margin != null && <Kpi label="Marge prévue" v={`${kpis.avg_expected_margin}%`} c="#1f8a4c" />}
         </div>
       )}
 
@@ -163,7 +163,7 @@ export default function PurchaseOrders() {
                       <div className="font-mono text-[10px] text-[#666]">{p.number}</div>
                       <div className="text-sm font-semibold truncate">{p.supplier_name}</div>
                       <div className="text-[11px] text-[#999]">{(p.items || []).length} lignes · {dateFmt(p.created_at)}</div>
-                      <div className="text-xs tabular font-bold text-[#b02a2a] mt-1">{fcfa(p.total)}</div>
+                      {p.total != null && <div className="text-xs tabular font-bold text-[#b02a2a] mt-1">{fcfa(p.total)}</div>}
                     </button>
                   ))}
                   {col.length === 0 && <div className="text-[11px] text-[#999] text-center py-4">—</div>}
@@ -183,7 +183,7 @@ export default function PurchaseOrders() {
                 <td className="text-xs text-[#666]">{dateFmt(p.created_at)}</td>
                 <td className="text-xs">{(p.items || []).length}</td>
                 <td><span className="dina-chip text-[10px]" style={{ color: STATUS_COLOR[p.status], borderColor: STATUS_COLOR[p.status] }}>{STATUS_LABEL[p.status] || p.status}</span></td>
-                <td className="text-right tabular font-semibold">{fcfa(p.total)}</td>
+                <td className="text-right tabular font-semibold">{p.total != null ? fcfa(p.total) : "—"}</td>
                 <td className="text-right whitespace-nowrap">
                   <button onClick={() => setDetail(p.id)} className="text-[#5867fd] mr-2"><Eye size={13} /></button>
                   {user?.role === "admin" && !["recu", "receptionne", "cloture"].includes(p.status) && <button onClick={() => del(p)} className="text-[#c62828]"><Trash2 size={13} /></button>}

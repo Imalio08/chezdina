@@ -44,11 +44,15 @@ const SECTIONS = [
     { to: "/console/fournisseurs", icon: Building2, label: "Fournisseurs" },
     { to: "/console/achats", icon: ShoppingBag, label: "Approvisionnements" },
     { to: "/console/stock", icon: Boxes, label: "Stock & inventaires" },
+    { to: "/console/fiches-colis", icon: Package, label: "Fiches colis", only: ["stock_keeper"] },
+    { to: "/console/alertes", icon: Boxes, label: "Alertes stock", only: ["stock_keeper"] },
   ]},
   { label: "Clients & marketing", items: [
     { to: "/console/clients", icon: Users, label: "Clients" },
     { to: "/console/messagerie", icon: MessageSquare, label: "Messagerie" },
     { to: "/console/segments", icon: Target, label: "Segments & campagnes" },
+    { to: "/console/campagnes", icon: Megaphone, label: "Campagnes", only: ["community_manager"] },
+    { to: "/console/campagnes-whatsapp", icon: MessageSquare, label: "Campagnes WhatsApp", only: ["community_manager"] },
     { to: "/console/promotions", icon: Megaphone, label: "Promotions" },
     { to: "/console/fidelite", icon: Gift, label: "Fidélité" },
     { to: "/console/parrainage", icon: Heart, label: "Parrainage" },
@@ -89,10 +93,10 @@ const SECTIONS = [
 const QUICK_ACTIONS = [
   { label: "Nouvelle vente", to: "/console/pos", icon: ShoppingCart },
   { label: "Nouvelle commande", to: "/console/commandes?new=1", icon: Receipt },
-  { label: "Nouveau produit", to: "/console/produits?new=1", icon: Package },
+  { label: "Nouveau produit", to: "/console/produits?new=1", icon: Package, deny: ["sales", "community_manager"] },
   { label: "Nouvel approvisionnement", to: "/console/achats?new=1", icon: ShoppingBag },
   { label: "Nouvelle dépense", to: "/console/depenses?new=1", icon: Wallet },
-  { label: "Nouvelle cliente", to: "/console/clients?new=1", icon: Users },
+  { label: "Nouvelle cliente", to: "/console/clients?new=1", icon: Users, deny: ["community_manager"] },
 ];
 
 const CHIPS_BY_PAGE = {
@@ -153,7 +157,7 @@ export default function ConsoleLayout() {
   const [punchStatus, setPunchStatus] = useState(null);
   const [attendanceCfg, setAttendanceCfg] = useState({ enabled: true, enabled_roles: null });
   const nav = useNavigate();
-  const { pathname } = useLocation();
+  const { pathname, search: locSearch } = useLocation();
   const unreadCount = notifs.filter(n => !readIds.has(n.id)).length;
 
   // RBAC — redirect user away from forbidden pages
@@ -221,7 +225,7 @@ export default function ConsoleLayout() {
     if (v.length < 2) { setSearchResults(null); return; }
     try {
       const get = (u) => api.get(u).then(r => r.data).catch(() => []);
-      const [p, o, c] = await Promise.all([get(`/products?q=${encodeURIComponent(v)}`), get(`/orders?q=${encodeURIComponent(v)}`), get(`/customers?q=${encodeURIComponent(v)}`)]);
+      const [p, o, c] = await Promise.all([get(`/products?q=${encodeURIComponent(v)}`), canAccess(user?.role, "/console/commandes") ? get(`/orders?q=${encodeURIComponent(v)}`) : [], canAccess(user?.role, "/console/clients") ? get(`/customers?q=${encodeURIComponent(v)}`) : []]);
       setSearchResults({ products: p.slice(0,4), orders: o.slice(0,4), customers: c.slice(0,4) });
     } catch { setSearchResults(null); }
   };
@@ -270,6 +274,7 @@ export default function ConsoleLayout() {
             const open = openSections[sec.label] !== false;
             const items = sec.items
               .filter(it => !it.adminOnly || isAdmin)
+              .filter(it => !it.only || it.only.includes(user?.role))
               .filter(it => canAccess(user?.role, it.to));
             if (items.length === 0) return null;
             return (
@@ -280,20 +285,24 @@ export default function ConsoleLayout() {
                     {open ? <ChevronDown size={10}/> : <ChevronRight size={10}/>}
                   </button>
                 ) : (sec.label && collapsed ? <div className="h-px bg-[#2a2a2a] my-1 mx-2"/> : null)}
-                {(!sec.label || open || collapsed) && items.map(({to, icon:Icon, label, end}) => (
+                {(!sec.label || open || collapsed) && items.map(({to, icon:Icon, label, end}) => {
+                  const [toPath, toQuery] = to.split("?");
+                  const qMatch = !toQuery || locSearch.replace(/^\?/, "").split("&").includes(toQuery.split("&")[0]);
+                  return (
                   <NavLink
                     key={to}
                     to={to}
                     end={end}
                     title={collapsed ? label : undefined}
-                    className={({isActive}) => `dina-sidebar-link ${isActive?"active":""} ${collapsed ? "!justify-center !px-2" : ""}`}
+                    className={({isActive}) => `dina-sidebar-link ${isActive && qMatch ?"active":""} ${collapsed ? "!justify-center !px-2" : ""}`}
                     data-testid={`nav-${label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/&/g,"et").replace(/\s+/g,"-").replace(/[^\w-]/g,"")}`}
                   >
                     <Icon size={14}/>
                     {!collapsed && <span className="truncate">{label}</span>}
                     {to === "/console/commandes" && unreadMsgs > 0 && <span className={`${collapsed ? "absolute top-1 right-1 w-2 h-2 p-0" : "ml-auto px-1.5 min-w-[18px]"} bg-[#e53935] text-white text-[10px] font-bold rounded-full text-center leading-[18px]`} title={`${unreadMsgs} message(s) non lu(s)`} data-testid="nav-orders-unread">{collapsed ? "" : unreadMsgs}</span>}
                   </NavLink>
-                ))}
+                  );
+                })}
               </div>
             );
           })}
@@ -361,7 +370,7 @@ export default function ConsoleLayout() {
             <button onClick={()=>setShowQuickActions(!showQuickActions)} className="dina-chip !bg-[#b02a2a] !text-white !border-[#b02a2a]" data-testid="quick-actions-trigger"><Plus size={13}/>Créer</button>
             {showQuickActions && (
               <div className="absolute right-0 top-10 w-56 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-1.5 z-40" data-testid="quick-actions-menu" onMouseLeave={()=>setShowQuickActions(false)}>
-                {QUICK_ACTIONS.map(a => (
+                {QUICK_ACTIONS.filter(a => canAccess(user?.role, a.to) && !(a.deny || []).includes(user?.role)).map(a => (
                   <Link key={a.to} to={a.to} onClick={()=>setShowQuickActions(false)} className="w-full flex items-center gap-2.5 px-3 py-2 rounded hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm" data-testid={`qa-${a.label.toLowerCase().replace(/\s+/g,"-")}`}>
                     <a.icon size={14} className="text-[#b02a2a]"/>{a.label}
                   </Link>

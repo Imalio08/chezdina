@@ -1,3 +1,5 @@
+import { useAuth } from "@/context/AuthContext";
+
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
@@ -18,6 +20,9 @@ function deriveStatus(p) { return p.status || "actif"; }
 
 export default function Products() {
   const nav = useNavigate();
+  const { user } = useAuth();
+  const money = ["admin", "manager"].includes(user?.role);
+  const canEdit = ["admin", "manager", "stock_keeper"].includes(user?.role);
   const [products, setProducts] = useState([]);
   const [kpis, setKpis] = useState(null);
   const [salesMap, setSalesMap] = useState({});
@@ -110,7 +115,7 @@ export default function Products() {
         <div><h1 className="font-serif text-3xl">Produits</h1><p className="text-sm text-[#666]">{products.length} références · {filtered.length} affichées</p></div>
         <div className="flex gap-2">
           <button onClick={exportCSV} className="dina-btn-secondary !min-h-[40px]" data-testid="products-export"><Download size={14}/>Exporter</button>
-          <button onClick={()=>setEditId("new")} className="dina-btn-primary !min-h-[40px]" data-testid="products-new"><Plus size={14}/>Nouveau produit</button>
+          {canEdit && <button onClick={()=>setEditId("new")} className="dina-btn-primary !min-h-[40px]" data-testid="products-new"><Plus size={14}/>Nouveau produit</button>}
         </div>
       </div>
 
@@ -122,9 +127,9 @@ export default function Products() {
           <KpiMini label="En attente" v={kpis.liste_attente} c="#e4991e"/>
           <KpiMini label="Rupture" v={kpis.rupture} c="#c62828"/>
           <KpiMini label="Stock bas" v={kpis.stock_bas} c="#e4991e"/>
-          <KpiMini label="Val. coût" v={fcfa(kpis.valeur_cout)} c="#5867fd" small/>
+          {kpis.valeur_cout != null && <KpiMini label="Val. coût" v={fcfa(kpis.valeur_cout)} c="#5867fd" small/>}
           <KpiMini label="Val. vente" v={fcfa(kpis.valeur_vente)} c="#b02a2a" small/>
-          <KpiMini label="Marge moy." v={`${kpis.marge_moyenne}%`} c="#1f8a4c"/>
+          {kpis.marge_moyenne != null && <KpiMini label="Marge moy." v={`${kpis.marge_moyenne}%`} c="#1f8a4c"/>}
         </div>
       )}
 
@@ -157,7 +162,7 @@ export default function Products() {
       {/* List */}
       {view === "grid" ? (
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3" data-testid="products-grid">
-          {filtered.map(p => <ProductCard key={p.id} p={p} selected={selected.includes(p.id)} onToggle={toggleSel} onOpen={()=>nav(`/console/produits/${p.id}`)} onEdit={()=>setEditId(p.id)} salesMap={salesMap}/>)}
+          {filtered.map(p => <ProductCard key={p.id} p={p} selected={selected.includes(p.id)} onToggle={toggleSel} onOpen={()=>nav(`/console/produits/${p.id}`)} onEdit={canEdit ? ()=>setEditId(p.id) : null} money={money} salesMap={salesMap}/>)}
           {filtered.length === 0 && <div className="col-span-full dina-card-white py-12 text-center text-sm text-[#666]">Aucun produit</div>}
         </div>
       ) : (
@@ -166,7 +171,7 @@ export default function Products() {
             <thead><tr>
               <th className="w-8"><input type="checkbox" checked={allSelected} onChange={()=>setSelected(allSelected?[]:filtered.map(p=>p.id))} className="accent-[#b02a2a]"/></th>
               <th>Produit</th><th>Marque</th><th>Catégorie</th><th>SKU</th>
-              <th className="text-right">Prix</th><th className="text-right">Achat</th><th className="text-right">Marge</th>
+              <th className="text-right">Prix</th>{money && <><th className="text-right">Achat</th><th className="text-right">Marge</th></>}
               <th className="text-right">Stock</th><th>Variantes</th><th>Statut</th><th className="text-right">Ventes 30j</th><th></th>
             </tr></thead>
             <tbody>{filtered.slice(0,200).map(p => {
@@ -181,16 +186,16 @@ export default function Products() {
                   <td className="text-[#666]">{p.category}</td>
                   <td className="font-mono text-xs">{p.sku}</td>
                   <td className="text-right tabular font-semibold">{fcfa(p.price)}</td>
-                  <td className="text-right tabular text-[#666]">{fcfa(p.cost||0)}</td>
-                  <td className="text-right tabular"><span className={m>=40?"text-[#1f8a4c]":m<20?"text-[#c62828]":"text-[#e4991e]"}>{m}%</span></td>
+                  {money && <><td className="text-right tabular text-[#666]">{fcfa(p.cost||0)}</td>
+                  <td className="text-right tabular"><span className={m>=40?"text-[#1f8a4c]":m<20?"text-[#c62828]":"text-[#e4991e]"}>{m}%</span></td></>}
                   <td className="text-right tabular"><span className={stk<5?"text-[#c62828] font-semibold":stk<10?"text-[#e4991e]":""}>{stk}</span></td>
                   <td className="text-xs text-[#666]">{(p.sizes||[]).length}·{(p.colors||[]).length}c</td>
                   <td><span className="dina-chip !py-0.5 !px-2 text-[10px]" style={{color:STATUS_COLOR[status],borderColor:STATUS_COLOR[status]}}>{STATUS_LABEL[status]||"Actif"}</span></td>
                   <td className="text-right tabular text-[#666]">{sales30}</td>
                   <td className="text-right whitespace-nowrap">
                     <button onClick={()=>setDetailId(p.id)} className="text-[#5867fd] mr-1.5" title="Voir" data-testid={`view-${p.sku}`}><Eye size={14}/></button>
-                    <button onClick={()=>setEditId(p.id)} className="text-[#0021cc] mr-1.5" title="Modifier" data-testid={`edit-product-${p.sku}`}><Pencil size={14}/></button>
-                    <button onClick={()=>del(p.id)} className="text-[#c62828]" title="Supprimer"><Trash2 size={14}/></button>
+                    {canEdit && <button onClick={()=>setEditId(p.id)} className="text-[#0021cc] mr-1.5" title="Modifier" data-testid={`edit-product-${p.sku}`}><Pencil size={14}/></button>}
+                    {money && <button onClick={()=>del(p.id)} className="text-[#c62828]" title="Supprimer"><Trash2 size={14}/></button>}
                   </td>
                 </tr>
               );
@@ -202,7 +207,7 @@ export default function Products() {
   );
 }
 
-function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap }) {
+function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap, money }) {
   const status = deriveStatus(p); const stk = p.stock||0;
   const promo = p.price_old && p.price_old > p.price;
   const m = p.price&&p.cost ? Math.round((p.price-p.cost)/p.price*100) : 0;
@@ -222,14 +227,14 @@ function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap }) {
           <div className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.2em]">{p.name}</div>
           <div className="flex items-baseline justify-between mt-1.5">
             <div><span className="tabular text-sm font-bold text-[#b02a2a]">{fcfa(p.price)}</span>{promo && <span className="text-[10px] text-[#999] line-through tabular ml-1">{fcfa(p.price_old)}</span>}</div>
-            <span className={`text-[10px] tabular ${m>=40?"text-[#1f8a4c]":m<20?"text-[#c62828]":""}`}>{m}%</span>
+            {money && <span className={`text-[10px] tabular ${m>=40?"text-[#1f8a4c]":m<20?"text-[#c62828]":""}`}>{m}%</span>}
           </div>
           <div className="flex items-center justify-between mt-1 text-[10px] text-[#999]"><span>Stk <b>{stk}</b> · {(p.sizes||[]).length}t·{(p.colors||[]).length}c</span><span><BarChart3 size={9} className="inline"/> {sales30}/30j</span></div>
         </div>
       </button>
-      <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
+      {onEdit && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
         <button onClick={onEdit} className="w-7 h-7 rounded-lg bg-white dark:bg-[#2a2a2a] shadow grid place-items-center" title="Modifier"><Pencil size={11}/></button>
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,0 +1,63 @@
+{
+  "summary": "Tested the limited-role console (sales / stock_keeper / community_manager) on the backend and frontend. WORKING: the deny-by-default allow-list (sales kpis, stats, cash-sessions, expenses and POST products all give 403; stock_keeper customers gives 403; CM POST pos gives 403). /api/products and /api/stock-movements have no cost or margin keys. stock_keeper /api/purchase-orders has no total, amount or price. A stock_keeper PATCH on cost is ignored. /api/dashboard/role returns the right keys for each role. my_sales_count and my_sales_total count only the sales user's own orders (verified with a sale by her and one by the manager). Sidebars match PATH_ROLES. RoleDashboard has no CA. Forbidden pages redirect to /console. Manager and admin keep the full dashboard, menus and costs. NOT WORKING: (1) Vendeuse cannot use the Caisse: POSSessionGuard calls GET /api/cash-sessions, gets 403 and the page stays locked. (2) Her Liste d'attente page never finishes loading ('Chargement…'). (3) Margins and costs still leak through aggregate endpoints with French or other key names, and in the UI. (4) /api/public/products returns 'cost' to anyone, with no login. (5) The community manager cannot write anything: promotions, campaigns, reviews moderation, segments, site appearance and pages all need the admin or manager role (require_role), so Site vitrine save shows a 403 'Erreur' toast. pytest: 33/47 pass.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/public/products", "issue": "Returns product 'cost' (purchase cost) to anyone, with no login. The field filter only runs after get_user, so public routes are never filtered. Any limited role or customer gets costs this way.", "priority": "CRITICAL"},
+      {"endpoint": "GET /api/products/kpis", "issue": "Returns valeur_cout and marge_moyenne to sales, stock_keeper and CM. These names are not in COST_KEYS. The Produits page shows 'VAL. COÛT 32 471 500 FCFA' and 'MARGE MOY. 51.2%'.", "priority": "HIGH"},
+      {"endpoint": "GET /api/brands/full, /api/brands/kpis", "issue": "Return avg_margin and ca_30d to all 3 limited roles. The Marques page shows Marge and CA 30j.", "priority": "HIGH"},
+      {"endpoint": "GET /api/purchase-orders/kpis", "issue": "stock_keeper receives total_month (2 778 773), due (242 250) and avg_expected_margin. The Achats page shows ACHETÉ MOIS, MONTANT DÛ and MARGE PRÉVUE. /api/purchase-orders also keeps extra_costs and landed_unit_cost.", "priority": "HIGH"},
+      {"endpoint": "GET /api/cash-sessions (sales)", "issue": "403 for sales. POSSessionGuard treats this as 'no open session', so the Caisse stays blocked and the Vendeuse cannot sell. POST /api/cash-sessions/open is also denied.", "priority": "CRITICAL"},
+      {"endpoint": "GET /api/waitlist/grouped, /api/out-of-catalog (sales)", "issue": "require_role('admin','manager') returns 403. Waitlist.jsx has no catch, so the page stays on 'Chargement…' forever. POST /api/waitlist/{id}/notify is also denied.", "priority": "HIGH"},
+      {"endpoint": "CM writes: PATCH /api/site, PATCH /api/storefront/sections, POST/PATCH /api/pages, POST/PATCH/DELETE /api/promotions, /api/campaigns (+/send), /api/segments, PATCH /api/reviews/{id}/moderate, PATCH /api/loyalty/settings, /api/promo-types", "issue": "role_access lets CM through, but the endpoints use require_role('admin','manager'), so everything is 403. CM cannot save the site appearance (UI toast 'Erreur'), moderate reviews or create promotions or campaigns. Note: Settings.jsx also uses PATCH /api/site (payments, security, wave link). If you allow CM on it, add a key whitelist (theme, home, menu, footer, seo, social…), because CM_DENY '/api/site/settings' matches no real route.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/customers (CM)", "issue": "The 'wallet' money field (customer wallet balance) is not stripped. MONEY_KEYS has wallet_balance but the actual key is 'wallet'."},
+      {"endpoint": "GET /api/attendance/today-kiosk", "issue": "403 for all 3 roles on the Pointage page they are allowed to open (it is missing from COMMON)."},
+      {"endpoint": "GET /api/wallet/transactions (CM)", "issue": "403 on /console/parrainage (fails silently)."},
+      {"endpoint": "GET /api/customers?q= (stock_keeper)", "issue": "The header global search fires one 403 per keystroke. Product results still show; the search should skip customers for this role."},
+      {"endpoint": "stock_keeper ROLE_API full /api/orders", "issue": "Gives stock_keeper POST /api/orders (create sales) and PATCH on any order field. Consider limiting this to status and preparation endpoints."},
+      {"endpoint": "stock_keeper /api/brands, /api/categories, /api/collections POST/PATCH", "issue": "Still require admin or manager, so the Magasinière cannot create or edit brands and categories. Confirm this is intended."},
+      {"endpoint": "POST /api/auth/login, /api/auth/login-pin", "issue": "Staff login has no brute-force lockout, and a 4-digit PIN can be brute-forced (existing issue)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "POS (sales)", "issue": "Locked behind 'Ouvrez votre session de caisse' because of the 403 on /cash-sessions.", "selector": "[data-testid=pos-session-guard]", "priority": "CRITICAL"},
+      {"component": "Waitlist (sales)", "issue": "Never-ending 'Chargement…'.", "selector": "/console/liste-attente", "priority": "HIGH"},
+      {"component": "Header 'Créer' quick menu", "issue": "Not filtered by canAccess. CM and sales see Nouvelle dépense, Nouvel approvisionnement, Nouveau produit and so on.", "selector": "button 'Créer'", "priority": "MEDIUM"},
+      {"component": "Sidebar Site vitrine (CM)", "issue": "All 5 '?tab=' NavLinks are highlighted as active at the same time.", "selector": "aside a[href^='/console/site?tab=']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "CM Site vitrine save", "issue": "PATCH /api/site gives 403 and the UI shows only 'Erreur'.", "affected_selectors": ["[data-testid=apparence-save]"]},
+      {"flow": "Products page for limited roles", "issue": "The KPI tiles show VAL. COÛT and MARGE MOY. Product cards show a '0%' margin badge (cost was stripped, so it computes 0). The 'Nouveau produit' button and edit pencil still show for read-only sales and CM.", "affected_selectors": ["/console/produits"]},
+      {"flow": "CM Clients", "issue": "The 'DÉPENSÉ' column shows '0 FCFA' for every customer, which is misleading; the column should be hidden. 'Nouvelle cliente' and the edit icons show, but CM is read-only.", "affected_selectors": ["/console/clients"]},
+      {"flow": "stock_keeper Achats", "issue": "Kanban cards show '0 FCFA' (total stripped), and the KPI tiles show the real amounts and margin.", "affected_selectors": ["/console/achats"]}
+    ],
+    "design_issues": [
+      {"screen": "Sidebar", "issues": ["stock_keeper menu has no 'Fiches colis' or 'Alertes' entries (only reachable from a dashboard card)", "CM menu has no separate 'Campagnes' or 'Campagnes WhatsApp' entries (only 'Segments & campagnes')", "The CM site page links to 'Paramètres → Identité', which CM cannot open"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_role_access_limited.py", "/app/backend/tests/_audit_routes.py", "/app/backend/tests/_scan_limited_gets.py", "/app/test_reports/pytest/role_access.xml"],
+  "action_items": [
+    "Allow sales GET /api/cash-sessions (own or open session) and POST /api/cash-sessions/open, or change POSSessionGuard for sales. The Caisse is unusable today.",
+    "Open /api/waitlist/grouped, /api/out-of-catalog and /api/waitlist/{id}/notify to sales, and add a .catch to Waitlist.jsx load().",
+    "Strip cost from /api/public/products (and every /api/public/* product payload) for everyone.",
+    "Add valeur_cout, marge_moyenne, avg_margin, ca_30d, avg_expected_margin, total_month, due, landed_unit_cost and extra_costs (for stock_keeper) to the hidden keys, or deny /api/products/kpis and /api/brands/kpis|full and /api/purchase-orders/kpis for limited roles. Then hide those KPI tiles and the margin badges in the UI.",
+    "Add community_manager to require_role on promotions, campaigns(+send), segments, reviews moderate/patch, loyalty settings, promo-types, pages, storefront/sections and PATCH /api/site. For /api/site, whitelist the appearance and content keys only.",
+    "Strip 'wallet' from CM customer payloads and hide the DÉPENSÉ column for CM.",
+    "Add /api/attendance/today-kiosk to COMMON (or hide the list), and skip the customers search for stock_keeper in the header search.",
+    "Filter the 'Créer' quick-action menu with canAccess and hide create/edit buttons on read-only pages."
+  ],
+  "critical_code_review_comments": [
+    "role_access api_allowed passes the allow-list, but the endpoint-level require_role still rejects the role. Audit with backend/tests/_audit_routes.py, which lists every allowed write route whose require_role excludes the role.",
+    "The field filter only sees request.state.role, which is set in get_user. Unauthenticated /api/public/* routes are never filtered.",
+    "Key blacklisting is fragile against French or alternative key names (valeur_cout, marge_moyenne, ca_30d). Prefer denying aggregate endpoints, or an explicit role-specific response model.",
+    "CM_DENY ('/api/site/settings', '/api/site-settings') does not match any existing route. Settings and appearance share PATCH /api/site."
+  ],
+  "updated_files": ["/app/backend/tests/test_role_access_limited.py", "/app/backend/tests/_audit_routes.py", "/app/backend/tests/_scan_limited_gets.py"],
+  "success_rate": {"backend": "70% (33/47)", "frontend": "65%"},
+  "seed_data_creation": "None kept. The pytest creates 2 TEST_role_access orders (fake product_id, so stock is not touched) and deletes them. Today's attendance records for sales, stock, cm and manager were deleted after the UI runs. No product cost was changed (verified).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_role_access_limited.py -n 0. sess(role) logs in and punches arrival through the API (selfie is 'data:image/jpeg;base64,'+'A'*1500), and the fixture deletes the attendance it created. In the UI, log in with input nth(0) and input[type=password] plus the 'Se connecter' button, then call fetch('/api/attendance/check-in') with the localStorage dina_token. After UI runs, delete today's attendance rows for those users with pymongo. _scan_limited_gets.py lists the 403s and the suspicious money keys for every GET route without parameters."
+}

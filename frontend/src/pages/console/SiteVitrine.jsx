@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import SectionBuilder from "./SectionBuilder";
 import SaveButton from "@/components/shared/SaveButton";
+import { useAuth } from "@/context/AuthContext";
 
 const TABS = [
   { id: "apparence", label: "Apparence", icon: Palette },
@@ -79,6 +80,7 @@ export default function SiteVitrine() {
 
 /* ========= Apparence ========= */
 function ApparenceTab() {
+  const isAdminUser = useAuth().user?.role === "admin";
   const [site, setSite] = useState({});
   const [theme, setTheme] = useState(DEFAULT_THEME);
   const [saving, setSaving] = useState(false);
@@ -93,14 +95,14 @@ function ApparenceTab() {
   const save = async () => {
     setSaving(true);
     try { await api.patch("/site", { theme }); toast.success("Apparence enregistrée — rechargez la boutique"); } 
-    catch { toast.error("Erreur"); } finally { setSaving(false); }
+    catch (e) { toast.error(e?.response?.data?.detail || "Enregistrement impossible · réessayez"); } finally { setSaving(false); }
   };
 
   return (
     <div className="space-y-4">
       <div className="dina-card-white p-5">
         <div className="font-serif text-xl mb-3">Logo & identité visuelle</div>
-        <p className="text-sm text-[#666]">Le logo est géré depuis <Link to="/console/parametres?tab=identite" className="text-[#b02a2a] underline">Paramètres → Identité</Link>. Il est utilisé partout : console, site, livreur, reçus, factures.</p>
+        <p className="text-sm text-[#666]">Le logo est géré depuis {isAdminUser ? <Link to="/console/parametres?tab=identite" className="text-[#b02a2a] underline">Paramètres → Identité</Link> : "Paramètres → Identité (propriétaire)"}. Il est utilisé partout : console, site, livreur, reçus, factures.</p>
         {site.logo && <img src={site.logo} alt="Logo" className="mt-3 h-16 object-contain"/>}
       </div>
 

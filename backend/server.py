@@ -2947,6 +2947,10 @@ async def update_sections(body: StorefrontSectionsIn, user: dict = Depends(requi
 @api.patch("/site")
 async def update_site(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
     body.pop("_id",None)
+    if user.get("role") == "community_manager":
+        body = {k: v for k, v in body.items() if k in ("theme", "menu", "footer", "social", "seo", "sections", "hero", "logo", "favicon")}
+        if not body:
+            raise HTTPException(403, "Réglage réservé à la propriétaire")
     await db.site_settings.update_one({"id":"main"}, {"$set":{**body,"id":"main","updated_at":now_iso()}}, upsert=True)
     return {"ok": True}
 

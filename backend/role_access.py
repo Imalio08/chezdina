@@ -1,8 +1,10 @@
 """Console access for limited staff roles (vendeuse, magasinière, community manager).
 
 Deny-by-default API allow-list per role + server-side removal of money fields they must not see.
+Inside its allow-list a limited role gets the gérante's permissions (see deps.require_role).
 """
 import json
+import re
 from datetime import datetime, timezone
 from typing import Any, Dict
 
@@ -13,37 +15,39 @@ from starlette.responses import Response
 from deps import db, get_user
 
 LIMITED_ROLES = ("sales", "stock_keeper", "community_manager")
+READ = ("GET", "HEAD")
 
-COMMON = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in", "/api/me/", "/api/notifications",
-          "/api/manual", "/api/users/me", "/api/push/", "/api/public/", "/api/dashboard/role", "/api/orders-messages")
+COMMON = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in", "/api/attendance/today-kiosk", "/api/me/",
+          "/api/notifications", "/api/manual", "/api/users/me", "/api/push/", "/api/public/", "/api/dashboard/role",
+          "/api/orders-messages")
 COMMON_READ = ("/api/business", "/api/brands", "/api/categories", "/api/products", "/api/stock", "/api/zones")
 
 ROLE_API = {
     "sales": {
         "full": ("/api/pos", "/api/orders", "/api/customers", "/api/messages", "/api/waitlist", "/api/abandoned-carts",
-                 "/api/invoices", "/api/out-of-catalog"),
+                 "/api/invoices", "/api/out-of-catalog", "/api/cash-sessions"),
         "read": ("/api/stock-movements", "/api/segments"),
+        "rules": (),
     },
     "stock_keeper": {
         "full": ("/api/products", "/api/stock", "/api/stock-movements", "/api/stock-alerts", "/api/brands", "/api/categories",
-                 "/api/collections", "/api/suppliers", "/api/purchase-orders", "/api/orders", "/api/deliveries"),
-        "read": ("/api/abandoned-carts",),
+                 "/api/collections", "/api/suppliers", "/api/purchase-orders", "/api/deliveries"),
+        "read": ("/api/abandoned-carts", "/api/orders"),
+        "rules": ((("PATCH", "POST"), re.compile(r"^/api/orders/[^/]+/(status|prepare|ready|items)")),),
     },
     "community_manager": {
         "full": ("/api/messages", "/api/reviews", "/api/promotions", "/api/promo-types", "/api/campaigns", "/api/segments",
                  "/api/loyalty", "/api/referrals", "/api/site", "/api/pages", "/api/storefront", "/api/cms"),
         "read": ("/api/customers", "/api/orders", "/api/wallet", "/api/stock-movements"),
+        "rules": (),
     },
 }
-# Site settings stay with the owner even for the community manager.
-CM_DENY = ("/api/site/settings", "/api/site-settings")
 
-# Never returned to limited roles.
-COST_KEYS = {"cost", "cost_price", "purchase_price", "buy_price", "unit_cost", "avg_cost", "landed_cost", "total_cost",
-             "margin", "margin_pct", "margin_rate", "gross_margin", "profit", "revenue", "stock_value", "cost_value"}
+# Any key naming a purchase cost, margin, profit or turnover is removed for limited roles (and on public routes).
+SENSITIVE_RE = re.compile(r"(cost|cout|coût|marge|margin|profit|revenue|benefice|bénéfice|landed|^ca$|^ca_|_ca$)", re.I)
 MONEY_KEYS = {"total", "subtotal", "discount", "delivery_fee", "amount", "unit_price", "total_spent", "spent", "ltv",
-              "lifetime_value", "avg_basket", "wallet_balance", "total_paid", "paid", "balance", "price"}
-# path prefix -> extra keys hidden for that role
+              "lifetime_value", "avg_basket", "wallet", "wallet_balance", "total_paid", "paid", "balance", "price",
+              "total_month", "due", "valeur_vente"}
 EXTRA_HIDDEN = {
     "stock_keeper": {"/api/purchase-orders": MONEY_KEYS},
     "community_manager": {"/api/customers": MONEY_KEYS - {"price"}, "/api/orders": MONEY_KEYS - {"price"}, "/api/wallet": MONEY_KEYS},
@@ -54,37 +58,38 @@ def api_allowed(role: str, method: str, path: str) -> bool:
     rules = ROLE_API.get(role)
     if rules is None:
         return True
-    if role == "community_manager" and path.startswith(CM_DENY):
-        return False
     if path.startswith(COMMON) or path.startswith(rules["full"]):
         return True
-    return method in ("GET", "HEAD") and (path.startswith(COMMON_READ) or path.startswith(rules["read"]))
+    if method in READ and (path.startswith(COMMON_READ) or path.startswith(rules["read"])):
+        return True
+    return any(method in m and rx.match(path) for m, rx in rules["rules"])
 
 
-def _strip(obj: Any, keys: set) -> Any:
+def _strip(obj: Any, extra: set) -> Any:
     if isinstance(obj, dict):
-        return {k: _strip(v, keys) for k, v in obj.items() if k not in keys}
+        return {k: _strip(v, extra) for k, v in obj.items() if k not in extra and not SENSITIVE_RE.search(k)}
     if isinstance(obj, list):
-        return [_strip(v, keys) for v in obj]
+        return [_strip(v, extra) for v in obj]
     return obj
 
 
 class LimitedRoleFieldFilter(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         resp = await call_next(request)
-        role = getattr(request.state, "role", None)
-        if role not in LIMITED_ROLES or "application/json" not in resp.headers.get("content-type", ""):
-            return resp
         path = request.url.path
+        role = getattr(request.state, "role", None)
+        public = path.startswith("/api/public/")
+        if (role not in LIMITED_ROLES and not public) or "application/json" not in resp.headers.get("content-type", ""):
+            return resp
         if path.startswith(("/api/auth/", "/api/dashboard/role")):
             return resp
-        keys = set(COST_KEYS)
-        for prefix, extra in EXTRA_HIDDEN.get(role, {}).items():
+        extra: set = set()
+        for prefix, keys in EXTRA_HIDDEN.get(role, {}).items():
             if path.startswith(prefix):
-                keys |= extra
+                extra |= keys
         body = b"".join([chunk async for chunk in resp.body_iterator])
         try:
-            data = _strip(json.loads(body), keys)
+            data = _strip(json.loads(body), extra)
         except ValueError:
             return Response(body, status_code=resp.status_code, headers=dict(resp.headers))
         headers = {k: v for k, v in resp.headers.items() if k.lower() != "content-length"}

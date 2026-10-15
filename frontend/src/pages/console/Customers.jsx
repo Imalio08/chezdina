@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
@@ -16,6 +17,7 @@ const TABS = [
 
 export default function Customers() {
   const nav = useNavigate();
+  const ro = useAuth().user?.role === "community_manager";
   const confirm = useConfirm();
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
@@ -91,7 +93,7 @@ export default function Customers() {
     <div className="space-y-5 font-sora">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Clientes</h1><p className="text-sm text-[#666]">{filtered.length} / {list.length} profils · {TABS.find(t => t.k === tab)?.label}</p></div>
-        <button onClick={() => { setEdit({}); setOpen(true); }} className="dina-btn-primary !min-h-[40px]" data-testid="cust-new"><Plus size={14} />Nouvelle cliente</button>
+        {!ro && <button onClick={() => { setEdit({}); setOpen(true); }} className="dina-btn-primary !min-h-[40px]" data-testid="cust-new"><Plus size={14} />Nouvelle cliente</button>}
       </div>
 
       <div className="flex gap-1 overflow-x-auto bg-[#f5f5f5] dark:bg-[#1a1a1a] p-1 rounded-lg w-fit">
@@ -118,7 +120,7 @@ export default function Customers() {
                     <div className="text-xs text-[#666]">{t.phone} · {t.orders_count || 0} commandes · {t.tier || "Bronze"}</div>
                   </div>
                   <div className="text-right">
-                    <div className="font-serif tabular text-[#b02a2a] font-semibold">{fcfa(t.total_spent || 0)}</div>
+                    {!ro && <div className="font-serif tabular text-[#b02a2a] font-semibold">{fcfa(t.total_spent || 0)}</div>}
                     <div className="text-[11px] text-[#666] tabular">{t.loyalty_points || 0} pts</div>
                   </div>
                 </div>
@@ -132,7 +134,7 @@ export default function Customers() {
       {tab !== "top" && view === "table" ? (
         <div className="dina-card-white overflow-x-auto">
           <table className="dina-table">
-            <thead><tr><th>Cliente</th><th>Téléphone</th><th>Zone</th><th className="text-right">Points</th><th className="text-right">Dépensé</th><th>Statut</th><th></th></tr></thead>
+            <thead><tr><th>Cliente</th><th>Téléphone</th><th>Zone</th><th className="text-right">Points</th>{!ro && <th className="text-right">Dépensé</th>}<th>Statut</th><th></th></tr></thead>
             <tbody>{filtered.map(c => (
               <tr key={c.id} data-testid={`cust-row-${c.phone}`}>
                 <td><button onClick={() => nav(`/console/clients/${c.id}`)} className="flex items-center gap-2 hover:text-[#b02a2a]">
@@ -142,14 +144,14 @@ export default function Customers() {
                 <td className="text-xs">{c.phone}</td>
                 <td className="text-xs text-[#666]">{c.zone || c.quartier || "—"}</td>
                 <td className="text-right tabular text-[#e4991e] font-semibold">{c.loyalty_points || 0}</td>
-                <td className="text-right tabular">{fcfa(c.total_spent || 0)}</td>
+                {!ro && <td className="text-right tabular">{fcfa(c.total_spent || 0)}</td>}
                 <td><span className={`dina-chip text-[10px] ${c.status === "blacklist" ? "!text-[#c62828] !border-[#c62828]" : c.derived_status === "inactive" ? "!text-[#999]" : "!text-[#1f8a4c] !border-[#1f8a4c]"}`}>{c.status === "blacklist" ? "Noire" : c.derived_status === "inactive" ? "Inactive" : "Active"}</span></td>
                 <td className="text-right whitespace-nowrap">
                   <button onClick={() => nav(`/console/clients/${c.id}?tab=messages`)} className="text-[#5867fd] mr-1.5" title="Message in-app" data-testid={`cust-msg-${c.phone}`}><MessageSquare size={13} /></button>
                   <button onClick={() => openWa(c)} className="text-[#1f8a4c] mr-1.5" title="WhatsApp" data-testid={`cust-wa-${c.phone}`}><Phone size={13} /></button>
-                  <button onClick={() => { setEdit(c); setOpen(true); }} className="text-[#0021cc] mr-1.5"><Pencil size={13} /></button>
+                  {!ro && <><button onClick={() => { setEdit(c); setOpen(true); }} className="text-[#0021cc] mr-1.5"><Pencil size={13} /></button>
                   <button onClick={() => regenCode(c)} className="text-[#e4991e] mr-1.5" title="Régénérer code"><Copy size={13} /></button>
-                  <button onClick={() => toggleBlacklist(c)} className="text-[#c62828]" title="Liste noire"><Ban size={13} /></button>
+                  <button onClick={() => toggleBlacklist(c)} className="text-[#c62828]" title="Liste noire"><Ban size={13} /></button></>}
                 </td>
               </tr>
             ))}{filtered.length === 0 && <tr><td colSpan={7} className="text-center text-sm text-[#666] py-8">Aucune cliente</td></tr>}</tbody>

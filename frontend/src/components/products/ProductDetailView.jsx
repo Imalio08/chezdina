@@ -80,10 +80,10 @@ export default function ProductDetailView({ productId, onBack, onEdit }) {
             {p.barcode && <span className="text-[#666]">· {p.barcode}</span>}
           </div>
 
-          <div className="grid grid-cols-3 gap-3 mt-4">
+          <div className={`grid ${p.cost != null ? "grid-cols-3" : "grid-cols-1"} gap-3 mt-4`}>
             <div className="dina-card-white p-3"><div className="text-[10px] uppercase text-[#666] font-semibold">Prix de vente</div><div className="font-serif text-xl tabular text-[#b02a2a]">{fcfa(p.price)}</div>{p.price_old && <div className="text-[10px] text-[#999] line-through">{fcfa(p.price_old)}</div>}</div>
-            <div className="dina-card-white p-3"><div className="text-[10px] uppercase text-[#666] font-semibold">Prix d'achat</div><div className="font-serif text-xl tabular">{fcfa(p.cost||0)}</div></div>
-            <div className="dina-card-white p-3"><div className="text-[10px] uppercase text-[#666] font-semibold">Marge</div><div className={`font-serif text-xl tabular ${margePct>=40?"text-[#1f8a4c]":margePct<20?"text-[#c62828]":"text-[#e4991e]"}`}>{margePct}%</div><div className="text-[10px] text-[#999]">{fcfa((p.price||0)-(p.cost||0))}</div></div>
+            {p.cost != null && <><div className="dina-card-white p-3"><div className="text-[10px] uppercase text-[#666] font-semibold">Prix d'achat</div><div className="font-serif text-xl tabular">{fcfa(p.cost||0)}</div></div>
+            <div className="dina-card-white p-3"><div className="text-[10px] uppercase text-[#666] font-semibold">Marge</div><div className={`font-serif text-xl tabular ${margePct>=40?"text-[#1f8a4c]":margePct<20?"text-[#c62828]":"text-[#e4991e]"}`}>{margePct}%</div><div className="text-[10px] text-[#999]">{fcfa((p.price||0)-(p.cost||0))}</div></div></>}
           </div>
 
           {p.description && <p className="text-sm text-[#666] leading-relaxed mt-4">{p.description}</p>}
@@ -108,7 +108,7 @@ export default function ProductDetailView({ productId, onBack, onEdit }) {
         {tab==="variants" && (
           <div className="mt-4 dina-card-white overflow-hidden">
             <table className="dina-table">
-              <thead><tr><th>Taille</th><th>Couleurs</th><th className="text-right">Stock</th><th className="text-right">Valeur coût</th><th>Statut</th></tr></thead>
+              <thead><tr><th>Taille</th><th>Couleurs</th><th className="text-right">Stock</th>{p.cost != null && <th className="text-right">Valeur coût</th>}<th>Statut</th></tr></thead>
               <tbody>
                 {(p.sizes||[]).map(s => {
                   const stk = Number(p.stock_by_size?.[s] ?? 0);
@@ -117,13 +117,13 @@ export default function ProductDetailView({ productId, onBack, onEdit }) {
                       <td className="font-semibold">{s}</td>
                       <td className="text-xs text-[#666]">{(p.colors||[]).join(" · ") || "—"}</td>
                       <td className="text-right tabular"><span className={stk===0?"text-[#c62828] font-bold":stk<3?"text-[#e4991e] font-bold":""}>{stk}</span></td>
-                      <td className="text-right tabular text-[#666]">{fcfa(stk*(p.cost||0))}</td>
+                      {p.cost != null && <td className="text-right tabular text-[#666]">{fcfa(stk*(p.cost||0))}</td>}
                       <td>{stk===0 ? <span className="text-xs text-[#c62828]">Rupture</span> : stk<3 ? <span className="text-xs text-[#e4991e]">Stock bas</span> : <span className="text-xs text-[#1f8a4c]">Dispo</span>}</td>
                     </tr>
                   );
                 })}
                 {(p.sizes||[]).length === 0 && <tr><td colSpan={5} className="text-center text-sm text-[#666] py-6">Aucune variante · stock global : <b>{totalStock}</b></td></tr>}
-                <tr className="font-semibold bg-[#fafafa] dark:bg-[#141414]"><td colSpan={2}>Total</td><td className="text-right tabular">{totalStock}</td><td className="text-right tabular">{fcfa(totalStock*(p.cost||0))}</td><td/></tr>
+                <tr className="font-semibold bg-[#fafafa] dark:bg-[#141414]"><td colSpan={2}>Total</td><td className="text-right tabular">{totalStock}</td>{p.cost != null && <td className="text-right tabular">{fcfa(totalStock*(p.cost||0))}</td>}<td/></tr>
               </tbody>
             </table>
           </div>

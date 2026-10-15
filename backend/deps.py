@@ -124,7 +124,10 @@ async def punch_required(user: dict) -> bool:
 
 def require_role(*roles):
     async def dep(user: dict = Depends(get_user)):
-        if user.get("role") not in roles and user.get("role") != "admin":
+        role = user.get("role")
+        # Limited roles act as the gérante inside their own API allow-list (checked in get_user).
+        inherits = role in ("sales", "stock_keeper", "community_manager") and "manager" in roles
+        if role not in roles and role != "admin" and not inherits:
             raise HTTPException(403, "Accès refusé")
         return user
     return dep

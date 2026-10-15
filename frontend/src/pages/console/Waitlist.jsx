@@ -23,7 +23,7 @@ export default function Waitlist() {
 
   const load = async () => {
     const [g, o] = await Promise.all([
-      api.get("/waitlist/grouped"),
+      api.get("/waitlist/grouped").catch(() => ({ data: [] })),
       api.get("/out-of-catalog").catch(()=>({data:{keywords:[],total:0}})),
     ]);
     setData(g.data); setOut(o.data);
