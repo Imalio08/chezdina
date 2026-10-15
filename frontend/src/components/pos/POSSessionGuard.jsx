@@ -17,16 +17,17 @@ export default function POSSessionGuard({ children }) {
   const [open, setOpen] = useState(null);  // session objet | null si pas ouverte
   const [showOpen, setShowOpen] = useState(false);
 
-  const check = async () => {
-    setLoading(true);
+  const check = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const r = await api.get("/cash-sessions");
       const current = (r.data || []).find(s => !s.closed);
       setOpen(current || null);
-    } catch { setOpen(null); }
+    } catch { if (!silent) setOpen(null); }
     finally { setLoading(false); }
   };
-  useEffect(() => { check(); const t = setInterval(check, 30000); return () => clearInterval(t); }, []);
+  // Background re-check stays silent so the Caisse (cart, open forms) is never unmounted.
+  useEffect(() => { check(); const t = setInterval(() => check(true), 30000); return () => clearInterval(t); }, []);
 
 
   if (loading) return <div className="min-h-[60vh] grid place-items-center text-sm text-[#666]">Vérification de la session…</div>;

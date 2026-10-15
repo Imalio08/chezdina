@@ -41,15 +41,15 @@ export default function PosNewCustomer({ onCreated, onClose }) {
       });
       toast.success(`Cliente ${name} créée`);
       onCreated(data);
-    } catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); } finally { setLoading(false); }
+    } catch (e) { toast.error(e?.response?.data?.detail || "La cliente n'a pas pu être créée · vos informations sont conservées, réessayez"); } finally { setLoading(false); }
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 grid place-items-end sm:place-items-center z-50 p-0 sm:p-4" onClick={onClose} data-testid="pos-new-customer-full">
+    <div className="fixed inset-0 bg-black/60 grid place-items-end sm:place-items-center z-50 p-0 sm:p-4" data-testid="pos-new-customer-full">
       <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-2xl max-h-[92vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
         <div className="sticky top-0 bg-white dark:bg-[#1a1a1a] flex items-center justify-between p-5 border-b border-[#ececec] dark:border-[#2a2a2a] z-10">
           <div><div className="font-serif text-xl">Nouvelle cliente</div><div className="text-xs text-[#666]">Fiche complète — pour un suivi personnalisé</div></div>
-          <button onClick={onClose}><X size={18}/></button>
+          <button onClick={onClose} data-testid="nc-close" aria-label="Fermer"><X size={18}/></button>
         </div>
         <div className="p-5 space-y-4">
           <div>
@@ -110,8 +110,8 @@ export default function PosNewCustomer({ onCreated, onClose }) {
           </div>
         </div>
         <div className="sticky bottom-0 bg-white dark:bg-[#1a1a1a] border-t border-[#ececec] dark:border-[#2a2a2a] p-4 flex gap-2">
-          <button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button>
-          <button onClick={save} disabled={loading} className="dina-btn-primary flex-1" data-testid="nc-save">{loading?"…":"Créer la cliente"}</button>
+          <button onClick={onClose} className="dina-btn-secondary flex-1" data-testid="nc-cancel">Annuler</button>
+          <button onClick={save} disabled={loading} className="dina-btn-primary flex-1" data-testid="nc-save">{loading?"Création…":"Créer la cliente"}</button>
         </div>
       </div>
     </div>

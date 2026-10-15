@@ -30,14 +30,15 @@ async def check_in(body: Dict[str, Any], user: dict = Depends(get_user)):
     kind = body.get("kind", "arrival")
     method = body.get("method", "phone")  # phone | tablet
     selfie = body.get("selfie")
-    pin = (body.get("pin") or "").strip()
+    pin = "".join(ch for ch in str(body.get("pin") or "") if ch.isdigit())
     if not selfie or not str(selfie).startswith("data:image/") or len(str(selfie)) < 1000:
         raise HTTPException(400, "Photo de pointage requise (caméra avant) · réessayez")
     if pin:
         import bcrypt
-        pin_hash = user.get("pin_hash")
+        # get_user() strips pin_hash, so read it from the account itself.
+        pin_hash = ((await db.users.find_one({"id": user["id"]}, {"pin_hash": 1})) or {}).get("pin_hash")
         if not pin_hash or not bcrypt.checkpw(pin.encode(), pin_hash.encode()):
-            raise HTTPException(401, "PIN incorrect")
+            raise HTTPException(401, "Code PIN incorrect pour ce compte")
     today = datetime.now(timezone.utc).date().isoformat()
     now = datetime.now(timezone.utc)
     biz = await db.business.find_one({"id": "main"}) or {}
