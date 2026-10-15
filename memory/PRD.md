@@ -1091,3 +1091,14 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_69 (backend 19/19, frontend 100 %). Données TEST_ supprimées.
 - Limite : push iPhone uniquement si l'app est installée sur l'écran d'accueil (iOS 16.4+).
 
+
+## 2026-10-15 — Parrainage complet + Porte-monnaie unifié
+- Règles : filleule 1 000 FCFA à l'inscription (utilisable dès la 1re commande) ; marraine 1 000 FCFA « en attente » puis versés à la 1re commande livrée de la filleule. Points : 1 pt / 500 FCFA d'articles, gagnés à la livraison seulement ; 1 pt = 10 FCFA, conversion par la cliente dès 100 pts. Porte-monnaie : articles seulement (pas la livraison), tout ou partie, cumulable promos, sans date limite, non retirable, rendu si commande annulée.
+- Backend routers/wallet.py : ledger wallet_tx (ref unique = idempotence, solde après, statut available/pending/validated), apply_referral, on_order_status (points + récompense marraine + remboursement), debit_for_order, endpoints client (/public/account/wallet, /wallet/convert, /referral), publics (/public/referral/{code}, /open), console (/customers/{id}/wallet, /wallet/adjust avec motif + audit, /wallet/transactions).
+- Commande : wallet_use + checkout_key (index unique partiel, anti double-clic) ; commande enregistrée avant le stock, remboursement si échec.
+- Front : question « Avez-vous été invitée… » + vérification du code en direct, page /boutique/invitation/:code (code gardé dans localStorage dina_ref + comptage des ouvertures), pages Parrainage (lien, copier, partager, stats, statuts), Porte-monnaie (soldes + historique), Fidélité (conversion), bloc porte-monnaie au paiement ; console : ConsoleWallet (fiche cliente) + tableau des mouvements dans Parrainage.
+- Sécurité : CORS sans credentials quand CORS_ORIGINS="*" ; get_customer privilégie le Bearer client ; codes de parrainage uniques (index).
+- Format FCFA français (« 1 000 FCFA ») dans toute l'app.
+- Testé : iteration_70 + 71 (backend 28/28, frontend 100 %). Données TEST_ supprimées, stock restauré.
+- Reste (signalé, hors périmètre) : écarts KPI bruts et « ⏱259957min » sur le tableau de bord console.
+

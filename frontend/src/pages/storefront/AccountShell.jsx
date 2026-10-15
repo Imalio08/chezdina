@@ -787,7 +787,7 @@ function useWallet() {
   return [w, setW, load];
 }
 
-const LoadError = ({ retry }) => <div className="dina-card-white p-6 text-center text-sm text-[#666]" data-testid="account-load-error">Impossible de charger vos données. <button onClick={retry} className="text-[#b02a2a] underline">Réessayer</button> ou reconnectez-vous.</div>;
+const LoadError = ({ retry }) => <div className="dina-card-white p-6 text-center text-sm text-[#666]" data-testid="account-load-error">Impossible de charger vos données. <button onClick={retry} className="text-[#b02a2a] underline" data-testid="account-load-retry">Réessayer</button> ou reconnectez-vous.</div>;
 
 function Loyalty() {
   const { customer, refresh } = useCustomer();
@@ -877,8 +877,8 @@ function WalletPage() {
   if (w.error) return <LoadError retry={reloadW}/>;
   return (
     <div className="space-y-3" data-testid="wallet-page">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="dina-card-white p-4 col-span-2 sm:col-span-1"><div className="text-[11px] uppercase text-[#666]">Disponible</div><div className="font-serif text-2xl sm:text-3xl text-[#b02a2a] whitespace-nowrap" data-testid="wallet-balance">{fcfa(w.balance)}</div></div>
+      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+        <div className="dina-card-white p-4 col-span-3 sm:col-span-1"><div className="text-[11px] uppercase text-[#666]">Disponible</div><div className="font-serif text-2xl sm:text-3xl text-[#b02a2a] whitespace-nowrap" data-testid="wallet-balance">{fcfa(w.balance)}</div></div>
         <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">En attente</div><div className="font-serif text-xl text-[#e4991e]" data-testid="wallet-pending">{fcfa(w.pending)}</div></div>
         <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">Total gagné</div><div className="font-serif text-xl text-[#1f8a4c]" data-testid="wallet-earned">{fcfa(w.earned_total)}</div></div>
         <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">Utilisé</div><div className="font-serif text-xl" data-testid="wallet-used">{fcfa(w.used_total)}</div></div>

@@ -1,0 +1,38 @@
+{
+  "summary": "Iter-71 retest of the iter-70 fixes (Parrainage + Porte-monnaie). All requested fixes are verified. Backend: the new test_iter71_wallet_fixes.py passed 12/12 and the iter70 regression suite passed 16/16. Frontend flows checked with Playwright at 1920x1080 and 390x844. (1) The AccountShell desktop menu now uses absolute hrefs /boutique/compte/<page>. Going Parrainage -> Porte-monnaie -> Fidélité -> Mes commandes from sub-pages renders the right content, and only the current item is highlighted. (2) The customer Bearer token from localStorage is sent on /public/*. In the browser, with filleule's cookie and marraine's localStorage session, the marraine's data is shown, so Bearer wins. A garbage Bearer token falls back to the cookie. When wallet/referral return a forced 500, Porte-monnaie, Parrainage and Fidélité show account-load-error, and Réessayer recovers. (3) WalletLedger debit rows show 'Débité · solde 700 FCFA'. (4) checkout-wallet-amount is clamped: 99999 becomes 700 (the max), -50 becomes 0, 250 is accepted and the total updates (29 500 + 1 500 - 250 = 30 750). (5) In the console Paiements tab, after a +250 adjust the header KPI Portefeuille goes 700 -> 950, matching console-wallet-balance. (6) fcfa() prints '1 000 FCFA' on /console, /console/commandes, /boutique and /boutique/catalog, and the wallet/checkout/customer detail pages. No clipped FCFA elements were found. (7) CORS: Origin https://evil.com gets ACAO '*' and no Access-Control-Allow-Credentials, on GET and on preflight. Same-origin customer login, wallet, checkout and console UI login still work. (8) The unique partial index orders.checkout_key exists. Sending the same key twice returns the same order with one debit. 8 concurrent requests with the same key all returned 200: 1 order, 1 debit of -1000, balance 2000, and the ledger holds no extra debit/refund rows. (9) 5 signups gave 5 distinct referral codes, and the DB has no duplicate referral_code. (10) GET /customers/{id}/wallet: rider 403, sales 200, admin 200. The audit entry has action 'wallet.adjust', user_name, entity_id and after.amount. (11) Full cycle regression: filleule gets 1000 and the marraine 1000 pending. A partial wallet use of 400 gives total 21 100. On delivery the marraine's reward is released (balance 1000, pending 0). Cancelling a 2nd order refunds the 600 used. The UI invitation link -> signup (mobile) gives filleule wallet 1 000 FCFA. All TEST_ data I created was cleaned up: 32 customers, 13 orders restocked, 38 wallet_tx, 6 referrals, 3 opens, 8 audit entries. The pre-existing TEST_Marraine and TEST_Filleule accounts were kept.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "customers.referral_code", "issue": "_unique_ref_code checks for an existing code before insert, but there is no unique index on customers.referral_code, so two concurrent signups could still get the same code. Low risk. Adding a unique sparse index would make this airtight."},
+      {"endpoint": "POST /api/public/orders", "issue": "The wallet is still debited BEFORE the order insert. A compensating refund runs on insert failure, which is correct, but a losing concurrent request can leave a debit+refund pair in the customer ledger. That did not happen with 8 concurrent requests in this test because the find_one dedupe caught them. Acceptable."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AccountShell LoadError", "issue": "The Réessayer button has no data-testid (suggest account-load-retry). After clicking retry, the error box stays until success, with no loading feedback.", "selector": "[data-testid=account-load-error] button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Account pages", "issues": ["[data-testid=wallet-page], [data-testid=referral] and account-load-error each appear 2 times in the DOM (mobile + desktop render), so APIs are probably called twice per page. Minor perf/test-ambiguity issue.", "Mobile (390px) Porte-monnaie: 4 KPI cards in a 2-col grid with Disponible spanning the full width leave 'Utilisé' orphaned on its own row."]},
+      {"screen": "Console dashboard (out of scope, pre-existing)", "issues": ["KPI deltas show raw unformatted numbers ('· -10841396', '· -119757') next to -100.0% / -99.4%, which looks like a broken comparison period. 'À confirmer' badge shows '⏱259957min' (should be humanised to days)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter71_wallet_fixes.py", "/app/backend/tests/test_iter70_wallet_referral.py", "/app/backend/tests/seed_iter71_ui.py", "/app/backend/tests/cleanup_iter71.py", "/app/test_reports/pytest/iter71_results.xml"],
+  "action_items": [
+    "Optional: add a unique sparse index on customers.referral_code.",
+    "Optional: add data-testid='account-load-retry' to the Réessayer button.",
+    "Optional: avoid the double render/fetch of the account page content (mobile + desktop).",
+    "Optional/out of scope: console dashboard delta formatting and the '259957min' badge."
+  ],
+  "critical_code_review_comments": [
+    "deps.get_customer: Bearer (kind=customer) is preferred, then the cookie. A staff token sent to /public/* is ignored correctly because kind != customer.",
+    "api.js interceptor: for /public/* the customer token overrides dina_token. If a staff page ever calls a /public/* endpoint that needs staff auth, it would get the customer token. No such case was found.",
+    "CORS: CORS_ORIGINS='*' gives allow_credentials=False; an explicit list gives credentials=True. Correct. For production, set an explicit CORS_ORIGINS."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter71_wallet_fixes.py", "/app/backend/tests/seed_iter71_ui.py", "/app/backend/tests/cleanup_iter71.py"],
+  "success_rate": {"backend": "100% (28/28 incl. iter70 regression)", "frontend": "100% of requested fixes verified"},
+  "seed_data_creation": "TEST_UIMarraine71 / TEST_UIFilleule71 / TEST_UIInvite71 and the pytest TEST_*71 customers were created and then deleted by cleanup_iter71.py.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest test_iter70_wallet_referral.py + test_iter71_wallet_fixes.py, then cleanup_iter71.py. The product API is /api/public/product/{id} (singular). The signup form needs signup-pin2 (confirm). Account content testids are duplicated (mobile + desktop), so use the :visible selector. Console KPI cards have no testid; locate them by label text 'Portefeuille'."
+}
