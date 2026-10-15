@@ -682,6 +682,8 @@ def _url_quote(s: str) -> str:
 async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get_user)):
     o = await db.orders.find_one({"id": oid})
     if not o: raise HTTPException(404)
+    if user.get("role") == "stock_keeper" and body.status not in ("en_preparation", "prete"):
+        raise HTTPException(403, "La magasinière peut seulement passer une commande en préparation ou prête")
     prev = o.get("status")
     tl = o.get("timeline", []); tl.append({"status": body.status, "at": now_iso(), "by": user.get("name"), "reason": body.reason, "next_date": body.next_date})
     upd = {"status": body.status, "timeline": tl}

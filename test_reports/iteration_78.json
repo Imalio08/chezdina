@@ -1,0 +1,48 @@
+{
+  "summary": "Retest of the limited-role console fixes from iteration 77. pytest file test_role_access_limited.py was extended with 13 new tests (65 tests total): 64 pass, 1 fails, and the failure is a new security finding. All iteration-77 failures are now FIXED. (1) /api/public/* returns no cost or margin keys. (2) The key-pattern filter removes valeur_cout, marge_moyenne, avg_margin, ca_30d, total_month, due, avg_expected_margin, extra_costs and landed_unit_cost; the money scan over all GET routes without parameters only finds valeur_vente in products/kpis (retail value, acceptable). (3) Vendeuse: GET /api/cash-sessions works, she can open a session with the manager PIN, a POS sale works, and the sale counts in my_sales_count. (4) She can load the waitlist (grouped and out-of-catalog) and send a notify. (5) CM can create, edit and delete promotions, segments and campaigns, moderate reviews, patch loyalty settings and storefront sections, and PATCH /api/site with theme or seo. PATCH /api/site with {payments} or {security} gives 403, and a mixed body silently drops payments. (6) stock_keeper: POST /api/orders gives 403, PATCH /orders/{id} gives 403, PATCH /orders/{id}/status gives 200. (7) CM /api/customers has no wallet or total_spent. (8) today-kiosk returns 200 for all 3 roles, and CM GET /api/wallet/transactions returns 200. UI checked with Playwright for sales, stock_keeper, CM and manager. Sidebars are correct. The Créer menu shows sales: vente/commande/cliente; stock: produit/approvisionnement; CM: empty. POS is usable. Waitlist loads. Produits shows no Val. coût or Marge, no margin badge, and no Nouveau produit for sales or CM. Product detail shows no Prix d'achat or Marge. Achats shows only counts for stock_keeper. Marques shows no margin or CA. Clients for CM has no Dépensé column, no new, edit or blacklist buttons, and no FCFA. CM Apparence save shows a success toast. Header search no longer sends 4xx requests. Regression: manager still sees the full dashboard, VAL. COÛT, MARGE MOY. and margin badges. Admin PATCH /api/site payments works. NEW ISSUE (privilege escalation): limited roles now inherit 'manager' on EVERY require_role('admin','manager') route under their allow-list prefixes, including sensitive ones.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/customers/{cid}/wallet/adjust (sales)", "issue": "deps.require_role lets sales inherit manager. /api/customers is in sales 'full', so a Vendeuse passes auth and can credit any customer wallet. Verified: the request with an empty body reached validation (400 'Montant requis') instead of 403. This is a money write.", "priority": "HIGH"},
+      {"endpoint": "DELETE /api/customers/{cid}, POST /api/customers/bulk, POST /api/customers/{cid}/regen-access-code, POST /api/orders/{oid}/mark-deposit-paid, POST /api/orders/{oid}/generate-invoice, POST /api/messages/broadcast, POST /api/abandoned-carts/relaunch (sales)", "issue": "All are now open to sales through the manager inheritance. Hard-deleting customers and marking a deposit as paid are manager actions.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "stock_keeper inherited routes", "issue": "Now allowed: DELETE /api/products/{pid}, DELETE /api/purchase-orders/{pid}, DELETE /api/suppliers/{sid}, POST /api/products/bulk-promo (changes prices), PATCH /api/deliveries/{oid}/assign, POST /api/stock/inventories, and brands, categories and collections CRUD. Confirm which are intended; at least the deletes and bulk-promo should probably stay manager-only."},
+      {"endpoint": "PATCH /api/orders/{oid}/status (stock_keeper)", "issue": "Any status value is accepted (livree, annulee and so on), not only the preparation states. The regex rule (status|prepare|ready|items) also matches status-v3."},
+      {"endpoint": "PATCH /api/manual/modules/{number}", "issue": "All 3 limited roles can edit the user manual (COMMON '/api/manual' plus manager inheritance)."},
+      {"endpoint": "CM inherited routes", "issue": "CM also gets POST /api/messages/broadcast, DELETE /api/reviews/{rid}, POST /api/campaigns/{cid}/send (sends WhatsApp) and DELETE /api/promo-types. These are probably intended, but confirm."},
+      {"endpoint": "PATCH /api/site (CM, mixed body)", "issue": "Forbidden keys are dropped silently and the response is 200. Acceptable, but returning the list of ignored keys would help."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Header 'Créer' button (CM)", "issue": "The button is shown but opens an empty menu. Hide it when no actions are allowed.", "selector": "header button 'Créer'", "priority": "LOW"},
+      {"component": "AI assistant floating button (limited roles)", "issue": "Visible for sales, stock and CM, but /api/ai/* is outside their allow-list (403). On Produits it also suggests 'Marge moyenne du catalogue'. Hide it, or allow it with a role-aware prompt.", "selector": "bottom-right sparkle button", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Clients (CM)", "issues": ["With the money columns removed, the table only fills about half the width and leaves a large empty area on the right. Make the table full width."]},
+      {"screen": "Sidebar Site vitrine (CM)", "issues": ["Only the current tab is visually highlighted (fixed), but all 5 ?tab= links still have aria-current='page' (a11y only)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_role_access_limited.py", "/app/backend/tests/_scan_limited_gets.py", "/app/backend/tests/_audit_routes.py", "/app/test_reports/pytest/role_access_78.xml"],
+  "action_items": [
+    "HIGH: Restrict the require_role manager inheritance for limited roles. Use a per-role deny-list or an explicit allow-list of inherited write routes. At minimum block for sales: wallet/adjust, DELETE customers, customers/bulk, regen-access-code, mark-deposit-paid. Block for stock_keeper: DELETE products, purchase-orders and suppliers, products/bulk-promo, deliveries assign. Block for all limited roles: PATCH /api/manual/modules.",
+    "Limit stock_keeper PATCH /orders/{id}/status to the preparation statuses (en_preparation, prete/ready).",
+    "Hide the 'Créer' button when the filtered action list is empty (CM).",
+    "Hide the AI assistant for limited roles, or allow it with a role-aware prompt.",
+    "Make the Clients table full width when money columns are hidden."
+  ],
+  "critical_code_review_comments": [
+    "deps.require_role: 'inherits = role in LIMITED and \"manager\" in roles' is too broad. It turns every gérante-level route under an allowed prefix into a write for vendeuse and magasinière. Combine it with an explicit set of inherited routes in role_access.",
+    "role_access.LimitedRoleFieldFilter rebuilds the Response with dict(resp.headers). Multiple Set-Cookie headers on /api/public/* responses would be collapsed into one. Use resp.headers.raw or MutableHeaders.",
+    "SENSITIVE_RE runs on all /api/public/* JSON. Today no public key matches (checked in the DB and in storefront code), but a future key such as 'delivery_cost' or a theme 'margin' would disappear silently from the storefront."
+  ],
+  "updated_files": ["/app/backend/tests/test_role_access_limited.py"],
+  "success_rate": {"backend": "98% (64/65; the single failure is the new privilege-escalation finding)", "frontend": "95%"},
+  "test_credentials": "From /app/memory/test_credentials.md (admin, manager, agent1, stock, cm). Manager PIN 2222 is used for opening a cash session.",
+  "seed_data_creation": "None kept. Cleanup done: today's attendance for agent1, stock, cm and manager deleted; TEST_role_access orders deleted; TEST promotion, segment and campaign deleted; the test cash session was deleted and the pre-existing open session 36f814ab was restored to open; site_settings, reviews, loyalty_settings and waitlist rows restored from snapshots. CM Apparence UI save re-saved identical theme values (only updated_at changed).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_role_access_limited.py -n 0. test_sales_privilege_escalation_wallet_adjust_blocked must return 403 once inheritance is restricted. /tmp/audit2.py logic: for each limited role, list non-GET routes allowed by api_allowed together with their require_role roles. Recreate it if needed to check the inheritance surface. The cash-session test temporarily closes the existing open session and reopens it in a finally block. After UI runs, delete today's attendance rows for the test users.",
+  "rca of the issue": "The iteration-77 CM write failures were fixed by letting limited roles inherit 'manager' in require_role. Because allow-lists are prefix-based ('full': /api/customers, /api/orders, /api/products...), the inheritance also unlocks every manager-only sub-route under those prefixes, including money and destructive operations. Mitigation: keep the inheritance but subtract an explicit INHERIT_DENY list per role (regex on method and path) inside api_allowed, or list the inherited routes explicitly."
+}

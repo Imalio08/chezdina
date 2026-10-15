@@ -25,3 +25,11 @@
 - Manifests : vitrine start_url « / », livreur start_url/scope « /riders » (ids inchangés pour les PWA installées). Liens notifications / partage → chezdina.net.
 - Tests : iteration_76 backend 9/9, frontend OK ; corrections suite au rapport (deep link après connexion, CTA CMS, onglet livreur vide).
 - Connu : rôles vendeuse / magasinière / community manager → menu console vide après pointage (RBAC ne connaît que admin + gérante).
+
+
+## 2026-10-15 — Menus et droits par rôle (vendeuse, magasinière, community manager)
+- backend/role_access.py : liste d'accès API par rôle (refus par défaut), lecture seule (produits, stock…), règles de refus (suppressions, ajustement porte-monnaie, acompte, actions groupées, modification du manuel, affectation livreur) ; dans sa liste, chaque rôle hérite des droits gérante (deps.require_role).
+- Filtre de champs serveur : clés coût / marge / profit / CA retirées pour ces rôles et sur toutes les routes /api/public ; montants des achats masqués pour la magasinière ; montants clients et commandes masqués pour la community manager.
+- Magasinière : statut de commande limité à en_preparation / prete. Community manager : PATCH /api/site limité à theme, menu, footer, social, seo, sections, hero, logo, favicon.
+- /api/dashboard/role + RoleDashboard (ventes du jour de la vendeuse via created_by_id) ; menus rbac.js ; menu « Créer » filtré et masqué s'il est vide ; assistant IA masqué pour ces rôles ; colonnes et tuiles coût / marge / dépensé masquées ; boutons d'édition retirés pour les rôles en lecture seule.
+- Tests : iteration_77 (manques) → iteration_78 (faille d'héritage trouvée) → corrigée, pytest 65/65.

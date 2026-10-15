@@ -74,7 +74,14 @@ def test_punch_required_for_limited_role():
 @pytest.mark.parametrize("role,method,path,expected", [
     ("sales", "GET", "/api/dashboard/kpis", 403),
     ("sales", "GET", "/api/stats/sales", 403),
-    ("sales", "GET", "/api/cash-sessions", 403),
+    ("sales", "GET", "/api/cash-sessions", 200),
+    ("sales", "GET", "/api/waitlist/grouped", 200),
+    ("sales", "GET", "/api/out-of-catalog", 200),
+    ("stock_keeper", "POST", "/api/orders", 403),
+    ("sales", "GET", "/api/attendance/today-kiosk", 200),
+    ("stock_keeper", "GET", "/api/attendance/today-kiosk", 200),
+    ("community_manager", "GET", "/api/attendance/today-kiosk", 200),
+    ("community_manager", "GET", "/api/wallet/transactions", 200),
     ("sales", "GET", "/api/expenses", 403),
     ("sales", "POST", "/api/products", 403),
     ("sales", "GET", "/api/products", 200),
@@ -156,7 +163,8 @@ def test_stock_keeper_purchase_orders_no_money():
     r = sess("stock_keeper").get(f"{BASE_URL}/api/purchase-orders")
     assert r.status_code == 200
     keys = set(_walk_keys(r.json()))
-    assert not (keys & {"total", "amount", "unit_price", "price", "cost"}), keys & {"total", "amount", "unit_price", "price", "cost"}
+    bad = {"total", "amount", "unit_price", "price", "cost", "extra_costs", "landed_unit_cost"}
+    assert not (keys & bad), keys & bad
 
 
 def test_cm_customers_orders_no_money():
@@ -224,10 +232,153 @@ def test_dashboard_role_cm():
 # --- CM writes on its own modules (plan: CM manages site appearance/pages, promos, campaigns, reviews)
 def test_cm_can_patch_site_content():
     s = sess("community_manager")
-    r = s.patch(f"{BASE_URL}/api/site", json={})
+    site = MDB.site_settings.find_one({"id": "main"}, {"_id": 0})
+    r = s.patch(f"{BASE_URL}/api/site", json={"seo": site.get("seo") or {}})
+    MDB.site_settings.replace_one({"id": "main"}, site)
     assert r.status_code == 200, f"CM PATCH /api/site -> {r.status_code} {r.text[:150]}"
 
 
 def test_cm_can_create_promotion():
     r = sess("community_manager").post(f"{BASE_URL}/api/promotions", json={})
     assert r.status_code != 403, f"CM POST /api/promotions -> 403 (require_role admin/manager)"
+
+
+# --- Iteration 78 retests
+def test_public_endpoints_no_cost_keys():
+    for p in ("/api/public/products", "/api/public/best-sellers", "/api/public/site", "/api/public/products?limit=200"):
+        r = requests.get(f"{BASE_URL}{p}")
+        if r.status_code == 200:
+            leaked = {k for k in _walk_keys(r.json()) if k in FORBIDDEN_COST or "margin" in k or "cost" in k}
+            assert not leaked, (p, leaked)
+
+
+def test_sales_cash_session_open_and_pos_sale():
+    s = sess("sales")
+    mgr_id = sess("manager") and _tokens["manager"][1]
+    opened = list(MDB.cash_sessions.find({"closed": False}, {"id": 1}))
+    MDB.cash_sessions.update_many({"id": {"$in": [o["id"] for o in opened]}}, {"$set": {"closed": True}})
+    new_sid = None
+    try:
+        r = s.post(f"{BASE_URL}/api/cash-sessions/open", json={"opening_cash": 0, "manager_id": mgr_id,
+                                                               "session_date": TODAY, "pin": "2222", "note": "TEST_role_access"})
+        assert r.status_code == 200, r.text
+        new_sid = r.json()["id"]
+        g = s.get(f"{BASE_URL}/api/cash-sessions")
+        assert g.status_code == 200 and any(x["id"] == new_sid and not x["closed"] for x in g.json())
+        before = s.get(f"{BASE_URL}/api/dashboard/role").json()
+        o = s.post(f"{BASE_URL}/api/orders", json={"items": [{"product_id": "TEST_none", "name": "TEST item", "qty": 1, "price": 500}],
+                                                     "note": "TEST_role_access", "mode": "store", "channel": "pos", "payment_method": "cash"})
+        assert o.status_code == 200, o.text
+        after = s.get(f"{BASE_URL}/api/dashboard/role").json()
+        assert after["my_sales_count"] == before["my_sales_count"] + 1
+    finally:
+        if new_sid:
+            MDB.cash_sessions.delete_one({"id": new_sid})
+        MDB.cash_sessions.update_many({"id": {"$in": [o["id"] for o in opened]}}, {"$set": {"closed": False}})
+
+
+def test_sales_waitlist_notify():
+    w = MDB.waitlist.find_one({}, {"_id": 0})
+    r = sess("sales").post(f"{BASE_URL}/api/waitlist/{w['id']}/notify", json={"channel": "whatsapp", "message": "TEST"})
+    MDB.waitlist.update_one({"id": w["id"]}, {"$set": {k: w.get(k) for k in w if k != "id"}})
+    MDB.waitlist.update_one({"id": w["id"]}, {"$unset": {k: "" for k in ("notified_at", "notified_by") if k not in w}}) if any(k not in w for k in ("notified_at", "notified_by")) else None
+    MDB.waitlist_notifications.delete_many({"waitlist_id": w["id"], "message": "TEST"})
+    assert r.status_code == 200, r.text
+
+
+def test_cm_writes_promotion_segment_campaign():
+    s = sess("community_manager")
+    p = s.post(f"{BASE_URL}/api/promotions", json={"code": "TEST_CMPROMO", "value": 5})
+    assert p.status_code == 200, p.text
+    assert s.patch(f"{BASE_URL}/api/promotions/{p.json()['id']}", json={"value": 7}).status_code == 200
+    assert s.delete(f"{BASE_URL}/api/promotions/{p.json()['id']}").status_code == 200
+    sg = s.post(f"{BASE_URL}/api/segments", json={"name": "TEST_seg", "customer_ids": []})
+    assert sg.status_code == 200, sg.text
+    sid = sg.json()["id"]
+    c = s.post(f"{BASE_URL}/api/campaigns", json={"name": "TEST_camp", "text": "TEST", "target_type": "ids", "customer_ids": []})
+    assert c.status_code == 200, c.text
+    assert s.delete(f"{BASE_URL}/api/campaigns/{c.json()['id']}").status_code == 200
+    assert s.delete(f"{BASE_URL}/api/segments/{sid}").status_code == 200
+    MDB.promotions.delete_many({"code": "TEST_CMPROMO"})
+    MDB.customer_segments_v2.delete_many({"name": "TEST_seg"})
+    MDB.campaigns.delete_many({"name": "TEST_camp"})
+
+
+def test_cm_moderate_review_and_loyalty_and_sections():
+    s = sess("community_manager")
+    rv = MDB.reviews.find_one({}, {"_id": 0})
+    r = s.patch(f"{BASE_URL}/api/reviews/{rv['id']}/moderate", json={"hidden": bool(rv.get("hidden", False))})
+    MDB.reviews.replace_one({"id": rv["id"]}, rv)
+    assert r.status_code == 200, r.text
+    ls = MDB.loyalty_settings.find_one({"id": "main"}, {"_id": 0})
+    g = s.get(f"{BASE_URL}/api/loyalty/settings").json()
+    r2 = s.patch(f"{BASE_URL}/api/loyalty/settings", json={k: v for k, v in g.items() if k not in ("id", "updated_at")})
+    if ls:
+        MDB.loyalty_settings.replace_one({"id": "main"}, ls)
+    assert r2.status_code == 200, r2.text
+    site = MDB.site_settings.find_one({"id": "main"}, {"_id": 0})
+    r3 = s.patch(f"{BASE_URL}/api/storefront/sections", json={"sections": site.get("sections") or []})
+    MDB.site_settings.replace_one({"id": "main"}, site)
+    assert r3.status_code == 200, r3.text
+
+
+def test_cm_site_whitelist():
+    s = sess("community_manager")
+    site = MDB.site_settings.find_one({"id": "main"}, {"_id": 0})
+    try:
+        r = s.patch(f"{BASE_URL}/api/site", json={"theme": {**(site.get("theme") or {}), "TEST_flag": 1}})
+        assert r.status_code == 200, r.text
+        assert MDB.site_settings.find_one({"id": "main"})["theme"].get("TEST_flag") == 1
+        for bad in ({"payments": {"TEST": 1}}, {"security": {"TEST": 1}}):
+            r = s.patch(f"{BASE_URL}/api/site", json=bad)
+            assert r.status_code == 403, (bad, r.status_code)
+        mixed = s.patch(f"{BASE_URL}/api/site", json={"seo": site.get("seo") or {}, "payments": {"TEST": 1}})
+        now = MDB.site_settings.find_one({"id": "main"})
+        assert (now.get("payments") or {}).get("TEST") is None
+        assert now.get("security") == site.get("security")
+    finally:
+        MDB.site_settings.replace_one({"id": "main"}, site)
+
+
+def test_admin_can_patch_site_payments():
+    s = sess("admin")
+    site = MDB.site_settings.find_one({"id": "main"}, {"_id": 0})
+    try:
+        r = s.patch(f"{BASE_URL}/api/site", json={"payments": {**(site.get("payments") or {}), "TEST_flag": 1}})
+        assert r.status_code == 200
+        assert MDB.site_settings.find_one({"id": "main"})["payments"].get("TEST_flag") == 1
+    finally:
+        MDB.site_settings.replace_one({"id": "main"}, site)
+
+
+def test_stock_keeper_orders_status_only():
+    m = sess("manager").post(f"{BASE_URL}/api/orders", json={"items": [{"product_id": "TEST_none", "name": "TEST item", "qty": 1, "price": 100}],
+                                                               "note": "TEST_role_access", "mode": "store"})
+    assert m.status_code == 200
+    oid = m.json()["id"]
+    sk = sess("stock_keeper")
+    r = sk.patch(f"{BASE_URL}/api/orders/{oid}/status", json={"status": "en_preparation"})
+    assert r.status_code == 200, r.text
+    r2 = sk.patch(f"{BASE_URL}/api/orders/{oid}", json={"total": 1})
+    assert r2.status_code == 403, r2.status_code
+
+
+def test_stock_keeper_po_list_no_money_keys():
+    r = sess("stock_keeper").get(f"{BASE_URL}/api/purchase-orders/kpis")
+    assert r.status_code == 200
+    assert not (set(r.json()) & {"total_month", "due", "avg_expected_margin"})
+
+
+def test_cm_customers_no_wallet():
+    r = sess("community_manager").get(f"{BASE_URL}/api/customers")
+    keys = set(_walk_keys(r.json()))
+    assert not (keys & {"wallet", "total_spent", "wallet_balance"})
+
+
+def test_sales_privilege_escalation_wallet_adjust_blocked():
+    # sales inherits manager inside /api/customers -> wallet/adjust (money) should not be allowed for a vendeuse
+    c = MDB.customers.find_one({"name": {"$regex": "^Test Pack6"}}, {"_id": 0, "id": 1})
+    if not c:
+        pytest.skip("no customer")
+    r = sess("sales").post(f"{BASE_URL}/api/customers/{c['id']}/wallet/adjust", json={})
+    assert r.status_code == 403, f"sales wallet/adjust -> {r.status_code}"

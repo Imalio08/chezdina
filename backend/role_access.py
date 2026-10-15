@@ -33,7 +33,7 @@ ROLE_API = {
         "full": ("/api/products", "/api/stock", "/api/stock-movements", "/api/stock-alerts", "/api/brands", "/api/categories",
                  "/api/collections", "/api/suppliers", "/api/purchase-orders", "/api/deliveries"),
         "read": ("/api/abandoned-carts", "/api/orders"),
-        "rules": ((("PATCH", "POST"), re.compile(r"^/api/orders/[^/]+/(status|prepare|ready|items)")),),
+        "rules": ((("PATCH",), re.compile(r"^/api/orders/[^/]+/status$")),),
     },
     "community_manager": {
         "full": ("/api/messages", "/api/reviews", "/api/promotions", "/api/promo-types", "/api/campaigns", "/api/segments",
@@ -54,10 +54,33 @@ EXTRA_HIDDEN = {
 }
 
 
+# Sensitive gérante actions that stay out of reach even inside a role's prefixes.
+W = ("POST", "PATCH", "PUT", "DELETE")
+DENY_ALL = (
+    (W, re.compile(r"^/api/manual/modules")),
+    (W, re.compile(r"/wallet/adjust")),
+)
+DENY = {
+    "sales": (
+        (("DELETE",), re.compile(r"^/api/")),
+        (W, re.compile(r"^/api/customers/bulk|/regen-access-code|/mark-deposit-paid|^/api/messages/broadcast")),
+    ),
+    "stock_keeper": (
+        (("DELETE",), re.compile(r"^/api/")),
+        (W, re.compile(r"^/api/products/bulk|^/api/deliveries/[^/]+/assign")),
+    ),
+    "community_manager": (
+        (("DELETE",), re.compile(r"^/api/(?!promotions|promo-types|campaigns|segments|pages|storefront)")),
+    ),
+}
+
+
 def api_allowed(role: str, method: str, path: str) -> bool:
     rules = ROLE_API.get(role)
     if rules is None:
         return True
+    if any(method in m and rx.search(path) for m, rx in DENY.get(role, ()) + DENY_ALL):
+        return False
     if path.startswith(COMMON) or path.startswith(rules["full"]):
         return True
     if method in READ and (path.startswith(COMMON_READ) or path.startswith(rules["read"])):

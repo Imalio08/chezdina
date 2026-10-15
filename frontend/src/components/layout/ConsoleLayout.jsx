@@ -14,7 +14,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import HelpButton from "@/components/console/HelpButton";
 import GuidedTour from "@/components/console/GuidedTour";
 import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
-import { canAccess, landingFor } from "@/lib/rbac";
+import { canAccess, landingFor, LIMITED_ROLES } from "@/lib/rbac";
 import { playChime, soundEnabled, setSoundEnabled } from "@/lib/notifySound";
 import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
 import { toast } from "sonner";
@@ -366,7 +366,7 @@ export default function ConsoleLayout() {
           </div>
 
           {/* Quick actions "+" */}
-          <div className="relative hidden sm:block">
+          {QUICK_ACTIONS.some(a => canAccess(user?.role, a.to) && !(a.deny || []).includes(user?.role)) && <div className="relative hidden sm:block">
             <button onClick={()=>setShowQuickActions(!showQuickActions)} className="dina-chip !bg-[#b02a2a] !text-white !border-[#b02a2a]" data-testid="quick-actions-trigger"><Plus size={13}/>Créer</button>
             {showQuickActions && (
               <div className="absolute right-0 top-10 w-56 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-1.5 z-40" data-testid="quick-actions-menu" onMouseLeave={()=>setShowQuickActions(false)}>
@@ -377,7 +377,7 @@ export default function ConsoleLayout() {
                 ))}
               </div>
             )}
-          </div>
+          </div>}
 
           <div className={`dina-chip hidden md:inline-flex ${online?"":"!border-[#c62828] !text-[#c62828]"}`} data-testid="sync-indicator">
             {online ? <><Wifi size={12}/>En ligne</> : <><WifiOff size={12}/>Hors ligne</>}
@@ -424,7 +424,7 @@ export default function ConsoleLayout() {
       <GuidedTour/>
 
       {/* Floating AI assistant — hidden on POS (would cover "Encaisser") */}
-      {!showAi && pathname !== "/console/pos" && (
+      {!showAi && pathname !== "/console/pos" && !LIMITED_ROLES.includes(user?.role) && (
         <button onClick={()=>{setShowAi(true); setAiMinimized(false);}} className="fixed bottom-6 right-6 w-14 h-14 rounded-full bg-[#b02a2a] text-white grid place-items-center shadow-xl hover:bg-[#8e1f1f] transition z-40 group" data-testid="ai-floating-button">
           <Sparkles size={22}/>
           {aiMsgs.length>0 && <span className="absolute -top-1 -right-1 bg-[#f4b12c] text-[#1c1c1c] text-[9px] rounded-full min-w-[16px] h-4 px-1 grid place-items-center font-bold">{aiMsgs.filter(m=>m.role==="bot").length}</span>}
