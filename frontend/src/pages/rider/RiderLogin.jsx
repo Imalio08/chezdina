@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { toast } from "sonner";
 import { Bike, LogIn, Eye, EyeOff } from "lucide-react";
 import api from "@/lib/api";
@@ -8,6 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 export default function RiderLogin() {
   const { login, logout } = useAuth();
   const nav = useNavigate();
+  const from = useLocation().state?.from;
   const [cms, setCms] = useState({});
   const [site, setSite] = useState({});
   const [email, setEmail] = useState("");
@@ -27,7 +28,7 @@ export default function RiderLogin() {
     try {
       const u = await login(email.trim(), password);
       if (u?.role !== "rider") { await logout(); toast.error("Cet espace est réservé aux livreurs · l'équipe se connecte sur /console"); return; }
-      nav("/riders", { replace: true });
+      nav(from?.startsWith("/riders") ? from : "/riders", { replace: true });
     } catch (err) { toast.error(err.response?.data?.detail || "Identifiants invalides"); }
     finally { setBusy(false); }
   };

@@ -110,16 +110,18 @@ import PunchGate from "@/components/shared/PunchGate";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
-  if (!user) return <Navigate to="/console/connexion" replace />;
+  if (!user) return <Navigate to="/console/connexion" replace state={{ from: location.pathname + location.search }} />;
   if (user.role === "rider") return <Navigate to="/riders" replace />;
   if (user.punch_required) return <PunchGate />;
   return children;
 }
 function ProtectedRider({ children }) {
   const { user, loading } = useAuth();
+  const location = useLocation();
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
-  if (!user) return <Navigate to="/riders/connexion" replace />;
+  if (!user) return <Navigate to="/riders/connexion" replace state={{ from: location.pathname + location.search }} />;
   if (user.role !== "rider") return <Navigate to="/console" replace />;
   return children;
 }

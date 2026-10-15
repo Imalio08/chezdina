@@ -154,7 +154,7 @@ async def dynamic_rider_manifest():
         "description": "Application des livreurs — courses, carte, pointage",
         "start_url": "/riders",
         "id": "/rider",
-        "scope": "/",
+        "scope": "/riders",
         "display": "standalone",
         "orientation": "portrait",
         "theme_color": cfg["rider_primary"],

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Outlet, Link, useNavigate } from "react-router-dom";
+import { siteLink } from "@/lib/format";
 import { ShoppingBag, User, Search, MessageCircle, X, ChevronDown, LogOut, Package, MessageSquare, Heart, Ticket, Sun, Moon } from "lucide-react";
 import { useApp } from "@/context/AppContext";
 import { useCustomer } from "@/context/CustomerContext";
@@ -126,7 +127,7 @@ export default function StorefrontLayout() {
                 {sugg.slice(0, 8).map((s, i) => (
                   <Link
                     key={i}
-                    to={s.link}
+                    to={siteLink(s.link)}
                     className="flex items-center gap-2 px-3 py-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-sm"
                     onMouseDown={(e) => e.preventDefault()}
                     data-testid={`search-sugg-${i}`}

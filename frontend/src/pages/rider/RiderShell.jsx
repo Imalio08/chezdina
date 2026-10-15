@@ -100,7 +100,7 @@ export default function RiderShell() {
       { key: "profil",      to: "/riders/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
     ];
     const raw = (cms?.tabs && Array.isArray(cms.tabs) && cms.tabs.length) ? cms.tabs : defaults;
-    const list = raw.filter(t => t.visible !== false);
+    const list = raw.filter(t => t.visible !== false && !(t.to && /^https?:\/\/?$/.test(t.to.trim())));
     if (!list.some(t => t.key === "messages" || t.to === "/riders/messages")) {
       const i = list.findIndex(t => t.key === "courses");
       list.splice(i + 1, 0, { key: "messages", to: "/riders/messages", icon: "MessageCircle", label: "Messages", visible: true, builtin: true });

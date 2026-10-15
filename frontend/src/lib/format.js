@@ -1,3 +1,6 @@
+// CMS links saved before the domain move may still start with /boutique.
+export const siteLink = (l) => (typeof l === "string" ? (l.replace(/^\/boutique(?=\/|$|\?)/, "") || "/") : l);
+
 export const fcfa = (n) => {
   const v = Math.round(Number(n || 0));
   return v.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") + " FCFA";

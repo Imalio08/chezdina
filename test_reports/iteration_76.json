@@ -1,0 +1,43 @@
+{
+  "summary": "Tested the domain path routing (storefront '/', console '/console', rider app '/riders'), legacy redirects, session separation and the mandatory arrival punch (HTTP 428 + PunchGate). Backend: 9/9 pytest pass (1 flaky run, see below). Frontend: all requested flows checked with Playwright. Storefront pages load after reload. /boutique, /rider, /login and /suivi redirects keep the query. Console login fields are empty. Admin lands on the dashboard with no punch. Stock (password and PIN 4444) and manager (PIN 2222) get the full-screen gate, the server answers 428 on /orders, /products, /me/notifications and dashboard data, and refreshing or opening /console/commandes or /console/messagerie still shows the gate. Bad selfies get 400. Fake camera: snap -> submit -> toast 'Arrivée pointée' -> console opens and stays open after reload. A mocked 500 shows punch-gate-error and the 'Réessayer le pointage' button. Denied camera shows punch-gate-cam-error and 'Réessayer', and access stays blocked. After a departure punch the gate comes back on the next API poll and after reload, and a new arrival punch restores access. Same-day re-login after arrival gives direct access. Logout works. Turning the config off gives the stock user access at once (cache reset). Config was restored. Rider: /console redirects to /riders, backend 403 on /orders and /products, 200 on /riders/me/today. Staff on /riders/connexion are rejected with a toast and no token is kept. Admin on /riders goes to /console. Customer token on /api/orders gets 401. Manifests: start_url '/' and '/riders'. Backend notification links use /compte/... and /riders/....",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "/api/public/manifest-rider.webmanifest", "issue": "id is still '/rider' (storefront id is '/boutique') and scope is '/', the same as the storefront PWA. Keeping the ids is fine if it is on purpose, to keep installed PWAs working. A rider scope of '/' can make links to the storefront or console open inside the installed rider PWA. Consider scope '/riders'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Storefront Home hero CTA", "issue": "href is '/boutique/catalog' because the CMS value home cta_link is stored with the old prefix. The redirect still works, but it breaks the 'no /boutique in hrefs' requirement. Strip a leading '/boutique' when rendering CMS links (hero cta_link, menus, banners), as RiderShell already does for '/rider'.", "selector": "[data-testid='hero-cta']", "priority": "LOW"},
+      {"component": "RiderShell bottom nav", "issue": "The rider CMS has a custom tab 'Onglet 6' with href 'https://' (empty URL). This is a data/config issue: hide tabs whose URL is empty or invalid.", "selector": "nav a[href='https://']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Deep link while logged out", "issue": "Protected and ProtectedRider redirect to /console/connexion or /riders/connexion without saving the original path. After login, Login.jsx always goes to '/console' and RiderLogin.jsx to '/riders'. So /console/commandes/DN-xxx, /riders?course=CODE or /riders/messages/X opened from a push notification while logged out sends the user to the home page instead of the target. Deep links only work when already logged in. Fix: pass state={{from: location}} (or ?next=) and navigate there after login. For staff with punch_required, after the punch.", "affected_selectors": ["[data-testid='login-submit']", "[data-testid='rider-login-submit']"]}
+    ],
+    "design_issues": [
+      {"screen": "Console as stock_keeper (and other non-manager punch roles)", "issues": ["After the arrival punch the stock_keeper sidebar is empty (only 'Voir le site vitrine'). rbac.js PATH_ROLES only knows admin and manager, but the dashboard still renders full sales KPIs (CA, marge). stock_keeper, sales and community_manager are forced to punch but then have no menu. This is either an RBAC gap or the dashboard is shown to a role that should not see it. Business decision needed."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_domain_routing_punch.py", "/app/test_reports/pytest/iter76.xml"],
+  "action_items": [
+    "Keep the original path (location state or ?next=) through /console/connexion and /riders/connexion (and through PunchGate) so logged-out deep links from notifications open the right order, conversation or course",
+    "Normalize CMS-stored storefront links that start with '/boutique' (hero cta_link etc.)",
+    "Decide RBAC for stock_keeper, sales and community_manager: today they must punch but get an empty sidebar and a dashboard with financial KPIs",
+    "Optional: rider manifest scope '/riders'; hide rider CMS tabs with an empty or 'https://' URL"
+  ],
+  "critical_code_review_comments": [
+    "deps.get_user: RIDER_PREFIXES has '/api/orders/' (trailing slash), so riders can still call /api/orders/{anything}. Check that those handlers check rider ownership.",
+    "deps._punch_roles: the 60 s in-process cache works with the single uvicorn worker. With several workers, reset_punch_cache only clears one process.",
+    "punch_required uses the UTC date. That is fine for Abidjan (UTC+0) but would be wrong for other timezones.",
+    "The check-in selfie check is only startswith('data:image/') and len>=1000. Any 1 KB base64 data URL passes. That is acceptable for an MVP.",
+    "The PunchGate/428 interceptor works: the gate comes back within one ConsoleLayout poll after a departure punch (seen at about 60 s)."
+  ],
+  "updated_files": ["/app/backend/tests/test_domain_routing_punch.py"],
+  "success_rate": {"backend": "100% (9/9)", "frontend": "95% (all requested flows pass; logged-out deep-link preservation and the hero CTA href are the only gaps)"},
+  "flaky_tests": ["test_config_disable_resets_cache failed once (1 of 4 runs, the 65 s run that coincided with a backend hot-reload after the test file was edited). It passed on the 3 other runs."],
+  "test_credentials": "Customer 'Test Pack6' (+225 07 00 00 11 22 / 368567) in test_credentials.md is stale: 'Code secret invalide'. Used Mariam Kouadio (démo) +225 07 48 11 22 01 / 202601.",
+  "seed_data_creation": "None kept. Today's attendance records for stock and manager were deleted at the end (4 removed). attendance_config is restored to {enabled:true, enabled_roles:[manager,sales,stock_keeper,community_manager,rider]}.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest with '-n 0' (pytest.ini enables xdist, and the module fixtures do cleanup). The headless browser in browser_automation has a fake camera, so PunchGate snap works. To simulate a denied camera, use add_init_script to override getUserMedia. Login PIN tab: data-testid login-tab-pin / login-pin / login-submit. Rider1 has 0 courses today, so the /riders?course= deep link could not be checked on a real course."
+}

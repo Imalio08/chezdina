@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import api from "@/lib/api";
-import { fcfa } from "@/lib/format";
+import { fcfa, siteLink } from "@/lib/format";
 import ProductCardV2 from "@/components/storefront/ProductCardV2";
 import { track } from "@/lib/analytics";
 import WelcomePopup from "@/components/storefront/WelcomePopup";
@@ -147,7 +147,7 @@ function HeroCarousel({ props }) {
           {props.tagline && <div className="text-xs uppercase tracking-widest text-[#b02a2a] font-semibold mb-3">{props.tagline}</div>}
           <h1 className="font-serif text-4xl md:text-6xl leading-[1.05]">{props.title}<br /><span className="italic text-[#b02a2a]">{props.highlight}</span></h1>
           <p className="text-[#666] dark:text-[#aaa] mt-4 max-w-md leading-relaxed">{props.subtitle}</p>
-          <Link to={props.cta_link || "/catalog"} className="dina-btn-primary mt-5 inline-flex" data-testid="hero-cta">{props.cta_label || "J'achète"} <ChevronRight size={16} /></Link>
+          <Link to={siteLink(props.cta_link) || "/catalog"} className="dina-btn-primary mt-5 inline-flex" data-testid="hero-cta">{props.cta_label || "J'achète"} <ChevronRight size={16} /></Link>
         </div>
         {images.length > 0 && (
           <div className="grid grid-cols-2 gap-3 h-[520px] md:h-[560px] overflow-hidden" data-testid="hero-mosaic">

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { siteLink } from "@/lib/format";
 import SmartImage from "@/components/shared/SmartImage";
 
 /**
@@ -154,7 +155,7 @@ function Tile({ img }) {
     if (isExternal) {
       return <a href={img.link} target="_blank" rel="noreferrer" data-testid="mosaic-tile">{inner}</a>;
     }
-    return <Link to={img.link} data-testid="mosaic-tile">{inner}</Link>;
+    return <Link to={siteLink(img.link)} data-testid="mosaic-tile">{inner}</Link>;
   }
   return <div data-testid="mosaic-tile">{inner}</div>;
 }

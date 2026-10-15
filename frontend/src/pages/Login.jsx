@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { ChevronRight, Store, Truck, Smartphone, Sparkles, Clock } from "lucide-react";
@@ -17,6 +17,7 @@ const COLLAGE = [
 export default function Login() {
   const { login, loginPin } = useAuth();
   const nav = useNavigate();
+  const from = useLocation().state?.from;
   const [mode, setMode] = useState("password");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,7 +33,7 @@ export default function Login() {
       const u = mode === "password" ? await login(email, password) : await loginPin(pin);
       if (u.role === "rider") { toast.message("Compte livreur · ouverture de l'application livreur"); nav("/riders", { replace: true }); return; }
       toast.success(u.punch_required ? `Bonjour ${u.name} · pointez votre arrivée pour continuer` : `Bienvenue ${u.name}`);
-      nav("/console", { replace: true });
+      nav(from?.startsWith("/console") ? from : "/console", { replace: true });
     } catch (err) {
       toast.error(err?.response?.data?.detail || "Connexion impossible");
     } finally { setLoading(false); }
