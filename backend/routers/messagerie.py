@@ -27,6 +27,11 @@ def _conv_key(parts: List[str]) -> str:
     return "|".join(sorted(parts))
 
 
+async def _mark_read(cid: str, uid: str) -> None:
+    await db.conversations.update_one({"id": cid}, {"$addToSet": {"messages.$[m].read_by": uid}},
+                                      array_filters=[{"m.read_by": {"$ne": uid}}])
+
+
 # -------- Core helper (reusable by server.py / other routers) --------
 async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
     """Create or append to a conversation. Returns {ok, conversation_id, message}."""
@@ -266,7 +271,7 @@ async def get_conversation(conv_id: str, user: dict = Depends(get_user)):
             m.setdefault("read_by", []).append(user["id"])
             changed = True
     if changed:
-        await db.conversations.update_one({"id": conv_id}, {"$set": {"messages": msgs}})
+        await _mark_read(conv_id, user["id"])
     return clean(c)
 
 
@@ -380,7 +385,7 @@ async def get_order_thread(oid: str, party: str, user: dict = Depends(get_user))
         for m in msgs:
             if user["id"] not in (m.get("read_by") or []):
                 m.setdefault("read_by", []).append(user["id"])
-        await db.conversations.update_one({"id": conv["id"]}, {"$set": {"messages": msgs}})
+        await _mark_read(conv["id"], user["id"])
     return clean(conv)
 
 
@@ -441,7 +446,7 @@ async def rider_conversation(cid: str, user: dict = Depends(get_user)):
         for m in msgs:
             if user["id"] not in (m.get("read_by") or []):
                 m.setdefault("read_by", []).append(user["id"])
-        await db.conversations.update_one({"id": cid}, {"$set": {"messages": msgs}})
+        await _mark_read(cid, user["id"])
     await mark_ref_read("rider" if user.get("role") == "rider" else "staff", user["id"], cid)
     return clean(conv)
 
@@ -518,7 +523,7 @@ async def mark_order_threads_read(oid: str, user: dict = Depends(get_user)):
             if user["id"] not in (m.get("read_by") or []):
                 m.setdefault("read_by", []).append(user["id"]); changed = True
         if changed:
-            await db.conversations.update_one({"id": c["id"]}, {"$set": {"messages": msgs}})
+            await _mark_read(c["id"], user["id"])
     return {"ok": True}
 
 

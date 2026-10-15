@@ -220,7 +220,7 @@ class TestFeed:
         assert len(f["items"]) <= 2 and isinstance(f["unread"], int)
         if len(f["items"]) == 2:
             nxt = notifs(ctx["r1"], limit=2, before=f["items"][-1]["at"])
-            assert all(x["at"] < f["items"][-1]["at"] for x in nxt["items"])
+            assert all(x["at"] <= f["items"][-1]["at"] for x in nxt["items"])  # paging now uses $lte (client dedups)
         un = notifs(ctx["r1"], unread_only="true", limit=100)
         assert all(not x["read"] for x in un["items"])
         o = make_order(ctx)
@@ -267,3 +267,90 @@ class TestPush:
         d = mongo.push_subscriptions.find_one({"endpoint": ep})
         assert d["kind"] == "rider" and d["owner_id"] == ctx["r1u"]["id"]
         mongo.push_subscriptions.delete_one({"endpoint": ep})
+
+
+# --- iteration 75 retests ---
+class TestIter75:
+    def test_double_unassign_same_minute(self, ctx):
+        """A loses the course twice within a minute => 2 'retirée' notifs for A."""
+        o = make_order(ctx)
+        assign(ctx, o, "r1"); assign(ctx, o, "r2"); assign(ctx, o, "r1"); assign(ctx, o, "r2")
+        n1 = by_ref(ctx["r1"], o["code"])
+        assert len([n for n in n1 if n["title"] == "Nouvelle course attribuée"]) == 2
+        assert len([n for n in n1 if "retirée" in n["title"]]) == 2
+        n2 = by_ref(ctx["r2"], o["code"])
+        assert len([n for n in n2 if n["title"] == "Nouvelle course attribuée"]) == 2
+        assert len([n for n in n2 if "retirée" in n["title"]]) == 1
+
+    def test_reportee_customer_label(self, ctx):
+        phone = f"+225 07 {random.randint(10,99)} {random.randint(10,99)} {random.randint(10,99)} {random.randint(10,99)}"
+        r = requests.post(f"{API}/public/customer-signup", json={"name": "TEST_Report Cust", "phone": phone, "pin": "482913"})
+        assert r.status_code == 200, r.text
+        d = r.json(); STATE["customers"].append(d["customer"]["id"])
+        ch = {"Authorization": f"Bearer {d['token']}"}
+        o = make_order(ctx, {"id": d["customer"]["id"], "name": d["customer"]["name"], "phone": phone})
+        assign(ctx, o, "r1")
+        nd = time.strftime("%Y-%m-%d", time.gmtime(time.time() + 86400 * 2))
+        r = requests.patch(f"{API}/orders/{o['id']}/status", json={"status": "reportee", "next_date": nd, "reason": "TEST"}, headers=ctx["admin"])
+        assert r.status_code == 200
+        rn = [x for x in by_ref(ctx["r1"], o["code"]) if "retirée" in x["title"]]
+        assert len(rn) == 1 and rn[0]["msg"] == "Nouveau statut : reportée par la boutique", rn
+        cn = requests.get(f"{API}/public/account/notifications", headers=ch).json()["items"]
+        cn = [x for x in cn if x.get("ref") == o["code"]]
+        assert any(x["msg"] == "Votre commande est reportée." for x in cn), cn
+        assert not any("confirmée" in x["msg"] for x in cn), cn
+
+    def test_rider_patch_forbidden_admin_allowed(self, ctx):
+        o = make_order(ctx)
+        assign(ctx, o, "r1")
+        r = requests.patch(f"{API}/orders/{o['id']}", json={"note": "TEST_rider edit"}, headers=ctx["r1"])
+        assert r.status_code == 403
+        assert mongo.orders.find_one({"id": o["id"]}).get("note") != "TEST_rider edit"
+        r = requests.patch(f"{API}/orders/{o['id']}", json={"note": "TEST_admin edit"}, headers=ctx["admin"])
+        assert r.status_code == 200
+        n = [x for x in by_ref(ctx["r1"], o["code"]) if "modifiée" in x["title"]]
+        assert len(n) == 1 and "instructions" in n[0]["msg"]
+
+    def test_send_to_rider_default_kind(self, ctx):
+        # use rider3 (fresh conv) if exists
+        r3 = mongo.users.find_one({"email": "rider3@dinastore.ci"}, {"id": 1, "_id": 0})
+        assert r3
+        before = {c["id"] for c in mongo.conversations.find({"participants.id": r3["id"]}, {"id": 1})}
+        r = requests.post(f"{API}/messages/send", json={"rider_id": r3["id"], "text": "TEST_kind check"}, headers=ctx["admin"])
+        assert r.status_code == 200, r.text
+        cid = r.json()["conversation_id"]
+        conv = mongo.conversations.find_one({"id": cid})
+        if cid not in before:
+            STATE["convs"].append(cid)
+            assert conv["kind"] == "boutique_livreur", conv["kind"]
+        else:
+            mongo.conversations.update_one({"id": cid}, {"$pull": {"messages": {"text": "TEST_kind check"}}})
+            print("existing conv kind:", conv["kind"])
+        mongo.user_notifications.delete_many({"ref": cid, "msg": {"$regex": "TEST_"}})
+
+    def test_console_open_clears_unread(self, ctx):
+        a = requests.post(f"{API}/rider/conversations/store", headers=ctx["r1"]).json()["id"]
+        if not mongo.conversations.find_one({"id": a}).get("messages"):
+            STATE["convs"].append(a)
+        requests.post(f"{API}/rider/conversations/{a}/send", json={"text": "TEST_unread q"}, headers=ctx["r1"])
+        lst = requests.get(f"{API}/messages/conversations", headers=ctx["admin"]).json()
+        c = next(x for x in lst if x["id"] == a)
+        assert c["unread"] >= 1
+        assert requests.get(f"{API}/messages/conversations/{a}", headers=ctx["admin"]).status_code == 200
+        lst = requests.get(f"{API}/messages/conversations", headers=ctx["admin"]).json()
+        assert next(x for x in lst if x["id"] == a)["unread"] == 0
+        mongo.conversations.update_one({"id": a}, {"$pull": {"messages": {"text": {"$regex": "^TEST_"}}}})
+
+    def test_paging_lte_same_timestamp(self, ctx):
+        uid = ctx["r1u"]["id"]
+        ts = "2001-01-01T00:00:00.000000+00:00"
+        docs = [{"id": f"TESTP{i}", "kind": "rider", "target_id": uid, "type": "info", "title": "TEST_page", "msg": f"TEST_p{i}",
+                 "link": "/rider", "ref": None, "event_key": None, "at": ts if i < 4 else f"2000-01-01T00:00:0{i}+00:00", "read": True} for i in range(8)]
+        mongo.user_notifications.insert_many(docs)
+        try:
+            # page whose boundary is the shared ts
+            p = notifs(ctx["r1"], limit=100, before="2001-01-01T00:00:00.000000+00:00")
+            ids = [x["id"] for x in p["items"] if x["id"].startswith("TESTP")]
+            assert set(ids) == {f"TESTP{i}" for i in range(8)}  # lte includes boundary
+        finally:
+            mongo.user_notifications.delete_many({"id": {"$regex": "^TESTP"}})

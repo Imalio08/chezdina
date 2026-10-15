@@ -1,0 +1,35 @@
+{
+  "summary": "Retested all 8 items from iteration 74. Everything passes. Backend: /app/backend/tests/test_rider_notifications.py now has 17 tests (6 new in TestIter75) and all 17 pass when run with -n 0. Checked: A->B->A->B reassign within one minute gives A 2 'Nouvelle course attribuée' and 2 'retirée', and gives B 2 assign notifications and 1 'retirée'. Reassigning to the same rider still sends nothing. Admin reportee with next_date: the rider gets exactly 'Nouveau statut : reportée par la boutique' and the customer gets 'Votre commande est reportée.' (no 'confirmée'). Rider PATCH /orders/{oid} returns 403 and the order is unchanged; admin PATCH still notifies the rider ('instructions'). POST /messages/send {rider_id} with no kind on a new conversation creates kind 'boutique_livreur' (checked with rider3). GET /messages/conversations/{id} sets unread to 0 in the list. /me/notifications?before= uses $lte, so items sharing the boundary timestamp are kept. UI at 390x844: rider header shows only bell, Aide icon, Pointer and Sortir icon (no messages icon); greeting 'Bonjour Kouamé' shows in full. Emoji picker stays inside the screen (x 10-298) and closes after a pick, after clicking send and after pressing Enter. The 7 bottom-nav labels no longer overlap (Performance is shortened with an ellipsis). 'Tout marquer comme lu' sits 17px from the panel edge. Console Messagerie: opening a rider conversation and a rider-customer conversation clears both unread badges, and they stay cleared after the 6s poll. Paging UI with 40 seeded notifications, several sharing the timestamp at the page boundary: 44 unique items after 'Voir les plus anciennes', none missing, no duplicates. Regression checks pass: bell badge, delivery notification opens the course sheet, message notification opens /rider/messages/{cid}, live toast with 'Ouvrir' opens the conversation, inbox tabs Clientes/Boutique with counts, 'Écrire à la boutique', 'Voir la course', push subscribe (pytest).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/messages/conversations/{conv_id}", "issue": "Marks messages read by reading the conversation and then writing back the whole array with $set messages. A message sent between the find and the update (rider, customer or other staff) is overwritten and lost. Use an atomic update instead: update_one({id}, {$addToSet: {'messages.$[m].read_by': uid}}, array_filters=[{'m.read_by': {$ne: uid}}]). Same risk applies wherever else the messages array is rewritten."},
+      {"endpoint": "GET /api/me/notifications?before=", "issue": "With $lte plus client-side dedup, if more than 'limit' (30) notifications share the exact same 'at', 'Voir les plus anciennes' would never move forward. Theoretical only; could page on (at, id) instead."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Rider bottom nav (390px)", "issues": ["'Performance' is shortened to 'Performa…'. The custom tab 'Onglet 6' label sits about 2px lower than the other labels (baseline not aligned)."]},
+      {"screen": "Rider header (390px)", "issues": ["The subtitle 'Chez Dina · Livr… · ⚠ GPS refusé' still wraps onto 2 lines and the role text is cut off."]},
+      {"screen": "Console Messagerie list", "issues": ["Long titles like 'Kouamé Serge (livreur) · DN-26…' run into the pin/hourglass status icon at the right edge of the row."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_rider_notifications.py", "/app/backend/tests/ui_seed_rider_notifs.py", "/app/test_reports/pytest/rider_notifications_75.xml"],
+  "action_items": [
+    "Make the mark-read in GET /messages/conversations/{id} atomic (arrayFilters + $addToSet) so a message sent at the same moment cannot be lost",
+    "Optional polish: rider subtitle wrapping, 'Onglet 6' label alignment, console conversation title running into the icon"
+  ],
+  "critical_code_review_comments": [
+    "messagerie.get_conversation: read-modify-write of the whole messages array can lose messages under concurrency (see backend minor)",
+    "A leftover rider notification 'Course DN-261015-6649 modifiée' / 'Nouveau statut : en route' with no ref or event_key points to an order that does not exist (manual/demo seed?). Title and message also don't match ('modifiée' vs a status text).",
+    "Pre-existing TEST_ leftovers from older iterations, not touched: 27 whatsapp_outbox rows (TEST_versement, TEST_rider_pp, TEST_Cliente Auto, TEST_UIFilleule3) and 1 conversation with TEST_Register ('Smoke')"
+  ],
+  "updated_files": ["/app/backend/tests/test_rider_notifications.py (added TestIter75; paging assertion changed to <=)", "/app/backend/tests/ui_seed_rider_notifs.py (Mongo from env)"],
+  "success_rate": {"backend": "100% (17/17)", "frontend": "100% of retested flows"},
+  "seed_data_creation": "Created TEST_ orders (product TEST_prod, so stock untouched), TEST_ customers, conversations, user_notifications (TESTP*/TESTN* paging rows) and the rider1 store conversation. All deleted; checked 0 TEST_ orders, customers and notifications left, and the store conversation created during the run was removed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && export $(grep REACT_APP_BACKEND_URL /app/frontend/.env) && export $(grep -E 'MONGO_URL|DB_NAME' .env | tr -d '\"') && pytest tests/test_rider_notifications.py -n 0. Run with -n 0, because tests share module STATE and the rider1 store conversation and fail under xdist. UI seed: python tests/ui_seed_rider_notifs.py seed|assign2|cleanup. Console login at /login: credentials are prefilled; uncheck the 'Pointer' checkbox and click 'Se connecter'."
+}

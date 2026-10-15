@@ -4,7 +4,7 @@ import requests
 from pymongo import MongoClient
 
 API = os.environ["REACT_APP_BACKEND_URL"].rstrip("/") + "/api"
-db = MongoClient("mongodb://localhost:27017")["dina_store"]
+db = MongoClient(os.environ["MONGO_URL"])[os.environ["DB_NAME"]]
 F = "/tmp/ui_seed.json"
 
 

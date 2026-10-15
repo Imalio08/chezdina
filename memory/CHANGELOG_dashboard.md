@@ -3,11 +3,15 @@
 - ActionItems : délai d'attente en min / h / j.
 
 ## 2026-10-15 — Expérience mobile & retours visuels (site client)
-- Toasts : sur téléphone en haut, centrés, agrandis (16px, bouton fermer) ; desktop en haut à droite (App.js AppToaster + index.css).
-- ScrollToTop global à chaque changement de page.
-- lib/reveal.js : défilement jusqu'au résultat + halo rouge (.dina-flash), cible le premier élément visible.
-- Ajout panier : toast avec bouton « Voir le panier ». Catalogue : tri/filtres ramènent la grille en vue.
-- Checkout : champ manquant ciblé + focus ; message d'erreur explicite.
-- Suivi : résultat ramené en vue ; « Mes commandes récentes » corrigé (endpoint orders-split, bug de code obsolète) ; /boutique/suivi → /boutique/suivi-commande.
-- Compte : une seule arborescence de routes (matchMedia 1024px) ; Aperçu accessible sur mobile via /boutique/compte/profil ; lien « ← Mon compte » ; états « Enregistrement… / Envoi… » ; cartes/adresses révélées après enregistrement ; messages défilent vers le dernier.
-- Tests : iteration_72 (3 bugs trouvés) → iteration_73 100 %.
+- Toasts mobile en haut, centrés, agrandis ; ScrollToTop ; lib/reveal.js (défilement + halo).
+- Ajout panier « Voir le panier », catalogue, checkout, suivi, compte (routes uniques matchMedia, /boutique/compte/profil).
+- Tests : iteration_72 → iteration_73 100 %.
+
+## 2026-10-15 — Application livreur connectée (notifications, messagerie, synchro)
+- notify(): champs ref (code commande / id conversation) + event_key (anti-doublon) ; push avec tag ; sw.js navigue la fenêtre existante vers l'URL.
+- Événements livreur : attribution / retrait / réaffectation (assign + ajout tournée), statut changé par la boutique (annulée, reportée…), course modifiée (adresse, tél., articles, montant, créneau, instructions), messages cliente / gérante / boutique, annonce CMS livreurs.
+- API : GET /me/notifications?unread_only&before&limit, POST /me/notifications/read {ids|ref|{}} ; POST /rider/conversations/store ; /messages/send accepte conversation_id ; lecture atomique ($addToSet read_by) ; PATCH /orders interdit aux livreurs.
+- Front livreur : cloche avec filtres Toutes/Non lues, non lues mises en avant, « Tout marquer comme lu », page /rider/notifications (historique paginé) ; clic → /rider?course=CODE ou conversation ; toasts « Ouvrir » + son pour chaque nouvel événement, rattrapage au retour au premier plan / reconnexion ; onglet Messages (badge) avec boîtes Clientes / Boutique-gérante, « Écrire à la boutique », « Voir la course ».
+- Console Messagerie : ouverture d'une conversation = messages lus ; réponse dans la même conversation.
+- Correctif : aperçu facture console (biz → brand).
+- Tests : iteration_74 (2 bugs mineurs) → iteration_75 100 % (17/17 backend).
