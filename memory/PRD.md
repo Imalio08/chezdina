@@ -1081,3 +1081,13 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Relance manuelle depuis le Manuel conservée (événement dina-replay-tour).
 - Testé : capture (1re visite = affichée, navigation = plus affichée, nouvel appareil = plus affichée).
 
+
+## 2026-10-15 — Compte client, adresses, commande, messagerie, notifications
+- Inscription autonome (POST /api/public/customer-signup : nom, téléphone, e-mail facultatif, PIN 6 chiffres, code de parrainage marraine) + connexion directe ; verrouillage 5 PIN faux / 15 min (429). Menu profil invité : « Se connecter » / « Créer un compte ».
+- Profil : modale infos perso seulement (nom, e-mail, anniversaire, pointure, taille). Adresses : AddressForm.jsx (GPS + carte OSM, zone, quartier, rue, repères, libellé, défaut), multi-adresses, plus aucun lien vers la console.
+- Commande : carte cliente préremplie + choix adresse (défaut / autre enregistrée / nouvelle, enregistrable) ; l'id cliente de la commande vient de la session (plus du navigateur).
+- Messagerie : RichComposer partagé (emojis, gras, italique, barré, photo) cliente / livreur / fils commande console ; boîte « Messages » livreur (/rider/messages, endpoints /api/rider/conversations*) ; routage cliente ↔ livreur vérifié de bout en bout.
+- Notifications : collection user_notifications + Web Push VAPID (pywebpush, clés dans backend/.env, REACT_APP_VAPID_PUBLIC_KEY) ; événements : nouveau message, nouvelle course / réaffectation / modification, statut commande (cliente), nouvelle commande en ligne (console). Cloche livreur, page Notifications cliente, boutons d'activation push (console, livreur, cliente).
+- Testé : iteration_69 (backend 19/19, frontend 100 %). Données TEST_ supprimées.
+- Limite : push iPhone uniquement si l'app est installée sur l'écran d'accueil (iOS 16.4+).
+
