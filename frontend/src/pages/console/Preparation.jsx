@@ -183,7 +183,7 @@ const MANUAL_REASONS = [
   "Scan refusé plusieurs fois",
 ];
 
-function PrepRunner({ order, onBack }) {
+export function PrepRunner({ order, onBack }) {
   // Each item line gets: scanned (boolean), manual (boolean), reason (string)
   const [lines, setLines] = useState(() => (order.items || []).map((it, i) => ({ idx: i, item: it, scanned: false, manual: false, reason: "" })));
   const [scanBuffer, setScanBuffer] = useState("");
@@ -264,7 +264,8 @@ function PrepRunner({ order, onBack }) {
       await api.patch(`/orders/${order.id}/status-v3`, payload).catch(async () => {
         await api.patch(`/orders/${order.id}/status`, { status: "prete" });
       });
-      toast.success("Commande marquée Prête ✓");
+      toast.success("Commande marquée Prête ✓ · fiche colis prête");
+      slip(order).catch(() => {});
       onBack();
     } catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
     finally { setSubmitting(false); }

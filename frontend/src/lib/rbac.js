@@ -29,7 +29,7 @@ export const PATH_ROLES = {
   // Operations
   "/console": [M, S, K, C],
   "/console/pos": [M, S],
-  "/console/commandes": [M, S],
+  "/console/commandes": [M, S, K],
   "/console/preparation": [M, S, K],
   "/console/sessions-caisse": [M],
   "/console/liste-attente": [M, S],

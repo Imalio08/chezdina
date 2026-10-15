@@ -6,9 +6,9 @@ import { AlertTriangle, Receipt, Package, Truck, Clock, ShoppingCart, Star, Zap 
 const waitFmt = (m) => m < 60 ? `${m} min` : m < 1440 ? `${Math.floor(m/60)} h` : `${Math.floor(m/1440)} j`;
 
 const CARDS = [
-  { key:"nouvelles", label:"À confirmer", icon:Receipt, color:"#e4991e", desc:"Nouvelles commandes en attente" },
-  { key:"preparation", label:"À préparer", icon:Package, color:"#5867fd", desc:"Confirmées ou en préparation" },
-  { key:"pretes_non_affectees", label:"À assigner", icon:Zap, color:"#b02a2a", desc:"Prêtes sans livreur" },
+  { key:"nouvelles", label:"À confirmer", icon:Receipt, color:"#e4991e", desc:"Commandes à confirmer" },
+  { key:"preparation", label:"À préparer", icon:Package, color:"#5867fd", desc:"Confirmées, à scanner" },
+  { key:"pretes_non_affectees", label:"À affecter", icon:Zap, color:"#b02a2a", desc:"Prêtes sans livreur" },
   { key:"en_livraison", label:"En livraison", icon:Truck, color:"#1f8a4c", desc:"Courses actives" },
   { key:"rupture", label:"Ruptures", icon:AlertTriangle, color:"#c62828", desc:"Variantes à 0" },
   { key:"stock_bas", label:"Stock bas", icon:AlertTriangle, color:"#e4991e", desc:"Moins de 5" },

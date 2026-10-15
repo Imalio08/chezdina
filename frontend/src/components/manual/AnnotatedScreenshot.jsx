@@ -37,7 +37,7 @@ function Chrome({ children, title = "Chez Dina · Console" }) {
       <text x="30" y="34" textAnchor="middle" fontFamily="serif" fontSize="12" fill={PALETTE.primary} fontWeight="bold">CD</text>
       <text x="55" y="28" fontFamily="serif" fontSize="14" fill="#fff">Chez Dina</text>
       <text x="55" y="42" fontFamily="sans-serif" fontSize="8" fill={PALETTE.muted} letterSpacing="2">CONSOLE</text>
-      {["Tableau de bord","Caisse","Commandes","Préparation","Livraisons","Produits","Clientes","Statistiques"].map((lbl, i) => (
+      {["Tableau de bord","Caisse","Commandes","Livraisons","Produits","Clientes","Statistiques"].map((lbl, i) => (
         <g key={i} transform={`translate(14 ${80 + i*34})`}>
           <rect x="0" y="0" width="152" height="24" rx="4" fill={i === 0 ? "#2a2a2a" : "transparent"}/>
           <text x="10" y="16" fontFamily="sans-serif" fontSize="11" fill={i === 0 ? "#fff" : "#aaa"}>{lbl}</text>

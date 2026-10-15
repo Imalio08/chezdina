@@ -33,7 +33,7 @@ ROLE_API = {
         "full": ("/api/products", "/api/stock", "/api/stock-movements", "/api/stock-alerts", "/api/brands", "/api/categories",
                  "/api/collections", "/api/suppliers", "/api/purchase-orders", "/api/deliveries"),
         "read": ("/api/abandoned-carts", "/api/orders"),
-        "rules": ((("PATCH",), re.compile(r"^/api/orders/[^/]+/status$")),),
+        "rules": ((("PATCH",), re.compile(r"^/api/orders/[^/]+/status(-v3)?$")),),
     },
     "community_manager": {
         "full": ("/api/messages", "/api/reviews", "/api/promotions", "/api/promo-types", "/api/campaigns", "/api/segments",

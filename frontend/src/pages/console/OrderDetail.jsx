@@ -10,13 +10,18 @@ import OrderThread from "@/components/shared/OrderThread";
 import useFocusParam from "@/lib/useFocusParam";
 import SmartImage from "@/components/shared/SmartImage";
 import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { OrderActions } from "@/pages/console/Orders";
+import { PrepRunner } from "@/pages/console/Preparation";
+import { useAuth } from "@/context/AuthContext";
 
 const STATUSES = ["nouvelle", "confirmee", "en_preparation", "prete", "assignee", "en_livraison", "livree", "retournee", "annulee"];
 
 export default function OrderDetail() {
   const { code } = useParams();
   const nav = useNavigate();
+  const { user } = useAuth();
   const [order, setOrder] = useState(null);
+  const [prep, setPrep] = useState(false);
   const [invoice, setInvoice] = useState(null);
   const [preview, setPreview] = useState(null);
   useFocusParam();
@@ -60,6 +65,7 @@ export default function OrderDetail() {
   };
 
   if (!order) return <div className="text-center py-12 text-sm text-[#666]">Chargement…</div>;
+  if (prep) return <PrepRunner order={{ ...order, status: "en_preparation" }} onBack={() => { setPrep(false); load(); }}/>;
 
   const subtotal = (order.items || []).reduce((s, i) => s + (i.qty * i.price), 0);
 
@@ -131,7 +137,14 @@ export default function OrderDetail() {
       </div>
 
       <div className="dina-card-white p-5" data-testid="order-status-flow">
-        <div className="font-semibold mb-2">Changer le statut</div>
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <div className="font-semibold">Prochaine étape</div>
+          <OrderActions o={order} canConfirm={["admin", "manager"].includes(user?.role)} onConfirm={() => changeStatus("confirmee")} onPrepare={async () => {
+            if (order.status === "confirmee") { try { await api.patch(`/orders/${order.id}/status-v3`, { status: "en_preparation" }); } catch (e) { return toast.error(e.response?.data?.detail || "Préparation impossible"); } }
+            setPrep(true);
+          }}/>
+        </div>
+        <div className="font-semibold mb-2 text-sm">Changer le statut</div>
         <div className="flex gap-2 flex-wrap">
           {STATUSES.map(s => (
             <button key={s} onClick={() => changeStatus(s)} className={`dina-chip ${order.status === s ? "!bg-[#1c1c1c] !text-white" : ""}`} data-testid={`od-status-${s}`}>

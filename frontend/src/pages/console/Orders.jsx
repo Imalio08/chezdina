@@ -1,26 +1,48 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
-import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt, Eye } from "lucide-react";
+import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt, Eye, CheckCircle2, ScanLine, Truck, Wallet } from "lucide-react";
 import { InvoicePreviewModal, buildInvoicePreview, shareInvoiceOnWhatsApp } from "@/components/shared/InvoicePreviewModal";
-import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { downloadInvoicePDF, downloadPackingSlipPDF, downloadPackingSlipsPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
+import { PrepRunner } from "@/pages/console/Preparation";
+import AssignDayModal from "@/components/orders/AssignDayModal";
+import { useAuth } from "@/context/AuthContext";
 
-const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","retournee","annulee","echouee"];
+const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee","retournee"];
+const KANBAN = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee"];
+const TABS = [["", "Toutes"], ["nouvelle", "À confirmer"], ["confirmee", "À préparer"], ["en_preparation", "En préparation"], ["prete", "Prêtes"], ["assignee", "Affectées"], ["en_livraison", "En livraison"], ["livree", "Livrées"], ["annulee_reportee", "Annulées / Reportées"], ["en_attente_acompte", "En attente d'acompte"]];
+const inTab = (o, t) => !t || (t === "annulee_reportee" ? ["annulee", "reportee", "echouee", "retournee"].includes(o.status) : t === "en_livraison" ? ["en_livraison", "recuperee"].includes(o.status) : o.status === t);
+
+export function OrderActions({ o, canConfirm, onConfirm, onPrepare, compact }) {
+  const cls = `inline-flex items-center gap-1 rounded-md font-semibold ${compact ? "text-[10px] px-2 py-1" : "text-xs px-2.5 py-1.5"}`;
+  if (o.status === "en_attente_acompte") return <span className={`${cls} bg-[#fff4e0] text-[#b26a00]`} title="Confirmation possible après réception de l'acompte" data-testid={`order-deposit-${o.code}`}><Wallet size={11}/>Acompte requis</span>;
+  if (o.status === "nouvelle" && canConfirm) return <button onClick={(e) => { e.stopPropagation(); onConfirm(o); }} className={`${cls} bg-[#0021cc] text-white`} data-testid={`order-confirm-${o.code}`}><CheckCircle2 size={11}/>Confirmer</button>;
+  if (["confirmee", "en_preparation"].includes(o.status)) return <button onClick={(e) => { e.stopPropagation(); onPrepare(o); }} className={`${cls} bg-[#b02a2a] text-white`} data-testid={`order-prepare-${o.code}`}><ScanLine size={11}/>{o.status === "en_preparation" ? "Reprendre" : "Préparer"}</button>;
+  return null;
+}
 
 export default function Orders() {
   const nav = useNavigate();
+  const { user } = useAuth();
+  const canConfirm = ["admin", "manager"].includes(user?.role);
+  const [sp, setSp] = useSearchParams();
   const [orders, setOrders] = useState([]);
-  const [view, setView] = useState("table");
-  const [filter, setFilter] = useState("");
+  const [view, setView] = useState(() => localStorage.getItem("orders_view") || "table");
+  const filter = sp.get("tab") || "";
+  const setFilter = (t) => { const n = new URLSearchParams(sp); if (t) n.set("tab", t); else n.delete("tab"); setSp(n, { replace: true }); setSel(new Set()); };
   const [selected, setSelected] = useState(null);
   const [preview, setPreview] = useState(null);
   const [unread, setUnread] = useState({});
   const [f, setF] = useState({ ...EMPTY_FILTERS });
+  const [sel, setSel] = useState(new Set());
+  const [prepOrder, setPrepOrder] = useState(null);
+  const [assigning, setAssigning] = useState(null);
+  const [busy, setBusy] = useState(false);
 
-  const load = async () => { try { const r = await api.get("/orders"); setOrders(r.data || []); } catch { toast.error("Erreur"); } };
+  const load = async () => { try { const r = await api.get("/orders"); setOrders(r.data || []); } catch { toast.error("Commandes indisponibles · réessayez"); } };
   const loadUnread = () => api.get("/orders-messages/unread").then(r => setUnread(r.data?.by_order || {})).catch(() => {});
   useEffect(() => {
     load(); loadUnread();
@@ -52,23 +74,44 @@ export default function Orders() {
     if (selected) setSelected({...selected, status: payload.status});
   };
 
-  const filtered = applyOrderFilters(orders, f).filter(o => !filter || (filter === "unread" ? unread[o.code] > 0 : o.status === filter));
+  const filtered = applyOrderFilters(orders, f).filter(o => filter === "unread" ? unread[o.code] > 0 : inTab(o, filter));
   const unreadCount = orders.filter(o => unread[o.code] > 0).length;
-  const counts = useMemo(() => {
-    const by = (fn) => orders.filter(fn).length;
-    const total = orders.length || 1;
-    return {
-      nouvelles: by(o => o.status === "nouvelle"),
-      en_preparation: by(o => ["confirmee","en_preparation"].includes(o.status)),
-      pretes: by(o => o.status === "prete"),
-      en_livraison: by(o => ["assignee","recuperee","en_livraison"].includes(o.status)),
-      livrees: by(o => o.status === "livree"),
-      annulees: by(o => ["annulee","echouee"].includes(o.status)),
-      reportees: by(o => o.rescheduled_for || o.status === "reportee"),
-      cancel_rate: Math.round(by(o => o.status === "annulee") / total * 1000) / 10,
-      ca_livre: orders.filter(o => o.status === "livree").reduce((s, o) => s + (o.total || 0), 0),
-    };
-  }, [orders]);
+  const counts = useMemo(() => Object.fromEntries(TABS.map(([k]) => [k, orders.filter(o => inTab(o, k)).length])), [orders]);
+  const selOrders = orders.filter(o => sel.has(o.id));
+  const toggle = (id) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const allShown = filtered.slice(0, 200);
+  const allChecked = allShown.length > 0 && allShown.every(o => sel.has(o.id));
+
+  const confirm = async (list) => {
+    const ok = list.filter(o => o.status === "nouvelle");
+    if (!ok.length) return toast.error("Aucune commande « À confirmer » dans la sélection");
+    setBusy(true);
+    let done = 0;
+    for (const o of ok) { try { await api.patch(`/orders/${o.id}/status`, { status: "confirmee" }); done++; } catch (e) { toast.error(`${o.code} : ${e.response?.data?.detail || "confirmation impossible"}`); } }
+    setBusy(false); setSel(new Set());
+    if (done) toast.success(done > 1 ? `${done} commandes confirmées · à préparer` : `${ok[0].code} confirmée · à préparer`);
+    load();
+  };
+  const prepare = async (o) => {
+    if (o.status === "confirmee") {
+      try { await api.patch(`/orders/${o.id}/status-v3`, { status: "en_preparation" }); }
+      catch (e) { return toast.error(e.response?.data?.detail || "Préparation impossible"); }
+    }
+    setPrepOrder({ ...o, status: "en_preparation" });
+    window.scrollTo(0, 0);
+  };
+  const printSlips = async (list) => {
+    if (!list.length) return;
+    try { downloadPackingSlipsPDF(list, await fetchBusinessForPdf(api)); } catch { toast.error("Impression impossible · réessayez"); }
+  };
+  const assignSel = () => {
+    const ready = selOrders.filter(o => o.status === "prete");
+    if (!ready.length) return toast.error("Sélectionnez des commandes « Prête »");
+    if (ready.length < selOrders.length) toast.message(`${selOrders.length - ready.length} commande(s) non prête(s) ignorée(s)`);
+    setAssigning(ready);
+  };
+
+  if (prepOrder) return <PrepRunner order={prepOrder} onBack={() => { setPrepOrder(null); load(); }}/>;
 
   const openInvoice = async (o, action) => {
     try {
@@ -94,70 +137,71 @@ export default function Orders() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Commandes</h1><p className="text-sm text-[#666]">Tous canaux · {orders.length} commandes</p></div>
         <div className="flex gap-2">
-          <button onClick={()=>setView("table")} className={`px-3 py-2 text-xs rounded-md border ${view==="table"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="orders-view-table">Table</button>
-          <button onClick={()=>setView("kanban")} className={`px-3 py-2 text-xs rounded-md border ${view==="kanban"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="orders-view-kanban">Kanban</button>
+          {[["table", "Table"], ["kanban", "Kanban"]].map(([v, l]) => <button key={v} onClick={()=>{ setView(v); localStorage.setItem("orders_view", v); }} className={`px-3 py-2 text-xs rounded-md border ${view===v?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid={`orders-view-${v}`}>{l}</button>)}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-2">
-        <KpiMini label="Nouvelles" value={counts.nouvelles} color="#0021cc" onClick={() => setFilter("nouvelle")} active={filter === "nouvelle"} testid="orders-kpi-nouvelles"/>
-        <KpiMini label="À préparer" value={counts.en_preparation} color="#e4991e" onClick={() => setFilter("en_preparation")} active={filter === "en_preparation"} testid="orders-kpi-prep"/>
-        <KpiMini label="Prêtes" value={counts.pretes} color="#f4b12c" onClick={() => setFilter("prete")} active={filter === "prete"} testid="orders-kpi-pretes"/>
-        <KpiMini label="En livraison" value={counts.en_livraison} color="#5867fd" onClick={() => setFilter("en_livraison")} active={filter === "en_livraison"} testid="orders-kpi-livraison"/>
-        <KpiMini label="Livrées" value={counts.livrees} color="#1f8a4c" onClick={() => setFilter("livree")} active={filter === "livree"} testid="orders-kpi-livrees"/>
-        <KpiMini label="Annulées" value={counts.annulees} color="#c62828" onClick={() => setFilter("annulee")} active={filter === "annulee"} testid="orders-kpi-annulees"/>
-        <KpiMini label="Reportées" value={counts.reportees} color="#e4991e" testid="orders-kpi-reportees"/>
-        <KpiMini label="Taux annulation" value={`${counts.cancel_rate}%`} color="#c62828" testid="orders-kpi-rate"/>
-        <KpiMini label="CA livré" value={fcfa(counts.ca_livre)} color="#1f8a4c" compact testid="orders-kpi-ca"/>
+      <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1 lg:flex-wrap" data-testid="orders-tabs">
+        {TABS.map(([k, l]) => <button key={k || "all"} onClick={()=>setFilter(k)} className={`dina-chip shrink-0 ${filter===k?"!bg-[#1c1c1c] !text-white":""}`} data-testid={`orders-tab-${k || "all"}`}>{k && k !== "annulee_reportee" && <span className="status-dot" style={{background:statusColor[k]}}/>}{l} <b className="tabular">{counts[k]}</b></button>)}
+        <button onClick={()=>setFilter("unread")} className={`dina-chip shrink-0 ${filter==="unread"?"!bg-[#e53935] !text-white !border-[#e53935]":"!text-[#e53935]"}`} data-testid="orders-filter-unread"><span className="w-2 h-2 rounded-full bg-[#e53935]"/>Messages non lus ({unreadCount})</button>
       </div>
 
       <OrderFilters orders={orders} value={f} onChange={setF} fields={["q", "date", "slot", "zone", "rider"]} testid="orders-filters"/>
 
-      <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1 lg:flex-wrap">
-        <button onClick={()=>setFilter("")} className={`dina-chip shrink-0 ${!filter?"!bg-[#1c1c1c] !text-white":""}`}>Tout ({orders.length})</button>
-        <button onClick={()=>setFilter("unread")} className={`dina-chip ${filter==="unread"?"!bg-[#e53935] !text-white !border-[#e53935]":"!text-[#e53935]"}`} data-testid="orders-filter-unread"><span className="w-2 h-2 rounded-full bg-[#e53935]"/>Messages non lus ({unreadCount})</button>
-        {STATUSES.map(s=><button key={s} onClick={()=>setFilter(s)} className={`dina-chip ${filter===s?"!bg-[#1c1c1c] !text-white":""}`} data-testid={`orders-filter-${s}`}><span className="status-dot" style={{background:statusColor[s]}}/>{statusLabel[s]} ({orders.filter(o=>o.status===s).length})</button>)}
-      </div>
+      {sel.size > 0 && (
+        <div className="sticky top-16 z-20 dina-card-white p-2.5 flex items-center gap-2 flex-wrap shadow-md" data-testid="orders-bulk-bar">
+          <span className="text-sm font-semibold px-1" data-testid="orders-bulk-count">{sel.size} sélectionnée(s)</span>
+          {canConfirm && <button onClick={() => confirm(selOrders)} disabled={busy} className="dina-btn-primary !min-h-[34px] text-xs" data-testid="orders-bulk-confirm"><CheckCircle2 size={13}/>{busy ? "Confirmation…" : "Confirmer"}</button>}
+          {canConfirm && <button onClick={assignSel} className="dina-btn-secondary !min-h-[34px] text-xs" data-testid="orders-bulk-assign"><Truck size={13}/>Affecter à une journée de livraison</button>}
+          <button onClick={() => printSlips(selOrders)} className="dina-btn-secondary !min-h-[34px] text-xs" data-testid="orders-bulk-print"><Printer size={13}/>Imprimer les fiches colis</button>
+          <button onClick={() => setSel(new Set())} className="text-xs text-[#666] ml-auto px-2" data-testid="orders-bulk-clear">Tout désélectionner</button>
+        </div>
+      )}
 
       {view === "table" ? (
         <div className="dina-card-white overflow-hidden"><div className="overflow-x-auto"><table className="dina-table">
-          <thead><tr><th>Commande</th><th>Date</th><th>Cliente</th><th>Canal</th><th>Mode</th><th>Statut</th><th className="text-right">Total</th><th className="text-center">Facture</th></tr></thead>
-          <tbody>{filtered.length === 0 ? <tr><td colSpan={8} className="text-sm text-[#666] text-center py-8">Aucune commande pour ce filtre</td></tr>
-          : filtered.slice(0,200).map(o=>(
-            <tr key={o.id} className="hover:bg-[#fafafa] dark:hover:bg-[#141414]" data-testid={`order-row-${o.code}`}>
+          <thead><tr><th className="w-8"><input type="checkbox" checked={allChecked} onChange={() => setSel(allChecked ? new Set() : new Set(allShown.map(o => o.id)))} className="accent-[#b02a2a]" data-testid="orders-select-all"/></th><th>Commande</th><th>Date</th><th>Cliente</th><th>Canal</th><th>Mode</th><th>Statut</th><th>Action</th><th className="text-right">Total</th><th className="text-center">Documents</th></tr></thead>
+          <tbody>{filtered.length === 0 ? <tr><td colSpan={10} className="text-sm text-[#666] text-center py-8">Aucune commande pour ce filtre</td></tr>
+          : allShown.map(o=>(
+            <tr key={o.id} className={`hover:bg-[#fafafa] dark:hover:bg-[#141414] ${sel.has(o.id) ? "bg-[#fff5f5]" : ""}`} data-testid={`order-row-${o.code}`}>
+              <td><input type="checkbox" checked={sel.has(o.id)} onChange={() => toggle(o.id)} className="accent-[#b02a2a]" data-testid={`order-select-${o.code}`}/></td>
               <td className="font-medium cursor-pointer hover:text-[#b02a2a]" onClick={()=>nav(`/console/commandes/${o.code}`)}><span className="inline-flex items-center gap-1.5">{o.code}<UnreadDot n={unread[o.code]} code={o.code}/></span></td>
               <td className="text-[#666] cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{dateTimeFmt(o.created_at)}</td>
               <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.customer?.name||"—"}</td>
               <td className="capitalize cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.channel}</td>
               <td className="capitalize text-xs cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.mode}</td>
-              <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}><span className="dina-chip" style={{color:statusColor[o.status]}}><span className="status-dot" style={{background:statusColor[o.status]}}/>{statusLabel[o.status]}</span></td>
+              <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}><span className="dina-chip" style={{color:statusColor[o.status]}}><span className="status-dot" style={{background:statusColor[o.status]}}/>{statusLabel[o.status] || o.status}</span></td>
+              <td><OrderActions o={o} canConfirm={canConfirm} onConfirm={(x) => confirm([x])} onPrepare={prepare}/></td>
               <td className="text-right tabular font-semibold cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{fcfa(o.total)}</td>
               <td>
                 <div className="flex items-center justify-center gap-1">
                   <button onClick={() => openInvoice(o, "view")} className="text-[#666] hover:text-[#b02a2a] p-1" title="Aperçu facture PDF" data-testid={`invoice-view-${o.code}`}><Eye size={13}/></button>
                   <button onClick={() => openInvoice(o, "pdf")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Voir la facture PDF" data-testid={`invoice-pdf-${o.code}`}><FileText size={13}/></button>
                   <button onClick={() => openInvoice(o, "wa")} className="text-[#1f8a4c] hover:text-[#b02a2a] p-1" title="Envoyer par WhatsApp" data-testid={`invoice-wa-${o.code}`}><MessageCircle size={13}/></button>
+                  <button onClick={() => printSlips([o])} className="text-[#666] hover:text-[#b02a2a] p-1" title="Fiche colis" data-testid={`slip-${o.code}`}><Printer size={13}/></button>
                 </div>
               </td>
             </tr>
           ))}</tbody>
         </table></div></div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 overflow-x-auto">
-          {STATUSES.slice(0,8).map(s=>(
-            <div key={s} className="dina-card p-3 min-h-[200px]">
-              <div className="font-semibold text-xs uppercase mb-2" style={{color:statusColor[s]}}>{statusLabel[s]} ({orders.filter(o=>o.status===s).length})</div>
-              <div className="space-y-2">{orders.filter(o=>o.status===s).slice(0,10).map(o=>(
-                <div key={o.id} onClick={()=>nav(`/console/commandes/${o.code}`)} className="bg-white rounded-lg border border-[#ececec] p-2 cursor-pointer hover:border-[#b02a2a]">
-                  <div className="text-xs font-medium flex items-center gap-1.5">{o.code}<UnreadDot n={unread[o.code]} code={o.code}/></div>
+        <div className="flex gap-3 overflow-x-auto pb-2" data-testid="orders-kanban">
+          {KANBAN.map(s=>{ const col = filtered.filter(o=>o.status===s); return (
+            <div key={s} className="dina-card p-3 min-h-[200px] w-64 shrink-0" data-testid={`kanban-col-${s}`}>
+              <div className="font-semibold text-xs uppercase mb-2 flex justify-between" style={{color:statusColor[s]}}><span>{statusLabel[s]}</span><span>{col.length}</span></div>
+              <div className="space-y-2">{col.slice(0,30).map(o=>(
+                <div key={o.id} onClick={()=>nav(`/console/commandes/${o.code}`)} className={`bg-white dark:bg-[#1a1a1a] rounded-lg border p-2 cursor-pointer hover:border-[#b02a2a] ${sel.has(o.id) ? "border-[#b02a2a]" : "border-[#ececec] dark:border-[#2a2a2a]"}`} data-testid={`kanban-card-${o.code}`}>
+                  <div className="text-xs font-medium flex items-center gap-1.5"><input type="checkbox" checked={sel.has(o.id)} onClick={e => e.stopPropagation()} onChange={() => toggle(o.id)} className="accent-[#b02a2a]" data-testid={`kanban-select-${o.code}`}/>{o.code}<UnreadDot n={unread[o.code]} code={o.code}/></div>
                   <div className="text-xs text-[#666]">{o.customer?.name||"—"}</div>
-                  <div className="tabular text-sm font-semibold">{fcfa(o.total)}</div>
+                  <div className="flex items-center justify-between mt-1 gap-1"><span className="tabular text-sm font-semibold">{fcfa(o.total)}</span><OrderActions o={o} canConfirm={canConfirm} onConfirm={(x) => confirm([x])} onPrepare={prepare} compact/></div>
                 </div>
               ))}</div>
             </div>
-          ))}
+          ); })}
         </div>
       )}
+
+      {assigning && <AssignDayModal orders={assigning} onClose={() => setAssigning(null)} onDone={() => { setAssigning(null); setSel(new Set()); load(); }}/>}
 
       {preview && <InvoicePreviewModal data={preview} onClose={() => setPreview(null)}/>}
       {selected && <OrderDrawer order={selected} onClose={()=>setSelected(null)} onStatus={changeStatus} onReload={load} onInvoice={openInvoice}/>}

@@ -146,8 +146,7 @@ function buildInvoiceDoc(order, invoice = {}, business = {}) {
   return { doc, filename: `facture-${number}.pdf` };
 }
 
-export function downloadPackingSlipPDF(order, business = {}) {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+function drawPackingSlip(doc, order, business) {
   let y = header(doc, business, "FICHE COLIS", [
     `Commande ${order.code || "—"}`,
     `Date : ${new Date(order.created_at || Date.now()).toLocaleDateString("fr-FR")}`,
@@ -156,14 +155,25 @@ export function downloadPackingSlipPDF(order, business = {}) {
   ].filter(Boolean));
   y = customerBlock(doc, order, y);
   y = itemsTable(doc, order.items, y);
-  // Rider / signature zone — no price shown on packing slip (optional)
   y = totalsBlock(doc, order, y);
   doc.setFont("helvetica", "normal"); doc.setFontSize(10);
   doc.text("Signature cliente :", 15, y + 10);
   doc.line(55, y + 10, 110, y + 10);
   doc.text("Signature livreur :", 120, y + 10);
   doc.line(160, y + 10, 195, y + 10);
+}
+
+export function downloadPackingSlipPDF(order, business = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  drawPackingSlip(doc, order, business);
   openPdf(doc, `fiche-colis-${order.code || "chez-dina"}.pdf`);
+}
+
+// Several packing slips in one PDF (one page per order).
+export function downloadPackingSlipsPDF(orders, business = {}) {
+  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  orders.forEach((o, i) => { if (i) doc.addPage(); drawPackingSlip(doc, o, business); });
+  openPdf(doc, `fiches-colis-${orders.length}.pdf`);
 }
 
 export function downloadRiderRoutePDF(rider, orders, business = {}) {

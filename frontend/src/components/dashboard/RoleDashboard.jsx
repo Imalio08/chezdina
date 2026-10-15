@@ -8,13 +8,13 @@ import { ShoppingBag, Package, AlertTriangle, MessageSquare, Star, Megaphone, Tr
 
 const CARDS = {
   sales: [
-    { k: "to_process", label: "Commandes à traiter", icon: ShoppingBag, to: "/console/commandes" },
-    { k: "to_prepare", label: "À préparer", icon: Package, to: "/console/preparation" },
+    { k: "to_process", label: "À confirmer", icon: ShoppingBag, to: "/console/commandes?tab=nouvelle" },
+    { k: "to_prepare", label: "À préparer", icon: Package, to: "/console/commandes?tab=confirmee" },
     { k: "unread_messages", label: "Messages non lus", icon: MessageSquare, to: "/console/messagerie" },
     { k: "waitlist", label: "Liste d'attente", icon: Clock, to: "/console/liste-attente" },
   ],
   stock_keeper: [
-    { k: "to_prepare", label: "Commandes à préparer", icon: Package, to: "/console/preparation" },
+    { k: "to_prepare", label: "Commandes à préparer", icon: Package, to: "/console/commandes?tab=confirmee" },
     { k: "low_stock", label: "Stock faible (≤ 3)", icon: AlertTriangle, to: "/console/alertes" },
     { k: "out_of_stock", label: "Ruptures", icon: Boxes, to: "/console/stock" },
     { k: "purchases_pending", label: "Réceptions attendues", icon: Truck, to: "/console/achats" },

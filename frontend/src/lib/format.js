@@ -41,19 +41,21 @@ export const dateTimeFmt = (iso) => {
 };
 export const statusLabel = {
   en_attente_acompte: "En attente d'acompte",
-  nouvelle: "Nouvelle",
-  confirmee: "Confirmée",
+  nouvelle: "À confirmer",
+  confirmee: "À préparer",
   en_preparation: "En préparation",
   prete: "Prête",
-  assignee: "Assignée",
+  assignee: "Affectée",
   recuperee: "Récupérée",
   en_livraison: "En livraison",
   livree: "Livrée",
-  echouee: "Échouée",
+  echouee: "Échec",
+  reportee: "Reportée",
   retournee: "Retournée",
   annulee: "Annulée",
 };
 export const statusColor = {
+  reportee: "#e4991e",
   en_attente_acompte: "#e4991e",
   nouvelle: "#0021cc",
   confirmee: "#3242e8",

@@ -678,12 +678,23 @@ def _url_quote(s: str) -> str:
     except Exception:
         return s
 
+def order_transition_guard(o: Dict[str, Any], new_status: str, user: dict) -> None:
+    """Shared rules: only gérante/owner confirm; deposit must be received; limited roles only prepare."""
+    role = user.get("role")
+    if role in ("stock_keeper", "sales") and new_status not in ("en_preparation", "prete"):
+        raise HTTPException(403, "Votre rôle peut seulement passer une commande en préparation ou prête")
+    if new_status == "confirmee" and o.get("status") in ("nouvelle", "en_attente_acompte"):
+        if role not in ("admin", "manager"):
+            raise HTTPException(403, "Seule la gérante ou la propriétaire confirme une commande")
+        if o.get("status") == "en_attente_acompte" and float(o.get("deposit_paid") or 0) < float(o.get("deposit_required") or 0):
+            raise HTTPException(400, "Acompte non reçu · marquez l'acompte comme reçu avant de confirmer")
+
+
 @api.patch("/orders/{oid}/status")
 async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get_user)):
     o = await db.orders.find_one({"id": oid})
     if not o: raise HTTPException(404)
-    if user.get("role") == "stock_keeper" and body.status not in ("en_preparation", "prete"):
-        raise HTTPException(403, "La magasinière peut seulement passer une commande en préparation ou prête")
+    order_transition_guard(o, body.status, user)
     prev = o.get("status")
     tl = o.get("timeline", []); tl.append({"status": body.status, "at": now_iso(), "by": user.get("name"), "reason": body.reason, "next_date": body.next_date})
     upd = {"status": body.status, "timeline": tl}
@@ -931,7 +942,7 @@ MANUAL_MODULES_SEED = [
      "roles": ["admin","manager","sales","stock"], "path_hints": ["/console/commandes"],
      "sections": [
          {"id":"s1","heading":"Confirmer une commande web","blocks":[
-             {"type":"steps","items":["Ouvrez Commandes","Filtrez par 'Nouvelle'","Vérifiez la disponibilité des articles","Appelez la cliente pour confirmer","Cliquez sur Confirmer"]},
+             {"type":"steps","items":["Ouvrez Commandes","Onglet « À confirmer »","Vérifiez la disponibilité des articles","Appelez la cliente pour confirmer","Cliquez sur Confirmer"]},
          ]},
          {"id":"s2","heading":"Préparer un colis","blocks":[
              {"type":"text","content":"Après confirmation, scannez chaque article pour éviter les erreurs."},
@@ -2163,9 +2174,9 @@ async def dashboard_actions(user: dict = Depends(get_user)):
     paniers = await db.abandoned_carts.count_documents({"recovered": False})
     reviews_pending = await db.reviews.count_documents({"status": "pending"})
     return {
-        "nouvelles": {"count": nouvelles, "wait_min": oldest_wait_min, "link":"/console/commandes?status=nouvelle"},
-        "preparation": {"count": preparation, "link":"/console/commandes?status=en_preparation"},
-        "pretes_non_affectees": {"count": pretes_non_affectees, "link":"/console/livraisons"},
+        "nouvelles": {"count": nouvelles, "wait_min": oldest_wait_min, "link":"/console/commandes?tab=nouvelle"},
+        "preparation": {"count": preparation, "link":"/console/commandes?tab=confirmee"},
+        "pretes_non_affectees": {"count": pretes_non_affectees, "link":"/console/commandes?tab=prete"},
         "en_livraison": {"count": en_livraison, "by_rider": [{"name":n,"count":c} for n,c in rider_cnt.items()], "link":"/console/livraisons"},
         "rupture": {"count": rupture, "link":"/console/stock"},
         "stock_bas": {"count": stock_bas, "link":"/console/stock"},
@@ -4313,7 +4324,7 @@ async def manual_reseed(user: dict = Depends(require_role("admin"))):
         {"number": 3, "title": "Préparer et expédier une commande", "icon": "Package",
          "description": "De la nouvelle commande à la livraison effective",
          "roles": ["admin","manager","sales","stock_keeper"],
-         "path_hints": ["/console/commandes","/console/preparation","/console/livraisons"],
+         "path_hints": ["/console/commandes","/console/livraisons"],
          "sections": [
             {"id": "s3-overview", "heading": "Lire les statuts d'une commande",
              "blocks": [
@@ -4343,7 +4354,7 @@ async def manual_reseed(user: dict = Depends(require_role("admin"))):
                     {"x": 50, "y": 92, "n": 4, "label": "Marquer Prête"},
                  ]},
                 {"type": "steps", "items": [
-                    "Ouvrez l'onglet Préparation — choisissez la commande à préparer",
+                    "Ouvrez Commandes → onglet « À préparer » puis cliquez « Préparer » sur la commande",
                     "Scannez chaque article avec la douchette (ou tapez le SKU + Entrée)",
                     "Un article scanné devient vert ; un article refusé reste à faire",
                     "Si l'étiquette est illisible, cliquez « Manuel » et choisissez un motif obligatoire",
@@ -4390,7 +4401,7 @@ async def manual_reseed(user: dict = Depends(require_role("admin"))):
                 {"type": "faq", "items": [
                     {"q": "Comment faire un remboursement ?", "a": "Dans Commandes, ouvrez la commande concernée et choisissez « Rembourser ». La propriétaire valide via la page « À approuver »."},
                     {"q": "Comment appliquer une remise exceptionnelle ?", "a": "Depuis la caisse, cliquez « Remise » et sélectionnez « Demande d'approbation ». La propriétaire reçoit la demande dans « À approuver »."},
-                    {"q": "Je n'arrive pas à scanner un article, que faire ?", "a": "Dans l'écran Préparation, cliquez « Manuel » sur la ligne concernée et choisissez un motif. L'action est tracée."},
+                    {"q": "Je n'arrive pas à scanner un article, que faire ?", "a": "Dans l'écran de scan (Commandes → Préparer), cliquez « Manuel » sur la ligne concernée et choisissez un motif. L'action est tracée."},
                     {"q": "Comment ajouter une nouvelle cliente ?", "a": "Depuis la caisse, cliquez sur la carte « Choisir la cliente » puis « + Nouvelle cliente ». Prénom, nom et téléphone suffisent."},
                     {"q": "Comment imprimer une facture ?", "a": "Dans Commandes, à droite de la ligne : icône PDF. Vous pouvez aussi l'envoyer par WhatsApp en 1 clic."},
                     {"q": "Comment pointer sans caméra ?", "a": "Pas de problème : le pointage marche sans selfie si la caméra est refusée — un badge rouge l'indique."},
@@ -5419,6 +5430,8 @@ TERMINAL_STATUSES = {"livree","annulee","reportee","echouee"}
 ROLE_ALLOWED_STATUSES = {
     "admin": None,  # any
     "manager": {"nouvelle","confirmee","en_preparation","prete","assignee"},
+    "stock_keeper": {"en_preparation","prete"},
+    "sales": {"en_preparation","prete"},
     "rider": {"en_livraison","livree","annulee","reportee","echouee"},
 }
 
@@ -5429,6 +5442,7 @@ async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Dep
     reason = body.get("reason","")
     o = await db.orders.find_one({"id": oid})
     if not o: raise HTTPException(404)
+    order_transition_guard(o, new_status, user)
     role = user.get("role","")
     allowed = ROLE_ALLOWED_STATUSES.get(role)
     if allowed is not None and new_status not in allowed:
