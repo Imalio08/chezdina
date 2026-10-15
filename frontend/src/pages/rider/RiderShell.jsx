@@ -9,7 +9,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
-import { MessageSquare, Bell } from "lucide-react";
+import { Bell } from "lucide-react";
 import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
 import { NotifItem, useOpenNotif, markAllRead, FilterTabs } from "@/pages/rider/Notifications";
 import { CheckCheck } from "lucide-react";
@@ -275,17 +275,14 @@ export default function RiderShell() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button onClick={() => nav("/rider/messages")} className="relative p-1.5 text-[#666] dark:text-[#999]" data-testid="rider-messages-btn" aria-label="Messages">
-            <MessageSquare size={17}/>{msgUnread > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-messages-badge">{msgUnread}</span>}
-          </button>
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <div className="relative">
             <button onClick={openFeed} className="relative p-1.5 text-[#666] dark:text-[#999]" data-testid="rider-notif-btn" aria-label="Notifications">
               <Bell size={17}/>{feed.unread > 0 && <span className="absolute -top-0.5 -right-0.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-notif-badge">{feed.unread}</span>}
             </button>
             {showFeed && (
               <div className="fixed sm:absolute right-2 sm:right-0 left-2 sm:left-auto top-14 sm:top-9 sm:w-96 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 z-50 max-h-[75vh] overflow-y-auto" data-testid="rider-notif-panel">
-                <div className="flex items-center justify-between gap-2 px-1 pb-2">
+                <div className="flex items-center justify-between gap-2 px-1 pb-2 pr-2">
                   <div className="font-semibold text-sm">Notifications</div>
                   {feed.unread > 0 && <button onClick={markAllRead} className="text-[11px] flex items-center gap-1 text-[color:var(--rider-primary)] font-semibold" data-testid="rider-notif-read-all"><CheckCheck size={13}/>Tout marquer comme lu</button>}
                 </div>
@@ -300,7 +297,7 @@ export default function RiderShell() {
           </div>
           {help?.enabled && (
             <button onClick={() => setShowHelp(true)} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-help-btn">
-              <HelpCircle size={13}/>Aide
+              <HelpCircle size={15}/><span className="hidden sm:inline">Aide</span>
             </button>
           )}
           {punchAllowed && (
@@ -312,7 +309,7 @@ export default function RiderShell() {
               <Clock size={12}/>{punchLabel}
             </button>
           )}
-          <button onClick={() => { logout(); nav("/rider/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout"><LogOut size={11} />Sortir</button>
+          <button onClick={() => { logout(); nav("/rider/login"); }} className="text-[11px] text-[#666] dark:text-[#999] flex items-center gap-1" data-testid="rider-logout" aria-label="Sortir"><LogOut size={15} /><span className="hidden sm:inline">Sortir</span></button>
         </div>
       </div>
 
@@ -367,7 +364,7 @@ export default function RiderShell() {
               data-testid={`rider-tab-${(t.key || label).toString().toLowerCase()}`}
               className={({ isActive }) => `relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${isActive ? "text-[color:var(--rider-primary)]" : "text-[#666] dark:text-[#999]"}`}
             >
-              <Icon size={18} /><span>{label}</span>
+              <Icon size={18} /><span className={`block max-w-full truncate px-0.5 ${tabs.length > 5 ? "text-[9px]" : ""}`}>{label}</span>
               {to === "/rider/messages" && msgUnread > 0 && <span className="absolute top-1 left-1/2 ml-1.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-tab-messages-badge">{msgUnread}</span>}
             </NavLink>
           );

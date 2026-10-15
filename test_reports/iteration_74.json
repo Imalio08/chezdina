@@ -1,0 +1,47 @@
+{
+  "summary": "Tested rider notifications, messaging and push, backend and frontend (section 10). Backend: 11 pytest cases in /app/backend/tests/test_rider_notifications.py, 9 pass and 2 fail, both real bugs. Covered: assign/reassign, admin status changes, no notification for the rider's own status change, order edit with field list and no-change PATCH, customer->rider message with deep link and auto-read on open, staff->rider, the rider-to-shop conversation id stays the same and a console reply lands in that same conversation, paging/unread_only/read by ids, ref and all, rider isolation (403/404), announcement sent once to all riders, push subscribe (kind=rider, owner_id, 400 on invalid). Frontend at 390x844: bell badge, panel with unread dots and filters, clicking a delivery notification opens that course's sheet (/rider?course=CODE), clicking a message notification opens the conversation, live toast with 'Ouvrir' shows up within the 15s poll and opens the right conversation, no duplicate toast after reload, history page paging (30 + 'Voir les plus anciennes' -> 40 unique), read-all, Messages tab badge, Clientes/Boutique tabs with counts, 'Écrire à la boutique', 'Voir la course', bold and emoji formatting in the composer. Console Messagerie received the rider's message and the reply showed up in the same thread. sw.js notificationclick navigates an existing window to the payload url, and notify() sends url + tag.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/deliveries/{oid}/assign (notify.rider_assigned)", "issue": "The duplicate-check keys include a minute timestamp: assign:{oid}:{rider}:{YYYY-MM-DDTHH:MM} and unassign:{oid}:{minute}. If an order goes rider A -> B -> A within the same minute, rider A gets NO second 'Nouvelle course attribuée' (reproduced: 1 notification instead of 2). If A loses the course twice in the same minute, the second 'retirée' is also dropped. Same-rider reassign is already blocked by prev_rider==rider_id, so the key should use something unique (e.g. timeline length or new_id) instead of the minute."},
+      {"endpoint": "PATCH /api/orders/{oid}/status status=reportee (admin)", "issue": "server.py turns reportee into status=confirmee before calling order_status_event(fresh, upd['status']). So the rider gets 'Course X retirée' with 'Nouveau statut : confirmée' instead of 'reportée par la boutique' (that label is never used), and the customer gets 'Votre commande est confirmée' instead of 'reportée'. Fix: pass body.status ('reportee') for the label."},
+      {"endpoint": "Console Messagerie (frontend) / GET /api/messages/conversations/{id}", "issue": "Console Messagerie.jsx never calls GET /messages/conversations/{id} (or any read endpoint) when a conversation is opened. Rider and customer messages never get the staff id in read_by, so the unread badge on that conversation (e.g. 'Kouamé Serge 1') stays after viewing and replying. Checked in DB: the rider message's read_by holds only the rider's id."},
+      {"endpoint": "send_message_core", "issue": "When staff writes to a rider for the first time (POST /messages/send {rider_id}) without kind, the conversation is created with kind='boutique_cliente' (the default). Messagerie open uses 'boutique_livreur'. Labels only, but inconsistent."},
+      {"endpoint": "PATCH /api/orders/{oid}", "issue": "Any authenticated user can call it, riders included (Depends(get_user)). A rider editing his own course also gets 'Course modifiée' about his own change. Consider restricting by role."},
+      {"endpoint": "GET /api/me/notifications?before=", "issue": "Paging uses a strict at<before, so items with exactly the same timestamp at a page boundary can be skipped. Unlikely in practice."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RichComposer emoji picker (rider)", "issue": "The emoji picker stays open after an emoji is chosen and after the message is sent. On 390px it also runs past the right edge (the 'Objets' tab is cut off).", "selector": "[data-testid='emoji-picker']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Console Messagerie unread", "issue": "Unread count on a conversation is never cleared after opening it (see the backend minor item)", "affected_selectors": ["[data-testid^='msg-conv-']"]}
+    ],
+    "design_issues": [
+      {"screen": "Rider bottom nav (390px)", "issues": ["7 tabs (Courses, Messages, Carte, Historique, Performance, Profil, Onglet 6): the 'Historique' and 'Performance' labels touch each other ('HistoriquePerformance')"]},
+      {"screen": "Rider header (390px)", "issues": ["Greeting is cut to 'Bonj…' and the subtitle to 'C… · ⚠ GPS refusé', which wraps onto 3 lines. Header icons: messages, bell, Aide, Pointer, Sortir. The header messages icon badge duplicates the Messages tab badge."]},
+      {"screen": "Rider notification panel", "issues": ["The 'Tout marquer comme lu' link is right at the panel's right edge"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_rider_notifications.py", "/app/backend/tests/ui_seed_rider_notifs.py", "/app/test_reports/pytest/rider_notifications.xml"],
+  "action_items": [
+    "notify.rider_assigned: make the assign/unassign duplicate-check keys unique per event (not per minute), so A->B->A within one minute still notifies A",
+    "server.update_order_status: for reportee, call order_status_event with 'reportee' (not the internal 'confirmee'), so the rider sees 'reportée par la boutique' and the customer sees 'reportée'",
+    "Console Messagerie.jsx: call GET /messages/conversations/{id} (or a read endpoint) when a conversation is opened, to clear its unread count",
+    "RichComposer: close the emoji picker after picking or sending; keep it inside the viewport on mobile",
+    "Rider bottom nav: fix the overlapping labels when 7 tabs are shown (smaller font, truncate, or a 'Plus' overflow)"
+  ],
+  "critical_code_review_comments": [
+    "send_message_core defaults kind to 'boutique_cliente' even for rider-only conversations",
+    "PATCH /orders/{oid} has no role guard",
+    "Console list_conversations returns every conversation that includes a store or rider participant, including rider↔customer threads (by design: read-only for staff)"
+  ],
+  "updated_files": ["/app/backend/tests/test_rider_notifications.py", "/app/backend/tests/ui_seed_rider_notifs.py"],
+  "success_rate": {"backend": "82% (9/11, 2 minor logic bugs)", "frontend": "95% (all core flows pass; minor UX/design issues)"},
+  "seed_data_creation": "All TEST_ orders (product_id TEST_prod, so stock is untouched), TEST_ customers, conversations, user_notifications (including 35 TESTN* paging notifications), notifications and whatsapp_outbox rows were deleted. The rider1 store conversation created by the test was removed. Verified 0 leftovers.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && export $(grep REACT_APP_BACKEND_URL /app/frontend/.env) && pytest tests/test_rider_notifications.py. The test_reassign_back_within_same_minute and test_admin_reportee tests should pass once fixed. UI seed: python tests/ui_seed_rider_notifs.py seed|assign2|cleanup (writes /tmp/ui_seed.json). Console login: credentials are prefilled; uncheck the 'Pointer mon arrivée' checkbox, then click 'Se connecter'. Markdown previews in the console list remove underscores (TEST_x shows as TESTx).",
+  "rca of the issue": "1) rider_assigned event_key = f'assign:{oid}:{rider}:{now_iso()[:16]}', so it is the same for every assignment within one minute, and notify() returns early when the key already exists. 2) update_order_status rewrites upd['status']='confirmee' for reportee, then passes upd['status'] to order_status_event, so the 'reportee' label branch can never be reached."
+}

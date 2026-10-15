@@ -150,6 +150,9 @@ export default function Messagerie() {
 
   useEffect(() => { load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, []); // eslint-disable-line
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [active?.messages?.length]);
+  useEffect(() => {
+    if (active?.id && active.unread > 0) api.get(`/messages/conversations/${active.id}`).then(() => setConvs(cs => cs.map(c => c.id === active.id ? { ...c, unread: 0 } : c))).catch(() => {});
+  }, [active?.id, active?.unread]); // eslint-disable-line
 
   // Deep-link: ?segment_id= opens broadcast, ?rider_id= / ?customer_id= opens conv
   useEffect(() => {

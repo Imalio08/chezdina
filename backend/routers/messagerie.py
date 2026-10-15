@@ -33,7 +33,7 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
     cust_id = body.get("customer_id")
     rider_id = body.get("rider_id")
     order_id = body.get("order_id")
-    kind = body.get("kind", "boutique_cliente")
+    kind = body.get("kind") or ("boutique_livreur" if rider_id and not cust_id else "boutique_cliente")
     existing = await db.conversations.find_one({"id": body["conversation_id"]}) if body.get("conversation_id") else None
     if existing and not existing.get("key", "").startswith("order:"):
         pk = {p.get("kind"): p.get("id") for p in existing.get("participants") or []}

@@ -723,7 +723,7 @@ async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get
         fresh = await db.orders.find_one({"id": oid})
         await _enqueue_wa(fresh, body.status, user.get("name"))
         from routers.notify import order_status_event
-        await order_status_event(fresh, upd["status"], user.get("role") == "rider", o.get("rider_id"))
+        await order_status_event(fresh, body.status if body.next_date else upd["status"], user.get("role") == "rider", o.get("rider_id"))
         from routers.wallet import on_order_status
         await on_order_status(fresh, upd["status"])
     return {"ok": True}

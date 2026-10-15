@@ -57,7 +57,7 @@ export default function RiderNotifications() {
   const load = useCallback(async (before) => {
     try {
       const r = await api.get("/me/notifications", { params: { unread_only: filter === "unread", limit: 30, before } });
-      setItems(prev => before ? [...(prev || []), ...r.data.items] : r.data.items);
+      setItems(prev => { if (!before) return r.data.items; const ids = new Set((prev || []).map(x => x.id)); return [...(prev || []), ...r.data.items.filter(x => !ids.has(x.id))]; });
       setUnread(r.data.unread); setMore(r.data.items.length === 30);
     } catch { setItems(p => p || []); toast.error("Notifications indisponibles · réessayez"); }
   }, [filter]);

@@ -79,6 +79,8 @@ async def create_order(body: OrderIn, user: dict = Depends(get_user)):
 
 @router.patch("/orders/{oid}")
 async def update_order(oid: str, body: Dict[str, Any], user: dict = Depends(get_user)):
+    if user.get("role") == "rider":
+        raise HTTPException(403, "Modification réservée à la boutique")
     o = await db.orders.find_one({"id": oid})
     if not o:
         raise HTTPException(404)

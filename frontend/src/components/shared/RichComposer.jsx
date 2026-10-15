@@ -13,7 +13,7 @@ const EMOJI_GROUPS = {
 export function EmojiPicker({ onPick, onClose }) {
   const [tab, setTab] = useState("Visages");
   return (
-    <div className="absolute bottom-full mb-2 left-0 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 w-72 max-w-[85vw] z-30" onClick={e => e.stopPropagation()} data-testid="emoji-picker">
+    <div className="absolute bottom-full mb-2 -left-24 sm:left-0 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-2 w-72 max-w-[calc(100vw-2rem)] z-30" onClick={e => e.stopPropagation()} data-testid="emoji-picker">
       <div className="flex gap-1 mb-2 border-b border-[#f0f0f0] dark:border-[#2a2a2a] pb-2 overflow-x-auto">
         {Object.keys(EMOJI_GROUPS).map(g => <button key={g} type="button" onClick={() => setTab(g)} className={`px-2 py-1 text-[11px] rounded whitespace-nowrap ${tab === g ? "bg-[#fff5f5] text-[#b02a2a]" : ""}`} data-testid={`emoji-tab-${g}`}>{g}</button>)}
       </div>
@@ -60,14 +60,14 @@ export function RichComposer({ value, onChange, onSend, onPhoto, sending, canSen
         <button type="button" onClick={() => wrap("~~")} className={tb} title="Barré" data-testid={`${testid}-strike`}><Strikethrough size={13}/></button>
         <div className="relative">
           <button type="button" onClick={() => setEmoji(!emoji)} className={`${tb} ${emoji ? "text-[#b02a2a]" : ""}`} title="Emoji" data-testid={`${testid}-emoji`}><Smile size={13}/></button>
-          {emoji && <EmojiPicker onPick={e => wrap(e, "")} onClose={() => setEmoji(false)}/>}
+          {emoji && <EmojiPicker onPick={e => { wrap(e, ""); setEmoji(false); }} onClose={() => setEmoji(false)}/>}
         </div>
       </div>
       <div className="flex gap-2 items-end">
         {onPhoto && <PhotoButton onPick={onPhoto} disabled={sending} testid={`${testid}-photo`}/>}
         <textarea ref={ref} rows={1} className="dina-input flex-1 resize-none !min-h-[40px] max-h-32" placeholder={placeholder} value={value}
-          onChange={e => onChange(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); } }} data-testid={`${testid}-input`}/>
-        <button type="button" onClick={onSend} disabled={sending || !canSend} className="dina-btn-primary !min-h-[40px]" data-testid={`${testid}-send`}><Send size={13}/><span className="hidden sm:inline">{sending ? "…" : "Envoyer"}</span></button>
+          onChange={e => onChange(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); setEmoji(false); onSend(); } }} data-testid={`${testid}-input`}/>
+        <button type="button" onClick={() => { setEmoji(false); onSend(); }} disabled={sending || !canSend} className="dina-btn-primary !min-h-[40px]" data-testid={`${testid}-send`}><Send size={13}/><span className="hidden sm:inline">{sending ? "…" : "Envoyer"}</span></button>
       </div>
     </div>
   );

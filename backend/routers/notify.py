@@ -61,7 +61,7 @@ async def rider_assigned(o: Dict[str, Any], rider_id: str, prev_rider: Optional[
     code = o.get("code")
     if prev_rider == rider_id:
         return
-    stamp = now_iso()[:16]
+    stamp = new_id()[:8]
     if prev_rider:
         await notify("rider", prev_rider, f"Course {code} retirée", "Cette livraison a été réaffectée à un autre livreur.",
                      "/rider", "delivery", code, f"unassign:{o['id']}:{stamp}")
@@ -145,7 +145,7 @@ async def _feed(kind: str, owner_id: str, unread_only: bool = False, before: Opt
     if unread_only:
         q["read"] = False
     if before:
-        q["at"] = {"$lt": before}
+        q["at"] = {"$lte": before}
     rows = await db.user_notifications.find(q).sort("at", -1).to_list(min(max(limit, 1), 100))
     return {"items": clean(rows), "unread": unread}
 
