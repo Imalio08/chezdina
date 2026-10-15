@@ -28,6 +28,7 @@ class CustomerSignupIn(BaseModel):
     pin: str
     email: Optional[str] = None
     referral_code: Optional[str] = None
+    visitor_id: Optional[str] = None
 
 
 # ---------- Staff auth ----------
@@ -160,7 +161,8 @@ async def cust_signup(body: CustomerSignupIn, response: Response):
     email = (body.email or "").lower().strip() or None
     marraine = None
     if (body.referral_code or "").strip():
-        marraine = await db.customers.find_one({"referral_code": body.referral_code.strip().upper()})
+        from routers.wallet import find_marraine
+        marraine = await find_marraine(body.referral_code)
         if not marraine:
             raise HTTPException(400, "Code de parrainage introuvable")
     c = {
@@ -168,17 +170,13 @@ async def cust_signup(body: CustomerSignupIn, response: Response):
         "wallet": 0, "loyalty_points": 0, "tier": "Bronze", "status": "active", "source": "site_web",
         "referral_code": f"DINA-{random.randint(1000, 9999)}", "access_code": pin, "addresses": [],
         "communication_prefs": {"whatsapp": True, "sms": True, "email": bool(email), "newsletter": False},
+        "visitor_id": (body.visitor_id or "")[:64] or None,
     }
     await db.customers.insert_one(c)
     if marraine:
-        s = await db.loyalty_settings.find_one({"id": "main"}) or {}
-        bp, bf = int(s.get("referral_bonus_parrain", 1000)), int(s.get("referral_bonus_filleul", 500))
-        await db.customers.update_one({"id": marraine["id"]}, {"$inc": {"wallet": bp, "referral_count": 1}})
-        await db.customers.update_one({"id": c["id"]}, {"$inc": {"wallet": bf}, "$set": {"referred_by": marraine["id"], "referred_by_code": marraine["referral_code"]}})
-        await db.referrals.insert_one({"id": new_id(), "parrain_id": marraine["id"], "parrain_name": marraine.get("name"),
-                                       "filleul_id": c["id"], "filleul_name": name, "code": marraine["referral_code"],
-                                       "bonus_parrain": bp, "bonus_filleul": bf, "created_at": now_iso(), "source": "inscription"})
-        c["wallet"] = bf
+        from routers.wallet import apply_referral
+        await apply_referral(marraine, c)
+        c = await db.customers.find_one({"id": c["id"]})
     return _customer_session(c, response)
 
 

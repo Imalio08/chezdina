@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Gift, Copy, Users, Trophy, Plus } from "lucide-react";
+import { SOURCE_LABEL } from "@/components/shared/WalletLedger";
 
 export default function Referrals() {
   const [list, setList] = useState([]);
@@ -28,9 +29,9 @@ export default function Referrals() {
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Parrainages validés</div><div className="font-serif text-2xl tabular mt-1 text-[#1f8a4c]">{list.length}</div></div>
-        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Récompense parrain</div><div className="font-serif text-2xl tabular mt-1 text-[#b02a2a]">{fcfa(settings?.referral_bonus_parrain || 1000)}</div></div>
-        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Récompense filleul</div><div className="font-serif text-2xl tabular mt-1">{fcfa(settings?.referral_bonus_filleul || 500)}</div></div>
+        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Parrainages</div><div className="font-serif text-2xl tabular mt-1 text-[#1f8a4c]">{list.length} <span className="text-sm text-[#666]">· {list.filter(r => r.status === "recompensee").length} récompensés</span></div></div>
+        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Récompense marraine</div><div className="font-serif text-2xl tabular mt-1 text-[#b02a2a]">{fcfa(settings?.referral_bonus_parrain || 1000)}</div><div className="text-[10px] text-[#999]">à la 1re commande livrée de la filleule</div></div>
+        <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Récompense filleule</div><div className="font-serif text-2xl tabular mt-1">{fcfa(settings?.referral_bonus_filleul || 1000)}</div><div className="text-[10px] text-[#999]">à l'inscription</div></div>
         <div className="dina-card-white p-4"><div className="text-xs uppercase text-[#666]">Top ambassadrices</div><div className="font-serif text-2xl tabular mt-1">{top.length}</div></div>
       </div>
 
@@ -55,12 +56,12 @@ export default function Referrals() {
           <div className="font-semibold mb-3 flex items-center gap-2"><Users size={16} />Dernières conversions</div>
           {list.length === 0 ? <div className="text-sm text-[#666] text-center py-8">Rien à afficher</div> :
             <table className="dina-table">
-              <thead><tr><th>Parrain</th><th>Filleul</th><th>Code</th><th>Date</th></tr></thead>
+              <thead><tr><th>Marraine</th><th>Filleule</th><th>Statut</th><th>Date</th></tr></thead>
               <tbody>{list.slice(0, 20).map(r => (
                 <tr key={r.id} data-testid={`refer-${r.id}`}>
                   <td className="font-medium">{r.parrain_name}</td>
                   <td>{r.filleul_name}</td>
-                  <td className="font-mono text-xs">{r.code}</td>
+                  <td className="text-xs">{r.status === "recompensee" ? <span className="text-[#1f8a4c]">Récompensé · {r.first_order_code}</span> : r.status === "inscrite" ? <span className="text-[#e4991e]">En attente 1re livraison</span> : <span className="text-[#666]">Ancien système</span>}</td>
                   <td className="text-xs text-[#666]">{dateTimeFmt(r.created_at)}</td>
                 </tr>
               ))}</tbody>
@@ -68,7 +69,28 @@ export default function Referrals() {
         </div>
       </div>
 
+      <WalletTxTable/>
+
       {showApply && <ApplyModal onClose={() => setShowApply(false)} onDone={() => { setShowApply(false); load(); }} />}
+    </div>
+  );
+}
+
+function WalletTxTable() {
+  const [rows, setRows] = useState([]);
+  const [src, setSrc] = useState("");
+  useEffect(() => { api.get("/wallet/transactions").then(r => setRows(r.data)).catch(() => {}); }, []);
+  const shown = rows.filter(r => r.status !== "validated" && (!src || r.source === src));
+  return (
+    <div className="dina-card-white p-5" data-testid="wallet-tx-table">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap"><div className="font-semibold">Mouvements des porte-monnaie</div>
+        <select className="dina-input !w-auto !min-h-[34px] text-xs" value={src} onChange={e => setSrc(e.target.value)} data-testid="wallet-tx-filter"><option value="">Toutes origines</option>{Object.entries(SOURCE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+      <div className="overflow-x-auto"><table className="dina-table">
+        <thead><tr><th>Date</th><th>Cliente</th><th>Origine</th><th>Libellé</th><th>Statut</th><th className="text-right">Montant</th><th className="text-right">Solde</th></tr></thead>
+        <tbody>{shown.length === 0 ? <tr><td colSpan={7} className="text-center text-sm text-[#666] py-6">Aucun mouvement</td></tr> : shown.slice(0, 200).map(r => (
+          <tr key={r.id}><td className="text-xs whitespace-nowrap">{dateTimeFmt(r.at)}</td><td>{r.customer_name}</td><td className="text-xs">{SOURCE_LABEL[r.source] || r.source}</td><td className="text-xs">{r.label}{r.by ? ` · par ${r.by}` : ""}</td><td className="text-xs">{r.status === "pending" ? "En attente" : "Crédité"}</td><td className={`text-right tabular ${r.amount < 0 ? "text-[#c62828]" : "text-[#1f8a4c]"}`}>{r.amount > 0 ? "+" : ""}{fcfa(r.amount)}</td><td className="text-right tabular">{r.balance_after != null ? fcfa(r.balance_after) : "—"}</td></tr>
+        ))}</tbody>
+      </table></div>
     </div>
   );
 }

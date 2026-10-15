@@ -119,7 +119,9 @@ class LoyaltySettingsIn(BaseModel):
     points_per_fcfa: int = 500  # 1 point per 500 FCFA spent
     tiers: List[Dict[str, Any]] = []  # [{name, min_points, discount_pct, free_delivery}]
     referral_bonus_parrain: int = 1000  # wallet credit for the referrer
-    referral_bonus_filleul: int = 500   # wallet credit for the referee
+    referral_bonus_filleul: int = 1000  # wallet credit for the referee (at signup)
+    point_value_fcfa: int = 10  # 1 loyalty point = 10 FCFA when converted
+    min_points_conversion: int = 100
     enabled: bool = True
     # Code format: prefix + random part length (default DINA-XXXX)
     referral_code_prefix: str = "DINA"
@@ -722,6 +724,8 @@ async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get
         await _enqueue_wa(fresh, body.status, user.get("name"))
         from routers.notify import order_status_event
         await order_status_event(fresh, upd["status"], user.get("role") == "rider")
+        from routers.wallet import on_order_status
+        await on_order_status(fresh, upd["status"])
     return {"ok": True}
 
 # ---------- Rider upgrades ----------
@@ -772,6 +776,8 @@ async def deliver_order(oid: str, body: ProofIn, user: dict = Depends(get_user))
     tl = o.get("timeline", []); tl.append({"status":"livree","at":now_iso(),"by":user.get("name"),"proof_method":body.method})
     await db.orders.update_one({"id": oid}, {"$set": {"status":"livree","timeline":tl,"proof": proof}})
     await _enqueue_wa({**o, "status":"livree"}, "livree", user.get("name"))
+    from routers.wallet import on_order_status
+    await on_order_status(o, "livree")
     return {"ok": True, "proof": proof}
 
 @api.post("/orders/{oid}/contact-log")
@@ -2706,7 +2712,9 @@ DEFAULT_LOYALTY = {
     "points_per_fcfa": 500,
     "enabled": True,
     "referral_bonus_parrain": 1000,
-    "referral_bonus_filleul": 500,
+    "referral_bonus_filleul": 1000,
+    "point_value_fcfa": 10,
+    "min_points_conversion": 100,
     "tiers": [
         {"name": "Bronze", "min_points": 0, "discount_pct": 0, "free_delivery": False},
         {"name": "Silver", "min_points": 500, "discount_pct": 5, "free_delivery": False},
@@ -2748,6 +2756,11 @@ async def apply_referral(body: ReferralApplyIn, user: dict = Depends(get_user)):
     if not filleul: raise HTTPException(404, "Filleul introuvable")
     if filleul.get("referred_by"): raise HTTPException(400, "Cette cliente a déjà utilisé un code")
     if parrain.get("id") == filleul.get("id"): raise HTTPException(400, "Impossible de se parrainer soi-même")
+    from routers.wallet import apply_referral as _apply
+    doc = await _apply(parrain, filleul, "console")
+    return clean(doc)
+
+async def _legacy_apply_referral_unused(parrain, filleul, body):
     settings = await db.loyalty_settings.find_one({"id": "main"}) or DEFAULT_LOYALTY
     bp = int(settings.get("referral_bonus_parrain", 1000))
     bf = int(settings.get("referral_bonus_filleul", 500))
@@ -3765,8 +3778,16 @@ async def public_create_order(body: OrderIn, request: Request):
     sub = sum(it.qty * it.price for it in body.items)
     total = sub + body.delivery_fee - body.discount
     code = gen_code()
-
-    # Compute deposit if COD and policy set
+    if body.checkout_key:
+        dup = await db.orders.find_one({"checkout_key": body.checkout_key})
+        if dup:
+            return {"code": dup["code"], "id": dup["id"], "status": dup["status"], "deposit_required": dup.get("deposit_required", 0), "wallet_used": dup.get("wallet_used", 0), "total": dup.get("total")}
+    oid = new_id()
+    wallet_used = 0
+    if logged and body.wallet_use > 0:
+        from routers.wallet import debit_for_order
+        wallet_used = await debit_for_order(logged["id"], int(body.wallet_use), max(0, sub - body.discount), oid, code)
+    total -= wallet_used
     deposit_amount = 0
     initial_status = "nouvelle"
     initial_payment = "en_attente"
@@ -3784,7 +3805,7 @@ async def public_create_order(body: OrderIn, request: Request):
             initial_status = "en_attente_acompte"
             initial_payment = "acompte_requis"
 
-    doc = {"id": new_id(), "code": code, "items": [it.model_dump() for it in body.items],
+    doc = {"id": oid, "code": code, "items": [it.model_dump() for it in body.items], "checkout_key": body.checkout_key, "wallet_used": wallet_used,
            "customer": body.customer, "channel": body.channel or "boutique", "payment_method": body.payment_method,
            "delivery_zone": body.delivery_zone, "delivery_fee": body.delivery_fee, "discount": body.discount,
            "note": body.note, "mode": body.mode or "delivery", "store_id":"store-cocody",
@@ -3797,11 +3818,11 @@ async def public_create_order(body: OrderIn, request: Request):
             await db.products.update_one({"id": it.product_id}, {"$inc": {f"stock_by_size.{it.size}": -it.qty}})
         await _record_stock_mov(it.product_id, it.size, -it.qty, "Commande en ligne", body.customer.get("name") if body.customer else None, code)
     if body.customer and body.customer.get("id"):
-        await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}, "$inc":{"loyalty_points": int(total/500)}})
+        await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}})
     await db.orders.insert_one(doc)
     from routers.notify import notify_staff
     await notify_staff("Nouvelle commande en ligne", f"{code} · {(body.customer or {}).get('name') or ''} · {int(total)} FCFA", f"/console/commandes/{code}")
-    return {"code": code, "id": doc["id"], "status": initial_status, "deposit_required": deposit_amount}
+    return {"code": code, "id": doc["id"], "status": initial_status, "deposit_required": deposit_amount, "wallet_used": wallet_used, "total": total}
 
 @api.get("/public/payment-config")
 async def public_payment_config():
@@ -5423,6 +5444,8 @@ async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Dep
             "status": "payee" if o.get("payment_status") == "paye" or True else "a_payer",
             "created_at": now_iso(), "generated_by": "auto"
         }}, upsert=True)
+    from routers.wallet import on_order_status
+    await on_order_status(o, new_status)
     return {"ok": True}
 
 @api.get("/orders/{oid}/invoice")
@@ -5664,6 +5687,8 @@ app.include_router(pwa_router)
 app.include_router(sync_router)
 from routers.notify import router as notify_router  # noqa: E402
 app.include_router(notify_router)
+from routers.wallet import router as wallet_router  # noqa: E402
+app.include_router(wallet_router)
 app.add_middleware(CORSMiddleware, allow_credentials=True, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"], expose_headers=["*"])
 
 @app.on_event("shutdown")

@@ -139,6 +139,8 @@ class OrderIn(BaseModel):
     note: str = ""
     mode: str = "store"
     store_id: Optional[str] = None
+    wallet_use: int = 0
+    checkout_key: Optional[str] = None
 
 
 class CashSessionOpenIn(BaseModel):

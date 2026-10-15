@@ -5,6 +5,36 @@ import { fcfa, dateFmt, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Phone, MessageSquare, Copy, Send, X } from "lucide-react";
 import SmartImage from "@/components/shared/SmartImage";
+import { WalletLedger } from "@/components/shared/WalletLedger";
+
+function ConsoleWallet({ cid }) {
+  const [w, setW] = useState(null);
+  const [f, setF] = useState({ amount: "", reason: "", source: "promotion" });
+  const load = () => api.get(`/customers/${cid}/wallet`).then(r => setW(r.data)).catch(() => {});
+  useEffect(() => { load(); }, [cid]); // eslint-disable-line
+  const adjust = async () => {
+    try { await api.post(`/customers/${cid}/wallet/adjust`, { amount: Number(f.amount), reason: f.reason, source: f.source }); toast.success("Porte-monnaie mis à jour"); setF({ amount: "", reason: "", source: "promotion" }); load(); }
+    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
+  };
+  if (!w) return <div className="dina-card-white p-4 text-sm text-[#666]">Chargement…</div>;
+  return (
+    <div className="dina-card-white p-4 lg:col-span-2 space-y-3" data-testid="console-wallet">
+      <div className="flex flex-wrap gap-4 items-end">
+        <div><div className="text-xs text-[#666]">Disponible</div><div className="font-serif text-3xl text-[#5867fd]" data-testid="console-wallet-balance">{fcfa(w.balance)}</div></div>
+        <div><div className="text-xs text-[#666]">En attente</div><div className="font-serif text-xl text-[#e4991e]">{fcfa(w.pending)}</div></div>
+        <div><div className="text-xs text-[#666]">Utilisé</div><div className="font-serif text-xl">{fcfa(w.used_total)}</div></div>
+        <div><div className="text-xs text-[#666]">Points</div><div className="font-serif text-xl">{w.points}</div></div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[120px_150px_1fr_auto] gap-2" data-testid="console-wallet-adjust">
+        <input className="dina-input" type="number" placeholder="± Montant" value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} data-testid="wallet-adjust-amount"/>
+        <select className="dina-input" value={f.source} onChange={e => setF({ ...f, source: e.target.value })} data-testid="wallet-adjust-source"><option value="promotion">Promotion</option><option value="remboursement">Remboursement</option><option value="correction">Correction</option><option value="autre">Autre</option></select>
+        <input className="dina-input" placeholder="Motif (obligatoire)" value={f.reason} onChange={e => setF({ ...f, reason: e.target.value })} data-testid="wallet-adjust-reason"/>
+        <button onClick={adjust} className="dina-btn-primary" data-testid="wallet-adjust-submit">Appliquer</button>
+      </div>
+      <WalletLedger rows={w.history} testid="console-wallet-history"/>
+    </div>
+  );
+}
 
 const TABS = [
   { k: "overview", label: "Aperçu" }, { k: "orders", label: "Commandes" }, { k: "payments", label: "Paiements" },
@@ -110,7 +140,7 @@ function Payments({ c, orders }) {
   return (
     <div className="grid lg:grid-cols-2 gap-4">
       <div className="dina-card-white p-4"><div className="font-semibold mb-3">Méthodes utilisées</div>{Object.entries(methods).map(([k, v]) => <div key={k} className="flex justify-between text-sm py-1"><span className="capitalize">{k}</span><span className="tabular font-semibold">{fcfa(v)}</span></div>)}</div>
-      <div className="dina-card-white p-4"><div className="font-semibold mb-3">Portefeuille</div><div className="font-serif text-3xl text-[#5867fd]">{fcfa(c.wallet || 0)}</div><div className="text-xs text-[#666] mt-1">Crédit disponible</div></div>
+      <ConsoleWallet cid={c.id}/>
     </div>
   );
 }

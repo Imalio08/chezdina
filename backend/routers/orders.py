@@ -72,6 +72,7 @@ async def create_order(body: OrderIn, user: dict = Depends(get_user)):
             {"id": body.customer["id"]},
             {"$set": {"last_order_at": now_iso()}, "$inc": {"loyalty_points": int(total / 500)}},
         )
+        doc["points_awarded"] = True
     await db.orders.insert_one(doc)
     return clean(doc)
 

@@ -94,6 +94,7 @@ import OpeningHoursBanner from "@/components/storefront/OpeningHoursBanner";
 import Catalog from "@/pages/storefront/Catalog";
 import ProductPage from "@/pages/storefront/Product";
 import Checkout from "@/pages/storefront/Checkout";
+import Invitation from "@/pages/storefront/Invitation";
 import Tracking from "@/pages/storefront/Tracking";
 import Account from "@/pages/storefront/Account";
 import AccountShell from "@/pages/storefront/AccountShell";
@@ -162,6 +163,7 @@ export default function App() {
               <Route path="catalog" element={<Catalog />} />
               <Route path="product/:id" element={<ProductPage />} />
               <Route path="checkout" element={<Checkout />} />
+              <Route path="invitation/:code" element={<Invitation />} />
               <Route path="account" element={<Account />} />
               <Route path="compte/*" element={<AccountShell />} />
               <Route path="bons-plans" element={<BonsPlans />} />

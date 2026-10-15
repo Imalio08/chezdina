@@ -75,7 +75,15 @@ export default function Checkout() {
 
   const sub = cart.reduce((s,x)=>s+x.qty*x.price,0);
   const fee = ZONES[zone] || 0;
-  const total = sub + fee;
+  const [walletBal, setWalletBal] = useState(0);
+  const [useWallet, setUseWallet] = useState(false);
+  const [walletAmt, setWalletAmt] = useState(0);
+  const [checkoutKey] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+  useEffect(() => { if (customer) api.get("/public/account/wallet").then(r => { setWalletBal(r.data.balance); }).catch(() => {}); }, [customer?.id]); // eslint-disable-line
+  const walletMax = Math.min(walletBal, sub);
+  const walletUsed = useWallet ? Math.max(0, Math.min(Number(walletAmt) || 0, walletMax)) : 0;
+  useEffect(() => { if (useWallet && !walletAmt) setWalletAmt(walletMax); }, [useWallet]); // eslint-disable-line
+  const total = sub + fee - walletUsed;
 
   // Compute expected deposit for COD based on payment config
   const pol = paymentConfig.deposit_policy || { mode: "none" };
@@ -114,7 +122,9 @@ export default function Checkout() {
         items: cart.map(x=>({product_id:x.product_id,name:x.name,size:x.size,color:x.color,qty:x.qty,price:x.price,image:x.image})),
         customer: { ...(customer ? { id: customer.id } : {}), name, phone, address: addr, lat: coords?.lat, lng: coords?.lng },
         channel: "boutique", payment_method: method, delivery_zone: zone, delivery_fee: fee, mode: "delivery",
+        wallet_use: walletUsed, checkout_key: checkoutKey,
       });
+      if (walletUsed && data.wallet_used !== walletUsed) toast.warning(`Porte-monnaie appliqué : ${fcfa(data.wallet_used || 0)}`);
       toast.success("Commande créée !");
       track("order_placed", { order_code: data.code, value: total });
       if (data.status === "en_attente_acompte" && data.deposit_required > 0) {
@@ -213,7 +223,15 @@ export default function Checkout() {
         <div className="text-sm space-y-1">
           <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(sub)}</span></div>
           <div className="flex justify-between"><span className="text-[#666]">Livraison · {zone}</span><span className="tabular">{fcfa(fee)}</span></div>
-          <div className="flex justify-between font-semibold text-base pt-2 border-t border-[#ececec]"><span>Total</span><span className="tabular">{fcfa(total)}</span></div>
+          {customer && walletBal > 0 && (
+            <div className="my-2 p-3 rounded-lg border border-[#ececec] bg-white space-y-2" data-testid="checkout-wallet">
+              <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={useWallet} onChange={e => setUseWallet(e.target.checked)} data-testid="checkout-wallet-toggle"/>Utiliser mon porte-monnaie</label>
+              <div className="text-xs text-[#666]">Disponible : <b data-testid="checkout-wallet-balance">{fcfa(walletBal)}</b> · utilisable jusqu'à {fcfa(walletMax)} (articles)</div>
+              {useWallet && <div className="flex gap-2 items-center"><input type="number" min={0} max={walletMax} className="dina-input !min-h-[36px] flex-1" value={walletAmt} onChange={e => setWalletAmt(e.target.value)} data-testid="checkout-wallet-amount"/><button type="button" onClick={() => setWalletAmt(walletMax)} className="dina-chip" data-testid="checkout-wallet-max">Max</button></div>}
+            </div>
+          )}
+          {walletUsed > 0 && <div className="flex justify-between text-[#1f8a4c]"><span>Porte-monnaie</span><span className="tabular" data-testid="checkout-wallet-used">−{fcfa(walletUsed)}</span></div>}
+          <div className="flex justify-between font-semibold text-base pt-2 border-t border-[#ececec]"><span>{walletUsed > 0 ? "Reste à payer" : "Total"}</span><span className="tabular" data-testid="checkout-total">{fcfa(total)}</span></div>
           {method === "cod" && expectedDeposit > 0 && (
             <div className="mt-3 bg-[#fff5f5] p-3 rounded-lg text-xs" data-testid="checkout-deposit-info">
               <div className="font-semibold text-[#b02a2a] mb-1">⚡ Acompte requis pour cette commande</div>

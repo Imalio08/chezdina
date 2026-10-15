@@ -10,7 +10,7 @@ const SKEY = "dina_sid";
 const CKEY = "dina_consent";
 
 function uuid() { return (crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`); }
-function getVisitorId() {
+export function getVisitorId() {
   let id = localStorage.getItem(VKEY);
   if (!id) { id = uuid(); localStorage.setItem(VKEY, id); }
   return id;

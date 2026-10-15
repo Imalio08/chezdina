@@ -9,6 +9,9 @@ import { RichComposer, RichText } from "@/components/shared/RichComposer";
 import { AddressModal, addressLine } from "@/components/storefront/AddressForm";
 import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
 import { playChime } from "@/lib/notifySound";
+import { getVisitorId } from "@/lib/analytics";
+import { REF_KEY } from "@/pages/storefront/Invitation";
+import { WalletLedger, SOURCE_LABEL } from "@/components/shared/WalletLedger";
 import {
   User, Package, MessageSquare, Star, Ticket, Heart, Eye, Gift, UserPlus, Wallet,
   MapPin, Settings, Shield, LogOut, Camera, Phone, MessageCircle, Download,
@@ -184,7 +187,15 @@ function LoginForm({ onSwitch }) {
 function SignupForm({ onSwitch }) {
   const nav = useNavigate();
   const { loginDone } = useCustomer();
-  const [f, setF] = useState({ name: "", phone: "+225 ", email: "", pin: "", pin2: "", referral_code: new URLSearchParams(window.location.search).get("ref") || "" });
+  const [f, setF] = useState({ name: "", phone: "+225 ", email: "", pin: "", pin2: "", referral_code: new URLSearchParams(window.location.search).get("ref") || localStorage.getItem(REF_KEY) || "" });
+  const [invited, setInvited] = useState(() => !!(new URLSearchParams(window.location.search).get("ref") || localStorage.getItem(REF_KEY)));
+  const [refInfo, setRefInfo] = useState(null);
+  useEffect(() => {
+    const code = f.referral_code.trim();
+    if (!invited || code.length < 4) { setRefInfo(null); return; }
+    const t = setTimeout(() => api.get(`/public/referral/${encodeURIComponent(code)}`).then(r => setRefInfo(r.data)).catch(() => setRefInfo({ valid: false })), 400);
+    return () => clearTimeout(t);
+  }, [f.referral_code, invited]);
   const [loading, setLoading] = useState(false);
   const set = (k, fn = (x) => x) => (e) => setF({ ...f, [k]: fn(e.target.value) });
   const digits = (x) => x.replace(/\D/g, "").slice(0, 6);
@@ -193,9 +204,11 @@ function SignupForm({ onSwitch }) {
     if (f.phone.replace(/\D/g, "").length < 10) return toast.error("Numéro de téléphone invalide");
     if (f.pin.length !== 6) return toast.error("Code PIN à 6 chiffres");
     if (f.pin !== f.pin2) return toast.error("Les deux codes PIN ne correspondent pas");
+    if (invited && f.referral_code.trim() && refInfo && !refInfo.valid) return toast.error("Code de parrainage introuvable · corrigez-le ou répondez Non");
     setLoading(true);
     try {
-      const r = await api.post("/public/customer-signup", { name: f.name, phone: f.phone, email: f.email || null, pin: f.pin, referral_code: f.referral_code || null });
+      const r = await api.post("/public/customer-signup", { name: f.name, phone: f.phone, email: f.email || null, pin: f.pin, referral_code: invited ? (f.referral_code || null) : null, visitor_id: getVisitorId() });
+      localStorage.removeItem(REF_KEY);
       loginDone({ token: r.data.token, customer: r.data.customer });
       toast.success(`Bienvenue ${r.data.customer.name.split(" ")[0]} 🎉 Votre compte est créé`);
       nav("/boutique/compte");
@@ -212,9 +225,17 @@ function SignupForm({ onSwitch }) {
         <input type="password" inputMode="numeric" className="dina-input tracking-[0.3em] text-center" placeholder="Confirmer" value={f.pin2} onChange={set("pin2", digits)} data-testid="signup-pin2"/>
       </div>
       <p className="text-[11px] text-[#666] -mt-1">6 chiffres, à garder secret. Évitez 123456 ou 000000.</p>
-      <div>
-        <input className="dina-input uppercase" placeholder="Code de parrainage (facultatif)" value={f.referral_code} onChange={set("referral_code", x => x.toUpperCase())} data-testid="signup-referral"/>
-        <p className="text-[11px] text-[#666] mt-1">Invitée par une marraine ? Saisissez son code pour recevoir votre bonus de bienvenue.</p>
+      <div className="rounded-lg border border-[#ececec] p-3 space-y-2" data-testid="signup-invited-block">
+        <div className="text-sm font-medium">Avez-vous été invitée par une autre cliente ?</div>
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setInvited(true)} className={`flex-1 py-1.5 rounded-lg text-sm border ${invited ? "bg-[#1c1c1c] text-white border-[#1c1c1c]" : "border-[#ececec]"}`} data-testid="signup-invited-yes">Oui</button>
+          <button type="button" onClick={() => setInvited(false)} className={`flex-1 py-1.5 rounded-lg text-sm border ${!invited ? "bg-[#1c1c1c] text-white border-[#1c1c1c]" : "border-[#ececec]"}`} data-testid="signup-invited-no">Non</button>
+        </div>
+        {invited && <>
+          <input className="dina-input uppercase" placeholder="Code de votre marraine (ex : DINA-1234)" value={f.referral_code} onChange={set("referral_code", x => x.toUpperCase())} data-testid="signup-referral"/>
+          {refInfo?.valid && <p className="text-[11px] text-[#1f8a4c]" data-testid="signup-referral-ok">✓ Code de {refInfo.first_name} · {fcfa(refInfo.bonus_filleul)} offerts à l'inscription</p>}
+          {refInfo && !refInfo.valid && <p className="text-[11px] text-[#c62828]" data-testid="signup-referral-ko">Code introuvable</p>}
+        </>}
       </div>
       <button onClick={submit} disabled={loading} className="dina-btn-primary w-full" data-testid="signup-submit">{loading ? "Création…" : "Créer mon compte"}</button>
       <div className="text-xs text-center text-[#666]">Déjà cliente ? <button onClick={onSwitch} className="text-[#b02a2a] underline" data-testid="gate-go-login">Se connecter</button></div>
@@ -759,41 +780,106 @@ function RecentlyViewed() {
   return <div className="grid grid-cols-2 md:grid-cols-3 gap-3">{list.map(p => <Link key={p.id} to={`/boutique/product/${p.id}`} className="dina-card-white p-3"><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium truncate">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link>)}</div>;
 }
 
+function useWallet() {
+  const [w, setW] = useState(null);
+  const load = () => api.get("/public/account/wallet").then(r => setW(r.data)).catch(() => {});
+  useEffect(() => { load(); }, []);
+  return [w, setW, load];
+}
+
 function Loyalty() {
-  const { customer } = useCustomer();
+  const { customer, refresh } = useCustomer();
+  const [w, setW] = useWallet();
+  const [pts, setPts] = useState("");
+  const [busy, setBusy] = useState(false);
+  if (!w) return <div className="dina-card-white p-6 text-sm text-[#666]">Chargement…</div>;
+  const convertible = w.points >= w.min_points;
+  const convert = async () => {
+    const n = Number(pts || w.points);
+    if (n < w.min_points || n > w.points) return toast.error(`Entre ${w.min_points} et ${w.points} points`);
+    setBusy(true);
+    try { const r = await api.post("/public/account/wallet/convert", { points: n, key: `${Date.now()}-${n}` }); setW(r.data); setPts(""); refresh(); toast.success(`${n} points convertis en ${fcfa(n * w.point_value)}`); }
+    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); } finally { setBusy(false); }
+  };
   return (
-    <div className="dina-card-white p-6 text-center" data-testid="loyalty">
-      <Gift size={48} className="mx-auto text-[#b02a2a] mb-3"/>
-      <div className="font-serif text-2xl mb-1">{customer.loyalty_points || 0} points</div>
-      <div className="text-sm text-[#666] mb-4">Niveau {customer.tier || "Bronze"}</div>
-      <Link to="/boutique/catalog" className="dina-btn-primary inline-flex">Continuer mes achats</Link>
+    <div className="space-y-3" data-testid="loyalty">
+      <div className="dina-card-white p-6 text-center">
+        <Gift size={40} className="mx-auto text-[#b02a2a] mb-2"/>
+        <div className="font-serif text-3xl" data-testid="loyalty-points">{w.points} points</div>
+        <div className="text-sm text-[#666]">Niveau {customer.tier || "Bronze"} · valeur {fcfa(w.points * w.point_value)}</div>
+      </div>
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="font-semibold">Convertir mes points en argent</div>
+        <p className="text-sm text-[#666]">1 point = {fcfa(w.point_value)} · conversion à partir de {w.min_points} points. L'argent arrive tout de suite dans votre porte-monnaie.</p>
+        <div className="flex gap-2 flex-wrap">
+          <input className="dina-input flex-1 min-w-[140px]" type="number" min={w.min_points} max={w.points} placeholder={`${w.points} points`} value={pts} onChange={e => setPts(e.target.value)} disabled={!convertible} data-testid="loyalty-convert-input"/>
+          <button onClick={convert} disabled={!convertible || busy} className="dina-btn-primary" data-testid="loyalty-convert">{busy ? "…" : `Convertir${pts ? ` · ${fcfa(Number(pts) * w.point_value)}` : ""}`}</button>
+        </div>
+        {!convertible && <p className="text-xs text-[#999]">Encore {w.min_points - w.points} points avant votre première conversion.</p>}
+      </div>
+      <div className="dina-card-white p-5 text-sm text-[#666] space-y-1">
+        <div className="font-semibold text-[#1c1c1c]">Comment gagner des points ?</div>
+        <div>• 1 point par tranche de {fcfa(w.points_per_fcfa)} d'articles achetés.</div>
+        <div>• Les points sont ajoutés quand votre commande est livrée (pas pour une commande annulée).</div>
+      </div>
     </div>
   );
 }
 
+const REF_STATUS = { inscrite: ["Inscrite", "#5867fd"], premiere_commande: ["1re commande en cours", "#e4991e"], recompensee: ["Récompense versée", "#1f8a4c"] };
+
 function Referral() {
-  const { customer } = useCustomer();
-  const copy = () => { navigator.clipboard.writeText(customer.referral_code || ""); toast.success("Copié !"); };
+  const [d, setD] = useState(null);
+  useEffect(() => { api.get("/public/account/referral").then(r => setD(r.data)).catch(() => {}); }, []);
+  if (!d) return <div className="dina-card-white p-6 text-sm text-[#666]">Chargement…</div>;
+  const link = `${window.location.origin}/boutique/invitation/${d.code}`;
+  const msg = `Je t'invite chez Chez Dina 👗 Crée ton compte avec mon lien et reçois ${fcfa(d.rules.filleul)} sur ta première commande : ${link}`;
+  const copy = (t) => { navigator.clipboard?.writeText(t); toast.success("Copié !"); };
+  const share = async () => { if (navigator.share) { try { await navigator.share({ title: "Chez Dina", text: msg }); } catch {} } else window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank"); };
+  const S = d.stats;
   return (
-    <div className="dina-card-white p-6" data-testid="referral">
-      <div className="font-serif text-xl mb-3">Mon code de parrainage</div>
-      <div className="flex items-center gap-3 p-4 bg-[#fff5f5] rounded-lg">
-        <div className="font-mono text-2xl text-[#b02a2a] font-bold">{customer.referral_code}</div>
-        <button onClick={copy} className="ml-auto dina-btn-secondary !min-h-[36px] text-xs">Copier</button>
+    <div className="space-y-3" data-testid="referral">
+      <div className="dina-card-white p-5 bg-[#fff5f5]">
+        <div className="font-serif text-xl mb-1">Invitez une amie, gagnez chacune {d.rules.parrain === d.rules.filleul ? fcfa(d.rules.parrain) : `${fcfa(d.rules.parrain)} / ${fcfa(d.rules.filleul)}`}</div>
+        <p className="text-sm text-[#666]" data-testid="referral-rules">Votre amie reçoit <b>{fcfa(d.rules.filleul)}</b> dès son inscription avec votre lien ou votre code, utilisables dès sa première commande. Vous recevez <b>{fcfa(d.rules.parrain)}</b> quand sa première commande est livrée. Les montants sont crédités dans le porte-monnaie, utilisables sur les articles de vos prochaines commandes (hors frais de livraison), sans date limite, cumulables avec les promotions, non retirables en argent.</p>
       </div>
-      <p className="text-sm text-[#666] mt-3">Partagez votre code — vous et votre amie recevez un bonus à chaque commande.</p>
+      <div className="dina-card-white p-5 space-y-3">
+        <div className="text-xs uppercase text-[#666] font-semibold">Mon code</div>
+        <div className="flex items-center gap-3"><div className="font-mono text-2xl text-[#b02a2a] font-bold" data-testid="referral-code">{d.code}</div><button onClick={() => copy(d.code)} className="ml-auto dina-btn-secondary !min-h-[34px] text-xs" data-testid="referral-copy-code">Copier</button></div>
+        <div className="text-xs uppercase text-[#666] font-semibold">Mon lien d'invitation</div>
+        <div className="flex gap-2 flex-wrap"><input readOnly className="dina-input flex-1 min-w-[200px] text-xs" value={link} data-testid="referral-link"/><button onClick={() => copy(link)} className="dina-btn-secondary !min-h-[40px] text-xs" data-testid="referral-copy-link">Copier le lien</button><button onClick={share} className="dina-btn-primary !min-h-[40px] text-xs" data-testid="referral-share">Partager</button></div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="referral-stats">
+        {[["Liens ouverts", S.opened, "opened"], ["Inscrites", S.signed_up, "signed"], ["1er achat", S.first_purchase, "purchase"], ["Récompenses", S.rewarded, "rewarded"]].map(([l, v, k]) => (
+          <div key={k} className="dina-card-white p-3"><div className="text-[11px] uppercase text-[#666]">{l}</div><div className="font-serif text-2xl" data-testid={`referral-stat-${k}`}>{v}</div></div>
+        ))}
+      </div>
+      <div className="dina-card-white p-4 text-sm flex flex-wrap gap-4"><div>Gagné : <b className="text-[#1f8a4c]" data-testid="referral-earned">{fcfa(S.earned)}</b></div><div>En attente : <b className="text-[#e4991e]" data-testid="referral-pending">{fcfa(S.pending)}</b></div></div>
+      <div className="dina-card-white p-4">
+        <div className="font-semibold mb-2">Mes invitations</div>
+        {d.items.length === 0 ? <div className="text-sm text-[#666] text-center py-4">Personne n'a encore utilisé votre code.</div> : d.items.map(i => {
+          const [l, c] = REF_STATUS[i.status] || [i.status, "#666"];
+          return <div key={i.id} className="flex items-center justify-between py-2 border-b border-[#f5f5f5] last:border-0 text-sm" data-testid={`referral-item-${i.id}`}><div className="min-w-0"><div className="font-medium truncate">{i.name}</div><div className="text-[11px] text-[#999]">Inscrite le {dateFmt(i.created_at)}</div></div><span className="text-[11px] font-semibold shrink-0" style={{ color: c }}>{l}{i.status === "recompensee" ? ` · +${fcfa(i.reward)}` : ""}</span></div>;
+        })}
+      </div>
     </div>
   );
 }
 
 function WalletPage() {
-  const { customer } = useCustomer();
+  const [w] = useWallet();
+  if (!w) return <div className="dina-card-white p-6 text-sm text-[#666]">Chargement…</div>;
   return (
-    <div className="dina-card-white p-6 text-center" data-testid="wallet-page">
-      <Wallet size={48} className="mx-auto text-[#b02a2a] mb-3"/>
-      <div className="font-serif text-3xl mb-1 text-[#b02a2a]">{fcfa(customer.wallet || 0)}</div>
-      <div className="text-sm text-[#666] mb-4">Solde porte-monnaie</div>
-      <Link to="/boutique/catalog" className="dina-btn-primary inline-flex">Continuer mes achats</Link>
+    <div className="space-y-3" data-testid="wallet-page">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="dina-card-white p-4 col-span-2 sm:col-span-1"><div className="text-[11px] uppercase text-[#666]">Disponible</div><div className="font-serif text-3xl text-[#b02a2a]" data-testid="wallet-balance">{fcfa(w.balance)}</div></div>
+        <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">En attente</div><div className="font-serif text-xl text-[#e4991e]" data-testid="wallet-pending">{fcfa(w.pending)}</div></div>
+        <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">Total gagné</div><div className="font-serif text-xl text-[#1f8a4c]" data-testid="wallet-earned">{fcfa(w.earned_total)}</div></div>
+        <div className="dina-card-white p-4"><div className="text-[11px] uppercase text-[#666]">Utilisé</div><div className="font-serif text-xl" data-testid="wallet-used">{fcfa(w.used_total)}</div></div>
+      </div>
+      {Object.keys(w.by_source).length > 0 && <div className="dina-card-white p-4 flex flex-wrap gap-2 text-xs">{Object.entries(w.by_source).map(([k, v]) => <span key={k} className="dina-chip">{SOURCE_LABEL[k] || k} · {fcfa(v)}</span>)}</div>}
+      <div className="dina-card-white p-4 text-xs text-[#666]">Utilisable sur les articles de vos commandes (hors frais de livraison), tout ou partie, sans date limite. Cumulable avec les promotions. Crédit interne non retirable en argent. Si une commande est annulée, le montant utilisé vous est rendu. <Link to="/boutique/compte/fidelite" className="text-[#b02a2a] underline">Convertir mes points</Link> · <Link to="/boutique/compte/parrainage" className="text-[#b02a2a] underline">Inviter une amie</Link></div>
+      <div className="dina-card-white p-4"><div className="font-semibold mb-1">Historique</div><WalletLedger rows={w.history}/></div>
     </div>
   );
 }
