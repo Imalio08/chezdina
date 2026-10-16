@@ -42,6 +42,9 @@ import RiderCarte from "@/pages/rider/Carte";
 import RiderHistorique from "@/pages/rider/Historique";
 import RiderPerformance from "@/pages/rider/Performance";
 import RiderProfil from "@/pages/rider/Profil";
+import RiderAvis from "@/pages/rider/Avis";
+import RiderSolde from "@/pages/rider/Solde";
+import RiderParametres from "@/pages/rider/Parametres";
 import RiderMessages from "@/pages/rider/Messages";
 import RiderNotifications from "@/pages/rider/Notifications";
 import BonsPlans from "@/pages/storefront/BonsPlans";
@@ -186,6 +189,9 @@ export default function App() {
               <Route path="historique" element={<ErrorBoundary><RiderHistorique /></ErrorBoundary>} />
               <Route path="performance" element={<ErrorBoundary><RiderPerformance /></ErrorBoundary>} />
               <Route path="profil" element={<ErrorBoundary><RiderProfil /></ErrorBoundary>} />
+              <Route path="avis" element={<ErrorBoundary><RiderAvis /></ErrorBoundary>} />
+              <Route path="solde" element={<ErrorBoundary><RiderSolde /></ErrorBoundary>} />
+              <Route path="parametres" element={<ErrorBoundary><RiderParametres /></ErrorBoundary>} />
               <Route path="messages" element={<ErrorBoundary><RiderMessages /></ErrorBoundary>} />
               <Route path="messages/:id" element={<ErrorBoundary><RiderMessages /></ErrorBoundary>} />
               <Route path="notifications" element={<ErrorBoundary><RiderNotifications /></ErrorBoundary>} />

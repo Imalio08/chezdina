@@ -3,6 +3,7 @@ import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { Star, TrendingUp, Trophy, MessageSquare } from "lucide-react";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Cell } from "recharts";
+import SubPage from "@/components/rider/SubPage";
 
 const LEVEL_COLORS = { Bronze: "#cd7f32", Argent: "#9fa6ad", Or: "#f4b12c", Excellence: "#b02a2a" };
 
@@ -16,7 +17,7 @@ export default function Performance() {
     api.get(`/riders/${user.id}/reviews`).then(r => setReviews(r.data)).catch(() => { });
   }, [user]);
 
-  if (!data) return <div className="text-sm text-[#666] text-center py-10">Chargement…</div>;
+  if (!data) return <SubPage title="Performance" testid="rider-performance-page"><div className="text-sm text-[#666] text-center py-10">Chargement…</div></SubPage>;
   const scoreColor = LEVEL_COLORS[data.level] || "#666";
   const distribution = [5, 4, 3, 2, 1].map(s => ({ star: `${s}★`, count: reviews.filter(r => r.rating === s).length }));
   const componentsArr = [
@@ -28,7 +29,7 @@ export default function Performance() {
   ];
 
   return (
-    <div className="space-y-3">
+    <SubPage title="Performance" testid="rider-performance-page">
       <div className="dina-card-white p-5 text-center" data-testid="rider-score">
         <div className="font-serif text-7xl tabular" style={{ color: scoreColor }}>{data.score}</div>
         <div className="text-xs uppercase tracking-widest text-[#999]">score sur 100</div>
@@ -64,22 +65,28 @@ export default function Performance() {
         </ResponsiveContainer>
       </div>
 
-      <div className="dina-card-white p-4">
-        <div className="font-semibold text-sm mb-3 flex items-center gap-2"><MessageSquare size={14} />Avis clientes</div>
-        {reviews.length === 0 ? <div className="text-xs text-[#666] text-center py-6">Aucun avis pour le moment</div> :
-          <div className="space-y-2">
-            {reviews.slice(0, 20).map(r => (
-              <div key={r.id} className="p-2.5 border border-[#ececec] dark:border-[#2a2a2a] rounded-lg" data-testid={`review-${r.id}`}>
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-[#666]">{r.customer?.name} · {r.customer?.quartier}</div>
-                  <div className="text-[#f4b12c] tabular">{"★".repeat(r.rating)}<span className="text-[#ddd]">{"★".repeat(5 - r.rating)}</span></div>
-                </div>
-                {r.comment && <div className="text-sm mt-1">« {r.comment} »</div>}
-                <div className="text-[10px] text-[#999] mt-0.5">{r.order_code}</div>
+      <ReviewsList reviews={reviews.slice(0, 20)} />
+    </SubPage>
+  );
+}
+
+export function ReviewsList({ reviews }) {
+  return (
+    <div className="dina-card-white p-4">
+      <div className="font-semibold text-sm mb-3 flex items-center gap-2"><MessageSquare size={14} />Avis clientes</div>
+      {reviews.length === 0 ? <div className="text-xs text-[#666] text-center py-6" data-testid="reviews-empty">Aucun avis pour le moment</div> :
+        <div className="space-y-2">
+          {reviews.map(r => (
+            <div key={r.id} className="p-2.5 border border-[#ececec] dark:border-[#2a2a2a] rounded-lg" data-testid={`review-${r.id}`}>
+              <div className="flex items-center justify-between">
+                <div className="text-xs text-[#666]">{r.customer?.name} · {r.customer?.quartier}</div>
+                <div className="text-[#f4b12c] tabular">{"★".repeat(r.rating)}<span className="text-[#ddd]">{"★".repeat(5 - r.rating)}</span></div>
               </div>
-            ))}
-          </div>}
-      </div>
+              {r.comment && <div className="text-sm mt-1">« {r.comment} »</div>}
+              <div className="text-[10px] text-[#999] mt-0.5">{r.order_code}</div>
+            </div>
+          ))}
+        </div>}
     </div>
   );
 }

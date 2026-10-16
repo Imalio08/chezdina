@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { fcfa, statusLabel, statusColor, dateFmt } from "@/lib/format";
 import { ChevronDown, ChevronUp, Clock, Check } from "lucide-react";
+import SubPage from "@/components/rider/SubPage";
 
 const PERIODS = [{ v: 1, label: "Aujourd'hui" }, { v: 7, label: "Semaine" }, { v: 30, label: "Mois" }, { v: 90, label: "3 mois" }];
 
@@ -19,7 +20,7 @@ export default function Historique() {
   const totalEcart = sessions.reduce((s, x) => s + Object.values(x.reconciliations || {}).reduce((a, b) => a + (typeof b === "object" ? b.ecart || 0 : 0), 0), 0);
 
   return (
-    <div className="space-y-3">
+    <SubPage title="Historique" testid="rider-historique-page">
       <div className="grid grid-cols-2 gap-2">
         <KPI label="Jours" v={sessions.length} />
         <KPI label="Livraisons" v={totalDeliv} c="#1f8a4c" />
@@ -71,7 +72,7 @@ export default function Historique() {
           );
         })}
       </div>
-    </div>
+    </SubPage>
   );
 }
 function KPI({ label, v, c, wide }) {

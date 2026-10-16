@@ -77,16 +77,25 @@ async def rider_score(rid: str, user: dict = Depends(get_user)):
     settings = await db.site_settings.find_one({"id": "main"}) or {}
     weights = (settings.get("delivery_templates") or {}).get("score_weights") or {"delivery_rate": 35, "punctuality": 20, "rating": 25, "cash": 10, "proof": 10}
     orders = await db.orders.find({"rider_id": rid}).to_list(2000)
+    reviews = await db.reviews.find({"rider_id": rid, "hidden": {"$ne": True}}).to_list(500)
+    sessions = await db.delivery_sessions.find({"rider_id": rid}).to_list(500)
+    out = _score(orders, reviews, sessions, weights)
+    week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    prev = _score([o for o in orders if (o.get("created_at") or "") < week_ago], [r for r in reviews if (r.get("created_at") or "") < week_ago],
+                  [s for s in sessions if (s.get("date") or s.get("created_at") or "") < week_ago[:10]], weights)
+    out["trend"] = out["score"] - prev["score"]
+    return out
+
+
+def _score(orders, reviews, sessions, weights):
     total = len(orders)
     delivered = [o for o in orders if o.get("status") == "livree"]
     failed = [o for o in orders if o.get("status") in ("echouee", "annulee")]
     delivery_rate = (len(delivered) / total * 100) if total else 100
     punctuality = 90
-    reviews = await db.reviews.find({"rider_id": rid, "hidden": {"$ne": True}}).to_list(500)
     ratings = [r.get("rating", 0) for r in reviews if r.get("rating")]
     avg = (sum(ratings) / len(ratings)) if ratings else 5
     rating_score = avg / 5 * 100
-    sessions = await db.delivery_sessions.find({"rider_id": rid}).to_list(500)
     recs = [v for s in sessions for v in (s.get("reconciliations") or {}).values() if isinstance(v, dict)]
     with_gap = [r for r in recs if abs(r.get("ecart", 0)) > 100]
     cash_score = max(0, 100 - (len(with_gap) * 10))

@@ -95,17 +95,18 @@ export default function RiderShell() {
     const defaults = [
       { key: "courses",     to: "/riders",             icon: "Package", label: "Courses",     visible: true, builtin: true },
       { key: "carte",       to: "/riders/carte",       icon: "Map",     label: "Carte",       visible: true, builtin: true },
-      { key: "historique",  to: "/riders/historique",  icon: "History", label: "Historique",  visible: true, builtin: true },
-      { key: "performance", to: "/riders/performance", icon: "Trophy",  label: "Performance", visible: true, builtin: true },
+      { key: "messages",    to: "/riders/messages",    icon: "MessageCircle", label: "Messages", visible: true, builtin: true },
       { key: "profil",      to: "/riders/profil",      icon: "User",    label: "Profil",      visible: true, builtin: true },
     ];
     const raw = (cms?.tabs && Array.isArray(cms.tabs) && cms.tabs.length) ? cms.tabs : defaults;
-    const list = raw.filter(t => t.visible !== false && !(t.to && /^https?:\/\/?$/.test(t.to.trim())));
+    const moved = /\/riders?\/(historique|performance)$/;
+    const list = raw.filter(t => t.visible !== false && !(t.to && /^https?:\/\/?$/.test(t.to.trim())) && !moved.test(t.to || "") && !["historique", "performance"].includes(t.key));
     if (!list.some(t => t.key === "messages" || t.to === "/riders/messages")) {
-      const i = list.findIndex(t => t.key === "courses");
-      list.splice(i + 1, 0, { key: "messages", to: "/riders/messages", icon: "MessageCircle", label: "Messages", visible: true, builtin: true });
+      list.push({ key: "messages", to: "/riders/messages", icon: "MessageCircle", label: "Messages", visible: true, builtin: true });
     }
-    return list;
+    const ORDER = ["courses", "carte", "messages", "profil"];
+    const rank = (t) => { const i = ORDER.indexOf(t.key); return i < 0 ? 3.5 : i; };
+    return list.sort((a, b) => rank(a) - rank(b));
   }, [cms]);
 
   // CMS colors — expose as CSS variables
@@ -226,6 +227,12 @@ export default function RiderShell() {
 
   useEffect(() => {
     import("@/lib/offlineQueue").then(m => { const stop = m.startAutoSync(); return () => stop && stop(); });
+  }, []);
+
+  useEffect(() => {
+    const f = () => setShowPunch(true);
+    window.addEventListener("rider-open-punch", f);
+    return () => window.removeEventListener("rider-open-punch", f);
   }, []);
 
   const punchLabel = punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer";
@@ -374,7 +381,7 @@ export default function RiderShell() {
       <AttendancePunchModal
         open={showPunch}
         onClose={() => setShowPunch(false)}
-        onDone={() => { api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {}); }}
+        onDone={() => { api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {}); window.dispatchEvent(new Event("rider-punch-changed")); }}
       />
 
       {/* Help modal */}
