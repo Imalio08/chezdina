@@ -41,6 +41,7 @@ const DEFAULTS = {
   accent_color: "#fff5f5",
   greeting: "Bonjour {name}",
   subtitle: "{brand} · Livreur",
+  manager_phone: "+225 07 77 92 61 79",
   announcement: { enabled: false, text: "", variant: "info" },
   help: { enabled: true, title: "Besoin d'aide ?", content: "Appelez votre gérante · +225 07 77 92 61 79" },
   tabs: DEFAULT_TABS,
@@ -74,7 +75,7 @@ function useRiderCms() {
       await api.patch("/rider-cms", cms);
       window.dispatchEvent(new Event("rider-cms-changed"));
       toast.success("App Livreur mise à jour · déployée en temps réel");
-    } catch { toast.error("Erreur · essayez à nouveau"); }
+    } catch (e) { toast.error(e.response?.data?.detail || "Erreur · essayez à nouveau"); }
     finally { setSaving(false); }
   };
 
@@ -218,6 +219,12 @@ function IdentiteTab({ ctx }) {
             </div>
           </label>
         </div>
+      </div>
+
+      <div className="dina-card-white p-5 space-y-3" data-testid="rider-manager-contact">
+        <div className="font-serif text-xl">Contact de la gérante</div>
+        <p className="text-[11px] text-[#999]">Numéro appelé par les livreurs depuis Profil › Contacter la gérante (appel et WhatsApp). Format international, ex. +225 07 00 00 00 00.</p>
+        <input className="dina-input tabular" placeholder="+225 07 00 00 00 00" value={cms.manager_phone || ""} onChange={e => upd("manager_phone", e.target.value)} data-testid="rider-manager-phone"/>
       </div>
 
       <div className="dina-card-white p-5 space-y-3">

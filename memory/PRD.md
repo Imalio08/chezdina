@@ -1122,3 +1122,10 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_82 (backend 7/7, frontend OK) + corrections (signalement, onglet actif, mode sombre, « Aucun avis »).
 - Reste : numéro de la gérante codé en dur (+225 07 77 92 61 79) ; Historique peut afficher deux journées à la même date (plusieurs sessions).
 
+
+
+
+## 2026-10-16 — Numéro de la gérante modifiable
+- Console › App Livreur : carte « Contact de la gérante » (champ rider_cms.manager_phone, 8 chiffres minimum, sinon 400).
+- App livreur Profil › Contacter la gérante (appel + WhatsApp + numéro affiché) et console Rider « Alerter la gérante » lisent ce numéro (repli +225 07 77 92 61 79).
+- Testé : API (refus « 12 », enregistrement, lecture publique), feuille de contact livreur affichant le nouveau numéro, carte console. Valeur d'origine remise.

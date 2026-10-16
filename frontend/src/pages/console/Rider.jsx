@@ -14,7 +14,7 @@ const TABS = [
 ];
 
 const CANCEL_REASONS = ["Cliente a refusé","Taille ne convient pas","Produit non conforme","Cliente injoignable","Adresse introuvable","Prix contesté","Commande en double"];
-const WA_MANAGER = "2250777926179";
+const WA_MANAGER_DEFAULT = "2250777926179";
 
 export default function Rider() {
   const { user, logout } = useAuth();
@@ -27,6 +27,8 @@ export default function Rider() {
 
   const load = () => api.get("/deliveries").then(r => setOrders(r.data));
   useEffect(() => { load(); }, []);
+  const [managerWa, setManagerWa] = useState("");
+  useEffect(() => { api.get("/public/rider-cms").then(r => setManagerWa((r.data?.manager_phone || "").replace(/\D/g, ""))).catch(() => {}); }, []);
 
   // Live GPS: push position every 30s if geolocation is granted
   useEffect(() => {
@@ -66,8 +68,9 @@ export default function Rider() {
   };
 
   const alertManager = () => {
+    const wa = managerWa || WA_MANAGER_DEFAULT;
     const msg = encodeURIComponent(`Bonjour, j'ai un souci sur la commande ${selected?.code || ""} : `);
-    window.open(`https://wa.me/${WA_MANAGER}?text=${msg}`, "_blank");
+    window.open(`https://wa.me/${wa}?text=${msg}`, "_blank");
   };
 
   return (

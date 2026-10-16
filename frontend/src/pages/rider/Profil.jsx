@@ -7,7 +7,7 @@ import { fcfa } from "@/lib/format";
 import { History, Trophy, Star, Wallet, Phone, AlertTriangle, Settings, LogOut, ChevronRight, MessageCircle, Store, TrendingUp, TrendingDown, Minus, Clock } from "lucide-react";
 
 const timeOf = (iso) => iso ? new Date(iso).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" }) : null;
-const MANAGER = "2250777926179";
+const DEFAULT_MANAGER = "+225 07 77 92 61 79";
 
 function Row({ icon: Icon, label, sub, onClick, testid, danger }) {
   return (
@@ -42,13 +42,14 @@ function SummaryCard({ score, today, onOpen }) {
   );
 }
 
-function ContactSheet({ onClose, onStore }) {
+function ContactSheet({ phone, onClose, onStore }) {
+  const digits = (phone || DEFAULT_MANAGER).replace(/\D/g, "");
   return (
     <div className="fixed inset-0 bg-black/60 z-[80] grid place-items-end" onClick={onClose} data-testid="profil-contact-sheet">
       <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl w-full p-4 pb-8 space-y-2" onClick={e => e.stopPropagation()}>
-        <div className="font-semibold mb-1">Contacter la gérante</div>
-        <button onClick={() => { window.location.href = `tel:+${MANAGER}`; }} className="dina-btn-secondary w-full !min-h-[48px]" data-testid="profil-call-manager"><Phone size={15}/>Appeler</button>
-        <button onClick={() => window.open(`https://wa.me/${MANAGER}?text=Bonjour,%20c'est%20votre%20livreur%20Chez%20Dina`, "_blank")} className="dina-btn-secondary w-full !min-h-[48px] !text-[#1f8a4c]" data-testid="profil-wa-manager"><MessageCircle size={15}/>WhatsApp</button>
+        <div className="font-semibold mb-1">Contacter la gérante <span className="text-xs font-normal text-[#666] tabular" data-testid="profil-manager-phone">· {phone || DEFAULT_MANAGER}</span></div>
+        <button onClick={() => { window.location.href = `tel:+${digits}`; }} className="dina-btn-secondary w-full !min-h-[48px]" data-testid="profil-call-manager"><Phone size={15}/>Appeler</button>
+        <button onClick={() => window.open(`https://wa.me/${digits}?text=Bonjour,%20c'est%20votre%20livreur%20Chez%20Dina`, "_blank")} className="dina-btn-secondary w-full !min-h-[48px] !text-[#1f8a4c]" data-testid="profil-wa-manager"><MessageCircle size={15}/>WhatsApp</button>
         <button onClick={onStore} className="dina-btn-primary w-full !min-h-[48px]" data-testid="profil-msg-manager"><Store size={15}/>Écrire dans l'app</button>
       </div>
     </div>
@@ -62,6 +63,8 @@ export default function Profil() {
   const [today, setToday] = useState(null);
   const [punch, setPunch] = useState(null);
   const [contact, setContact] = useState(false);
+  const [managerPhone, setManagerPhone] = useState("");
+  useEffect(() => { api.get("/public/rider-cms").then(r => setManagerPhone(r.data?.manager_phone || "")).catch(() => {}); }, []);
   useEffect(() => {
     if (!user) return;
     const loadPunch = () => api.get("/attendance/me").then(r => setPunch(r.data)).catch(() => {});
@@ -105,7 +108,7 @@ export default function Profil() {
         <Row icon={Settings} label="Paramètres" sub="Photo, thème, WhatsApp par défaut" onClick={() => nav("/riders/parametres")} testid="profil-row-parametres"/>
         {punch?.checked_in && !punch?.departure && <Row icon={LogOut} label="Pointer mon départ" sub="Fin de journée" onClick={() => window.dispatchEvent(new Event("rider-open-punch"))} testid="profil-row-depart"/>}
       </div>
-      {contact && <ContactSheet onClose={() => setContact(false)} onStore={writeStore}/>}
+      {contact && <ContactSheet phone={managerPhone} onClose={() => setContact(false)} onStore={writeStore}/>}
     </div>
   );
 }

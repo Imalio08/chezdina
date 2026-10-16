@@ -7,7 +7,7 @@ Stores the config under db.site_settings.rider_cms. Exposes:
  - PATCH /api/rider-cms         → admin/manager write
 """
 from typing import Any, Dict
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
 from deps import db, get_user, require_role, clean, now_iso
 
@@ -20,6 +20,7 @@ DEFAULT_RIDER_CMS: Dict[str, Any] = {
     "accent_color": "#fff5f5",
     "greeting": "Bonjour {name}",
     "subtitle": "{brand} · Livreur",
+    "manager_phone": "+225 07 77 92 61 79",
     "announcement": {"enabled": False, "text": "", "variant": "info"},
     "help": {
         "enabled": True,
@@ -60,6 +61,11 @@ async def rider_cms_get(user: dict = Depends(get_user)):
 @router.patch("/rider-cms")
 async def rider_cms_update(body: Dict[str, Any], user: dict = Depends(require_role("admin", "manager"))):
     body.pop("_id", None)
+    if "manager_phone" in body:
+        phone = (body.get("manager_phone") or "").strip()
+        if len("".join(c for c in phone if c.isdigit())) < 8:
+            raise HTTPException(400, "Numéro de la gérante invalide · 8 chiffres minimum")
+        body["manager_phone"] = phone[:30]
     current = await _load()
     merged = {**current, **{k: v for k, v in body.items() if v is not None}}
     # Keep tabs as list of dicts
