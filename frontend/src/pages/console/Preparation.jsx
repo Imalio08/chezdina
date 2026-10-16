@@ -261,7 +261,8 @@ export function PrepRunner({ order, onBack }) {
           manual_reason: l.reason || null,
         })),
       };
-      await api.patch(`/orders/${order.id}/status-v3`, payload).catch(async () => {
+      await api.patch(`/orders/${order.id}/status-v3`, payload).catch(async (e) => {
+        if (e?.response?.status && e.response.status !== 404) throw e;
         await api.patch(`/orders/${order.id}/status`, { status: "prete" });
       });
       toast.success("Commande marquée Prête ✓ · fiche colis prête");

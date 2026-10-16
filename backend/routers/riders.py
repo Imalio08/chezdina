@@ -361,11 +361,17 @@ async def session_add_order(sid: str, body: Dict[str, Any], user: dict = Depends
     if not s:
         raise HTTPException(404)
     prev_rider = ((await db.orders.find_one({"id": oid}, {"rider_id": 1})) or {}).get("rider_id")
+    cur = await db.orders.find_one({"id": oid}, {"status": 1})
+    if not cur:
+        raise HTTPException(404, "Commande introuvable")
+    if cur.get("status") in ("livree", "annulee", "echouee", "retournee", "en_attente_acompte", "nouvelle"):
+        raise HTTPException(400, "Seules les commandes confirmées ou prêtes peuvent être affectées")
     orders = s.get("orders", [])
     if oid not in orders:
         orders.append(oid)
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"orders": orders}})
-    await db.orders.update_one({"id": oid}, {"$set": {"rider_id": s["rider_id"], "rider_name": s["rider_name"], "status": "assignee", "session_id": sid}})
+    await db.orders.update_one({"id": oid}, {"$set": {"rider_id": s["rider_id"], "rider_name": s["rider_name"], "status": "assignee", "session_id": sid, "delivery_date": s.get("date")},
+                                            "$push": {"timeline": {"status": "assignee", "at": now_iso(), "by": user.get("name"), "reason": f"Journée {s.get('date')} · {s['rider_name']}"}}})
     res = await _apply_slot(oid, s["rider_id"], body.get("slot_id")) if "slot_id" in body else {}
     o = await db.orders.find_one({"id": oid})
     if o and prev_rider != s["rider_id"]:

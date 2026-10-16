@@ -122,9 +122,9 @@ const SCREENS = {
     </Chrome>
   ),
   preparation_scan: () => (
-    <Chrome title="Préparation">
+    <Chrome title="Commandes · Préparer">
       <g transform="translate(20 18)">
-        <text x="0" y="20" fontFamily="serif" fontSize="20" fill={PALETTE.text}>Préparation · DN-2026</text>
+        <text x="0" y="20" fontFamily="serif" fontSize="20" fill={PALETTE.text}>Scan · DN-2026</text>
         <rect x="0" y="36" width="760" height="60" rx="8" fill={PALETTE.card} stroke={PALETTE.stroke}/>
         <rect x="14" y="52" width="500" height="28" rx="4" fill={PALETTE.bg}/>
         <text x="26" y="70" fontFamily="monospace" fontSize="11" fill={PALETTE.muted}>Scannez un article…</text>

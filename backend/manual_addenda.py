@@ -32,10 +32,14 @@ ADDENDA = [
         {"id": "add-orders-postpone", "heading": "Reporter une livraison", "blocks": [
             S(["Dans la fiche ou depuis l'app livreur, choisissez « Reporter »", "Sélectionnez la nouvelle date et le motif", "Confirmez"]),
             INFO("La commande reste visible « Reportée au JJ/MM » dans la journée d'origine, sort du montant à encaisser et revient à affecter le jour choisi.")]},
-        {"id": "add-prep-views", "heading": "Préparation : Cartes, Tableau, Kanban", "blocks": [
-            T("Dans Préparation, choisissez la vue en haut à droite. Le choix est mémorisé."),
-            S(["Kanban : glissez une carte de « Nouvelles » vers « Confirmées » ou « En préparation »",
-               "Déposer dans « Prêtes » ouvre le scan obligatoire article par article"])]},
+        {"id": "add-prep-views", "heading": "Commandes : confirmer, préparer, affecter", "blocks": [
+            T("Préparation fait maintenant partie de Commandes. Choisissez la vue Table ou Kanban en haut à droite ; le choix est mémorisé."),
+            S(["Onglet « À confirmer » : cliquez « Confirmer » (ou cochez plusieurs commandes puis « Confirmer »)",
+               "Onglet « À préparer » : cliquez « Préparer » pour ouvrir le scan article par article",
+               "Quand tout est scanné (ou validé à la main avec un motif), la commande passe « Prête » et la fiche colis s'imprime",
+               "Cochez les commandes « Prête » puis « Affecter à une journée de livraison » (date + livreur)",
+               "« Imprimer les fiches colis » regroupe les commandes cochées dans un seul PDF"]),
+            INFO("Une commande « En attente d'acompte » ne peut être confirmée qu'après avoir marqué l'acompte comme reçu.")]},
     ]),
     ("livraison", [
         {"id": "add-slots", "heading": "Créneaux de livraison", "blocks": [

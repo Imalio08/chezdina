@@ -39,3 +39,12 @@
 - Caisse : POSSessionGuard revérifiait la session toutes les 30 s en affichant un écran de chargement → toute la Caisse (formulaire + panier) était démontée. Revérification désormais silencieuse ; le formulaire ne se ferme plus en cliquant à côté ; téléphone normalisé (+225 + 10 chiffres) ; messages d'erreur explicites, données conservées.
 - Tests : iteration_79 100 % (5/5 backend, UI avec attente de 70 s).
 
+
+## 2026-10-15 — Fusion Commandes + Préparation
+- Libellés : nouvelle « À confirmer », confirmee « À préparer », assignee « Affectée », echouee « Échec », reportee « Reportée » (clés internes inchangées).
+- server.order_transition_guard (sur /status et /status-v3) : confirmation réservée à la gérante et à la propriétaire ; acompte reçu obligatoire ; vendeuse, magasinière et community manager limitées à en_preparation et prete. PATCH /orders ne peut plus changer le statut, le livreur ni l'acompte.
+- Orders.jsx : onglets avec compteurs (?tab=), Table + Kanban (toutes les colonnes), cases à cocher, barre d'actions groupées (Confirmer, Affecter à une journée, Imprimer les fiches colis en un seul PDF), OrderActions (Confirmer, Préparer ou badge « Acompte requis ») ; PrepRunner intégré, fiche colis après « Prête ».
+- AssignDayModal : réutilise ou crée la journée du livreur ; add-order refuse les commandes non confirmées et fixe delivery_date et la timeline.
+- /console/preparation redirige vers Commandes ; menu Préparation retiré (entrée « À préparer » pour la magasinière) ; liens du tableau de bord et manuel mis à jour.
+- Tests : iteration_80 (1 contournement + correctifs mineurs) → pytest 26/26.
+

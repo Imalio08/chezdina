@@ -1,0 +1,52 @@
+{
+  "summary": "Tested the Commandes + Préparation merge on backend and frontend. Backend (new tests/test_commandes_merge.py): 25/26 pass. Deposit guard works on /status and /status-v3: confirming an en_attente_acompte order before the deposit returns 400 'Acompte non reçu…', and mark-deposit-paid then moves it to confirmee. sales, stock_keeper and CM get 403 on confirm (both endpoints). Manager and admin can confirm. stock_keeper and sales can set en_preparation and prete (both endpoints) but cannot cancel; CM cannot prepare. Assign day: the session is created and then reused for the same rider and date, add-order sets the order to assignee with rider and session, and the rider gets a 'Nouvelle course attribuée' user_notification. The dashboard action-items links are correct. The 1 failure is a guard bypass: sales calls PATCH /api/orders/{id} {status:'confirmee'} -> 200 and the order is confirmed. Frontend (Playwright, admin/manager/stock): all 10 tabs show the correct counts, checked against the DB (638/23/77/28/40/42/38/358/30/2), and ?tab= stays after reload. New labels are shown. Row Confirmer gives the toast and the order moves to À préparer. Bulk confirm of 2 orders gives the toast '2 commandes confirmées'. The deposit order shows order-deposit badge and no Confirmer. Préparer sets en_preparation, opens PrepRunner (wrong scan toast, scan and manual override with reason), then Prête, the fiche colis PDF preview opens and you return to the list. Kanban: 11 columns, cards with checkbox and Confirmer/Préparer/acompte badge. Assigning a Prête selection plus 1 non-prête shows the toast 'non prête(s) ignorée(s)', assign-day-modal sends only the 3 Prête orders, they move to Affectée, and the rider is notified. Bulk print gives one PDF 'fiches-colis-3.pdf' with 3 pages; per-row slip works. Order detail: Prochaine étape has Confirmer, then Préparer, which opens the scan screen inside the detail page; Retour brings back 'Reprendre'. /console/preparation redirects to ?tab=confirmee. There is no Préparation item for admin or manager. stock_keeper sees Commandes plus 'À préparer', has no Confirmer/Affecter (only Imprimer), and can Préparer up to Prête. The dashboard cards À confirmer / À affecter link correctly.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "PATCH /api/orders/{id}", "issue": "The generic order update accepts any body keys, including 'status', with no order_transition_guard. sales (full /api/orders allow-list) can PATCH {status:'confirmee'} -> 200 and the order is confirmed. This bypasses the rule that only the gérante/owner confirms. It also bypasses the deposit guard for any role that can call it. Fix: pop status/timeline/rider_id/session_id/deposit_* from the body, or run order_transition_guard when 'status' is present.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "PATCH /api/delivery-sessions/{sid}/add-order", "issue": "It does not check that the order is 'prete'; only the frontend filters. It also does not set order.delivery_date to the session date (assigning to 2030-01-20 left delivery_date undefined) and does not add an 'assignee' timeline entry."},
+      {"endpoint": "PATCH /api/orders/{id}/status (CM)", "issue": "community_manager is only blocked by the role_access read-only allow-list. order_transition_guard's limited-role rule only lists stock_keeper and sales. That works today, but 'community_manager' should be added there too, as defence in depth."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OrderDetail changeStatus", "issue": "The catch shows a generic toast 'Erreur' and drops the backend detail. Clicking the od-status-confirmee chip on an en_attente_acompte order shows 'Erreur' instead of 'Acompte non reçu…'. 403 role messages are hidden the same way.", "selector": "[data-testid='od-status-confirmee']", "priority": "MEDIUM"},
+      {"component": "Sidebar (stock_keeper)", "issue": "On /console/commandes?tab=confirmee, both 'Commandes' and 'À préparer' are highlighted as active, because NavLink matching ignores the query string.", "selector": "aside nav", "priority": "LOW"},
+      {"component": "Orders table Documents (stock_keeper)", "issue": "The invoice-view/pdf/wa icons are shown to stock_keeper, but POST /api/invoices/from-order returns 403, so clicking gives 'Erreur facture'. Hide them for limited roles.", "selector": "[data-testid^='invoice-view-']", "priority": "LOW"},
+      {"component": "Kanban", "issue": "There are no columns for 'retournee' (13 orders) or 'recuperee', so these orders are invisible in Kanban 'Toutes'. The Annulées/Reportées tab counts 30, but the Kanban columns show 17.", "selector": "[data-testid^='kanban-col-']", "priority": "LOW"},
+      {"component": "PrepRunner markReady", "issue": "Any status-v3 error (e.g. 400 'Scan incomplet') is caught and silently retried via /status, which skips the scan check.", "selector": "[data-testid='prep-mark-ready']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "AssignDayModal / OrderFilters", "issues": ["assign-day-date and the filters date use the browser's native date picker (mm/dd/yyyy) instead of the shadcn Calendar."]},
+      {"screen": "Commandes mobile 390px", "issues": ["The table needs horizontal scrolling: the Statut/Action (Confirmer/Préparer) columns are off-screen, and there is no card layout on mobile.", "The active tab chip (e.g. Prêtes) is not scrolled into view."]},
+      {"screen": "Commandes desktop", "issues": ["The table does not fill the card width; there is a large empty area on the right at 1920px."]},
+      {"screen": "Manuel", "issues": ["The manual still has the addendum 'Préparation : Cartes, Tableau, Kanban', which says 'Dans Préparation…' and describes drag-and-drop Kanban (backend/manual_addenda.py add-prep-views, plus the stored manual_modules doc). The page is removed and the new Kanban has no drag-and-drop."]},
+      {"screen": "rbac.js", "issues": ["'/console/preparation' is still listed in frontend/src/lib/rbac.js. It is harmless (the route redirects) but it is dead config."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_commandes_merge.py", "/app/backend/tests/ui_seed_commandes.py", "/app/backend/tests/ui_punch.py", "/app/test_reports/pytest/iter80.xml"],
+  "action_items": [
+    "HIGH: Block 'status' (and the rider/session/deposit fields) in PATCH /api/orders/{id}, or route it through order_transition_guard. sales can currently confirm orders this way.",
+    "OrderDetail.changeStatus: show e.response.data.detail in the error toast.",
+    "add-order: set delivery_date = session.date, push an 'assignee' timeline entry, and optionally reject non-prete orders server-side.",
+    "Add retournee/recuperee to the Kanban (or include them in an Annulées/Reportées column).",
+    "Hide the invoice buttons for stock_keeper, and fix the double-active sidebar items.",
+    "Update the manual addendum add-prep-views (and the stored manual_modules) to describe the merged Commandes flow.",
+    "Use the shadcn Calendar in AssignDayModal; add a responsive card layout for mobile Commandes."
+  ],
+  "critical_code_review_comments": [
+    "Orders.jsx: OrderDrawer (about 80 lines) and the 'selected' state are dead code; setSelected is never called with an order.",
+    "Orders.jsx: KpiMini is unused.",
+    "PrepRunner's .catch fallback to /status hides real validation errors.",
+    "AssignDayModal: the sequential add-order loop has no partial-failure reporting. If order 2 of 5 fails, the first ones are assigned but the toast only shows the error."
+  ],
+  "updated_files": ["/app/backend/tests/test_commandes_merge.py", "/app/backend/tests/ui_seed_commandes.py", "/app/backend/tests/ui_punch.py"],
+  "success_rate": {"backend": "96% (25/26)", "frontend": "95% (all requested flows pass; minor UI issues above)"},
+  "seed_data_creation": "8 TEST_UI orders and many TEST_ orders were created with fake product_ids (no stock impact) and all deleted. The delivery sessions for 2030-01-15 and 2030-01-20, the user_notifications, and today's attendance for stock/manager/agent1/cm were removed. Order count is back to 630.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && REACT_APP_BACKEND_URL=... python -m pytest tests/test_commandes_merge.py -n 0. It punches arrival for manager, stock, agent1 and cm, then cleans up. The UI seed is python tests/ui_seed_commandes.py seed|clean. Limited roles must have an arrival punch: python tests/ui_punch.py email pw pin. Staff login inputs: input:visible nth(0)/nth(1) + button 'Se connecter'. The PDF preview modal uses pdf-preview-modal/pdf-preview-title/pdf-preview-pages (one canvas per page).",
+  "rca of the issue": "Confirmation bypass: routers/orders.py update_order does $set of the raw body, so 'status' passes straight through. role_access gives sales full /api/orders, so the PATCH is allowed. The guard is only called in update_order_status and update_order_status_v3."
+}

@@ -294,7 +294,7 @@ export default function ConsoleLayout() {
                     to={to}
                     end={end}
                     title={collapsed ? label : undefined}
-                    className={({isActive}) => `dina-sidebar-link ${isActive && qMatch ?"active":""} ${collapsed ? "!justify-center !px-2" : ""}`}
+                    className={({isActive}) => `dina-sidebar-link ${isActive && qMatch && !(!toQuery && items.some(i => i.to.startsWith(`${toPath}?`) && locSearch.includes(i.to.split("?")[1])))?"active":""} ${collapsed ? "!justify-center !px-2" : ""}`}
                     data-testid={`nav-${label.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/&/g,"et").replace(/\s+/g,"-").replace(/[^\w-]/g,"")}`}
                   >
                     <Icon size={14}/>

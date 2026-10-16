@@ -681,7 +681,7 @@ def _url_quote(s: str) -> str:
 def order_transition_guard(o: Dict[str, Any], new_status: str, user: dict) -> None:
     """Shared rules: only gérante/owner confirm; deposit must be received; limited roles only prepare."""
     role = user.get("role")
-    if role in ("stock_keeper", "sales") and new_status not in ("en_preparation", "prete"):
+    if role in ("stock_keeper", "sales", "community_manager") and new_status not in ("en_preparation", "prete"):
         raise HTTPException(403, "Votre rôle peut seulement passer une commande en préparation ou prête")
     if new_status == "confirmee" and o.get("status") in ("nouvelle", "en_attente_acompte"):
         if role not in ("admin", "manager"):

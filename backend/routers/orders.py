@@ -87,6 +87,9 @@ async def update_order(oid: str, body: Dict[str, Any], user: dict = Depends(get_
     if o.get("status") == "livree":
         raise HTTPException(400, "Commande livrée, non modifiable")
     body.pop("id", None)
+    # Status, rider and deposit only change through their dedicated, guarded endpoints.
+    for k in ("status", "timeline", "rider_id", "rider_name", "session_id", "deposit_paid", "deposit_paid_at", "deposit_tx_ref", "payment_status"):
+        body.pop(k, None)
     body.pop("_id", None)
     if "items" in body or "delivery_fee" in body or "discount" in body:
         items = body.get("items", o.get("items", []))

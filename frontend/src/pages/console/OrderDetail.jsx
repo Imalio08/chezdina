@@ -46,7 +46,7 @@ export default function OrderDetail() {
     try {
       await api.patch(`/orders/${order.id}/status`, payload);
       toast.success("Statut mis à jour"); load();
-    } catch { toast.error("Erreur"); }
+    } catch (e) { toast.error(e?.response?.data?.detail || "Changement de statut impossible · réessayez"); }
   };
 
   const invoiceAction = async (action) => {

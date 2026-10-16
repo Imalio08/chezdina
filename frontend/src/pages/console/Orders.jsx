@@ -12,7 +12,7 @@ import AssignDayModal from "@/components/orders/AssignDayModal";
 import { useAuth } from "@/context/AuthContext";
 
 const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee","retournee"];
-const KANBAN = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee"];
+const KANBAN = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee","retournee"];
 const TABS = [["", "Toutes"], ["nouvelle", "À confirmer"], ["confirmee", "À préparer"], ["en_preparation", "En préparation"], ["prete", "Prêtes"], ["assignee", "Affectées"], ["en_livraison", "En livraison"], ["livree", "Livrées"], ["annulee_reportee", "Annulées / Reportées"], ["en_attente_acompte", "En attente d'acompte"]];
 const inTab = (o, t) => !t || (t === "annulee_reportee" ? ["annulee", "reportee", "echouee", "retournee"].includes(o.status) : t === "en_livraison" ? ["en_livraison", "recuperee"].includes(o.status) : o.status === t);
 
@@ -28,6 +28,7 @@ export default function Orders() {
   const nav = useNavigate();
   const { user } = useAuth();
   const canConfirm = ["admin", "manager"].includes(user?.role);
+  const canInvoice = canConfirm;
   const [sp, setSp] = useSearchParams();
   const [orders, setOrders] = useState([]);
   const [view, setView] = useState(() => localStorage.getItem("orders_view") || "table");
@@ -159,7 +160,7 @@ export default function Orders() {
       )}
 
       {view === "table" ? (
-        <div className="dina-card-white overflow-hidden"><div className="overflow-x-auto"><table className="dina-table">
+        <div className="dina-card-white overflow-hidden"><div className="overflow-x-auto"><table className="dina-table w-full">
           <thead><tr><th className="w-8"><input type="checkbox" checked={allChecked} onChange={() => setSel(allChecked ? new Set() : new Set(allShown.map(o => o.id)))} className="accent-[#b02a2a]" data-testid="orders-select-all"/></th><th>Commande</th><th>Date</th><th>Cliente</th><th>Canal</th><th>Mode</th><th>Statut</th><th>Action</th><th className="text-right">Total</th><th className="text-center">Documents</th></tr></thead>
           <tbody>{filtered.length === 0 ? <tr><td colSpan={10} className="text-sm text-[#666] text-center py-8">Aucune commande pour ce filtre</td></tr>
           : allShown.map(o=>(
@@ -175,9 +176,11 @@ export default function Orders() {
               <td className="text-right tabular font-semibold cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{fcfa(o.total)}</td>
               <td>
                 <div className="flex items-center justify-center gap-1">
+                  {canInvoice && <>
                   <button onClick={() => openInvoice(o, "view")} className="text-[#666] hover:text-[#b02a2a] p-1" title="Aperçu facture PDF" data-testid={`invoice-view-${o.code}`}><Eye size={13}/></button>
                   <button onClick={() => openInvoice(o, "pdf")} className="text-[#5867fd] hover:text-[#b02a2a] p-1" title="Voir la facture PDF" data-testid={`invoice-pdf-${o.code}`}><FileText size={13}/></button>
                   <button onClick={() => openInvoice(o, "wa")} className="text-[#1f8a4c] hover:text-[#b02a2a] p-1" title="Envoyer par WhatsApp" data-testid={`invoice-wa-${o.code}`}><MessageCircle size={13}/></button>
+                  </>}
                   <button onClick={() => printSlips([o])} className="text-[#666] hover:text-[#b02a2a] p-1" title="Fiche colis" data-testid={`slip-${o.code}`}><Printer size={13}/></button>
                 </div>
               </td>
@@ -186,7 +189,7 @@ export default function Orders() {
         </table></div></div>
       ) : (
         <div className="flex gap-3 overflow-x-auto pb-2" data-testid="orders-kanban">
-          {KANBAN.map(s=>{ const col = filtered.filter(o=>o.status===s); return (
+          {KANBAN.map(s=>{ const col = filtered.filter(o=>o.status===s || (s === "en_livraison" && o.status === "recuperee")); return (
             <div key={s} className="dina-card p-3 min-h-[200px] w-64 shrink-0" data-testid={`kanban-col-${s}`}>
               <div className="font-semibold text-xs uppercase mb-2 flex justify-between" style={{color:statusColor[s]}}><span>{statusLabel[s]}</span><span>{col.length}</span></div>
               <div className="space-y-2">{col.slice(0,30).map(o=>(
