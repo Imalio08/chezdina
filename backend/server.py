@@ -839,9 +839,24 @@ async def upload_my_photo(body: RiderPhotoIn, user: dict = Depends(get_user)):
     await db.users.update_one({"id": user["id"]}, {"$set": {"photo": body.photo, "updated_at": now_iso()}})
     return {"ok": True, "photo": body.photo}
 
+@api.patch("/users/me/profile")
+async def update_my_profile(body: Dict[str, Any], user: dict = Depends(get_user)):
+    patch = {}
+    if "name" in body:
+        name = (body.get("name") or "").strip()
+        if len(name) < 2: raise HTTPException(400, "Nom trop court")
+        patch["name"] = name[:80]
+    if "phone" in body:
+        phone = (body.get("phone") or "").strip()
+        if len("".join(c for c in phone if c.isdigit())) < 8: raise HTTPException(400, "Numéro invalide · 8 chiffres minimum")
+        patch["phone"] = phone[:30]
+    if not patch: raise HTTPException(400, "Aucune modification")
+    await db.users.update_one({"id": user["id"]}, {"$set": {**patch, "updated_at": now_iso()}})
+    return {"ok": True, **patch}
+
 @api.patch("/users/me/prefs")
 async def set_my_prefs(body: Dict[str, Any], user: dict = Depends(get_user)):
-    ALLOWED = {"theme", "wa", "sound", "language", "notifications"}
+    ALLOWED = {"theme", "sound", "language", "notifications"}
     prefs = {k: v for k, v in body.items() if k in ALLOWED}
     await db.users.update_one({"id": user["id"]}, {"$set": {"prefs": prefs, "updated_at": now_iso()}})
     return {"ok": True, "prefs": prefs}

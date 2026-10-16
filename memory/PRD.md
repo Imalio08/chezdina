@@ -1129,3 +1129,11 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Console › App Livreur : carte « Contact de la gérante » (champ rider_cms.manager_phone, 8 chiffres minimum, sinon 400).
 - App livreur Profil › Contacter la gérante (appel + WhatsApp + numéro affiché) et console Rider « Alerter la gérante » lisent ce numéro (repli +225 07 77 92 61 79).
 - Testé : API (refus « 12 », enregistrement, lecture publique), feuille de contact livreur affichant le nouveau numéro, carte console. Valeur d'origine remise.
+
+
+## 2026-10-16 — App livreur : sélecteur WhatsApp retiré, infos modifiables
+- Paramètres livreur = photo + Mes informations (nom, téléphone via PATCH /api/users/me/profile, 8 chiffres min.) + thème. Sélecteur « WhatsApp / WhatsApp Business » et réglage du son retirés ; préférence `wa` n'est plus acceptée.
+- Boutons WhatsApp = lien wa.me direct (le téléphone ouvre l'app installée). Côté cliente : messagerie interne + bouton WhatsApp direct (déjà en place).
+- Manuel livreur mis à jour (add-rider-nav).
+- Testé : API (numéro trop court refusé), page Paramètres (pas de sélecteur, enregistrement du nom puis restauration).
+

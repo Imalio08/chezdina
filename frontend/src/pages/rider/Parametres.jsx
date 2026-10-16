@@ -1,28 +1,40 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "sonner";
 import { editImageFile } from "@/components/shared/ImageEditor";
-import { playChime, setSoundEnabled } from "@/lib/notifySound";
-import { Camera, Sun, Moon, Smartphone } from "lucide-react";
+import { Camera, Sun, Moon, Smartphone, Save } from "lucide-react";
 import SubPage from "@/components/rider/SubPage";
+
+function InfoForm({ user, setUser }) {
+  const [name, setName] = useState(user?.name || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    setBusy(true);
+    try { const r = await api.patch("/users/me/profile", { name, phone }); setUser({ ...user, name: r.data.name, phone: r.data.phone }); toast.success("Informations enregistrées"); }
+    catch (e) { toast.error(e.response?.data?.detail || "Enregistrement impossible · réessayez"); }
+    finally { setBusy(false); }
+  };
+  const changed = name !== (user?.name || "") || phone !== (user?.phone || "");
+  return (
+    <div className="dina-card-white p-4 space-y-2" data-testid="rider-info-form">
+      <div className="text-xs uppercase text-[#999]">Mes informations</div>
+      <input className="dina-input" placeholder="Nom complet" value={name} onChange={e => setName(e.target.value)} data-testid="rider-info-name"/>
+      <input className="dina-input tabular" type="tel" placeholder="+225 07 00 00 00 00" value={phone} onChange={e => setPhone(e.target.value)} data-testid="rider-info-phone"/>
+      <button onClick={save} disabled={busy || !changed} className="dina-btn-primary w-full !min-h-[44px] disabled:opacity-50" data-testid="rider-info-save"><Save size={14}/>{busy ? "Enregistrement…" : "Enregistrer"}</button>
+    </div>
+  );
+}
 
 export default function Parametres() {
   const { user, setUser } = useAuth();
-  const [prefs, setPrefs] = useState({ theme: "light", wa: "whatsapp", sound: "on", ...(user?.prefs || {}) });
-  useEffect(() => {
-    try { const stored = JSON.parse(localStorage.getItem("rider_prefs") || "{}"); setPrefs(p => ({ ...p, ...stored })); } catch { }
-  }, []);
-  const update = async (patch) => {
-    const next = { ...prefs, ...patch };
-    setPrefs(next);
-    localStorage.setItem("rider_prefs", JSON.stringify(next));
-    if (patch.sound) { setSoundEnabled(patch.sound === "on"); if (patch.sound === "on") playChime("notif", true); }
-    if (patch.theme) {
-      localStorage.setItem("rider_theme", patch.theme);
-      document.documentElement.classList.toggle("dark", patch.theme === "dark" || (patch.theme === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches));
-    }
-    try { await api.patch("/users/me/prefs", next); } catch { }
+  const [theme, setTheme] = useState(() => localStorage.getItem("rider_theme") || user?.prefs?.theme || "light");
+  const pickTheme = async (t) => {
+    setTheme(t);
+    localStorage.setItem("rider_theme", t);
+    document.documentElement.classList.toggle("dark", t === "dark" || (t === "auto" && window.matchMedia("(prefers-color-scheme: dark)").matches));
+    try { await api.patch("/users/me/prefs", { ...(user?.prefs || {}), theme: t }); } catch { }
   };
   const onPhoto = async (e) => {
     const f = e.target.files?.[0]; e.target.value = ""; if (!f) return;
@@ -34,33 +46,20 @@ export default function Parametres() {
     };
     reader.readAsDataURL(ed);
   };
-  const chip = (on) => `py-2 rounded-lg border text-xs ${on ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec] dark:border-[#2a2a2a]"}`;
   return (
     <SubPage title="Paramètres" testid="rider-parametres-page">
       <div className="dina-card-white p-4 flex items-center gap-3">
         {user?.photo ? <img src={user.photo} alt="" className="w-16 h-16 rounded-full object-cover"/> : <div className="w-16 h-16 rounded-full bg-[#fde8e8] text-[#b02a2a] grid place-items-center font-serif text-2xl font-bold">{user?.name?.[0] || "L"}</div>}
         <label className="dina-btn-secondary !min-h-[40px] text-xs cursor-pointer" data-testid="profil-photo"><Camera size={14}/>Changer ma photo<input type="file" accept="image/*" capture="user" className="hidden" onChange={onPhoto}/></label>
       </div>
-      <div className="dina-card-white p-4 space-y-4">
-        <div>
-          <div className="text-xs uppercase text-[#999] mb-1">Thème</div>
-          <div className="grid grid-cols-3 gap-2">
-            {[["light", Sun, "Clair"], ["dark", Moon, "Sombre"], ["auto", Smartphone, "Auto"]].map(([v, Ic, l]) => (
-              <button key={v} onClick={() => update({ theme: v })} className={`${chip(prefs.theme === v)} flex flex-col items-center gap-1`} data-testid={`theme-${v}`}><Ic size={14}/>{l}</button>
-            ))}
-          </div>
+      <InfoForm user={user} setUser={setUser}/>
+      <div className="dina-card-white p-4">
+        <div className="text-xs uppercase text-[#999] mb-1">Thème</div>
+        <div className="grid grid-cols-3 gap-2">
+          {[["light", Sun, "Clair"], ["dark", Moon, "Sombre"], ["auto", Smartphone, "Auto"]].map(([v, Ic, l]) => (
+            <button key={v} onClick={() => pickTheme(v)} className={`py-2 rounded-lg border text-xs flex flex-col items-center gap-1 ${theme === v ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec] dark:border-[#2a2a2a]"}`} data-testid={`theme-${v}`}><Ic size={14}/>{l}</button>
+          ))}
         </div>
-        <div>
-          <div className="text-xs uppercase text-[#999] mb-1">WhatsApp par défaut</div>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => update({ wa: "whatsapp" })} className={chip(prefs.wa === "whatsapp")} data-testid="wa-standard">WhatsApp</button>
-            <button onClick={() => update({ wa: "business" })} className={chip(prefs.wa === "business")} data-testid="wa-business">WhatsApp Business</button>
-          </div>
-        </div>
-        <label className="flex items-center justify-between text-sm">
-          <span>Son des notifications</span>
-          <input type="checkbox" checked={prefs.sound === "on"} onChange={e => update({ sound: e.target.checked ? "on" : "off" })} className="accent-[#b02a2a]" data-testid="pref-sound"/>
-        </label>
       </div>
     </SubPage>
   );

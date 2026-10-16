@@ -186,8 +186,6 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
       .replace("{montant}", fcfa(order.total))
       .replace("{lien_suivi}", `${window.location.origin}/suivi/${order.code}`);
     api.post(`/orders/${order.id}/contact-log`, { kind: "whatsapp", template_key: tpl.key }).catch(() => { });
-    const pref = JSON.parse(localStorage.getItem("rider_prefs") || "{}");
-    const scheme = pref.wa === "business" ? "whatsapp" : "whatsapp"; // click-to-chat works for both
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(prefill)}`, "_blank");
     setShowWa(false);
   };

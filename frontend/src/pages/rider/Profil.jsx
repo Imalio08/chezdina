@@ -105,7 +105,7 @@ export default function Profil() {
         <Row icon={Wallet} label="Mon solde" sub={today ? `À remettre : ${fcfa(today.balance_to_hand_over || 0)}` : null} onClick={() => nav("/riders/solde")} testid="profil-row-solde"/>
         <Row icon={Phone} label="Contacter la gérante" sub="Appel, WhatsApp ou message" onClick={() => setContact(true)} testid="profil-row-contact"/>
         <Row icon={AlertTriangle} label="Signaler un problème" sub="Panne, accident, colis abîmé…" onClick={reportIssue} testid="profil-report" danger/>
-        <Row icon={Settings} label="Paramètres" sub="Photo, thème, WhatsApp par défaut" onClick={() => nav("/riders/parametres")} testid="profil-row-parametres"/>
+        <Row icon={Settings} label="Paramètres" sub="Photo, nom, téléphone, thème" onClick={() => nav("/riders/parametres")} testid="profil-row-parametres"/>
         {punch?.checked_in && !punch?.departure && <Row icon={LogOut} label="Pointer mon départ" sub="Fin de journée" onClick={() => window.dispatchEvent(new Event("rider-open-punch"))} testid="profil-row-depart"/>}
       </div>
       {contact && <ContactSheet phone={managerPhone} onClose={() => setContact(false)} onStore={writeStore}/>}
