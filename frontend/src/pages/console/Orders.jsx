@@ -13,8 +13,8 @@ import { useAuth } from "@/context/AuthContext";
 
 const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee","retournee"];
 const KANBAN = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee","retournee"];
-const TABS = [["", "Toutes"], ["nouvelle", "À confirmer"], ["confirmee", "À préparer"], ["en_preparation", "En préparation"], ["prete", "Prêtes"], ["assignee", "Affectées"], ["en_livraison", "En livraison"], ["livree", "Livrées"], ["annulee_reportee", "Annulées / Reportées"], ["en_attente_acompte", "En attente d'acompte"]];
-const inTab = (o, t) => !t || (t === "annulee_reportee" ? ["annulee", "reportee", "echouee", "retournee"].includes(o.status) : t === "en_livraison" ? ["en_livraison", "recuperee"].includes(o.status) : o.status === t);
+const TABS = [["", "Toutes"], ["nouvelle", "À confirmer"], ["confirmee", "À préparer"], ["en_preparation", "En préparation"], ["prete", "Prêtes"], ["assignee", "Affectées"], ["en_livraison", "En livraison"], ["livree", "Livrées"], ["annulee_reportee", "Annulées / Reportées"], ["en_attente_acompte", "En attente d'acompte"], ["wave_verif", "Paiements Wave à vérifier"]];
+const inTab = (o, t) => !t || (t === "wave_verif" ? o.payment_status === "preuve_envoyee" : t === "annulee_reportee" ? ["annulee", "reportee", "echouee", "retournee"].includes(o.status) : t === "en_livraison" ? ["en_livraison", "recuperee"].includes(o.status) : o.status === t);
 
 export function OrderActions({ o, canConfirm, onConfirm, onPrepare, compact }) {
   const cls = `inline-flex items-center gap-1 rounded-md font-semibold ${compact ? "text-[10px] px-2 py-1" : "text-xs px-2.5 py-1.5"}`;
@@ -143,7 +143,7 @@ export default function Orders() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto scrollbar-thin pb-1 lg:flex-wrap" data-testid="orders-tabs">
-        {TABS.map(([k, l]) => <button key={k || "all"} onClick={()=>setFilter(k)} className={`dina-chip shrink-0 ${filter===k?"!bg-[#1c1c1c] !text-white":""}`} data-testid={`orders-tab-${k || "all"}`}>{k && k !== "annulee_reportee" && <span className="status-dot" style={{background:statusColor[k]}}/>}{l} <b className="tabular">{counts[k]}</b></button>)}
+        {TABS.map(([k, l]) => <button key={k || "all"} onClick={()=>setFilter(k)} className={`dina-chip shrink-0 ${filter===k?"!bg-[#1c1c1c] !text-white":""}`} data-testid={`orders-tab-${k || "all"}`}>{k && !["annulee_reportee", "wave_verif"].includes(k) && <span className="status-dot" style={{background:statusColor[k]}}/>}{l} <b className="tabular">{counts[k]}</b></button>)}
         <button onClick={()=>setFilter("unread")} className={`dina-chip shrink-0 ${filter==="unread"?"!bg-[#e53935] !text-white !border-[#e53935]":"!text-[#e53935]"}`} data-testid="orders-filter-unread"><span className="w-2 h-2 rounded-full bg-[#e53935]"/>Messages non lus ({unreadCount})</button>
       </div>
 
@@ -171,7 +171,7 @@ export default function Orders() {
               <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.customer?.name||"—"}</td>
               <td className="capitalize cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.channel}</td>
               <td className="capitalize text-xs cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{o.mode}</td>
-              <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}><span className="dina-chip" style={{color:statusColor[o.status]}}><span className="status-dot" style={{background:statusColor[o.status]}}/>{statusLabel[o.status] || o.status}</span></td>
+              <td className="cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}><span className="dina-chip" style={{color:statusColor[o.status]}}><span className="status-dot" style={{background:statusColor[o.status]}}/>{statusLabel[o.status] || o.status}</span>{o.payment_status === "preuve_envoyee" && <span className="ml-1 text-[10px] font-semibold text-[#b26a00] bg-[#fff4e0] rounded px-1.5 py-0.5" data-testid={`order-wave-verify-${o.code}`}>Wave à vérifier</span>}</td>
               <td><OrderActions o={o} canConfirm={canConfirm} onConfirm={(x) => confirm([x])} onPrepare={prepare}/></td>
               <td className="text-right tabular font-semibold cursor-pointer" onClick={()=>nav(`/console/commandes/${o.code}`)}>{fcfa(o.total)}</td>
               <td>

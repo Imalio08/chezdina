@@ -6,7 +6,7 @@ Extracted from server.py (P5 Refactor Feb 2026). The auth state (JWT secret, coo
 import random
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
 from deps import (
@@ -56,6 +56,28 @@ async def login_pin(body: PinIn, response: Response):
             u["punch_required"] = await punch_required(u)
             return {"user": u, "token": token}
     raise HTTPException(401, "PIN invalide")
+
+
+@router.post("/auth/rider-login-pin")
+async def rider_login_pin(body: PinIn, request: Request, response: Response):
+    pin = "".join(ch for ch in body.pin if ch.isdigit())
+    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
+    key = f"rider-pin:{ip}"
+    since = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+    if await db.login_attempts.count_documents({"identifier": key, "at": {"$gt": since}}) >= 8:
+        raise HTTPException(429, "Trop d'essais · réessayez dans 15 minutes")
+    if len(pin) >= 4:
+        async for u in db.users.find({"role": "rider", "active": {"$ne": False}}):
+            if verify_pw(pin, u.get("pin_hash", "")):
+                await db.login_attempts.delete_many({"identifier": key})
+                token = make_token(u["id"], u["role"])
+                response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60 * 60 * 24 * 7, path="/")
+                for k in ("_id", "password_hash", "pin_hash"):
+                    u.pop(k, None)
+                u["punch_required"] = False
+                return {"user": u, "token": token}
+    await db.login_attempts.insert_one({"identifier": key, "at": now_iso()})
+    raise HTTPException(401, "Code PIN incorrect")
 
 
 @router.get("/auth/me")

@@ -267,19 +267,19 @@ function LivraisonTab() {
 /* -------- Paiements -------- */
 function PaiementsTab() {
   const [s, setS] = useState({ methods: { cash: true, wave: true, orange: true, mtn: false, moov: false, card: false, cod: true }, wave_business: "", orange_money: "", mtn_money: "" });
-  const [extra, setExtra] = useState({ wave_payment_link: "", deposit_policy: { mode: "none", value: 0, threshold: 0 }, social: {} });
+  const [extra, setExtra] = useState({ wave_payment_link: "", wave_number: "", wave_name: "", deposit_policy: { mode: "none", value: 0, threshold: 0 }, social: {} });
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     api.get("/public/site").then(r => {
       const d = r.data || {};
       setS(prev => ({ ...prev, ...(d.payments || {}) }));
-      setExtra({ wave_payment_link: d.wave_payment_link || "", deposit_policy: d.deposit_policy || { mode: "none", value: 0, threshold: 0 }, social: d.social || {} });
+      setExtra({ wave_payment_link: d.wave_payment_link || "", wave_number: d.wave_number || "", wave_name: d.wave_name || "", deposit_policy: d.deposit_policy || { mode: "none", value: 0, threshold: 0 }, social: d.social || {} });
     }).catch(() => {});
   }, []);
   const save = async () => {
     if (busy) return;
     setBusy(true);
-    try { await api.patch("/site", { payments: s, wave_payment_link: extra.wave_payment_link, deposit_policy: extra.deposit_policy, social: extra.social }); toast.success("Modifications enregistrées · propagées sur la vitrine"); }
+    try { await api.patch("/site", { payments: s, wave_payment_link: extra.wave_payment_link, wave_number: extra.wave_number, wave_name: extra.wave_name, deposit_policy: extra.deposit_policy, social: extra.social }); toast.success("Modifications enregistrées · propagées sur la vitrine"); }
     catch { toast.error("Erreur enregistrement"); } finally { setBusy(false); }
   };
   const methods = s.methods || {};
@@ -301,6 +301,11 @@ function PaiementsTab() {
         <div className="text-xs text-[#666]">Utilisé partout où un paiement Wave est demandé (checkout, POS, orders, rider app). Le montant n'est pas inclus — la cliente le tape elle-même.</div>
         <input className="dina-input" placeholder="https://pay.wave.com/m/..." value={extra.wave_payment_link} onChange={e => setExtra({...extra, wave_payment_link: e.target.value})} data-testid="wave-payment-link"/>
         <div className="text-[11px] text-[#5867fd]">💡 Affiché avec le montant exact + référence commande à chaque envoi.</div>
+        <div className="grid sm:grid-cols-2 gap-2">
+          <input className="dina-input" placeholder="Numéro Wave de la boutique (ex : +225 07 …)" value={extra.wave_number} onChange={e => setExtra({...extra, wave_number: e.target.value})} data-testid="wave-number"/>
+          <input className="dina-input" placeholder="Nom affiché sur Wave (facultatif)" value={extra.wave_name} onChange={e => setExtra({...extra, wave_name: e.target.value})} data-testid="wave-name"/>
+        </div>
+        <div className="text-[11px] text-[#666]">La cliente voit ce numéro, paie, puis envoie sa capture d'écran. La commande n'est marquée payée qu'après votre vérification (Commandes › Paiements Wave à vérifier).</div>
       </div>
 
       <div className="dina-card-white p-5 space-y-3">

@@ -8,6 +8,7 @@ import { reveal } from "@/lib/reveal";
 import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalLink } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { useCustomer } from "@/context/CustomerContext";
+import WavePayBox from "@/components/storefront/WavePayBox";
 import { DELIVERY_ZONES as ZONES, AddressFields, emptyAddress, validAddress, toPayload, addressLine } from "@/components/storefront/AddressForm";
 
 function AddressChooser({ addresses, choice, setChoice, draft, setDraft, saveNew, setSaveNew }) {
@@ -128,8 +129,9 @@ export default function Checkout() {
       if (walletUsed && data.wallet_used !== walletUsed) toast.warning(`Porte-monnaie appliqué : ${fcfa(data.wallet_used || 0)}`);
       toast.success("Commande créée !");
       track("order_placed", { order_code: data.code, value: total });
-      if (data.status === "en_attente_acompte" && data.deposit_required > 0) {
-        setConfirmedOrder({ code: data.code, deposit: data.deposit_required, total });
+      if ((data.status === "en_attente_acompte" && data.deposit_required > 0) || method === "wave") {
+        clearCart();
+        setConfirmedOrder({ code: data.code, status: data.status, deposit_required: data.deposit_required, total: data.total, payment_method: method, payment_status: "en_attente" });
       } else {
         clearCart(); nav(`/suivi/${data.code}`);
       }
@@ -248,19 +250,13 @@ export default function Checkout() {
 
       {confirmedOrder && (
         <div className="fixed inset-0 bg-black/60 z-50 grid place-items-center p-4" data-testid="deposit-modal">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
             <div className="text-center mb-4">
-              <div className="w-14 h-14 mx-auto rounded-full bg-[#fff5f5] grid place-items-center text-[#b02a2a] mb-2"><ExternalLink size={22}/></div>
               <div className="font-serif text-xl">Commande {confirmedOrder.code} créée</div>
-              <div className="text-xs text-[#666]">Elle sera confirmée dès réception de votre acompte Wave.</div>
+              <div className="text-xs text-[#666]">{confirmedOrder.status === "en_attente_acompte" ? "Elle sera confirmée dès que la boutique aura vérifié votre acompte Wave." : "Elle sera marquée payée dès que la boutique aura vérifié votre paiement Wave."}</div>
             </div>
-            <div className="bg-[#fff5f5] p-4 rounded-lg mb-4">
-              <div className="flex items-center justify-between text-sm mb-2"><span className="text-[#666]">Montant acompte</span><span className="font-serif text-2xl text-[#b02a2a] tabular font-bold">{fcfa(confirmedOrder.deposit)}</span></div>
-              <div className="text-xs mb-2"><span className="text-[#666]">Référence à indiquer dans la note Wave</span><div className="font-mono font-bold text-[#1c1c1c] text-base flex items-center gap-2 mt-0.5">{confirmedOrder.code}<button onClick={() => copyRef(confirmedOrder.code)} className="text-[#5867fd]" data-testid="copy-ref"><Copy size={12}/></button></div></div>
-              <div className="text-xs text-[#c62828] italic">⚠️ N'oubliez pas de taper le montant exact et d'indiquer la référence dans la note du paiement Wave.</div>
-            </div>
-            <a href={paymentConfig.wave_link} target="_blank" rel="noreferrer" onClick={() => { setTimeout(() => { clearCart(); nav(`/suivi/${confirmedOrder.code}`); }, 500); }} className="dina-btn-primary w-full justify-center" data-testid="wave-pay-link"><ExternalLink size={14}/>Payer {fcfa(confirmedOrder.deposit)} avec Wave</a>
-            <button onClick={() => { clearCart(); nav(`/suivi/${confirmedOrder.code}`); }} className="dina-btn-secondary w-full mt-2 text-xs" data-testid="later-link">Je paierai plus tard — voir ma commande</button>
+            <WavePayBox order={confirmedOrder} phone={phone} onChange={() => nav(`/suivi/${confirmedOrder.code}`)}/>
+            <button onClick={() => nav(`/suivi/${confirmedOrder.code}`)} className="dina-btn-secondary w-full mt-2 text-xs" data-testid="later-link">J'enverrai la preuve plus tard — voir ma commande</button>
           </div>
         </div>
       )}

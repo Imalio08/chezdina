@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { fcfa, statusLabel, statusColor } from "@/lib/format";
+import { fcfa, statusLabel, statusColor, payInfo } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Check, X, Pencil, Trash2, Printer, Map, Shield, GripVertical, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -119,7 +119,7 @@ export default function Deliveries() {
                       <div className="flex justify-between items-start"><div className="font-medium text-xs">{o.code}</div><div className="tabular font-semibold text-xs">{fcfa(o.total)}</div></div>
                       <div className="text-[11px] text-[#666] truncate">{o.customer?.name}</div>
                       <div className="text-[11px] text-[#666] truncate">{o.delivery_zone || "—"}</div>
-                      <div className="text-[10px] text-[#999] mt-0.5">{o.items?.length || 0} art · {o.payment_method === "cod" ? <span className="text-[#c62828] font-semibold">COD {fcfa(o.total)}</span> : <span className="text-[#1f8a4c]">Payé</span>}</div>
+                      <div className="text-[10px] text-[#999] mt-0.5">{o.items?.length || 0} art · {o.payment_method === "cod" ? <span className="text-[#c62828] font-semibold">COD {fcfa(o.total)}</span> : <span style={{ color: payInfo(o).color }}>{payInfo(o).label}</span>}</div>
                     </div>
                   </div>
                 </div>
@@ -157,7 +157,7 @@ export default function Deliveries() {
                             <div className="text-[11px] text-[#666] truncate">{o.customer?.name}</div>
                             <div className="text-[11px] text-[#666] truncate">{o.delivery_zone}</div>
                             <SlotBadge order={o}/>
-                            <div className="text-[10px] tabular mt-0.5">{o.payment_method === "cod" ? <span className={o.postponed_to ? "line-through text-[#999]" : "text-[#c62828] font-semibold"}>COD {fcfa(o.total)}</span> : <span className="text-[#1f8a4c]">Payé</span>}</div>
+                            <div className="text-[10px] tabular mt-0.5">{o.payment_method === "cod" ? <span className={o.postponed_to ? "line-through text-[#999]" : "text-[#c62828] font-semibold"}>COD {fcfa(o.total)}</span> : <span style={{ color: payInfo(o).color }}>{payInfo(o).label}</span>}</div>
                           </div>
                         ))}
                       </div>

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { fcfa, statusLabel, statusColor } from "@/lib/format";
+import { fcfa, statusLabel, statusColor, payInfo } from "@/lib/format";
 import { toast } from "sonner";
 import { Phone, MapPin, Package, LogOut, History, Wallet, User, MessageCircle, Navigation, QrCode, AlertCircle, Clock, CheckCircle2, Truck } from "lucide-react";
 
@@ -95,7 +95,7 @@ export default function Rider() {
             <div className="text-sm font-medium">{o.customer?.name}</div>
             <div className="text-xs text-[#666] flex items-center gap-1 mt-1"><MapPin size={11}/>{o.delivery_zone}{o.delivery_address?` · ${o.delivery_address.slice(0,40)}`:""}</div>
             <div className="flex justify-between items-end mt-3">
-              <div className="text-xs text-[#666]">{(o.items || []).length} article(s) · {o.payment_method==="cod"?<strong className="text-[#c62828]">À encaisser {fcfa(o.total)}</strong>:<strong className="text-[#1f8a4c]">Déjà payé</strong>}</div>
+              <div className="text-xs text-[#666]">{(o.items || []).length} article(s) · {o.payment_method==="cod"?<strong className="text-[#c62828]">À encaisser {fcfa(o.total)}</strong>:<strong style={{ color: payInfo(o).color }}>{payInfo(o).paid ? "Déjà payé" : payInfo(o).label}</strong>}</div>
               <div className="tabular font-semibold text-sm">{fcfa(o.total)}</div>
             </div>
           </div>

@@ -3,7 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import api from "@/lib/api";
-import { fcfa } from "@/lib/format";
+import { fcfa, payInfo } from "@/lib/format";
 import { Phone, MessageCircle, Navigation, Package, Shuffle, ExternalLink } from "lucide-react";
 import { Link, useSearchParams } from "react-router-dom";
 
@@ -121,7 +121,7 @@ export default function Carte() {
       {selected && (
         <div className="fixed bottom-16 left-0 right-0 bg-white dark:bg-[#1a1a1a] border-t border-[#ececec] dark:border-[#2a2a2a] p-3 z-30 shadow-xl" data-testid="map-selected">
           <div className="max-w-md mx-auto">
-            <div className="flex justify-between items-start mb-2"><div><div className="font-semibold">{selected.code} · {(selected.customer?.name || "").split(" ")[0]}</div><div className="text-xs text-[#666]">{selected.customer?.quartier || selected.delivery_zone}</div><div className="text-xs mt-0.5">{selected.payment_method === "cod" ? <span className="text-[#c62828] font-semibold">COD {fcfa(selected.total)}</span> : <span className="text-[#1f8a4c]">Payé</span>}</div></div><button onClick={() => setSelected(null)} className="text-[#999]">✕</button></div>
+            <div className="flex justify-between items-start mb-2"><div><div className="font-semibold">{selected.code} · {(selected.customer?.name || "").split(" ")[0]}</div><div className="text-xs text-[#666]">{selected.customer?.quartier || selected.delivery_zone}</div><div className="text-xs mt-0.5">{selected.payment_method === "cod" ? <span className="text-[#c62828] font-semibold">COD {fcfa(selected.total)}</span> : <span style={{ color: payInfo(selected).color }}>{payInfo(selected).label}</span>}</div></div><button onClick={() => setSelected(null)} className="text-[#999]">✕</button></div>
             <div className="grid grid-cols-4 gap-1.5">
               <a href={`tel:${selected.customer?.phone?.replace(/\D/g, "")}`} className="dina-btn-secondary !min-h-[40px] text-[10px] flex-col gap-0"><Phone size={12} />Appel</a>
               <a href={`https://wa.me/${selected.customer?.phone?.replace(/\D/g, "") || ""}`} target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px] text-[10px] flex-col gap-0"><MessageCircle size={12} />WA</a>

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Routes, Route, Link, NavLink, useNavigate, useParams, Outlet, useLocation } from "react-router-dom";
 import api from "@/lib/api";
 import { fcfa, dateFmt, statusLabel, statusColor } from "@/lib/format";
+import WavePayBox, { needsWave } from "@/components/storefront/WavePayBox";
 import { reveal } from "@/lib/reveal";
 import { toast } from "sonner";
 import { useCustomer } from "@/context/CustomerContext";
@@ -459,7 +460,8 @@ function OrderDetail() {
   const { code } = useParams();
   const nav = useNavigate();
   const [d, setD] = useState(null);
-  useEffect(() => { api.get(`/public/account/order/${code}`).then(r=>setD(r.data)).catch(()=>{toast.error("Introuvable"); nav("..");}); }, [code]);
+  const load = () => api.get(`/public/account/order/${code}`).then(r=>setD(r.data)).catch(()=>{toast.error("Introuvable"); nav("..");});
+  useEffect(() => { load(); }, [code]); // eslint-disable-line
   if (!d) return <div className="text-sm text-[#666]">Chargement…</div>;
   const { order: o, rider } = d;
   const isDelivering = o.status === "en_livraison";
@@ -510,7 +512,8 @@ function OrderDetail() {
           <div className="border-t border-[#ececec] mt-2 pt-2 flex justify-between font-semibold">
             <span>Total</span><span className="tabular text-[#b02a2a]">{fcfa(o.total)}</span>
           </div>
-          <div className="mt-2 text-xs">{paid ? <span className="text-[#1f8a4c]">✓ Payé</span> : <span className="text-[#e4991e]">En attente de paiement</span>}</div>
+          <div className="mt-2 text-xs">{paid ? <span className="text-[#1f8a4c]">✓ Payé</span> : o.payment_status === "preuve_envoyee" ? <span className="text-[#e4991e]">Preuve Wave envoyée · en attente de vérification</span> : <span className="text-[#e4991e]">En attente de paiement</span>}</div>
+          {(needsWave(o) || o.wave_proof) && !paid && <div className="mt-4 pt-4 border-t border-[#ececec]" data-testid="account-wave"><WavePayBox order={o} phone={o.customer?.phone} onChange={load}/></div>}
         </div>
         <div className="dina-card-white p-5">
           <div className="font-serif text-lg mb-3">Livraison</div>

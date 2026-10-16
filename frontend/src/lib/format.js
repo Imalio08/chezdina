@@ -39,6 +39,13 @@ export const dateTimeFmt = (iso) => {
   const d = new Date(iso);
   return d.toLocaleString("fr-FR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
 };
+export const payInfo = (o) => {
+  if (o.payment_status === "paye") return { label: "Payé", color: "#1f8a4c", paid: true };
+  if (o.payment_status === "preuve_envoyee") return { label: "Wave à vérifier", color: "#e4991e" };
+  if (o.payment_status === "preuve_refusee") return { label: "Preuve Wave refusée", color: "#c62828" };
+  if (o.payment_method === "wave") return { label: "Wave non payé", color: "#c62828" };
+  return { label: "Payé", color: "#1f8a4c", paid: true };
+};
 export const statusLabel = {
   en_attente_acompte: "En attente d'acompte",
   nouvelle: "À confirmer",

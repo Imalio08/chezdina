@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
-import { fcfa } from "@/lib/format";
+import { fcfa, payInfo } from "@/lib/format";
 import { toast } from "sonner";
 import { Printer, Phone, MapPin } from "lucide-react";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
@@ -66,7 +66,7 @@ export default function FichesColis() {
               <div className="flex-1 min-w-0">
                 <div className="font-semibold text-sm">{o.code}</div>
                 <div className="text-xs text-[#666] truncate">{o.customer?.name} · {o.delivery_zone}</div>
-                <div className="text-xs tabular">{fcfa(o.total)} · {o.payment_method==="cod"?"Paiement livraison":"Payé"}</div>
+                <div className="text-xs tabular">{fcfa(o.total)} · {o.payment_method==="cod"?"Paiement livraison":payInfo(o).label}</div>
               </div>
             </label>
           ))}

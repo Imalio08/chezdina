@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
-import { fcfa, statusLabel, statusColor } from "@/lib/format";
+import { fcfa, statusLabel, statusColor, payInfo } from "@/lib/format";
 import { toast } from "sonner";
 import { Phone, MessageCircle, Navigation, ChevronRight, X, MapPin, Send } from "lucide-react";
 import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
@@ -156,7 +156,7 @@ function OrderCard({ order, onOpen }) {
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-sm">{(order.customer?.name || "").split(" ")[0]} · {order.delivery_zone}</div>
         <div className="text-[11px] text-[#666] dark:text-[#999] truncate">{order.customer?.quartier || order.note || ""}</div>
-        <div className="text-[11px] mt-0.5">{isCod ? <span className="text-[#c62828] font-semibold">COD {fcfa(order.total)}</span> : <span className="text-[#1f8a4c]">Déjà payé</span>}</div>
+        <div className="text-[11px] mt-0.5">{isCod ? <span className="text-[#c62828] font-semibold">COD {fcfa(order.total)}</span> : <span style={{ color: payInfo(order).color }}>{payInfo(order).paid ? "Déjà payé" : payInfo(order).label}</span>}</div>
         <SlotBadge order={order}/>
       </div>
       <div className="flex flex-col items-end gap-1">
@@ -220,7 +220,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
           <div className="dina-card-white p-3 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(order.subtotal || order.total)}</span></div>
             {order.delivery_fee > 0 && <div className="flex justify-between"><span className="text-[#666]">Livraison</span><span className="tabular">{fcfa(order.delivery_fee)}</span></div>}
-            <div className="flex justify-between font-semibold text-base pt-1 border-t border-[#ececec]"><span>À encaisser</span><span className="tabular text-[#b02a2a]">{order.payment_method === "cod" ? fcfa(order.total) : "0 (prépayée)"}</span></div>
+            <div className="flex justify-between font-semibold text-base pt-1 border-t border-[#ececec]"><span>À encaisser</span><span className="tabular text-[#b02a2a]">{order.payment_method === "cod" ? fcfa(order.total) : payInfo(order).paid ? "0 (prépayée)" : payInfo(order).label}</span></div>
           </div>
           <div className="grid grid-cols-2 gap-2">
             {["confirmee", "prete", "assignee"].includes(order.status) && <button onClick={() => onStatus(order.id, "en_livraison")} className="dina-btn-primary !min-h-[44px]" data-testid="status-en-route">Je démarre</button>}

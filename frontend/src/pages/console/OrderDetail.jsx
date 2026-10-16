@@ -13,6 +13,7 @@ import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from 
 import { OrderActions } from "@/pages/console/Orders";
 import { PrepRunner } from "@/pages/console/Preparation";
 import { useAuth } from "@/context/AuthContext";
+import WaveProofCard from "@/components/orders/WaveProofCard";
 
 const STATUSES = ["nouvelle", "confirmee", "en_preparation", "prete", "assignee", "en_livraison", "livree", "retournee", "annulee"];
 
@@ -135,6 +136,8 @@ export default function OrderDetail() {
           <div className="flex justify-between font-semibold text-base pt-2 border-t"><span>Total</span><span className="tabular text-[#b02a2a] text-xl">{fcfa(order.total)}</span></div>
         </div>
       </div>
+
+      <WaveProofCard order={order} canVerify={["admin", "manager"].includes(user?.role)} onDone={load}/>
 
       <div className="dina-card-white p-5" data-testid="order-status-flow">
         <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">

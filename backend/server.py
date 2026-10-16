@@ -196,9 +196,16 @@ async def list_users(user: dict = Depends(get_user)):
     rows = await db.users.find({}, {"password_hash":0,"pin_hash":0}).to_list(200)
     return clean(rows)
 
+async def _rider_pin_taken(pin: str, exclude_id: str = None) -> bool:
+    async for r in db.users.find({"role": "rider"}, {"id": 1, "pin_hash": 1}):
+        if r["id"] != exclude_id and verify_pw(pin, r.get("pin_hash", "")):
+            return True
+    return False
+
 @api.post("/users")
 async def create_user(body: UserIn, user: dict = Depends(require_role("admin"))):
     if await db.users.find_one({"email": body.email.lower()}): raise HTTPException(400, "Email déjà pris")
+    if body.role == "rider" and await _rider_pin_taken(body.pin or "0000"): raise HTTPException(400, "Ce code PIN est déjà utilisé par un autre livreur")
     doc = {"id": new_id(), "name": body.name, "email": body.email.lower(), "role": body.role,
            "phone": body.phone, "password_hash": hash_pw(body.password),
            "pin_hash": hash_pw(body.pin or "0000"), "attendance_code": body.pin or "0000",
@@ -211,7 +218,11 @@ async def create_user(body: UserIn, user: dict = Depends(require_role("admin")))
 async def update_user(uid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin"))):
     body.pop("id", None); body.pop("_id", None)
     if "password" in body: body["password_hash"] = hash_pw(body.pop("password"))
-    if "pin" in body: body["pin_hash"] = hash_pw(body.pop("pin"))
+    if "pin" in body:
+        target = await db.users.find_one({"id": uid}, {"role": 1}) or {}
+        if (body.get("role") or target.get("role")) == "rider" and await _rider_pin_taken(str(body["pin"]), uid):
+            raise HTTPException(400, "Ce code PIN est déjà utilisé par un autre livreur")
+        body["pin_hash"] = hash_pw(body.pop("pin"))
     await db.users.update_one({"id": uid}, {"$set": body})
     return {"ok": True}
 
@@ -3855,6 +3866,8 @@ async def public_payment_config():
     s = await db.site_settings.find_one({"id": "main"}) or {}
     return {
         "wave_link": s.get("wave_payment_link") or "https://pay.wave.com/m/M_ci_JFf9sWPuwent/c/ci/",
+        "wave_number": s.get("wave_number") or "",
+        "wave_name": s.get("wave_name") or "",
         "deposit_policy": s.get("deposit_policy") or {"mode": "none", "value": 0, "threshold": 0},
     }
 
@@ -5457,7 +5470,9 @@ async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Dep
         if scanned and len(scanned) < len(o.get("items",[])):
             raise HTTPException(400, f"Scan incomplet : {len(scanned)}/{len(o.get('items',[]))} articles")
     patch = {"status": new_status, "updated_at": now_iso()}
-    if new_status == "livree": patch["delivered_at"] = now_iso(); patch["payment_status"] = "paye"
+    if new_status == "livree":
+        patch["delivered_at"] = now_iso()
+        if o.get("payment_method") != "wave": patch["payment_status"] = "paye"
     if new_status == "annulee": patch["cancellation_reason"] = reason
     await db.orders.update_one({"id": oid}, {
         "$set": patch,
@@ -5720,6 +5735,8 @@ from routers.wallet import router as wallet_router  # noqa: E402
 app.include_router(wallet_router)
 from role_access import router as role_router, LimitedRoleFieldFilter  # noqa: E402
 app.include_router(role_router)
+from routers.wave_pay import router as wave_router  # noqa: E402
+app.include_router(wave_router)
 app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:
