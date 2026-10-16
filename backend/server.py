@@ -5537,6 +5537,12 @@ async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Dep
     if new_status == "annulee" and o.get("status") != "annulee":
         await _restock_order(o)
     patch = {"status": new_status, "updated_at": now_iso()}
+    if new_status == "prete":
+        sc = body.get("scanned_items") or []
+        patch["prep_scan"] = {"items": sc, "by": user.get("name"), "at": now_iso()}
+        manual = [f"{(o.get('items') or [{}])[i].get('name', '?')} : {s.get('manual_reason')}" for i, s in enumerate(sc) if s.get("manual")]
+        if manual and not reason:
+            reason = "Validation manuelle · " + " ; ".join(manual)
     if new_status == "livree":
         patch["delivered_at"] = now_iso()
         if o.get("payment_method") != "wave": patch["payment_status"] = "paye"

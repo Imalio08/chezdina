@@ -78,7 +78,8 @@ def test_2_console_flow(admin):
     for st in ("confirmee", "en_preparation"):
         assert admin.patch(f"{BASE_URL}/api/orders/{oid}/status-v3", json={"status": st}).status_code == 200
     o = mdb.orders.find_one({"id": oid})
-    scanned = [{"line_index": i, "product_id": it["product_id"], "scanned": True} for i, it in enumerate(o["items"])]
+    # stricter contract (iteration_85): scanned_qty must reach qty for each scanned line
+    scanned = [{"line_index": i, "product_id": it["product_id"], "scanned": True, "scanned_qty": it["qty"]} for i, it in enumerate(o["items"])]
     assert admin.patch(f"{BASE_URL}/api/orders/{oid}/status-v3", json={"status": "prete", "scanned_items": scanned}).status_code == 200
     r = admin.post(f"{BASE_URL}/api/delivery-sessions", json={"rider_id": R1["id"], "rider_name": R1["name"], "date": "2026-01-16"})
     assert r.status_code == 200, r.text

@@ -1,0 +1,62 @@
+{
+  "summary": "Retest of the fixes from iteration_84 (Chez Dina final audit §15). Backend: new file test_final_audit_15_retest.py (17 tests) plus the previous suites, with test_2 in the e2e file updated to the new scanned_qty contract. All 41 tests pass. UI tested with Playwright on desktop 1920, tablet 1024x768 and 768x1024, and mobile 390. Every fix listed in the request works. Three new issues found: (1) order items carry no 'sku' (0 of 630 orders), so scanning the real product SKU or barcode answers 'Code inconnu' and only the product UUID can be scanned; (2) the manual-override reason and scanned_items are not stored on the order or in audit_log; (3) one old cash session (validated before the closed=True fix) is still closed=False, so it shows as 'Session en cours' and hides the 'Ouvrir une session' button. All TEST data was deleted and stock of DEMO-100 restored exactly.",
+  "feature_table": [
+    {"feature": "Preparation scan: size alone ('39') rejected", "status": "validée", "evidence": "toast 'Code inconnu dans cette commande · vérifiez l'article (SKU ou SKU|taille|couleur)', line stays 0/2"},
+    {"feature": "Preparation scan: SKU and SKU|taille|couleur, qty 2 needs 2 scans, 3rd scan says 'Déjà complet'", "status": "validée", "evidence": "prep-line-count-0 shows 1/2 then 2/2; 3rd scan toast 'Déjà complet : Mules Raphia Naturel (2/2) · article en trop'; prep-progress '1 / 2 lignes · 2 / 3 pièces'"},
+    {"feature": "Preparation scan with real order data", "status": "à corriger (HIGH)", "anomaly": "Order items do not store sku (0/630 orders). The line shows '—' as SKU, and scanning the product SKU (e.g. DEMO-102) answers 'Code inconnu'. Only the product UUID matches. The scan only worked in my test because I seeded an order with items[].sku.", "fix": "Store sku (and barcode/ean) on items at order creation (public, POS, AI, console), or enrich items with the product SKU in GET /orders or in PrepRunner (load the products), or match against the product's SKU and variant SKU (DEMO-100-39)"},
+    {"feature": "Manual override: reason select starts empty and a reason is required", "status": "validée (with reservations)", "evidence": "prep-manual-reason starts at '', confirm without a reason shows 'Motif obligatoire' and the modal stays open; after choosing a reason the line is OK, then Prête (200)", "anomaly": "The reason is NOT saved: status-v3 does not save scanned_items or manual_reason (timeline reason '' and audit_log after.reason ''), even though the modal says 'sera enregistré dans le journal d'audit'", "fix": "In update_order_status_v3 for prete, save scanned_items in patch (prep_scan) and add the manual reasons to the timeline and audit_log"},
+    {"feature": "Preparation on tablet 1024x768 / 768x1024", "status": "validée", "evidence": "No horizontal scroll (scrollWidth 768), sticky 'Marquer Prête' button visible", "anomaly": "Sonner toasts (top right) cover the prep-progress counter", "fix": "Move the toasts to the bottom on this screen or move the counter"},
+    {"feature": "Backend status-v3 prete contract", "status": "validée", "evidence": "400 for empty scanned_items, missing scanned_items, a missing line, scanned without scanned_qty, scanned_qty 1/2, manual with a blank reason, scanned=false/manual=false; 200 for a valid payload; PATCH /status prete returns 400 and the status is unchanged"},
+    {"feature": "Cancel order restores stock once", "status": "validée", "evidence": "/status and /status-v3: stock, stock_by_size and variants.$.stock go back to their exact values, restocked_at is set; a 2nd cancel through either endpoint and a forced status reset followed by a new cancel do not double", "anomaly": "Only 'annulee' restocks; 'retournee' and 'echouee' do not (confirm this is the intended business rule)"},
+    {"feature": "Console product form keeps cost, stock = sum of variants", "status": "validée", "evidence": "pfv-cost loaded 12250 from GET /api/products/{pid}; after editing variant 39/Noir 4→5 the PATCH sends cost 12250 and stock 19, and the DB has stock 19 = sum of variants, stock_by_size {39:5}", "anomaly": "The 'Stock initial' size table (pfv-stock-*) is still shown and editable next to the variants grid with a different total (18 vs 19), and edits in it are silently overwritten on save. The payload spreads the whole form state (writes empty description, seo_*, tags, etc.)", "fix": "Hide the size table or make it read-only when variants exist"},
+    {"feature": "GET /api/products/{pid} (staff only)", "status": "validée", "evidence": "admin 200 with cost and no _id; rider 403; anonymous 401/403; unknown id 404; /products/kpis still resolves (not shadowed). Vendeuse (sales) gets 200 because require_role lets sales inherit manager"},
+    {"feature": "Commandes: Échecs tab, postponed orders under Annulées / Reportées", "status": "validée", "evidence": "orders-tab-echouee 'Échecs 3' = DB 3; Annulées / Reportées 31 = 27 annulee/reportee/retournee + 4 confirmee with rescheduled_for", "anomaly": "Postponed orders are also counted in 'À préparer' (counted twice across tabs, which may be intended)"},
+    {"feature": "Commandes → 'Commande depuis un message' → POS paste modal", "status": "validée", "evidence": "orders-from-message opens /console/pos?coller=1 with paste-wa-modal; data-testid pos-paste-wa appears only once; an unmatched item shows the paste-wa-pick-0 select (39 products), and after picking it becomes a priced line", "anomaly": "The picked product has no size/colour choice ('sans variante'). ?coller=1 stays in the URL after closing, so a reload reopens the modal", "fix": "Add size/colour selects after picking; remove the query param on close"},
+    {"feature": "AI parse possible_duplicate", "status": "validée", "evidence": "API: possible_duplicate.code is the seeded order for the same phone and product within 24h, and nothing for another phone. UI: paste-wa-duplicate warning shown; the confirm dialog blocks on Cancel and fills the cart on OK (1 article, 26 500 FCFA)"},
+    {"feature": "Cash handover: reject requires a category, gérante notification, declare guards, validate closes", "status": "validée", "evidence": "reject without or with an invalid category returns 400; user_notifications {kind:staff, target_id: manager id, ref: sid}; declare returns 400 for pending_validation/validated/gap and 403 for sales; validate sets closed True and closed_at; the UI row shows '45 000 FCFA · écart -5 000 FCFA' and 'Écart de caisse'; the modal blocks without a category"},
+    {"feature": "Cash sessions: old data", "status": "à corriger", "anomaly": "Session 36f814ab-92ed-498b-a352-1a4782d6ace1 (10/10, status validated, closed False, validated before the fix) is still picked as 'Session en cours' (sessions.find(!closed)). This hides 'Ouvrir une session' and shows 'Clôturer la journée' on a validated session", "fix": "One-off migration: db.cash_sessions.update_many({status:{$in:['validated','gap']}, closed:{$ne:true}}, {$set:{closed:true}})"},
+    {"feature": "Regression: rider versement reject → resubmit → validate", "status": "validée", "evidence": "test_final_audit_15 TestVersementReject 5/5"},
+    {"feature": "Regression: storefront swatches + checkout", "status": "validée", "evidence": "Mobile 390: product-color-Noir/Blanc/Nude, size 38 shows '3 restants', add to cart, COD checkout creates the order and opens the deposit modal. E2E storefront → console → rider → livrée → tracking passes", "anomaly": "Data: DEMO-100 'Mules Raphia Naturel' is in category 'Cabas', so the page says 'Taille' instead of 'Pointure' and the form offers clothing sizes"}
+  ],
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "PATCH /api/orders/{id}/status-v3 (prete)", "issue": "scanned_items and manual_reason are not saved (no trace of the manual override in the order, timeline or audit_log)"},
+      {"endpoint": "Order creation (public/POS/AI)", "issue": "items[] have no sku/barcode, so preparation cannot match a real product SKU scan"},
+      {"endpoint": "cash_sessions data", "issue": "Old validated session with closed=False is still treated as the current session"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "PrepRunner", "issue": "Scanning the product SKU fails on real orders (item.sku missing; line shows '—')", "selector": "[data-testid=prep-scan-input]", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Manual override audit", "issue": "Reason chosen in prep-manual-reason is never saved by the backend", "affected_selectors": ["[data-testid=prep-manual-confirm]", "[data-testid=prep-mark-ready]"]}
+    ],
+    "design_issues": [
+      {"screen": "Preparation", "issues": ["Toasts cover the prep-progress counter at top right"]},
+      {"screen": "ProductFormV3", "issues": ["Size table and variants grid show two different stock totals for variant products; the size table is editable but ignored on save"]},
+      {"screen": "PosPasteWA", "issues": ["A product picked for an unmatched item has no size/colour selector", "?coller=1 stays in the URL after closing"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_final_audit_15_retest.py", "/app/backend/tests/test_final_audit_15.py", "/app/backend/tests/test_final_audit_15_e2e.py", "/app/backend/tests/seed_aud85_ui.py", "/app/test_reports/pytest/pytest_aud85.xml"],
+  "action_items": [
+    "HIGH: Put sku (plus variant SKU/barcode) on order items at creation, or enrich them for PrepRunner, so a real SKU/barcode scan matches (today only the product UUID works)",
+    "Save scanned_items and the manual override reasons in update_order_status_v3 (order.prep_scan plus timeline/audit_log)",
+    "Migrate old cash_sessions with status validated/gap and closed != true to closed=True (session 36f814ab... is blocking 'Ouvrir une session')",
+    "Optional: hide or lock the size stock table in ProductFormV3 when variants exist; size/colour picker after paste-wa-pick; remove ?coller=1 on close; restock on retournee if that is the business rule"
+  ],
+  "critical_code_review_comments": [
+    "PrepRunner.matches splits the scan on whitespace and '_', so colours with spaces ('Rose poudré', 'Vert émeraude') can never match in SKU|taille|couleur format; split only on '|'",
+    "require_role lets sales inherit manager: GET /products/{pid} (and the GET /products list) exposes cost to the vendeuse; strip cost for sales if that is sensitive",
+    "ProductFormV3 save sends {...f} (the whole document, including rating fields and created_at); send a whitelist instead",
+    "_restock_order runs for any cancel, including orders whose stock was never decremented (e.g. old or seeded orders without a stock movement); consider a 'stock_reserved' flag"
+  ],
+  "updated_files": ["/app/backend/tests/test_final_audit_15_e2e.py", "/app/backend/tests/test_final_audit_15_retest.py", "/app/backend/tests/seed_aud85_ui.py"],
+  "success_rate": {"backend": "100% (41/41)", "frontend": "~88% (15/17 checks validated; prep scan with real SKUs and saving the override reason are to fix)"},
+  "seed_data_creation": "Temporary only: TEST-AUD85-* orders, test-aud85-* cash sessions, attendance and notifications, all deleted. DEMO-100 stock/stock_by_size/variants restored from a snapshot after the product-form and checkout tests. Checkout order DN-261016-5402 (TEST_AUD85 Checkout) deleted. Final DB: 630 orders, no TEST data, every variant product has stock = sum of variants.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: cd /app/backend && pytest tests/test_final_audit_15_retest.py tests/test_final_audit_15.py tests/test_final_audit_15_e2e.py -n 0. Sales/manager need a today attendance doc or the API returns 428 (the fixtures insert one). UI: log in by setting localStorage dina_token from /api/auth/login. Prep UI seed: python tests/seed_aud85_ui.py seed|clean (order TEST-AUD85-PREP with items[0].sku=DEMO-100; items[1] has no sku, like real orders). To retest the SKU fix, seed an order WITHOUT items.sku and scan the product SKU.",
+  "test_credentials": "From /app/memory/test_credentials.md (admin aouattaraesca@gmail.com / Admin123!, manager, agent1, rider PIN 5555). Auth playbook not retested in this iteration (out of scope)."
+}

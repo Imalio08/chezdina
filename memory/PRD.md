@@ -1144,5 +1144,17 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Manuel livreur : section « Mode hors ligne » (add-rider-offline).
 - Testé : iteration_83 (scénario complet en mode avion, conflit de réaffectation) + corrections ; pytest 11/11. Données TEST supprimées.
 
+
+
+## 2026-10-16 — Audit final §15
+- Catalogue : 48 photos stock enregistrées dans /frontend/public/catalog ; chaque produit ≥3 images ; 19/38 produits avec variantes couleur × taille (stock réparti) ; script backend/scripts/catalog_illustrate.py. Couleurs affichées en pastilles (lib/colors.jsx), sélecteur taille masqué si « Unique ». Stock des variantes décrémenté à la commande (deps.inc_variant) et restauré à l'annulation (_restock_order, une seule fois).
+- Versements livreurs : bouton Rejeter (catégorie + motif + montant remis/écart, historique), livreur voit le rejet dans Mon solde et renvoie une correction (POST /riders/me/versements/{sid}/{oid}/resubmit), console « Corrigé : X ».
+- Versements gérantes : Valider/Rejeter (propriétaire) aussi dans l'historique ; rejet = catégorie + montant attendu + écart + motif, handover_history, notification à la gérante (manager_id) ; garde-fous déclaration/validation ; validation ferme la session.
+- Préparation : scan strict (SKU produit/variante ou SKU|taille|couleur, quantités pièce par pièce, « Déjà complet »), motif manuel obligatoire et enregistré (prep_scan + timeline) ; /status ne peut plus marquer Prête.
+- Commandes : onglet Échecs, reportées visibles, bouton « Commande depuis un message » (Caisse), choix manuel des articles non reconnus, alerte doublon 24 h ; catalogue entier envoyé à l'IA ; liste jusqu'à 5000 commandes.
+- Fiche produit console : coût conservé (GET /api/products/{pid}), stock = somme des variantes.
+- Testé : iteration_84 (audit complet) + iteration_85 (retest) + pytest 41/41. Données TEST supprimées.
+- Reste : photos de stock ne correspondent pas toujours à la couleur du produit ; tableau de stock par taille encore modifiable quand des variantes existent ; pas de sélecteur taille/couleur après choix manuel d'un article dans « Commande depuis un message ».
+
 - Testé : API (numéro trop court refusé), page Paramètres (pas de sélecteur, enregistrement du nom puis restauration).
 

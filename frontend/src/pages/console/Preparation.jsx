@@ -191,6 +191,10 @@ export function PrepRunner({ order, onBack }) {
   const [reason, setReason] = useState("");
   const [customReason, setCustomReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [codes, setCodes] = useState({});
+  useEffect(() => {
+    api.get("/products").then(r => setCodes(Object.fromEntries((r.data || []).map(p => [p.id, { sku: p.sku, barcode: p.barcode || p.ean, variants: p.variants || [] }])))).catch(() => {});
+  }, []);
   const inputRef = useRef(null);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
@@ -200,8 +204,12 @@ export function PrepRunner({ order, onBack }) {
   const matches = (scan, item) => {
     const parts = norm(scan).split(/[|,;_\s]+/).filter(Boolean);
     if (!parts.length) return false;
-    const codes = [item.sku, item.barcode, item.ean, item.product_id].map(norm).filter(c => c.length > 2);
-    if (!codes.includes(parts[0])) return false;
+    const p = codes[item.product_id] || {};
+    const v = (p.variants || []).find(x => x.size === item.size && x.color === item.color) || {};
+    const base = [item.sku, item.barcode, item.ean, item.product_id, p.sku, p.barcode].map(norm).filter(c => c.length > 2);
+    if ([v.sku, v.barcode].map(norm).filter(c => c.length > 2).includes(parts[0]) || (p.sku && item.size && norm(`${p.sku}-${item.size}`) === parts[0])) return true;
+    const codesList = base;
+    if (!codesList.includes(parts[0])) return false;
     const [, s, c] = parts;
     if (s && item.size && norm(item.size) !== s) return false;
     if (c && item.color && norm(item.color) !== c) return false;
@@ -297,7 +305,7 @@ export function PrepRunner({ order, onBack }) {
               <div className="flex-1 min-w-0">
                 <div className="font-serif text-base truncate">{l.item.name}</div>
                 <div className="text-xs text-[#666] flex items-center gap-2 flex-wrap">
-                  <span className="font-mono">{l.item.sku || "—"}</span>
+                  <span className="font-mono">{l.item.sku || codes[l.item.product_id]?.sku || "—"}</span>
                   {l.item.size && <span>· Taille <b>{l.item.size}</b></span>}
                   {l.item.color && <span>· Couleur <b>{l.item.color}</b></span>}
                   <span>· Qté <b>{l.item.qty}</b></span>
