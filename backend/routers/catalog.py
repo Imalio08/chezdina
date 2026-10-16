@@ -102,6 +102,10 @@ async def update_brand(bid: str, body: Dict[str, Any], user: dict = Depends(requ
     body.pop("id", None)
     body["updated_at"] = now_iso()
     old = await db.brands.find_one({"id": bid})
+    if not old and bid.startswith("name:"):
+        old = {"id": new_id(), "name": bid[5:], "status": "active", "created_at": now_iso()}
+        await db.brands.insert_one(dict(old))
+        bid = old["id"]
     if not old:
         raise HTTPException(404, "Marque introuvable")
     if body.get("name") and old.get("name") and old["name"] != body["name"]:
@@ -138,7 +142,7 @@ async def list_brands_full(user: dict = Depends(get_user)):
         products_rows = await db.products.find({"brand": name}).to_list(500)
         margins = [((p["price"] - p["cost"]) / p["price"] * 100) for p in products_rows if p.get("price", 0) > 0 and p.get("cost", 0) > 0]
         out.append({
-            "id": s.get("id") or new_id(),
+            "id": s.get("id") or f"name:{name}",
             "name": name,
             "logo": s.get("logo", ""),
             "note": s.get("note", ""),
@@ -153,6 +157,8 @@ async def list_brands_full(user: dict = Depends(get_user)):
 @router.get("/brands/{bid}")
 async def brand_detail(bid: str, user: dict = Depends(get_user)):
     b = await db.brands.find_one({"id": bid})
+    if not b and bid.startswith("name:"):
+        b = await db.brands.find_one({"name": bid[5:]}) or {"id": bid, "name": bid[5:], "note": "", "logo": "", "status": "active"}
     if not b:
         b = {"id": bid, "name": bid, "note": "", "logo": "", "status": "active"}
     name = b.get("name")

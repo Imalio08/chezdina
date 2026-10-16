@@ -126,8 +126,8 @@ h1,h2,h3,.font-serif { font-family: 'Sora','Inter',sans-serif; font-weight: 600;
 .dina-card-white { background: #ffffff; border: 1px solid var(--dina-border); border-radius: 12px; }
 /* Never cut KPI values or labels inside cards: wrap instead of ellipsis, shrink on small screens */
 .dina-card-white .font-serif.tabular.truncate, .dina-card .font-serif.tabular.truncate,
-.dina-card-white .uppercase.truncate, .dina-card .uppercase.truncate { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
-.dina-card-white .font-serif.tabular, .dina-card .font-serif.tabular { overflow-wrap: anywhere; min-width: 0; }
+.dina-card-white .uppercase.truncate, .dina-card .uppercase.truncate { white-space: normal; overflow: visible; text-overflow: clip; overflow-wrap: break-word; word-break: normal; hyphens: auto; }
+.dina-card-white .font-serif.tabular, .dina-card .font-serif.tabular { overflow-wrap: break-word; min-width: 0; }
 @media (max-width: 640px) { .dina-card-white .font-serif.tabular.text-2xl, .dina-card-white .font-serif.tabular.text-xl { font-size: 1.05rem; line-height: 1.3; } }
 .dina-chip { white-space: nowrap; }
 

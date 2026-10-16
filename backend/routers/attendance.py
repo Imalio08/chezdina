@@ -142,7 +142,7 @@ async def attendance_stats(eid: str, days: int = 30, user: dict = Depends(presen
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
     rows = await db.attendance.find({"user_id": eid, "day": {"$gte": cutoff}}).to_list(1000)
     worked_days = len({r["day"] for r in rows if r["kind"] == "arrival"})
-    late_count = sum(1 for r in rows if r["kind"] == "arrival" and r.get("late"))
+    late_count = len({r["day"] for r in rows if r["kind"] == "arrival" and r.get("late")})
     total_late_min = sum(r.get("late_min", 0) for r in rows)
     outside = sum(1 for r in rows if r.get("outside"))
     arrivals = [r for r in rows if r["kind"] == "arrival" and r.get("at")]
@@ -157,7 +157,7 @@ async def attendance_stats(eid: str, days: int = 30, user: dict = Depends(presen
     return {
         "worked_days": worked_days, "late_count": late_count, "late_min_total": total_late_min,
         "outside_count": outside,
-        "punctuality_pct": round((worked_days - late_count) / max(1, worked_days) * 100, 1),
+        "punctuality_pct": max(0.0, min(100.0, round((worked_days - late_count) / max(1, worked_days) * 100, 1))),
         "avg_arrival": avg_arrival_h,
     }
 
@@ -175,8 +175,8 @@ async def attendance_all_stats(days: int = 30, user: dict = Depends(presence_vie
         rows = await db.attendance.find({"user_id": u["id"], "day": {"$gte": cutoff}}).to_list(1000)
         arr_rows = [r for r in rows if r.get("kind") == "arrival"]
         worked_days = len({r["day"] for r in arr_rows})
-        late_count = sum(1 for r in arr_rows if r.get("late"))
-        late_min_total = sum(r.get("late_min", 0) for r in arr_rows)
+        late_count = len({r["day"] for r in arr_rows if r.get("late")})
+        late_min_total = sum(max((x.get("late_min", 0) for x in arr_rows if x["day"] == d), default=0) for d in {r["day"] for r in arr_rows})
         absences = max(0, days - worked_days)
         avg_arrival_h = None
         if arr_rows:
@@ -192,7 +192,7 @@ async def attendance_all_stats(days: int = 30, user: dict = Depends(presence_vie
             "worked_days": worked_days, "absences": absences,
             "late_count": late_count, "late_min_total": late_min_total,
             "avg_arrival": avg_arrival_h,
-            "punctuality_pct": round((worked_days - late_count) / max(1, worked_days) * 100, 1),
+            "punctuality_pct": max(0.0, min(100.0, round((worked_days - late_count) / max(1, worked_days) * 100, 1))),
         })
     return {"period_days": days, "rows": out}
 

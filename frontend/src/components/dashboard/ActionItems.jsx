@@ -28,7 +28,7 @@ export default function ActionItems() {
     <div className="space-y-2">
       <div className="font-semibold text-sm flex items-center gap-2"><Clock size={14} className="text-[#b02a2a]"/>À traiter maintenant</div>
       <div className="text-xs text-[#666]">Actions urgentes qui demandent une intervention · mis à jour chaque minute</div>
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-2.5">
+      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-2.5">
         {CARDS.map(c => {
           const d = data[c.key] || { count: 0 };
           const empty = !d.count;

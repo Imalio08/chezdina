@@ -115,8 +115,8 @@ export default function Pointage() {
       { k: "worked_days", t: "Jours", w: 20, right: true },
       { k: "absences", t: "Absences", w: 22, right: true },
       { k: "late_count", t: "Retards", w: 22, right: true },
-      { k: "late_min_total", t: "Min retard", w: 24, right: true },
-      { k: "avg_arrival", t: "Arrivée moy.", w: 28 },
+      { k: "late_min_total", t: "Minutes de retard", w: 24, right: true },
+      { k: "avg_arrival", t: "Arrivée moyenne", w: 28 },
       { k: "punctuality_pct", t: "Ponctualité", w: 25, right: true },
     ];
     let x = 10;
@@ -196,11 +196,11 @@ export default function Pointage() {
                 <tr>
                   <th className="text-left">Employé</th>
                   <th className="text-left">Rôle</th>
-                  <th className="text-right">Jours trav.</th>
+                  <th className="text-right">Jours travaillés</th>
                   <th className="text-right">Absences</th>
                   <th className="text-right">Retards</th>
-                  <th className="text-right">Min retard</th>
-                  <th>Arrivée moy.</th>
+                  <th className="text-right">Minutes de retard</th>
+                  <th>Arrivée moyenne</th>
                   <th className="text-right">Ponctualité</th>
                   <th></th>
                 </tr>
@@ -209,7 +209,7 @@ export default function Pointage() {
                 {allStats.rows.map(r => (
                   <tr key={r.user_id} className="hover:bg-[#fff5f5] dark:hover:bg-[#2a1818]" data-testid={`stat-row-${r.user_id}`}>
                     <td className="font-medium">{r.name}</td>
-                    <td className="text-[#666] capitalize">{r.role}</td>
+                    <td className="text-[#666]">{ROLE_LABELS[r.role] || (r.role === "admin" ? "Propriétaire" : r.role === "rider" ? "Livreur" : r.role)}</td>
                     <td className="text-right tabular">{r.worked_days}</td>
                     <td className={`text-right tabular ${r.absences > 5 ? "text-[#c62828] font-semibold" : ""}`}>{r.absences}</td>
                     <td className={`text-right tabular ${r.late_count > 3 ? "text-[#e4991e] font-semibold" : ""}`}>{r.late_count}</td>
@@ -240,7 +240,7 @@ export default function Pointage() {
             <button key={a.id} onClick={() => openEmployee(a.user_id)} className="w-full flex items-center gap-3 p-2.5 rounded-lg hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] text-left" data-testid={`punch-${a.id}`}>
               {a.selfie ? <img src={a.selfie} alt="" className="w-10 h-10 rounded-full object-cover scale-x-[-1]"/> : <div className="w-10 h-10 rounded-full bg-[#fde8e8] grid place-items-center font-bold text-[#b02a2a]">{a.user_name?.[0]}</div>}
               <div className="flex-1 min-w-0">
-                <div className="text-sm font-medium truncate">{a.user_name} · <span className="text-[#666] text-xs capitalize">{a.user_role}</span></div>
+                <div className="text-sm font-medium truncate">{a.user_name} · <span className="text-[#666] text-xs">{ROLE_LABELS[a.user_role] || (a.user_role === "admin" ? "Propriétaire" : a.user_role === "rider" ? "Livreur" : a.user_role)}</span></div>
                 <div className="text-xs text-[#666]">{timeOf(a.at)} · {a.method === "tablet" ? "tablette" : "téléphone"}{a.late ? ` · retard ${a.late_min} min` : ""}</div>
               </div>
               <div className="flex flex-col items-end gap-0.5">

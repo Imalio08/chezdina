@@ -1156,5 +1156,18 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_84 (audit complet) + iteration_85 (retest) + pytest 41/41. Données TEST supprimées.
 - Reste : photos de stock ne correspondent pas toujours à la couleur du produit ; tableau de stock par taille encore modifiable quand des variantes existent ; pas de sélecteur taille/couleur après choix manuel d'un article dans « Commande depuis un message ».
 
+
+
+## 2026-10-16 — Réorganisation des onglets et affichage
+- Ventes › Opportunités (/console/opportunites) : sous-onglets Liste d'attente / Demandes hors catalogue / Paniers abandonnés + 5 KPI communs ; anciennes URL redirigées.
+- Caisse : bandeau de session (ouverte depuis HHhMM · gérante + Fermer la session / Aucune session ouverte + Ouvrir la session, ventes bloquées). Sessions de caisse inchangée (suivi).
+- Produits & achats › Catégories & marques (?tab=cats|cols|marques) ; /console/marques redirigé ; ids de marques stables (« name:… ») + création de la fiche marque au premier enregistrement.
+- Équipe › Présences (/console/presences) : accès propriétaire + rôles cochés (site_settings.presence_roles, GET/PATCH /api/attendance/access, presence_viewer) ; lien kiosque ; ponctualité par jour et bornée 0–100 ; libellés complets, rôles en français.
+- Paramètres › Sécurité & audit : réglages + Journal d'audit (propriétaire) ; /console/audit redirigé.
+- Textes coupés : règles CSS globales dans les cartes (plus d'ellipses sur valeurs/libellés), montants compacts + montant exact au survol (Produits, Opportunités, Paniers), libellés sans abréviation (Valeur au coût, Valeur de vente, Marge moyenne, Chiffre d'affaires 30 jours…), cartes « À traiter » sur 4 colonnes en tablette.
+- Manuel : sections add-pos-session-banner, add-handover-reject, add-versement-reject, add-console-nav-2026.
+- Testé : iteration_86 (bug critique Paniers corrigé par le testeur) + corrections vérifiées (marques, ponctualité, KPI en double, capture 1024 px).
+- Reste : noms de produits coupés sur quelques vignettes (Caisse, fiche marque, cartes produit), barre de recherche étroite à 1024 px, en-tête app livreur coupé à 390 px.
+
 - Testé : API (numéro trop court refusé), page Paramètres (pas de sélecteur, enregistrement du nom puis restauration).
 

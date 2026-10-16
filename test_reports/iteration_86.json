@@ -1,0 +1,50 @@
+{
+  "summary": "Frontend testing of the Chez Dina tab reorganisation, using Playwright with an admin token, a manager token and a rider token, at 1920, 1024 and 390 widths. Working: the sidebar structure; redirects for liste-attente, paniers-abandonnes, marques, presence and audit; the Opportunités KPIs (compact value with the exact amount on hover); the waitlist and out-of-catalogue sub-tabs; the POS session banner in both states (opened and closed a TEST session through the banner, then deleted it); the Présences RBAC (manager blocked from the UI and the API with 403, allowed after admin ticks Gérante, then restored to []); Paramètres > Sécurité & audit with filters and export; manager has no access to Paramètres or audit; the 3 manual sections exist (checked with the manual search API). CRITICAL bug found and FIXED: the Paniers abandonnés sub-tab crashed with 'ReferenceError: fcfaCompact is not defined' because AbandonedCarts.jsx did not import it. Remaining issues: brand detail is broken (random ids); Présences punctuality can be negative; the 1024 dashboard action cards break words in the middle; several cut or abbreviated labels remain.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/brands/full + GET /api/brands/{bid}", "issue": "The db.brands collection is empty, so /brands/full gives brands found only on products a fresh new_id() on every call. GET /brands/{bid} then cannot find that id and returns a stub with name=id, 0 products and 0 FCFA. Clicking the Dina Carry card (14 products) opens a detail page titled with a UUID and 'Aucun produit pour cette marque'.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/attendance/all-stats and /attendance/stats/{eid}", "issue": "late_count counts every arrival row, and there can be several per day (arrival, departure, arrival again), while worked_days counts distinct days. Punctuality shows -400% or -200% for Fatou Konaté. Absences = days - worked_days also counts days off and weekends. Hours worked are not computed, although the subtitle promises 'heures travaillées'."},
+      {"endpoint": "GET /api/attendance/stats/{own id}", "issue": "A manager without presence access cannot see her own stats (403). Acceptable, but say so in the manual."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AbandonedCarts (Opportunités > Paniers abandonnés)", "issue": "Crashed into the ErrorBoundary because fcfaCompact was not imported. FIXED by the testing agent; re-verified: table, detail panel (ac-detail-panel / ac-detail-relaunch) and KPIs all render.", "selector": "[data-testid=abandoned-carts-page]", "priority": "CRITICAL (fixed)"},
+      {"component": "MarquesV2 brand detail", "issue": "Opens the wrong or empty brand (see backend issue)", "selector": "[data-testid^=brand-card-]", "priority": "HIGH"},
+      {"component": "Dashboard 'À traiter maintenant' at 1024px", "issue": "8 action cards in one row are too narrow. The labels break in the middle of words ('À CONFIR MER', 'À PRÉPARE R', 'ABANDO NNÉS', 'RUPTURE S', badge '181 j' on 2 lines) and the subtitles are cut with an ellipsis ('Comma…', 'Confirm…', 'Yao:4 · —…'). Cause: index.css:129 sets overflow-wrap:anywhere on .uppercase labels, plus too many grid columns below xl.", "selector": "[data-testid^=action-]", "priority": "HIGH"},
+      {"component": "Console top bar at 1024px", "issue": "The search field collapses to almost zero width; the 'Ctrl K' chip overlaps the logo area, and the logo appears both in the sidebar and in the top bar.", "selector": "header search", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Opportunités", "issues": ["Duplicate KPI rows: the top 5 KPIs repeat inside each sub-tab ('Demandes en attente 104' twice, 'Paniers abandonnés 158' twice, 'Taux de récupération' twice). Hide the inner KPI rows when embedded.", "The abandoned-carts table only fills about 60% of the card width at 1920", "Inconsistent formats: '0 %' vs '0%'; the button reads '+ Créer une offre de relance' and also has an icon (double +)"]},
+      {"screen": "Remaining abbreviations (requirement: labels in full)", "issues": ["Brand cards: 'Marge moy.' and 'CA 30j'", "Présences table: 'JOURS TRAV.', 'MIN RETARD', 'ARRIVÉE MOY.'; raw role keys 'Stock_keeper' and 'Community_manager' instead of French labels", "Product grid cards: 'Stk 52 · 6t·3c', '1/30j'; price wraps as '29 500 / FCFA' with the old price on a third line at 1024"]},
+      {"screen": "Remaining cut text", "issues": ["Product card names cut by line-clamp at 1024 and 390 (product-card-*: 'Sandales Bordeaux Plateforme', 'Pochette Enveloppe Noir Soirée')", "POS shortcut tiles: 'Sac à Main Rouge…', 'Escarpins Blanc…' cut with an ellipsis at 1920", "Rider app header (rider-gps-indicator): 'Chez Dina · Liv…' cut at 390", "Storefront checkout at 390: cart-item name 'Escarpins Satin Ro…' cut", "Dashboard at 390: top-product-* names cut", "Présences: the period select '30 jours' is clipped and misaligned with the CSV/PDF buttons; the access bar sits above the page title"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Fix brand ids: in /brands/full use a stable id (e.g. s.get('id') or the brand name or a slug), and in /brands/{bid}, when no stored brand is found, fall back to matching by name or slug (or persist the derived brands to db.brands)",
+    "Fix punctuality: count late arrivals per distinct day (first arrival of the day) and clamp to 0–100; compute absences on working days only; add hours worked",
+    "Dashboard action cards: use fewer columns below xl (e.g. grid-cols-4 at md/lg) and replace overflow-wrap:anywhere on .uppercase labels with normal or break-word plus hyphens",
+    "Fix the console top bar search at 1024 (hide it behind an icon or drop the duplicate logo)",
+    "Remove the duplicate KPI rows inside the Opportunités sub-tabs (Waitlist/AbandonedCarts when embedded)",
+    "Replace the remaining abbreviations (Marge moy., CA 30j, Jours trav., Min retard, Arrivée moy., Stk, 6t·3c) and translate role keys in Présences",
+    "Remove the ellipsis or line-clamp on product names (POS shortcuts, product cards, checkout cart item at 390, rider header) or add a title attribute"
+  ],
+  "critical_code_review_comments": [
+    "AbandonedCarts.jsx used fcfaCompact without importing it; no lint check caught it (fixed)",
+    "POSSessionGuard: the SessionBanner 'pending' branch (status === 'pending_validation') can never run, because only !closed sessions are passed in and closing sets closed=true",
+    "ConsoleLayout fetches presenceOk only when user.role changes, so the sidebar does not update after the admin changes access until a reload (acceptable)",
+    "/cash-sessions returns only the 50 most recent sessions; an older session with closed=False would be invisible to the guard while still blocking /cash-sessions/open",
+    "The manual search in the Manuel page UI did not show the 'Bandeau de session' result with my input selector (main input .first); the API /manual/search returns all 3 sections. Not confirmed in the UI."
+  ],
+  "updated_files": ["/app/frontend/src/pages/console/AbandonedCarts.jsx (added fcfaCompact import)"],
+  "success_rate": {"backend": "n/a (frontend testing)", "frontend": "~78% (sidebar, redirects, Opportunités, POS banner, Présences RBAC, Sécurité & audit, manual all pass; brand detail fails; truncation partially fails)"},
+  "seed_data_creation": "Created a TEST cash session (note TEST_session_iter86), opened and closed through the UI, then deleted from db.cash_sessions; no session is open now (same as before). Created one manager attendance arrival to pass the 428 gate, then deleted it. presence_roles is back to [].",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Log in by setting localStorage 'dina_token' from POST /api/auth/login (the login inputs have no type=email). A manager needs an attendance arrival (POST /api/attendance/check-in with a selfie data:image/... of 1000+ chars), otherwise the API returns 428. Managers in cash-session managers: Fatou Konaté PIN 2222, Mireille Yao 2223, admin 1234. db.brands is empty; brands are derived from products. Retest: brand detail, Présences punctuality, dashboard action cards at 1024, Opportunités duplicate KPIs, abbreviations.",
+  "rca of the issue": "Paniers abandonnés crash: the KPIs were switched to fcfaCompact during the anti-truncation pass but the import was not updated, giving a ReferenceError at render. Brand detail: list_brands_full builds ids with new_id() for brands that exist only on products, so the id changes on every request and brand_detail falls back to a stub. Negative punctuality: multiple arrival rows per day are counted as late more than once."
+}

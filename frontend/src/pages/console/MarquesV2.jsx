@@ -76,8 +76,8 @@ export default function MarquesV2({ embedded }) {
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px]">
-                  <div><div className="text-[#999]">CA 30j</div><div className="font-semibold tabular">{fcfa(b.ca_30d)}</div></div>
-                  <div><div className="text-[#999]">Marge moy.</div><div className="font-semibold tabular text-[#1f8a4c]">{b.avg_margin}%</div></div>
+                  <div><div className="text-[#999]">Chiffre d'affaires 30 jours</div><div className="font-semibold tabular">{fcfa(b.ca_30d)}</div></div>
+                  <div><div className="text-[#999]">Marge moyenne</div><div className="font-semibold tabular text-[#1f8a4c]">{b.avg_margin}%</div></div>
                 </div>
               </button>
             ))}
@@ -85,7 +85,7 @@ export default function MarquesV2({ embedded }) {
       ) : (
         <div className="dina-card-white overflow-x-auto">
           <table className="dina-table">
-            <thead><tr><th>Logo</th><th>Marque</th><th className="text-right">Produits</th><th className="text-right">CA 30j</th><th className="text-right">Marge</th><th>Statut</th><th></th></tr></thead>
+            <thead><tr><th>Logo</th><th>Marque</th><th className="text-right">Produits</th><th className="text-right">Chiffre d'affaires 30 jours</th><th className="text-right">Marge</th><th>Statut</th><th></th></tr></thead>
             <tbody>
               {brands.map(b => (
                 <tr key={b.id} data-testid={`brand-row-${b.name}`}>
@@ -174,7 +174,7 @@ function BrandDetail({ bid, onBack, onEdit }) {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
         <KpiMini label="Produits" v={b.stats.product_count} c="#5867fd" i={Package} />
-        <KpiMini label="CA 30 jours" v={fcfa(b.stats.ca_30d)} c="#b02a2a" i={TrendingUp} />
+        <KpiMini label="Chiffre d'affaires 30 jours" v={fcfa(b.stats.ca_30d)} c="#b02a2a" i={TrendingUp} />
         <KpiMini label="Marge moyenne" v={`${b.stats.avg_margin}%`} c="#1f8a4c" i={Percent} />
         <KpiMini label="Valeur stock" v={fcfa(b.stats.stock_value)} c="#e4991e" />
       </div>

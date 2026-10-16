@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { fcfa } from "@/lib/format";
+import { fcfa, fcfaCompact } from "@/lib/format";
 import { ShoppingBag, DollarSign, MessageSquare, CheckCircle, X, Send, Target, Upload, Trash2 } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
 import ImageUpload from "@/components/shared/ImageUpload";
@@ -54,17 +54,17 @@ export default function AbandonedCarts({ embedded }) {
     <div className="space-y-5" data-testid="abandoned-carts-page">
       <div className="flex items-center justify-between flex-wrap gap-2">
         {!embedded && <div><h1 className="font-serif text-3xl">Paniers abandonnés</h1><p className="text-sm text-[#666]">Récupérez le chiffre d'affaires perdu</p></div>}
-        <button onClick={()=>setRelaunchFor("all")} className="dina-btn-primary !min-h-[40px]" data-testid="relaunch-all"><Target size={14}/>+ Créer une offre de relance</button>
+        <button onClick={()=>setRelaunchFor("all")} className="dina-btn-primary !min-h-[40px]" data-testid="relaunch-all"><Target size={14}/>Créer une offre de relance</button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+      {!embedded && <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <KPICard testid="ac-count" label="Paniers abandonnés" value={carts.length} icon={ShoppingBag} color="#e4991e"/>
         <KPICard testid="ac-value" label="Valeur totale" value={fcfaCompact(total)} valueFull={fcfa(total)} icon={DollarSign} color="#b02a2a"/>
         <KPICard testid="ac-relaunched" label="Relancés" value={relaunched} icon={MessageSquare} color="#5867fd"/>
         <KPICard testid="ac-recovered" label="Récupérés" value={recovered} icon={CheckCircle} color="#1f8a4c"/>
         <KPICard testid="ac-rate" label="Taux de récupération" value={`${rate}%`} color="#1f8a4c"/>
         <KPICard testid="ac-ca" label="Chiffre d'affaires récupéré" value={fcfaCompact(recoveredCA)} valueFull={fcfa(recoveredCA)} color="#1f8a4c"/>
-      </div>
+      </div>}
 
       {selected.length > 0 && (
         <div className="flex items-center gap-2 bg-[#fff5f5] dark:bg-[#2a1818] p-2 rounded-lg text-sm">

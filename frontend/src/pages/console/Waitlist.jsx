@@ -42,7 +42,7 @@ export default function Waitlist({ embedded, section }) {
     <div className="space-y-5" data-testid="waitlist-page">
       {!embedded && <div><h1 className="font-serif text-3xl">Liste d'attente</h1><p className="text-sm text-[#666]">Clientes qui attendent un produit, une taille ou une couleur</p></div>}
 
-      {(!embedded || section === "groups") && <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {!embedded && <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPICard testid="wl-pending" label="Demandes en attente" value={data.pending} icon={BellRing} color="#e4991e"/>
         <KPICard testid="wl-prods" label="Produits concernés" value={data.products_affected} icon={Package} color="#5867fd"/>
         <KPICard testid="wl-clients" label="Clientes concernées" value={data.customers_total} icon={Users} color="#b02a2a"/>
