@@ -5752,6 +5752,8 @@ from role_access import router as role_router, LimitedRoleFieldFilter  # noqa: E
 app.include_router(role_router)
 from routers.wave_pay import router as wave_router  # noqa: E402
 app.include_router(wave_router)
+from routers.rider_offline import router as rider_offline_router  # noqa: E402
+app.include_router(rider_offline_router)
 app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:

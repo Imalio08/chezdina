@@ -87,6 +87,16 @@ ADDENDA = [
                "Côté cliente, elle vous joint par la messagerie interne (bouton « Message ») ou par le bouton WhatsApp qui ouvre directement la conversation",
                "Historique et Performance s'ouvrent en pleine page avec leurs filtres, calendrier, indicateurs et graphiques ; la flèche en haut à gauche ramène au Profil"]),
             TIP("« Pointer mon départ » n'apparaît qu'après avoir pointé votre arrivée.")]},
+        {"id": "add-rider-offline", "heading": "Mode hors ligne", "blocks": [
+            T("L'app livreur fonctionne sans internet. À chaque pointage et à chaque actualisation en ligne, elle enregistre sur le téléphone vos courses du jour : clientes, adresses et positions GPS, articles, montants à encaisser, codes de livraison et la carte des zones."),
+            S(["Sans réseau, vous pouvez voir vos courses et leur détail, ouvrir l'itinéraire, appeler la cliente, passer une course en Livrée, Annulée, Reportée ou Échec avec le motif",
+               "Livraison avec code : le code est vérifié directement sur le téléphone ; sans code : photo du colis et signature comme d'habitude",
+               "Les messages écrits hors ligne sont gardés et envoyés automatiquement dès le retour du réseau",
+               "Chaque action est enregistrée avec son heure exacte et votre position GPS, puis envoyée dans l'ordre, sans doublon, dès que la connexion revient",
+               "Le bandeau en haut indique « Hors ligne · X actions en attente », puis « Synchronisé » une fois tout envoyé ; touchez-le pour forcer l'envoi",
+               "Rien n'est perdu si l'app est fermée ou si le téléphone redémarre avant la synchronisation"]),
+            INFO("Si la boutique a modifié une commande pendant que vous étiez hors ligne (réaffectée, annulée…), c'est la version de la boutique qui compte : vous recevez une notification et votre action reste visible dans l'historique de la commande pour vérification."),
+            TIP("Ouvrez l'app une fois connecté au début de la journée (ou pointez votre arrivée) pour que tout soit téléchargé.")]},
     ]),
 ]
 

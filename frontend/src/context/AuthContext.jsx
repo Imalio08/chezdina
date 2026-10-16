@@ -15,8 +15,10 @@ export function AuthProvider({ children }) {
       try {
         const { data } = await api.get("/auth/me");
         setUser(data);
-      } catch {
-        setUser(false);
+        if (data?.role === "rider") localStorage.setItem("dina_rider_user", JSON.stringify(data));
+      } catch (e) {
+        const cached = !e.response && localStorage.getItem("dina_rider_user");
+        setUser(cached ? JSON.parse(cached) : false);
       } finally {
         setLoading(false);
       }
@@ -43,6 +45,7 @@ export function AuthProvider({ children }) {
   const logout = async () => {
     try { await api.post("/auth/logout"); } catch {}
     localStorage.removeItem("dina_token");
+    localStorage.removeItem("dina_rider_user");
     setUser(false);
   };
 

@@ -9,6 +9,7 @@ import OrderThread, { PhotoButton } from "@/components/shared/OrderThread";
 import { useNavigate as useNav, useSearchParams } from "react-router-dom";
 import { notifsChanged } from "@/pages/rider/Notifications";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
+import { fetchDay, enqueue, patchCachedOrder, isNetErr, kvGet } from "@/lib/riderOffline";
 
 const FAIL_REASONS = ["Cliente absente", "Cliente injoignable", "Refus de la commande", "Adresse introuvable", "Autre"];
 
@@ -26,7 +27,7 @@ function FailForm({ order, onCancel, onStatus }) {
     const label = `Échec : ${reason}${note.trim() ? ` — ${note.trim()}` : ""}`;
     setBusy(true);
     try {
-      if (photo || note.trim()) await api.post(`/orders/${order.id}/thread/rider/send`, { text: label, attachments: photo ? [{ type: "image", url: photo, name: "echec.jpg", mime: "image/jpeg" }] : [] }).catch(() => {});
+      if (photo || note.trim()) await api.post(`/orders/${order.id}/thread/rider/send`, { text: label, attachments: photo ? [{ type: "image", url: photo, name: "echec.jpg", mime: "image/jpeg" }] : [] }).catch((e) => { if (isNetErr(e)) return enqueue("thread", { order_id: order.id, party: "rider", payload: { text: label, attachments: photo ? [{ type: "image", url: photo, name: "echec.jpg", mime: "image/jpeg" }] : [] } }); });
       await onStatus(order.id, later ? "reportee" : "echouee", label, later ? date : undefined);
     } finally { setBusy(false); }
   };
@@ -62,8 +63,10 @@ export default function Courses() {
   const [sp, setSp] = useSearchParams();
   const want = sp.get("course");
 
-  const load = () => api.get("/riders/me/today").then(r => { setD(r.data); setOpen(prev => prev ? ((r.data.orders || []).find(x => x.id === prev.id) || prev) : prev); }).catch(() => toast.error("Courses indisponibles · vérifiez votre connexion"));
-  useEffect(() => { load(); const t = setInterval(load, 30000); window.addEventListener("rider-notifs-changed", load); return () => { clearInterval(t); window.removeEventListener("rider-notifs-changed", load); }; }, []); // eslint-disable-line
+  const show = (data) => { setD(data); setOpen(prev => prev ? ((data.orders || []).find(x => x.id === prev.id) || prev) : prev); };
+  const load = () => fetchDay().then(r => show(r.data)).catch(() => toast.error("Courses indisponibles · connectez-vous une première fois à internet"));
+  const fromCache = () => kvGet("today").then(x => x && show(x));
+  useEffect(() => { load(); const t = setInterval(load, 30000); window.addEventListener("rider-notifs-changed", load); window.addEventListener("rider-day-changed", fromCache); return () => { clearInterval(t); window.removeEventListener("rider-notifs-changed", load); window.removeEventListener("rider-day-changed", fromCache); }; }, []); // eslint-disable-line
   const openCourse = (o) => { setOpen(o); api.post("/me/notifications/read", { ref: o.code }).then(r => { if (r.data?.updated) notifsChanged(); }).catch(() => {}); };
   useEffect(() => {
     if (!want || !d) return;
@@ -85,8 +88,14 @@ export default function Courses() {
   };
 
   const changeStatus = async (oid, status, reason, next_date) => {
+    const offline = async () => {
+      await enqueue("status", { order_id: oid, payload: { status, reason, next_date } });
+      await patchCachedOrder(oid, { status, last_reason: reason });
+      toast.success("Enregistré hors ligne · envoi automatique au retour du réseau"); setOpen(null);
+    };
+    if (!navigator.onLine) return offline();
     try { await api.patch(`/orders/${oid}/status`, { status, reason, next_date }); toast.success(next_date ? "Commande reportée" : "Mis à jour"); load(); setOpen(null); }
-    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); }
+    catch (e) { if (isNetErr(e)) return offline(); toast.error(e.response?.data?.detail || "Erreur"); }
   };
   const confirmDeliver = (o) => setProof(o);
 

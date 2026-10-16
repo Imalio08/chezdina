@@ -6,6 +6,7 @@ import { fcfa } from "@/lib/format";
 import { Shield, Camera, X, Check, AlertTriangle } from "lucide-react";
 import { compressImage } from "@/lib/imageCompress";
 import { editImage } from "@/components/shared/ImageEditor";
+import { enqueue, patchCachedOrder, isNetErr } from "@/lib/riderOffline";
 
 export default function DeliveryProofModal({ order, onClose, onDone }) {
   const [tab, setTab] = useState("code"); // code | photo | thirdparty
@@ -19,7 +20,7 @@ export default function DeliveryProofModal({ order, onClose, onDone }) {
   const [paymentMethod] = useState(order.payment_method || "cod");
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState(null);
-  useEffect(() => { api.get("/delivery-templates").then(r => setTemplates(r.data)).catch(() => { }); }, []);
+  useEffect(() => { api.get("/delivery-templates").then(r => { setTemplates(r.data); localStorage.setItem("dina_delivery_tpl", JSON.stringify(r.data)); }).catch(() => { try { setTemplates(JSON.parse(localStorage.getItem("dina_delivery_tpl") || "null")); } catch { } }); }, []);
   const threshold = templates?.proof_threshold || 50000;
   const highValue = (order.total || 0) >= threshold;
   const needsPin = tab !== "code" && highValue;
@@ -44,8 +45,14 @@ export default function DeliveryProofModal({ order, onClose, onDone }) {
       if (needsPin) { if (pin.length < 4) return toast.error("PIN gérante requis"); payload.manager_pin = pin; }
     }
     setLoading(true);
-    try { await api.post(`/orders/${order.id}/deliver`, payload); toast.success("Livraison confirmée"); onDone(); }
-    catch (e) { toast.error(e.response?.data?.detail || "Erreur"); } finally { setLoading(false); }
+    const offline = async () => {
+      if (tab === "code" && order.delivery_code && order.delivery_code !== code) { toast.error("Code incorrect · vérifiez avec la cliente"); return; }
+      await enqueue("deliver", { order_id: order.id, payload });
+      await patchCachedOrder(order.id, { status: "livree", proof: { method: tab, amount_collected: +amount, offline: true } });
+      toast.success("Livraison enregistrée hors ligne · envoi automatique au retour du réseau"); onDone();
+    };
+    try { if (!navigator.onLine) await offline(); else { await api.post(`/orders/${order.id}/deliver`, payload); toast.success("Livraison confirmée"); onDone(); } }
+    catch (e) { if (isNetErr(e)) await offline(); else toast.error(e.response?.data?.detail || "Erreur"); } finally { setLoading(false); }
   };
 
   return (

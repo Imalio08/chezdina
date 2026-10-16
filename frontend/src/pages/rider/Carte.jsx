@@ -37,7 +37,7 @@ export default function Carte() {
   const [routeTo, setRouteTo] = useState(sp.get("route"));
 
   useEffect(() => {
-    api.get("/riders/me/today").then(r => setOrders(r.data.orders || [])).catch(() => { });
+    api.get("/riders/me/today").then(r => setOrders(r.data.orders || [])).catch(() => { import("@/lib/riderOffline").then(m => m.kvGet("today")).then(d => d && setOrders(d.orders || [])).catch(() => {}); });
     if (!navigator.geolocation) return;
     // Live GPS watch for rider: shows own position on map
     const wid = navigator.geolocation.watchPosition(

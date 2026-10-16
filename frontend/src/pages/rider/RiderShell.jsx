@@ -15,6 +15,8 @@ import { Bell } from "lucide-react";
 import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
 import { NotifItem, useOpenNotif, markAllRead, FilterTabs } from "@/pages/rider/Notifications";
 import { CheckCheck } from "lucide-react";
+import OfflineBar from "@/components/rider/OfflineBar";
+import { startRiderSync, fetchDay } from "@/lib/riderOffline";
 
 // Icons available for custom rider tabs
 const ICONS = {
@@ -229,7 +231,11 @@ export default function RiderShell() {
   }, []);
 
   useEffect(() => {
-    import("@/lib/offlineQueue").then(m => { const stop = m.startAutoSync(); return () => stop && stop(); });
+    const stop = startRiderSync();
+    fetchDay().catch(() => {});
+    const onConf = (e) => (e.detail || []).forEach(c => toast.warning("Action hors ligne non appliquée", { description: `${c.message} · la version de la boutique est conservée`, duration: 10000 }));
+    window.addEventListener("rider-sync-conflicts", onConf);
+    return () => { stop(); window.removeEventListener("rider-sync-conflicts", onConf); };
   }, []);
 
   useEffect(() => {
@@ -338,6 +344,7 @@ export default function RiderShell() {
         </div>
       )}
 
+      <OfflineBar/>
       <div className="max-w-md mx-auto p-3"><Outlet /></div>
 
       {/* Bottom nav */}
@@ -384,7 +391,7 @@ export default function RiderShell() {
       <AttendancePunchModal
         open={showPunch}
         onClose={() => setShowPunch(false)}
-        onDone={() => { api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {}); window.dispatchEvent(new Event("rider-punch-changed")); }}
+        onDone={() => { api.get("/attendance/me").then(r => setPunchStatus(r.data)).catch(() => {}); window.dispatchEvent(new Event("rider-punch-changed")); fetchDay().catch(() => {}); }}
       />
 
       {/* Help modal */}

@@ -7,6 +7,7 @@ import { notifsChanged } from "@/pages/rider/Notifications";
 import { dateTimeFmt } from "@/lib/format";
 import { MessagePhotos, PhotoLightbox } from "@/components/shared/OrderThread";
 import { RichComposer, RichText } from "@/components/shared/RichComposer";
+import { kvGet, kvSet, enqueue } from "@/lib/riderOffline";
 
 const KIND = { livreur_cliente: "Cliente", commande_livreur: "Boutique · commande" };
 const kindLabel = (c) => KIND[c.kind] || "Boutique";
@@ -18,7 +19,7 @@ function Inbox() {
   const [tab, setTab] = useState(() => sessionStorage.getItem("rider_inbox_tab") || "clientes");
   const [opening, setOpening] = useState(false);
   useEffect(() => {
-    const load = () => api.get("/rider/conversations").then(r => setList(r.data)).catch(() => setList(l => l || []));
+    const load = () => api.get("/rider/conversations").then(r => { setList(r.data); kvSet("inbox", r.data).catch(() => {}); }).catch(async () => { const c = await kvGet("inbox").catch(() => null); setList(l => l || c || []); });
     load(); const t = setInterval(load, 10000); return () => clearInterval(t);
   }, []);
   const pick = (t) => { setTab(t); sessionStorage.setItem("rider_inbox_tab", t); };
@@ -71,7 +72,7 @@ function Conversation({ id }) {
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
   const notified = useRef(false);
-  const load = () => api.get(`/rider/conversations/${id}`).then(r => { setConv(r.data); if (!notified.current) { notified.current = true; notifsChanged(); } }).catch(() => toast.error("Conversation introuvable"));
+  const load = () => api.get(`/rider/conversations/${id}`).then(r => { setConv(r.data); kvSet(`conv:${id}`, r.data).catch(() => {}); if (!notified.current) { notified.current = true; notifsChanged(); } }).catch(async (e) => { if (!e.response) { const c = await kvGet(`conv:${id}`).catch(() => null); setConv(prev => prev || c || { messages: [], participants: [] }); } else toast.error("Conversation introuvable"); });
   useEffect(() => { load(); const t = setInterval(load, 6000); return () => clearInterval(t); }, [id]); // eslint-disable-line
   const count = conv?.messages?.length || 0;
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [count]);
@@ -81,7 +82,14 @@ function Conversation({ id }) {
     try {
       const r = await api.post(`/rider/conversations/${id}/send`, { text, attachments: photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [] });
       setText(""); setPhoto(null); setConv(c => ({ ...c, messages: [...(c?.messages || []), r.data.message] }));
-    } catch (e) { toast.error(e.response?.data?.detail || "Message non envoyé · réessayez"); }
+    } catch (e) {
+      if (!e.response) {
+        const attachments = photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [];
+        await enqueue("conv", { conv_id: id, payload: { text, attachments } });
+        setConv(c => ({ ...c, messages: [...(c?.messages || []), { id: `local_${Date.now()}`, from_kind: "rider", text: `${text} · ⏳ envoi au retour du réseau`, at: new Date().toISOString(), attachments }] }));
+        setText(""); setPhoto(null); toast.success("Message gardé · envoyé au retour du réseau");
+      } else toast.error(e.response?.data?.detail || "Message non envoyé · réessayez");
+    }
     finally { setSending(false); }
   };
   const other = conv && (conv.participants || []).find(p => p.kind !== "rider");

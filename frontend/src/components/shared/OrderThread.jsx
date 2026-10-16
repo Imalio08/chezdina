@@ -50,8 +50,12 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
   const count = conv?.messages?.length || 0;
 
   const load = async () => {
-    try { const r = await api.get(`/orders/${orderId}/thread/${party}`); setConv(r.data); setError(null); }
-    catch (e) { setError(e.response?.data?.detail || "Messagerie indisponible"); }
+    const key = `thread:${orderId}:${party}`;
+    try { const r = await api.get(`/orders/${orderId}/thread/${party}`); setConv(r.data); setError(null); if (me === "rider") import("@/lib/riderOffline").then(m => m.kvSet(key, r.data)).catch(() => {}); }
+    catch (e) {
+      if (me === "rider" && !e.response) { const m = await import("@/lib/riderOffline"); const c = await m.kvGet(key).catch(() => null); setConv(prev => prev || c || { messages: [] }); setError(null); return; }
+      setError(e.response?.data?.detail || "Messagerie indisponible");
+    }
   };
   useEffect(() => { setConv(null); setPhoto(null); load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [orderId, party]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [count]);
@@ -65,7 +69,16 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
       const r = await api.post(`/orders/${orderId}/thread/${party}/send`, { text: txt, attachments });
       setText(""); if (attachments.length) setPhoto(null);
       setConv(c => ({ ...c, messages: [...(c?.messages || []), r.data.message] })); onSent?.(txt);
-    } catch (e) { toast.error(e.response?.data?.detail || "Erreur envoi"); }
+    } catch (e) {
+      if (me === "rider" && !e.response) {
+        const attachments = photo && value === undefined ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [];
+        const { enqueue } = await import("@/lib/riderOffline");
+        await enqueue("thread", { order_id: orderId, party, payload: { text: txt, attachments } });
+        setText(""); if (attachments.length) setPhoto(null);
+        setConv(c => ({ ...c, messages: [...(c?.messages || []), { id: `local_${Date.now()}`, from_kind: "rider", text: `${txt} · ⏳ envoi au retour du réseau`, at: new Date().toISOString(), attachments }] }));
+        toast.success("Message gardé · envoyé au retour du réseau");
+      } else toast.error(e.response?.data?.detail || "Erreur envoi");
+    }
     finally { setSending(false); }
   };
 
