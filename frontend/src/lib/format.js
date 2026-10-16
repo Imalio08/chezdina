@@ -60,6 +60,7 @@ export const statusLabel = {
   echouee: "Échec",
   reportee: "Reportée",
   retournee: "Retournée",
+  action_hors_ligne: "Action hors ligne à vérifier",
   annulee: "Annulée",
 };
 export const statusColor = {

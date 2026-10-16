@@ -129,7 +129,7 @@ export default function Courses() {
       </div>
 
       {open && <OrderDetail order={open} onClose={() => setOpen(null)} onStatus={changeStatus} onDeliver={confirmDeliver} />}
-      {proof && <DeliveryProofModal order={proof} onClose={() => setProof(null)} onDone={() => { setProof(null); load(); }} />}
+      {proof && <DeliveryProofModal order={proof} onClose={() => setProof(null)} onDone={() => { setProof(null); setOpen(null); load(); }} />}
     </div>
   );
 }

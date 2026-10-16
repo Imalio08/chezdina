@@ -16,11 +16,17 @@ async def _stamp(oid: str, before_len: int, op: Dict[str, Any], extra: Dict[str,
     await db.orders.update_one({"id": oid}, {"$set": {"timeline": tl, **(extra or {})}})
 
 
+async def _msg_time(r: Any, op: Dict[str, Any]) -> None:
+    m = (r or {}).get("message") if isinstance(r, dict) else None
+    if m and m.get("id"):
+        await db.conversations.update_one({"messages.id": m["id"]}, {"$set": {"messages.$.at": op["at"], "messages.$.offline": True, "messages.$.synced_at": now_iso()}})
+
+
 async def _review(o: Dict[str, Any], op: Dict[str, Any], user: dict, why: str) -> Dict[str, Any]:
     p = op.get("payload") or {}
     what = LABEL.get(op["kind"], op["kind"]) + (f" « {p.get('status')} »" if p.get("status") else "")
     await db.orders.update_one({"id": o["id"]}, {"$push": {"timeline": {
-        "status": o.get("status"), "at": now_iso(), "by": user.get("name"), "offline": True, "offline_rejected": True,
+        "status": "action_hors_ligne", "at": now_iso(), "by": f"{user.get('name')} (hors ligne)", "offline": True, "offline_rejected": True,
         "offline_action": {"kind": op["kind"], "status": p.get("status"), "reason": p.get("reason"), "at": op["at"], "lat": op.get("lat"), "lng": op.get("lng")},
         "note": f"Action hors ligne non appliquée ({what}, faite à {op['at'][11:16]}) · {why}"}}})
     from routers.notify import notify
@@ -34,7 +40,11 @@ async def _apply(op: Dict[str, Any], user: dict) -> Dict[str, Any]:
     from routers.messagerie import send_order_thread, rider_conversation_send
     kind, p = op.get("kind"), op.get("payload") or {}
     if kind == "conv":
-        await rider_conversation_send(op["conv_id"], p, user)
+        try:
+            r = await rider_conversation_send(op["conv_id"], p, user)
+        except HTTPException as e:
+            return {"id": op["id"], "ok": True, "conflict": True, "message": f"Message non envoyé : {e.detail}"}
+        await _msg_time(r, op)
         return {"id": op["id"], "ok": True}
     o = await db.orders.find_one({"id": op.get("order_id")})
     if not o:
@@ -52,7 +62,8 @@ async def _apply(op: Dict[str, Any], user: dict) -> Dict[str, Any]:
             await deliver_order(o["id"], ProofIn(**p), user)
             await _stamp(o["id"], n, op, {"delivered_at": op["at"], "proof.at": op["at"], "proof.offline": True})
         elif kind == "thread":
-            await send_order_thread(o["id"], op.get("party") or "rider", p, user)
+            r = await send_order_thread(o["id"], op.get("party") or "rider", p, user)
+            await _msg_time(r, op)
         else:
             raise HTTPException(400, "Action inconnue")
     except HTTPException as e:

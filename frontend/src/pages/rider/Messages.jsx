@@ -86,7 +86,7 @@ function Conversation({ id }) {
       if (!e.response) {
         const attachments = photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [];
         await enqueue("conv", { conv_id: id, payload: { text, attachments } });
-        setConv(c => ({ ...c, messages: [...(c?.messages || []), { id: `local_${Date.now()}`, from_kind: "rider", text: `${text} · ⏳ envoi au retour du réseau`, at: new Date().toISOString(), attachments }] }));
+        setConv(c => { const next = { ...c, messages: [...(c?.messages || []), { id: `local_${Date.now()}`, from_kind: "rider", text: `${text} · ⏳ envoi au retour du réseau`, at: new Date().toISOString(), attachments }] }; kvSet(`conv:${id}`, next).catch(() => {}); return next; });
         setText(""); setPhoto(null); toast.success("Message gardé · envoyé au retour du réseau");
       } else toast.error(e.response?.data?.detail || "Message non envoyé · réessayez");
     }

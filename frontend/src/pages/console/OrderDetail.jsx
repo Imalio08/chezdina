@@ -14,6 +14,7 @@ import { OrderActions } from "@/pages/console/Orders";
 import { PrepRunner } from "@/pages/console/Preparation";
 import { useAuth } from "@/context/AuthContext";
 import WaveProofCard from "@/components/orders/WaveProofCard";
+import OrderTimeline from "@/components/orders/OrderTimeline";
 
 const STATUSES = ["nouvelle", "confirmee", "en_preparation", "prete", "assignee", "en_livraison", "livree", "retournee", "annulee"];
 
@@ -156,6 +157,8 @@ export default function OrderDetail() {
           ))}
         </div>
       </div>
+
+      <OrderTimeline timeline={order.timeline}/>
 
       <OrderMessages order={order} />
     </div>

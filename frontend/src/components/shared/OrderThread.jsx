@@ -75,7 +75,8 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
         const { enqueue } = await import("@/lib/riderOffline");
         await enqueue("thread", { order_id: orderId, party, payload: { text: txt, attachments } });
         setText(""); if (attachments.length) setPhoto(null);
-        setConv(c => ({ ...c, messages: [...(c?.messages || []), { id: `local_${Date.now()}`, from_kind: "rider", text: `${txt} · ⏳ envoi au retour du réseau`, at: new Date().toISOString(), attachments }] }));
+        const local = { id: `local_${Date.now()}`, from_kind: "rider", text: `${txt} · ⏳ envoi au retour du réseau`, at: new Date().toISOString(), attachments };
+        setConv(c => { const next = { ...c, messages: [...(c?.messages || []), local] }; import("@/lib/riderOffline").then(m => m.kvSet(`thread:${orderId}:${party}`, next)).catch(() => {}); return next; });
         toast.success("Message gardé · envoyé au retour du réseau");
       } else toast.error(e.response?.data?.detail || "Erreur envoi");
     }

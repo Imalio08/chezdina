@@ -1135,5 +1135,14 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Paramètres livreur = photo + Mes informations (nom, téléphone via PATCH /api/users/me/profile, 8 chiffres min.) + thème. Sélecteur « WhatsApp / WhatsApp Business » et réglage du son retirés ; préférence `wa` n'est plus acceptée.
 - Boutons WhatsApp = lien wa.me direct (le téléphone ouvre l'app installée). Côté cliente : messagerie interne + bouton WhatsApp direct (déjà en place).
 - Manuel livreur mis à jour (add-rider-nav).
+
+
+## 2026-10-16 — App livreur : mode hors ligne
+- Front : lib/riderOffline.js (IndexedDB « dina_rider_offline » : cache du jour, file d'actions avec id unique, ordre, heure et GPS), OfflineBar (« Hors ligne · X actions en attente » / « Synchronisation… » / « Synchronisé »), Courses/DeliveryProofModal (code vérifié localement, photo + signature)/Échec/Report/Annulation hors ligne, messages hors ligne (fil commande + conversations, bulle ⏳ gardée après rechargement), Carte et Messages lisent le cache, AuthContext garde le livreur connecté hors ligne, sw.js met en cache l'app, les fichiers statiques et les tuiles de carte (préchargées autour des adresses du jour, zooms 13-16).
+- Backend : routers/rider_offline.py POST /api/rider/sync (ordre seq, idempotent via rider_sync_ops, heures du téléphone dans le timeline, delivered_at et messages ; réaffectée/annulée/refusée → version console conservée + entrée « Action hors ligne à vérifier » + notification livreur).
+- Console : fiche commande affiche l'Historique (marqueur hors ligne, actions refusées en orange) ; tiroir Commandes aussi.
+- Manuel livreur : section « Mode hors ligne » (add-rider-offline).
+- Testé : iteration_83 (scénario complet en mode avion, conflit de réaffectation) + corrections ; pytest 11/11. Données TEST supprimées.
+
 - Testé : API (numéro trop court refusé), page Paramètres (pas de sélecteur, enregistrement du nom puis restauration).
 

@@ -300,7 +300,7 @@ function OrderDrawer({ order, onClose, onStatus, onReload, onInvoice }) {
 
         <div className="text-xs text-[#666]">
           <div className="font-semibold text-[#1c1c1c] mb-1">Historique</div>
-          {(order.timeline||[]).map((t,i)=><div key={i}>{dateTimeFmt(t.at)} · {statusLabel[t.status]||t.status} · {t.by}{t.reason?` — ${t.reason}`:""}</div>)}
+          {(order.timeline||[]).map((t,i)=><div key={i} className={t.offline_rejected ? "text-[#8a5a00]" : ""}>{dateTimeFmt(t.at)} · {t.offline_rejected ? "Action hors ligne à vérifier" : (statusLabel[t.status]||t.status)} · {t.by}{t.reason?` — ${t.reason}`:""}{t.note?` — ${t.note}`:""}{t.offline && !t.offline_rejected ? " · hors ligne" : ""}</div>)}
         </div>
       </div>
     </div>

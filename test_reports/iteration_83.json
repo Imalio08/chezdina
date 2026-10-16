@@ -1,0 +1,47 @@
+{
+  "summary": "Rider offline mode tested end to end. Backend: 11 pytest cases for POST /api/rider/sync, 10 pass. Ops run in seq order, replaying an op is idempotent (stored result returned, timeline not doubled), timeline gets the device 'at', offline:true and lat/lng, delivered_at and proof.at equal device time, reassigned/cancelled/wrong-code ops give conflict:true plus an offline_rejected timeline note plus a rider notification, non-rider gets 403. The 1 failure is a real bug: any HTTPException from a 'conv' op (404 unknown conversation, 400 'Conversation fermée', 400 'Message vide') fails the whole batch, so the queue gets stuck. Frontend (Playwright set_offline, mobile 390x844): PIN 5555 login, courses cached, 'Hors ligne · 0 action en attente' bar shown, wrong code rejected locally ('Code incorrect'), right code accepted ('Livraison enregistrée hors ligne'), photo (image editor) plus signature delivery saved offline, store and client messages in the order thread saved with '⏳ envoi au retour du réseau', Échec with reason saved offline, store conversation message saved offline. Counter went 1→7. A page reload while offline worked (shell served by the service worker, 7 ops kept in IndexedDB). Back online the bar showed 'Synchronisé' within 2s. Database checked: UI1/UI2 livree with delivered_at = device time and proof.offline, UI3 echouee with reason and device time, messages in the threads. UI4 (reassigned to rider2 via API while the rider was offline) stayed with rider2/assignee, the rejected note was added to the timeline, the rider got the 'Action hors ligne non appliquée' toast and a notification. Manual module 15 contains add-rider-offline. Gaps: the console order page does not show the offline history at all, and messages are stamped with the sync time instead of the time they were written.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/rider/sync (kind 'conv')", "issue": "In _apply, a 'conv' op calls rider_conversation_send with no try/except. Any HTTPException (404 'Conversation introuvable', 400 'Conversation fermée', 400 'Message vide') makes the whole request fail (reproduced: 404). The frontend flush() then deletes nothing, so the conv op and every op after it are replayed every 20s forever and the 'X actions en attente' count never clears. Realistic case: rider delivers offline, then writes to the client conversation. The delivery is applied first, the conversation is closed, and the queue is stuck. Fix: wrap the conv branch (and the whole _apply per op) in try/except and return {ok:true, conflict:true, message} so the op is recorded in rider_sync_ops and removed from the queue.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/rider/sync (kind 'thread'/'conv')", "issue": "Messages are stamped with the sync time (now_iso()), not the device 'at'. Example: written at 01:51:21, saved as 01:51:42. The request asks for 'right times' in the console. Store op['at'] on the message, or add a 'written_at' field with an offline flag."},
+      {"endpoint": "POST /api/rider/sync _review", "issue": "The rejected entry is pushed with status = the current console status (e.g. 'assignee') and by = rider name. In the existing timeline view this reads as 'Affectée · Kouamé Serge', as if the rider had reassigned the order."},
+      {"endpoint": "POST /api/rider/sync", "issue": "Only the first 100 ops by seq are processed per call and there is no 'more' flag. It works because flush runs again every 20s, but it is slow for large backlogs."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Console OrderDetail page (/console/commandes/:code)", "issue": "There is no timeline/Historique section on this page, so the console cannot see the offline status times or the 'Action hors ligne non appliquée' review entry ('kept in order history for review' is not visible). The OrderDrawer in Orders.jsx (line 303) does show the timeline, but it renders only at/status/by/reason: it ignores t.note and t.offline/offline_rejected, so the rejected-action note and the 'hors ligne' marker never appear.", "selector": "pages/console/OrderDetail.jsx, pages/console/Orders.jsx:303", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "Pending messages after reload", "issue": "Messages queued offline are only added to React state, not to the cached thread/conv in IndexedDB. After a reload while offline the '⏳ envoi au retour du réseau' bubble is gone (the op is still queued and is sent later), so the rider may think the message was lost. Seen in the store conversation after the offline reload.", "affected_selectors": ["rider-conversation", "order-thread-rider"]}
+    ],
+    "design_issues": [
+      {"screen": "Rider course detail after offline Livrée", "issues": ["The order detail sheet stays open after the proof modal closes (onDone does not close it). The rider has to close it manually; this is the same online."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_rider_offline_sync.py", "/app/backend/tests/seed_offline_ui.py", "/app/test_reports/pytest/rider_offline.xml"],
+  "action_items": [
+    "HIGH: in routers/rider_offline.py, catch exceptions per op (including kind 'conv' and unexpected errors) and return conflict results, so one bad op never fails the whole batch or blocks the queue",
+    "HIGH: show the order timeline in the console OrderDetail page, including t.note, an 'hors ligne' badge for t.offline, and highlighting for t.offline_rejected (offline_action.status/reason/at); also render t.note in the Orders.jsx OrderDrawer timeline",
+    "MEDIUM: stamp offline messages (thread/conv) with the device time op['at'] (or a written_at field) so the console shows when they were written",
+    "LOW: persist queued messages into the kv cache (thread:/conv: keys) so the pending bubbles survive an offline reload",
+    "LOW: use a neutral status label (e.g. status 'offline_rejected') for review entries, so they do not read as a status change made by the rider"
+  ],
+  "critical_code_review_comments": [
+    "rider_offline._apply: the conv branch has no exception handling (see critical issue); also a non-HTTP exception inside update_order_status/deliver_order returns 500 for the whole batch",
+    "riderOffline.flush: on any non-2xx response nothing is deleted and there is no backoff, so it retries the same failing batch every 20s forever",
+    "Security trade-off: /riders/me/today returns delivery_code to the rider (now also stored in IndexedDB), so a rider can validate a code delivery without the customer. This is what the feature asks for, but consider storing only a hash (e.g. sha256(code+order_id)) for local checks",
+    "DeliveryProofModal offline: getPos() waits up to 5s when geolocation is denied before showing the 'Code incorrect' or success toast; consider reusing the cached GPS position",
+    "Courses.changeStatus offline: patchCachedOrder sets status for 'en_livraison' (Je démarre) correctly, but counts.en_route relies on recount and was not checked in the UI"
+  ],
+  "updated_files": ["/app/backend/tests/test_rider_offline_sync.py", "/app/backend/tests/seed_offline_ui.py"],
+  "success_rate": {"backend": "91% (10/11)", "frontend": "90% (all rider offline flows pass; console history view missing)"},
+  "test_credentials": "rider1 PIN 5555 (Kouamé Serge id 9cd8883c-...), rider2 Yao Franck id 4efa4df1-b3f7-4a1c-b80a-aa8f014cd717, admin aouattaraesca@gmail.com / Admin123!. Note: python urllib needs a User-Agent header or the preview ingress returns 403. The staff /login inputs are not reachable with input[type=email] or form input; inject dina_token into localStorage instead.",
+  "seed_data_creation": "Seeded TEST-OFF-UI1..4 (ids test-off-ui-1..4) and pytest TEST-OFF-PY-* orders. All deleted afterwards, together with rider_sync_ops, order conversations, notifications, whatsapp_outbox, invoices and the TEST_offline message in rider1's store conversation. The main agent's TEST-OFF-1..3 were also deleted.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: python /app/backend/tests/seed_offline_ui.py seed|show|clean. The Playwright offline flow works with page.context.set_offline(True). Toasts are captured via a MutationObserver on [data-sonner-toast] added with add_init_script. Close the course sheet by clicking at (195,30). Open the store conversation online first (rider-write-store) so it is cached, then navigate to it with history.pushState while offline. For the conflict, reassign via PATCH /api/deliveries/{id}/assign with the admin token while the browser is offline. After the fix, test_bad_conv_does_not_block_queue should pass.",
+  "rca of the issue": "Queue stuck: rider_sync loops over ops and awaits _apply. For kind 'conv', _apply calls rider_conversation_send directly, which raises HTTPException (404/400). This is not caught (only the order branch catches it), so FastAPI returns an error for the whole request. Earlier ops are already in rider_sync_ops, but the client gets no results, deletes nothing, and retries every 20s, hitting the same error. Reproduction: test_bad_conv_does_not_block_queue (conv_id='does-not-exist' followed by a valid status op returns 404 and the status op is never applied). Mitigation: try/except around each op that returns {id, ok:true, conflict:true, message:detail}."
+}
