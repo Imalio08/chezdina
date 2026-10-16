@@ -1180,3 +1180,8 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 
 - Testé : API (numéro trop court refusé), page Paramètres (pas de sélecteur, enregistrement du nom puis restauration).
 
+
+## 2026-10-16 — Choix taille/couleur dans « Commande depuis un message »
+- PosPasteWA.jsx : après choix manuel d'un produit, sélecteurs Taille et Couleur (stock par option, épuisé désactivé, présélection si une seule valeur). « Remplir le panier » bloqué tant que taille/couleur manquent.
+- Vérifié par capture (session de caisse TEST temporaire, supprimée ensuite).
+
