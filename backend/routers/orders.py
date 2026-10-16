@@ -38,7 +38,7 @@ async def orders(user: dict = Depends(get_user), status: Optional[str] = None, c
             {"customer.name": {"$regex": q, "$options": "i"}},
             {"customer.phone": {"$regex": q, "$options": "i"}},
         ]
-    return clean(await db.orders.find(f).sort("created_at", -1).to_list(1000))
+    return clean(await db.orders.find(f).sort("created_at", -1).to_list(5000))
 
 
 @router.post("/orders")

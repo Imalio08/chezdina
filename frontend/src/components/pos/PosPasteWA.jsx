@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { X, Sparkles } from "lucide-react";
@@ -9,6 +9,12 @@ export default function PosPasteWA({ onApply, onClose }) {
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(false);
   const [parsed, setParsed] = useState(null);
+  const [catalog, setCatalog] = useState([]);
+  useEffect(() => { api.get("/products").then(r => setCatalog(r.data || [])).catch(() => {}); }, []);
+  const pick = (i, pid) => {
+    const p = catalog.find(x => x.id === pid);
+    setParsed(d => ({ ...d, items: d.items.map((it, k) => k === i ? { ...it, product_id: p?.id, name: p?.name || it.name, price: p?.price || 0, image: p?.image } : it) }));
+  };
 
   const parse = async () => {
     if (!text.trim()) return toast.error("Collez un message WhatsApp");
@@ -22,6 +28,9 @@ export default function PosPasteWA({ onApply, onClose }) {
 
   const apply = () => {
     if (!parsed) return;
+    if (parsed.possible_duplicate && !window.confirm(`Une commande similaire existe déjà (${parsed.possible_duplicate.code}, moins de 24 h). Continuer quand même ?`)) return;
+    const missing = (parsed.items || []).filter(it => !it.product_id).length;
+    if (missing && !window.confirm(`${missing} article(s) non identifié(s) seront ignorés. Continuer ?`)) return;
     const items = (parsed.items||[]).filter(it => it.product_id).map(it => ({
       product_id: it.product_id, name: it.name, size: it.size || null, color: it.color || null,
       qty: Number(it.qty||1), price: Number(it.price||0), image: it.image,
@@ -32,7 +41,7 @@ export default function PosPasteWA({ onApply, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 grid place-items-end sm:place-items-center z-50 p-0 sm:p-4" onClick={onClose} data-testid="pos-paste-wa">
+    <div className="fixed inset-0 bg-black/60 grid place-items-end sm:place-items-center z-50 p-0 sm:p-4" onClick={onClose} data-testid="paste-wa-modal">
       <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl sm:rounded-2xl w-full sm:max-w-xl max-h-[92vh] overflow-y-auto" onClick={e=>e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-[#ececec] dark:border-[#2a2a2a]">
           <div className="flex items-center gap-2"><div className="w-9 h-9 rounded-lg bg-[#fff5f5] text-[#b02a2a] grid place-items-center"><Sparkles size={16}/></div><div><div className="font-serif text-lg">Coller une commande WhatsApp</div><div className="text-xs text-[#666]">Dina IA remplit le panier automatiquement</div></div></div>
@@ -44,12 +53,14 @@ export default function PosPasteWA({ onApply, onClose }) {
 
           {parsed && (
             <div className="mt-3 border border-[#ececec] dark:border-[#2a2a2a] rounded-xl p-3">
+              {parsed.possible_duplicate && <div className="mb-2 text-xs bg-[#fff4e0] text-[#8a5a00] rounded p-2" data-testid="paste-wa-duplicate">⚠ Commande similaire déjà créée pour ce numéro : <b>{parsed.possible_duplicate.code}</b>. Vérifiez avant de recréer.</div>}
               <div className="text-[10px] uppercase font-semibold text-[#666] mb-2">Articles identifiés · confiance {(parsed.confidence*100||0).toFixed(0)}%</div>
               {(parsed.items||[]).length === 0 ? <div className="text-sm text-[#c62828]">Aucun article trouvé — vérifiez l'orthographe ou ajoutez-les manuellement.</div> :
                 (parsed.items||[]).map((it, i) => (
-                  <div key={i} className={`flex items-center gap-2 py-1.5 ${!it.product_id?"opacity-50":""}`}>
+                  <div key={i} className={`flex items-center gap-2 py-1.5 ${!it.product_id?"bg-[#fff8e8] rounded px-1":""}`}>
                     <div className="w-10 h-10 rounded bg-[#fff5f5] overflow-hidden shrink-0">{it.image && <img src={it.image} alt="" className="w-full h-full object-cover"/>}</div>
-                    <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{it.qty}× {it.name || "Produit inconnu"}</div><div className="text-xs text-[#666]">{[it.size,it.color].filter(Boolean).join(" · ") || "sans variante"}{!it.product_id?" · ⚠ non identifié":""}</div></div>
+                    <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{it.qty}× {it.name || "Produit inconnu"}</div><div className="text-xs text-[#666]">{[it.size,it.color].filter(Boolean).join(" · ") || "sans variante"}{!it.product_id?" · ⚠ non identifié":""}</div>
+                      {!it.product_id && <select className="dina-input !min-h-[32px] text-xs mt-1 !opacity-100" value="" onChange={e => pick(i, e.target.value)} data-testid={`paste-wa-pick-${i}`}><option value="">Choisir le produit…</option>{catalog.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select>}</div>
                     {it.price>0 && <div className="tabular text-sm font-semibold">{fcfa(it.qty*it.price)}</div>}
                   </div>
                 ))

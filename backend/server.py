@@ -701,12 +701,25 @@ def order_transition_guard(o: Dict[str, Any], new_status: str, user: dict) -> No
             raise HTTPException(400, "Acompte non reçu · marquez l'acompte comme reçu avant de confirmer")
 
 
+async def _restock_order(o: dict) -> None:
+    if o.get("restocked_at"): return
+    for it in o.get("items") or []:
+        pid, qty = it.get("product_id"), int(it.get("qty") or 0)
+        if not pid or qty <= 0: continue
+        inc = {"stock": qty}
+        if it.get("size"): inc[f"stock_by_size.{it['size']}"] = qty
+        await db.products.update_one({"id": pid}, {"$inc": inc})
+        await inc_variant(pid, it.get("size"), it.get("color"), qty)
+    await db.orders.update_one({"id": o["id"]}, {"$set": {"restocked_at": now_iso()}})
+
 @api.patch("/orders/{oid}/status")
 async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get_user)):
     o = await db.orders.find_one({"id": oid})
     if not o: raise HTTPException(404)
+    if body.status == "prete": raise HTTPException(400, "Passez par l'écran de préparation (scan) pour marquer la commande Prête")
     order_transition_guard(o, body.status, user)
     prev = o.get("status")
+    if body.status == "annulee" and prev != "annulee": await _restock_order(o)
     tl = o.get("timeline", []); tl.append({"status": body.status, "at": now_iso(), "by": user.get("name"), "reason": body.reason, "next_date": body.next_date})
     upd = {"status": body.status, "timeline": tl}
     if body.reason: upd["last_reason"] = body.reason
@@ -3234,7 +3247,7 @@ async def ai_parse_order(body: Dict[str, Any], user: dict = Depends(get_user)):
     if not text: raise HTTPException(400, "Texte requis")
     # Load available products catalog (name + sizes + colors + id)
     all_prods = await db.products.find({}).to_list(1000)
-    cat_lines = [f"- id={p['id']} | {p['name']} | marque={p.get('brand','')} | cat={p.get('category','')} | couleurs={','.join(p.get('colors',[]))} | tailles={','.join(p.get('sizes',[]))} | prix={p.get('price',0)}" for p in all_prods[:200]]
+    cat_lines = [f"- id={p['id']} | {p['name']} | marque={p.get('brand','')} | cat={p.get('category','')} | couleurs={','.join(p.get('colors',[]))} | tailles={','.join(p.get('sizes',[]))} | prix={p.get('price',0)}" for p in all_prods]
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
         system = ("Tu es un parseur de commandes WhatsApp pour la boutique 'Chez Dina' (Abidjan). "
@@ -3242,7 +3255,7 @@ async def ai_parse_order(body: Dict[str, Any], user: dict = Depends(get_user)):
                   "{\"items\":[{\"product_id\":\"...\",\"name\":\"...\",\"size\":\"...\",\"color\":\"...\",\"qty\":1}], "
                   "\"customer_hint\":{\"name\":\"...\",\"phone\":\"...\",\"zone\":\"...\",\"address\":\"...\"}, \"confidence\":0.0}. "
                   "Fais correspondre chaque article à un product_id du catalogue ci-dessous. Si pas sûr, laisse product_id vide. "
-                  "Catalogue:\n" + "\n".join(cat_lines[:150]))
+                  "Catalogue:\n" + "\n".join(cat_lines[:400]))
         chat = LlmChat(api_key=os.environ.get("EMERGENT_LLM_KEY",""), session_id=f"dina-parse-{user['id']}", system_message=system).with_model("anthropic","claude-sonnet-4-5-20250929")
         reply = await chat.send_message(UserMessage(text=f"Message cliente :\n{text}\n\nRéponds UNIQUEMENT par le JSON, sans texte avant/après."))
         import json, re
@@ -3260,6 +3273,15 @@ async def ai_parse_order(body: Dict[str, Any], user: dict = Depends(get_user)):
                 it["price"] = p.get("price", 0)
                 it["image"] = p.get("image")
                 if not it.get("name"): it["name"] = p.get("name")
+        hint = data.get("customer_hint") or {}
+        digits = "".join(c for c in (hint.get("phone") or "") if c.isdigit())[-8:]
+        if len(digits) == 8:
+            since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+            pids = {it.get("product_id") for it in data.get("items", []) if it.get("product_id")}
+            async for prev in db.orders.find({"created_at": {"$gte": since}, "status": {"$ne": "annulee"}}, {"code": 1, "customer": 1, "items": 1, "created_at": 1}):
+                if "".join(c for c in ((prev.get("customer") or {}).get("phone") or "") if c.isdigit())[-8:] == digits and pids & {i.get("product_id") for i in prev.get("items") or []}:
+                    data["possible_duplicate"] = {"code": prev.get("code"), "created_at": prev.get("created_at")}
+                    break
         return data
     except Exception:
         logger.exception("parse_order")
@@ -5244,6 +5266,8 @@ async def declare_handover(sid: str, body: Dict[str,Any], user: dict = Depends(g
     """Gérante declares the amount handed to the owner. Session awaits owner validation."""
     s = await db.cash_sessions.find_one({"id": sid})
     if not s: raise HTTPException(404)
+    if user.get("role") not in ("admin", "manager"): raise HTTPException(403, "Réservé à la gérante")
+    if s.get("status") in ("pending_validation", "validated", "gap"): raise HTTPException(400, "Un versement est déjà déclaré ou validé pour cette session")
     await db.cash_sessions.update_one({"id": sid}, {"$push": {"handover_history": {"decision": "declare", "amount": int(body.get("amount", 0)), "note": body.get("note", ""), "by": user.get("name"), "at": now_iso()}}, "$set": {
         "handover_amount": int(body.get("amount",0)), "handover_at": now_iso(), "handover_by": user.get("name"),
         "handover_note": body.get("note",""), "status": "pending_validation"
@@ -5264,7 +5288,7 @@ async def validate_handover(sid: str, body: Dict[str,Any], user: dict = Depends(
     status = "validated" if gap == 0 else "gap"
     await db.cash_sessions.update_one({"id": sid}, {"$push": {"handover_history": {"decision": "valide", "declared": s.get("handover_amount"), "expected": expected, "actual": actual, "gap": gap, "by": user.get("name"), "at": now_iso()}}, "$set": {
         "validated_at": now_iso(), "validated_by": user.get("name"), "validation_gap": gap,
-        "validation_note": body.get("note",""), "status": status, "closed_at": now_iso()
+        "validation_note": body.get("note",""), "status": status, "closed_at": now_iso(), "closed": True
     }})
     # If gap, record it on the Gérante balance
     if gap != 0 and s.get("manager_id"):
@@ -5281,7 +5305,8 @@ async def reject_handover(sid: str, body: Dict[str,Any], user: dict = Depends(re
     reason = (body.get("reason") or "").strip()
     if not reason: raise HTTPException(400, "Motif de rejet obligatoire")
     cats = {"montant": "Montant incorrect", "justificatif": "Justificatif manquant", "ecart": "Écart de caisse", "autre": "Autre anomalie"}
-    cat = body.get("category") if body.get("category") in cats else "autre"
+    if body.get("category") not in cats: raise HTTPException(400, "Type d'anomalie obligatoire")
+    cat = body["category"]
     declared = s.get("handover_amount")
     expected = body.get("expected")
     expected = int(expected) if expected not in (None, "") else int(s.get("expected") or 0)
@@ -5302,11 +5327,12 @@ async def reject_handover(sid: str, body: Dict[str,Any], user: dict = Depends(re
         "msg": f"{user.get('name')} a rejeté votre versement ({cats[cat]}) : {reason}",
         "color": "#c62828", "at": now_iso(),
         "link": f"/console/sessions-caisse?focus={sid}",
-        "target_user_id": s.get("opened_by_id"),
+        "target_user_id": s.get("manager_id") or s.get("opened_by_id"),
     })
-    if s.get("opened_by_id"):
+    mid = s.get("manager_id") or s.get("opened_by_id")
+    if mid:
         from routers.notify import notify
-        await notify("staff", s["opened_by_id"], "Versement rejeté", f"{cats[cat]} : {reason}", f"/console/sessions-caisse?focus={sid}", "versement", sid, f"hrej:{sid}:{entry['at']}")
+        await notify("staff", mid, "Versement rejeté", f"{cats[cat]} : {reason}", f"/console/sessions-caisse?focus={sid}", "versement", sid, f"hrej:{sid}:{entry['at']}")
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.reject_handover","entity_id":sid,"after":{"reason":reason},"at":now_iso()})
     return {"ok": True, "reason": reason}
 
@@ -5497,8 +5523,19 @@ async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Dep
     # Preparation control: 'prete' requires scanned items match
     if new_status == "prete":
         scanned = body.get("scanned_items") or []
-        if scanned and len(scanned) < len(o.get("items",[])):
-            raise HTTPException(400, f"Scan incomplet : {len(scanned)}/{len(o.get('items',[]))} articles")
+        items = o.get("items", [])
+        if len(scanned) != len(items):
+            raise HTTPException(400, f"Scan incomplet : {len(scanned)}/{len(items)} articles")
+        for it, s in zip(items, scanned):
+            if s.get("manual"):
+                if not (s.get("manual_reason") or "").strip():
+                    raise HTTPException(400, f"Motif obligatoire pour la validation manuelle de {it.get('name')}")
+                continue
+            done = int(s.get("scanned_qty") or 0)
+            if not s.get("scanned") or done < int(it.get("qty") or 1):
+                raise HTTPException(400, f"{it.get('name')} : {done}/{int(it.get('qty') or 1)} scanné(s)")
+    if new_status == "annulee" and o.get("status") != "annulee":
+        await _restock_order(o)
     patch = {"status": new_status, "updated_at": now_iso()}
     if new_status == "livree":
         patch["delivered_at"] = now_iso()

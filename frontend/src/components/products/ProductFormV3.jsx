@@ -33,7 +33,7 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (productId) api.get(`/public/product/${productId}`).then(r => setF(prev => ({...prev, ...r.data})));
+    if (productId) api.get(`/products/${productId}`).then(r => setF(prev => ({...prev, ...r.data}))).catch(() => toast.error("Produit introuvable"));
   }, [productId]);
 
   const upd = (k,v) => setF(p => ({...p, [k]:v}));
@@ -67,7 +67,12 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
     if (belowCost && !confirm("Le prix de vente est inférieur au coût. Confirmer ?")) return;
     setLoading(true);
     try {
-      const payload = { ...f, stock: totalStock || f.stock || 0 };
+      const vs = (f.variants || []).filter(v => v.enabled !== false);
+      const payload = { ...f };
+      if (vs.length) {
+        payload.stock = vs.reduce((s, v) => s + Number(v.stock || 0), 0);
+        payload.stock_by_size = vs.reduce((m, v) => ({ ...m, [v.size]: (m[v.size] || 0) + Number(v.stock || 0) }), {});
+      } else payload.stock = Object.keys(f.stock_by_size || {}).length ? totalStock : (f.stock || 0);
       if (f.images?.[0]) payload.image = f.images[0];
       if (productId) await api.patch(`/products/${productId}`, payload);
       else await api.post("/products", payload);

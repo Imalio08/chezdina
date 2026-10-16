@@ -27,7 +27,7 @@ function POSInner() {
   const [custQ, setCustQ] = useState("");
   const [custResults, setCustResults] = useState([]);
   const [showNewCust, setShowNewCust] = useState(false);
-  const [showPasteWA, setShowPasteWA] = useState(false);
+  const [showPasteWA, setShowPasteWA] = useState(() => new URLSearchParams(window.location.search).get("coller") === "1");
   const [showPayment, setShowPayment] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
   const [sheetProduct, setSheetProduct] = useState(null);

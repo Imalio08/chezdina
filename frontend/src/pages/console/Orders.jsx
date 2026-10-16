@@ -13,8 +13,8 @@ import { useAuth } from "@/context/AuthContext";
 
 const STATUSES = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee","retournee"];
 const KANBAN = ["en_attente_acompte","nouvelle","confirmee","en_preparation","prete","assignee","en_livraison","livree","annulee","reportee","echouee","retournee"];
-const TABS = [["", "Toutes"], ["nouvelle", "À confirmer"], ["confirmee", "À préparer"], ["en_preparation", "En préparation"], ["prete", "Prêtes"], ["assignee", "Affectées"], ["en_livraison", "En livraison"], ["livree", "Livrées"], ["annulee_reportee", "Annulées / Reportées"], ["en_attente_acompte", "En attente d'acompte"], ["wave_verif", "Paiements Wave à vérifier"]];
-const inTab = (o, t) => !t || (t === "wave_verif" ? o.payment_status === "preuve_envoyee" : t === "annulee_reportee" ? ["annulee", "reportee", "echouee", "retournee"].includes(o.status) : t === "en_livraison" ? ["en_livraison", "recuperee"].includes(o.status) : o.status === t);
+const TABS = [["", "Toutes"], ["nouvelle", "À confirmer"], ["confirmee", "À préparer"], ["en_preparation", "En préparation"], ["prete", "Prêtes"], ["assignee", "Affectées"], ["en_livraison", "En livraison"], ["livree", "Livrées"], ["echouee", "Échecs"], ["annulee_reportee", "Annulées / Reportées"], ["en_attente_acompte", "En attente d'acompte"], ["wave_verif", "Paiements Wave à vérifier"]];
+const inTab = (o, t) => !t || (t === "wave_verif" ? o.payment_status === "preuve_envoyee" : t === "annulee_reportee" ? ["annulee", "reportee", "retournee"].includes(o.status) || (!!o.rescheduled_for && o.status === "confirmee") : t === "en_livraison" ? ["en_livraison", "recuperee"].includes(o.status) : o.status === t);
 
 export function OrderActions({ o, canConfirm, onConfirm, onPrepare, compact }) {
   const cls = `inline-flex items-center gap-1 rounded-md font-semibold ${compact ? "text-[10px] px-2 py-1" : "text-xs px-2.5 py-1.5"}`;
@@ -138,6 +138,7 @@ export default function Orders() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div><h1 className="font-serif text-3xl">Commandes</h1><p className="text-sm text-[#666]">Tous canaux · {orders.length} commandes</p></div>
         <div className="flex gap-2">
+          <button onClick={() => nav("/console/pos?coller=1")} className="px-3 py-2 text-xs rounded-md border border-[#b02a2a] text-[#b02a2a] font-semibold" data-testid="orders-from-message">Commande depuis un message</button>
           {[["table", "Table"], ["kanban", "Kanban"]].map(([v, l]) => <button key={v} onClick={()=>{ setView(v); localStorage.setItem("orders_view", v); }} className={`px-3 py-2 text-xs rounded-md border ${view===v?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid={`orders-view-${v}`}>{l}</button>)}
         </div>
       </div>

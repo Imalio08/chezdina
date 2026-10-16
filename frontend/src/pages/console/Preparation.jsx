@@ -185,7 +185,7 @@ const MANUAL_REASONS = [
 
 export function PrepRunner({ order, onBack }) {
   // Each item line gets: scanned (boolean), manual (boolean), reason (string)
-  const [lines, setLines] = useState(() => (order.items || []).map((it, i) => ({ idx: i, item: it, scanned: false, manual: false, reason: "" })));
+  const [lines, setLines] = useState(() => (order.items || []).map((it, i) => ({ idx: i, item: it, done: 0, scanned: false, manual: false, reason: "" })));
   const [scanBuffer, setScanBuffer] = useState("");
   const [manualFor, setManualFor] = useState(null);
   const [reason, setReason] = useState("");
@@ -196,40 +196,37 @@ export function PrepRunner({ order, onBack }) {
   useEffect(() => { inputRef.current?.focus(); }, []);
   const refocus = () => setTimeout(() => inputRef.current?.focus(), 80);
 
+  const norm = (x) => (x || "").toString().toLowerCase().trim();
   const matches = (scan, item) => {
-    const s = (scan || "").toLowerCase().trim();
-    if (!s) return false;
-    const parts = s.split(/[|,;_\s]+/);
-    const sku = (item.sku || item.product_id || "").toLowerCase();
-    const size = (item.size || "").toLowerCase();
-    const color = (item.color || "").toLowerCase();
-    if (parts.includes(sku) || s === sku) return true;
-    if (s.includes(sku) && sku.length > 2) return true;
-    if (size && parts.includes(size)) return true;
-    return false;
+    const parts = norm(scan).split(/[|,;_\s]+/).filter(Boolean);
+    if (!parts.length) return false;
+    const codes = [item.sku, item.barcode, item.ean, item.product_id].map(norm).filter(c => c.length > 2);
+    if (!codes.includes(parts[0])) return false;
+    const [, s, c] = parts;
+    if (s && item.size && norm(item.size) !== s) return false;
+    if (c && item.color && norm(item.color) !== c) return false;
+    return true;
   };
+  const need = (l) => Math.max(1, Number(l.item.qty || 1));
 
   const handleScan = (raw) => {
     const code = raw.trim();
     if (!code) return;
-    const idx = lines.findIndex(l => !l.scanned && !l.manual && matches(code, l.item));
-    if (idx === -1) {
-      toast.error("Article non trouvé dans cette commande");
-      setScanBuffer(""); refocus();
-      return;
-    }
-    const newLines = [...lines];
-    newLines[idx] = { ...newLines[idx], scanned: true };
-    setLines(newLines);
-    toast.success(`✓ ${newLines[idx].item.name}`);
     setScanBuffer(""); refocus();
+    const candidates = lines.filter(l => !l.manual && matches(code, l.item));
+    if (!candidates.length) return toast.error("Code inconnu dans cette commande · vérifiez l'article (SKU ou SKU|taille|couleur)");
+    const target = candidates.find(l => l.done < need(l));
+    if (!target) return toast.error(`Déjà complet : ${candidates[0].item.name} (${need(candidates[0])}/${need(candidates[0])}) · article en trop, ne pas l'ajouter`);
+    const done = target.done + 1;
+    setLines(ls => ls.map(l => l.idx === target.idx ? { ...l, done, scanned: done >= need(l) } : l));
+    toast.success(`✓ ${target.item.name} · ${done}/${need(target)}`);
   };
 
   const onKey = (e) => {
     if (e.key === "Enter") { handleScan(scanBuffer); e.preventDefault(); }
   };
 
-  const openManual = (idx) => { setManualFor(idx); setReason(MANUAL_REASONS[0]); setCustomReason(""); };
+  const openManual = (idx) => { setManualFor(idx); setReason(""); setCustomReason(""); };
   const confirmManual = () => {
     const finalReason = reason === "__custom__" ? customReason.trim() : reason;
     if (!finalReason) { toast.error("Motif obligatoire"); return; }
@@ -242,6 +239,8 @@ export function PrepRunner({ order, onBack }) {
 
   const allDone = lines.every(l => l.scanned || l.manual);
   const scannedCount = lines.filter(l => l.scanned || l.manual).length;
+  const unitsTotal = lines.reduce((s, l) => s + need(l), 0);
+  const unitsDone = lines.reduce((s, l) => s + (l.manual ? need(l) : Math.min(l.done, need(l))), 0);
 
   const markReady = async () => {
     if (!allDone) { toast.error("Scannez ou confirmez tous les articles"); return; }
@@ -256,15 +255,13 @@ export function PrepRunner({ order, onBack }) {
           size: l.item.size,
           color: l.item.color,
           qty: l.item.qty,
+          scanned_qty: l.done,
           scanned: l.scanned,
           manual: l.manual,
           manual_reason: l.reason || null,
         })),
       };
-      await api.patch(`/orders/${order.id}/status-v3`, payload).catch(async (e) => {
-        if (e?.response?.status && e.response.status !== 404) throw e;
-        await api.patch(`/orders/${order.id}/status`, { status: "prete" });
-      });
+      await api.patch(`/orders/${order.id}/status-v3`, payload);
       toast.success("Commande marquée Prête ✓ · fiche colis prête");
       slip(order).catch(() => {});
       onBack();
@@ -276,7 +273,7 @@ export function PrepRunner({ order, onBack }) {
     <div className="space-y-4" data-testid="prep-runner">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <button onClick={onBack} className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]" data-testid="prep-back"><ArrowLeft size={14}/>Retour</button>
-        <div className="text-xs text-[#666]"><b className="text-[#1c1c1c] dark:text-white">{scannedCount}</b> / {lines.length} articles</div>
+        <div className="text-xs text-[#666]" data-testid="prep-progress"><b className="text-[#1c1c1c] dark:text-white">{scannedCount}</b> / {lines.length} lignes · <b className="text-[#1c1c1c] dark:text-white">{unitsDone}</b> / {unitsTotal} pièces</div>
       </div>
 
       <div className="dina-card-white p-5">
@@ -304,6 +301,7 @@ export function PrepRunner({ order, onBack }) {
                   {l.item.size && <span>· Taille <b>{l.item.size}</b></span>}
                   {l.item.color && <span>· Couleur <b>{l.item.color}</b></span>}
                   <span>· Qté <b>{l.item.qty}</b></span>
+                  {!l.manual && <span className={`font-semibold ${l.scanned ? "text-[#1f8a4c]" : l.done ? "text-[#e4991e]" : "text-[#999]"}`} data-testid={`prep-line-count-${idx}`}>· {Math.min(l.done, need(l))}/{need(l)} scanné{need(l) > 1 ? "s" : ""}</span>}
                 </div>
                 {l.manual && <div className="text-[11px] text-[#e4991e] font-semibold mt-0.5">Override manuel · "{l.reason}"</div>}
               </div>
@@ -331,6 +329,7 @@ export function PrepRunner({ order, onBack }) {
             <div className="text-xs text-[#666] mb-3">Confirmez manuellement <b>{lines[manualFor].item.name}</b>. Le motif est obligatoire et sera enregistré dans le journal d'audit.</div>
             <label className="text-xs uppercase text-[#666] font-semibold">Motif *</label>
             <select className="dina-input mt-1 mb-3" value={reason} onChange={e => setReason(e.target.value)} data-testid="prep-manual-reason">
+              <option value="">Choisir un motif…</option>
               {MANUAL_REASONS.map(r => <option key={r} value={r}>{r}</option>)}
               <option value="__custom__">Autre (préciser)…</option>
             </select>

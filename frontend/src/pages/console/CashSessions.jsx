@@ -119,7 +119,7 @@ export default function CashSessions() {
                 <td className="text-right tabular">{fcfa(s.cash_sales || 0)}</td>
                 <td className="text-right tabular">{fcfa(s.expected || 0)}</td>
                 <td className="text-right tabular font-semibold">{s.closing_cash != null ? fcfa(s.closing_cash) : "—"}</td>
-                <td className="text-right tabular">{s.handover_amount != null ? fcfa(s.handover_amount) : "—"}</td>
+                <td className="text-right tabular">{s.handover_amount != null ? fcfa(s.handover_amount) : s.rejection_declared != null ? <span className="text-[#c62828]" title={s.rejection_reason}>{fcfa(s.rejection_declared)} · écart {fcfa(s.rejection_gap || 0)}</span> : "—"}</td>
                 <td className={`text-right tabular font-semibold ${s.validation_gap > 0 ? "text-[#1f8a4c]" : s.validation_gap < 0 ? "text-[#c62828]" : ""}`}>{s.validation_gap != null ? ((s.validation_gap > 0 ? "+" : "") + fcfa(s.validation_gap)) : "—"}</td>
                 <td className="text-right whitespace-nowrap">{s.status === "pending_validation" && isOwner && (<>
                   <button onClick={() => setValidateFor(s)} className="text-[#1f8a4c] text-xs font-semibold hover:underline" data-testid={`cash-validate-${s.id}`}>Valider</button>

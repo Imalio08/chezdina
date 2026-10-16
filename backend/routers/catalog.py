@@ -25,6 +25,14 @@ async def products(user: dict = Depends(get_user), q: Optional[str] = None):
     return clean(await db.products.find(f).to_list(500))
 
 
+@router.get("/products/{pid}")
+async def product_one(pid: str, user: dict = Depends(require_role("admin", "manager", "stock_keeper", "community_manager"))):
+    p = await db.products.find_one({"$or": [{"id": pid}, {"slug": pid}]})
+    if not p:
+        raise HTTPException(404)
+    return clean(p)
+
+
 @router.post("/products")
 async def create_product(body: ProductIn, user: dict = Depends(require_role("admin", "manager", "stock_keeper"))):
     doc = body.model_dump()
