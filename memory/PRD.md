@@ -1113,3 +1113,12 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_81 + retest pytest 15/15. Données de test supprimées.
 - Reste : numéro Wave de la boutique à saisir dans Paramètres › Paiements ; prix des articles encore repris du panier client à la commande (faille préexistante).
 
+
+
+## 2026-10-16 — App livreur : 4 onglets + Profil hub
+- Demande : barre du bas réduite à Courses · Carte · Messages · Profil ; Historique et Performance déplacés dans Profil ; Profil = en-tête (photo, nom, pointage), carte score /100 + tendance + livraisons du jour + encaissé (ouvre Performance), menu (Historique, Performance, Avis clients, Mon solde, Contacter la gérante, Signaler un problème, Paramètres, Pointer mon départ) ; manuel livreur mis à jour.
+- Front : RiderShell (onglets filtrés/ordonnés même si le CMS contient historique/performance ; onglet Profil actif sur ses sous-pages ; événement rider-open-punch), Profil.jsx réécrit, nouvelles pages Avis / Solde / Paramètres, SubPage (flèche retour Profil) sur Historique, Performance et les nouvelles pages ; routes /riders/avis, /riders/solde, /riders/parametres.
+- Backend : /riders/{rid}/score renvoie `trend` (score actuel − score sans les 7 derniers jours) ; nouveau POST /api/rider/report (signalement → notification console + push équipe ; l'ancien appel échouait sans le dire) ; manuel addendum add-rider-nav.
+- Testé : iteration_82 (backend 7/7, frontend OK) + corrections (signalement, onglet actif, mode sombre, « Aucun avis »).
+- Reste : numéro de la gérante codé en dur (+225 07 77 92 61 79) ; Historique peut afficher deux journées à la même date (plusieurs sessions).
+

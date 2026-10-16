@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useRef, useMemo } from "react";
 import { toast } from "sonner";
 import { playChime, setSoundEnabled } from "@/lib/notifySound";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
+
+const PROFIL_SUB = /^\/riders\/(historique|performance|avis|solde|parametres)/;
 import {
   Package, Map, History, Trophy, User, LogOut, Clock,
   HelpCircle, Phone, MessageCircle, Info, ExternalLink, Megaphone, Star, Heart, Home, Settings as SettingsIcon
@@ -24,6 +26,7 @@ const resolveIcon = (name) => ICONS[name] || Info;
 export default function RiderShell() {
   const { user, logout } = useAuth();
   const nav = useNavigate();
+  const { pathname } = useLocation();
   const [theme, setTheme] = useState(() => localStorage.getItem("rider_theme") || "light");
   const [site, setSite] = useState({});
   const [cms, setCms] = useState(null);
@@ -369,7 +372,7 @@ export default function RiderShell() {
               to={to}
               end={end}
               data-testid={`rider-tab-${(t.key || label).toString().toLowerCase()}`}
-              className={({ isActive }) => `relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${isActive ? "text-[color:var(--rider-primary)]" : "text-[#666] dark:text-[#999]"}`}
+              className={({ isActive }) => `relative flex flex-col items-center gap-0.5 py-2.5 text-[10px] font-medium ${(isActive || (to === "/riders/profil" && PROFIL_SUB.test(pathname))) ? "text-[color:var(--rider-primary)]" : "text-[#666] dark:text-[#999]"}`}
             >
               <Icon size={18} /><span className={`block max-w-full truncate px-0.5 ${tabs.length > 5 ? "text-[9px]" : ""}`}>{label}</span>
               {to === "/riders/messages" && msgUnread > 0 && <span className="absolute top-1 left-1/2 ml-1.5 bg-[#b02a2a] text-white text-[9px] font-bold rounded-full min-w-[16px] h-4 px-1 grid place-items-center" data-testid="rider-tab-messages-badge">{msgUnread}</span>}

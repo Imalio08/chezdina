@@ -1,0 +1,40 @@
+{
+  "summary": "Tested the rider nav refactor (4 tabs + Profil hub) at 390/360 widths, plus the backend score trend, store conversation and manual addendum. Backend: 7/7 pytest passed. Frontend: almost everything works. Bottom nav has exactly courses, carte, messages, profil (no historique/performance tabs). Profil header, check-in text, summary card (score 73, trend -1, livrées, à livrer, encaissé) all render, and tapping the card opens /riders/performance. Every menu row opens its subpage (Historique with hist-period-*/hist-tab-*, Performance, Avis, Solde with all 5 boxes, Paramètres with photo/theme/wa/sound). rider-subpage-back always returns to /riders/profil. Direct URLs and reload work for all 5 subpages. The contact sheet shows call, WhatsApp (wa.me/2250777926179) and in-app buttons; the in-app button opens the store conversation at /riders/messages/{id}. profil-row-depart shows only after arrival and opens the Pointage modal on the Départ step. The messages badge appeared (1) after a seeded unread store message and cleared after the thread was opened. The inbox tabs and write-store button are present. Theme dark/light and WA business preferences persist after reload. No horizontal overflow at 390 or 360. The manual contains 'Navigation : 4 onglets et le Profil'. One bug: 'Signaler un problème' always fails.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "POST /api/notifications", "issue": "This endpoint does not exist (405 Method Not Allowed; only GET /api/notifications is defined). Profil 'Signaler un problème' calls it, so every rider report fails with the toast 'Signalement non envoyé · réessayez'. Older Profil versions swallowed the error and showed a fake 'Gérante alertée', so the manager has never received these reports.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/riders/{rid}/score", "issue": "With 0 reviews, stats.rating_avg = 5 and satisfaction = 100/100. The Profil row then shows '0 avis · 5★' and Performance shows 'Note moyenne 5★', while the Avis page says 'Aucun avis pour le moment'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Profil > Signaler un problème", "issue": "Always shows the error toast because of the missing backend endpoint (see backend critical).", "selector": "[data-testid='profil-report']", "priority": "HIGH"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Profil subpages (/riders/historique, performance, avis, solde, parametres)", "issues": ["No bottom tab is highlighted on these subpages. The Profil tab should stay active, because these pages are part of Profil."]},
+      {"screen": "Profil dark mode", "issues": ["The 'Signaler un problème' (danger) icon chip keeps a light #fdecec background in dark mode, while the other rows' chips are dark."]},
+      {"screen": "Historique", "issues": ["Some dates appear twice (e.g. hist-day-2026-10-09 and 2026-10-06 twice), which gives duplicate data-testids and possibly duplicate React keys. Probably several sessions on the same day: consider merging them or adding a session label."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_rider_nav_profil.py", "/app/test_reports/pytest/pytest_iter82.xml"],
+  "action_items": [
+    "HIGH: add a backend endpoint for rider issue reports (e.g. POST /api/rider/report-issue, rider auth). It should insert into db.notifications (type alert) and call notify_staff. Then point Profil.reportIssue at it.",
+    "Keep the Profil tab active on /riders/{historique,performance,avis,solde,parametres}.",
+    "When there are no reviews, show '—' instead of 5★ in the Profil Avis row and on Performance.",
+    "Optional: replace the prompt() dialogs in 'Signaler un problème' with an in-app sheet (type chips + textarea), to match the mobile UI."
+  ],
+  "critical_code_review_comments": [
+    "Profil.reportIssue posts to a non-existent route. The previous code had .catch(()=>{}) and showed a false success, which hid the bug.",
+    "Profil.jsx parses arrival/departure fields defensively (at/time/string); attendance docs use 'at', so this works.",
+    "RiderShell msgUnread counts every message without the rider's id in read_by, including the rider's own messages if read_by is missing. Fine for the current send path, which sets read_by."
+  ],
+  "updated_files": ["/app/backend/tests/test_rider_nav_profil.py"],
+  "success_rate": {"backend": "100% (7/7)", "frontend": "~95% (all requested flows pass except the report-issue submission)"},
+  "seed_data_creation": "Temporary only, all removed: a TEST_ store message in rider1's store conversation, a TEST_att_arr arrival attendance record for rider1, and the rider1 store conversation created by the test (deleted, it was empty). Rider prefs restored to theme light / WhatsApp standard.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Rider login: /riders/connexion, rider-pin-key-5 x4 + rider-pin-submit. To test profil-row-depart, insert a temporary attendance doc {user_id, day: today UTC, kind: 'arrival', at} and delete it afterwards. Scroll to the page bottom before clicking the depart row: a forced Playwright click can land on the fixed bottom nav (Messages tab). For the messages badge, push an unread message (read_by: []) into the rider's boutique_livreur conversation. Retest profil-report once the endpoint exists."
+}

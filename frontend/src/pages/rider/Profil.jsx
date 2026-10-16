@@ -12,7 +12,7 @@ const MANAGER = "2250777926179";
 function Row({ icon: Icon, label, sub, onClick, testid, danger }) {
   return (
     <button onClick={onClick} className="w-full flex items-center gap-3 px-4 py-3.5 text-left active:bg-[#fff5f5] dark:active:bg-[#2a1818] border-b border-[#f0f0f0] dark:border-[#2a2a2a] last:border-0" data-testid={testid}>
-      <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${danger ? "bg-[#fdecec] text-[#c62828]" : "bg-[#fde8e8] text-[#b02a2a]"}`}><Icon size={17}/></span>
+      <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${danger ? "bg-[#fdecec] dark:bg-[#3a1515] text-[#c62828]" : "bg-[#fde8e8] dark:bg-[#2a1818] text-[#b02a2a]"}`}><Icon size={17}/></span>
       <span className="flex-1 min-w-0"><span className="block text-sm font-semibold">{label}</span>{sub && <span className="block text-[11px] text-[#666] truncate">{sub}</span>}</span>
       <ChevronRight size={16} className="text-[#bbb] shrink-0"/>
     </button>
@@ -81,7 +81,7 @@ export default function Profil() {
     const kind = prompt("Type de problème (panne moto, accident, client agressif, colis endommagé) ?") || "autre";
     const details = prompt("Décrivez brièvement :") || "";
     if (!details) return;
-    try { await api.post("/notifications", { kind: "alert", title: `Signalement livreur ${user.name} : ${kind}`, body: details }); toast.success("Gérante alertée"); }
+    try { await api.post("/rider/report", { kind, details }); toast.success("Gérante alertée"); }
     catch { toast.error("Signalement non envoyé · réessayez"); }
   };
   return (
@@ -98,7 +98,7 @@ export default function Profil() {
       <div className="dina-card-white !p-0 overflow-hidden" data-testid="profil-menu">
         <Row icon={History} label="Historique" sub="Mes journées et courses passées" onClick={() => nav("/riders/historique")} testid="profil-row-historique"/>
         <Row icon={Trophy} label="Performance" sub={score ? `Niveau ${score.level}` : "Score et critères"} onClick={() => nav("/riders/performance")} testid="profil-row-performance"/>
-        <Row icon={Star} label="Avis clients" sub={score ? `${score.stats?.reviews || 0} avis · ${score.stats?.rating_avg}★` : null} onClick={() => nav("/riders/avis")} testid="profil-row-avis"/>
+        <Row icon={Star} label="Avis clients" sub={score ? (score.stats?.reviews ? `${score.stats.reviews} avis · ${score.stats.rating_avg}★` : "Aucun avis pour le moment") : null} onClick={() => nav("/riders/avis")} testid="profil-row-avis"/>
         <Row icon={Wallet} label="Mon solde" sub={today ? `À remettre : ${fcfa(today.balance_to_hand_over || 0)}` : null} onClick={() => nav("/riders/solde")} testid="profil-row-solde"/>
         <Row icon={Phone} label="Contacter la gérante" sub="Appel, WhatsApp ou message" onClick={() => setContact(true)} testid="profil-row-contact"/>
         <Row icon={AlertTriangle} label="Signaler un problème" sub="Panne, accident, colis abîmé…" onClick={reportIssue} testid="profil-report" danger/>

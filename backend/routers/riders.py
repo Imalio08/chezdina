@@ -117,6 +117,24 @@ def _score(orders, reviews, sessions, weights):
     }
 
 
+@router.post("/rider/report")
+async def rider_report(body: Dict[str, Any], user: dict = Depends(get_user)):
+    if user.get("role") != "rider":
+        raise HTTPException(403, "Réservé aux livreurs")
+    details = (body.get("details") or "").strip()[:500]
+    if not details:
+        raise HTTPException(400, "Décrivez le problème")
+    kind = (body.get("kind") or "autre").strip()[:60]
+    await db.notifications.insert_one({
+        "id": new_id(), "type": "rider_report", "title": f"Signalement livreur {user.get('name')} : {kind}",
+        "msg": details, "color": "#c62828", "at": now_iso(), "link": f"/console/livreurs/{user.get('id')}",
+    })
+    from routers.notify import notify_staff
+    await notify_staff(f"Signalement livreur · {kind}", f"{user.get('name')} : {details}", f"/console/livreurs/{user.get('id')}")
+    return {"ok": True}
+
+
+
 @router.get("/riders/{rid}/reviews")
 async def rider_reviews(rid: str, user: dict = Depends(get_user)):
     is_rider_self = user.get("role") == "rider" and user.get("id") == rid
