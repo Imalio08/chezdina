@@ -8,7 +8,7 @@ export default function WaveProofCard({ order, canVerify, onDone }) {
   const [zoom, setZoom] = useState(false);
   const [busy, setBusy] = useState(false);
   const p = order.wave_proof;
-  if (order.payment_method !== "wave" && !p) return null;
+  if (order.payment_method !== "wave" && order.status !== "en_attente_acompte" && !p) return null;
   const info = order.status === "en_attente_acompte" && !p ? { label: "Acompte non payé", color: "#c62828" } : payInfo(order);
   const verify = async (decision) => {
     const body = { decision };

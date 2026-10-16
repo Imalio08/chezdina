@@ -41,6 +41,7 @@ export const dateTimeFmt = (iso) => {
 };
 export const payInfo = (o) => {
   if (o.payment_status === "paye") return { label: "Payé", color: "#1f8a4c", paid: true };
+  if (o.payment_status === "acompte_recu") return { label: "Acompte reçu", color: "#1f8a4c" };
   if (o.payment_status === "preuve_envoyee") return { label: "Wave à vérifier", color: "#e4991e" };
   if (o.payment_status === "preuve_refusee") return { label: "Preuve Wave refusée", color: "#c62828" };
   if (o.payment_method === "wave") return { label: "Wave non payé", color: "#c62828" };

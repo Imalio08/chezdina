@@ -57,6 +57,8 @@ async def verify_proof(oid: str, body: Dict[str, Any], user: dict = Depends(requ
         raise HTTPException(404)
     if o.get("payment_status") in DONE:
         raise HTTPException(400, "Paiement déjà validé")
+    if (o.get("wave_proof") or {}).get("status") != "en_attente":
+        raise HTTPException(400, "Aucune preuve Wave en attente de vérification")
     decision = body.get("decision")
     cust = o.get("customer") or {}
     tx = (body.get("tx_ref") or (o.get("wave_proof") or {}).get("tx_ref") or "").strip() or None

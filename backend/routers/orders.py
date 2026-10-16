@@ -107,7 +107,15 @@ async def track(code: str):
     o = await db.orders.find_one({"code": code})
     if not o:
         raise HTTPException(404)
-    return clean(o)
+    keep = ("code", "status", "items", "total", "subtotal", "delivery_fee", "discount", "created_at", "timeline", "rider_name",
+            "payment_method", "payment_status", "deposit_required", "deposit_paid", "delivery_zone", "mode")
+    out = {k: o.get(k) for k in keep}
+    c = o.get("customer") or {}
+    out["customer"] = {"name": (c.get("name") or "").split(" ")[0]}
+    p = o.get("wave_proof")
+    if p:
+        out["wave_proof"] = {k: p.get(k) for k in ("status", "reject_reason", "kind", "amount", "submitted_at")}
+    return clean(out)
 
 
 # ---------- POS: PIN authorizations ----------

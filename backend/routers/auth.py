@@ -61,10 +61,11 @@ async def login_pin(body: PinIn, response: Response):
 @router.post("/auth/rider-login-pin")
 async def rider_login_pin(body: PinIn, request: Request, response: Response):
     pin = "".join(ch for ch in body.pin if ch.isdigit())
-    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
+    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[-1].strip()
     key = f"rider-pin:{ip}"
     since = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
-    if await db.login_attempts.count_documents({"identifier": key, "at": {"$gt": since}}) >= 8:
+    if await db.login_attempts.count_documents({"identifier": key, "at": {"$gt": since}}) >= 8 or \
+            await db.login_attempts.count_documents({"identifier": {"$regex": "^rider-pin:"}, "at": {"$gt": since}}) >= 40:
         raise HTTPException(429, "Trop d'essais · réessayez dans 15 minutes")
     if len(pin) >= 4:
         async for u in db.users.find({"role": "rider", "active": {"$ne": False}}):

@@ -1102,3 +1102,14 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_70 + 71 (backend 28/28, frontend 100 %). Données TEST_ supprimées, stock restauré.
 - Reste (signalé, hors périmètre) : écarts KPI bruts et « ⏱259957min » sur le tableau de bord console.
 
+
+
+## 2026-10-16 — Connexion livreur par PIN + Paiement Wave vérifié
+- Demande : « Permettre au chauffeur de se connecter juste avec son code pin. Et adapter les couleurs au rouge bordeaux et autre de la charte de la boutique » + « Quand le client dit de payer par wave… upload la preuve de paiement… la gérante vérifie sur Wave… ce n'est qu'après qu'elle marque paiement reçu que la commande prend le statut payé ».
+- Livreur : /riders/connexion = pavé PIN (POST /api/auth/rider-login-pin, livreurs actifs uniquement, 8 essais/15 min par IP + 40 globaux → 429), bascule e-mail/mot de passe ; dégradé bordeaux (#b02a2a → #8e1f1f → #4a1010) ; rider_cms.primary_color remis à #b02a2a. PIN livreur unique (création/modification refusée sinon).
+- Wave : routers/wave_pay.py — POST /api/public/orders/{code}/wave-proof (capture + ID transaction, téléphone de la commande ou compte cliente) → payment_status preuve_envoyee ; POST /api/orders/{oid}/wave-verify (admin/gérante, preuve en attente obligatoire) accept → paye (ou acompte_recu + confirmee pour un acompte), reject (motif) → preuve_refusee + notification cliente. Livraison d'une commande Wave non vérifiée ne la marque plus payée ; facture auto « à payer ».
+- Front : WavePayBox (checkout, /suivi, Mon compte), WaveProofCard (fiche commande console), onglet « Paiements Wave à vérifier » + badge, libellés « Wave à vérifier / Wave non payé / Acompte reçu » (livreur, livraisons, fiches colis), Paramètres › Paiements : numéro + nom Wave.
+- /orders/track/{code} renvoie désormais une vue limitée (prénom seulement, sans téléphone ni image de preuve).
+- Testé : iteration_81 + retest pytest 15/15. Données de test supprimées.
+- Reste : numéro Wave de la boutique à saisir dans Paramètres › Paiements ; prix des articles encore repris du panier client à la commande (faille préexistante).
+

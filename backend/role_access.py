@@ -63,7 +63,7 @@ DENY_ALL = (
 DENY = {
     "sales": (
         (("DELETE",), re.compile(r"^/api/")),
-        (W, re.compile(r"^/api/customers/bulk|/regen-access-code|/mark-deposit-paid|^/api/messages/broadcast")),
+        (W, re.compile(r"^/api/customers/bulk|/regen-access-code|/mark-deposit-paid|/wave-verify|^/api/messages/broadcast")),
     ),
     "stock_keeper": (
         (("DELETE",), re.compile(r"^/api/")),

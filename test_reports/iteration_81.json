@@ -1,0 +1,50 @@
+{
+  "summary": "Tested the rider PIN login and the Wave payment-proof flow on backend and frontend. Backend (new tests/test_wave_proof_rider_pin.py): 15/17 pass after 1 fix by the tester. Rider PIN: 5555 logs in rider1 (user + token + httpOnly cookie, no pin_hash returned, pin_hash is $2b$). Staff PINs 1234/2222 and 0000 get 401 'Code PIN incorrect'. After 8 failures the 9th call gets 429, even with the correct PIN. Setting rider2's PIN to 5555 gets 400 'déjà utilisé' and the hash is unchanged. Wave: an order is created with payment_status en_attente. The proof endpoint checks the inputs (wrong phone -> 403, non-image -> 400, unknown code -> 404, non-Wave COD without deposit -> 400). A valid proof sets preuve_envoyee. Accept sets paye and copies tx_ref; a second accept gets 400 and the proof is then refused. Reject needs a reason, sets preuve_refusee, and a new proof can be sent. A deposit order (COD 20000, 30% = 6000) accepted gives confirmee + acompte_recu + deposit_paid 6000. Delivery (livree) of an unverified Wave order keeps payment_status en_attente. wave_number/wave_name round-trip through PATCH /api/site -> GET /public/payment-config. FIXED by tester: sales (agent1) got 200 on POST /api/orders/{oid}/wave-verify, because require_role lets limited roles inherit 'manager'. Added /wave-verify to the sales DENY regex in role_access.py; it now returns 403. Frontend (Playwright): /riders/connexion has the bordeaux gradient. A wrong PIN shows the toast 'Code PIN incorrect' and clears the dots. The del key works, the toggle shows the email form, and 5555 lands on /riders. Checkout with Wave opens the modal with amount, ref, link and upload. Uploading and submitting gives the toast and redirects to /suivi/{code}, which shows wave-status-pending. Console (admin): the tab 'Paiements Wave à vérifier 3' and the badges are correct. wave-proof-card shows the thumbnail and the zoom works. Accept asks for confirmation and gives 'Payé'. Reject asks for a reason and gives 'Preuve Wave refusée'; the customer tracking page then shows wave-status-rejected and the form, and re-uploading gives pending again. Deposit accept works. Settings Paiements: wave-number/name save and appear in the tracking instructions (wave-copy-number); settings were restored. In rider Courses, the labels 'Wave à vérifier' and 'Wave non payé' are correct.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/orders/track/{code}", "issue": "This public, unauthenticated endpoint returns the full order (clean(o)), including the wave_proof.image base64 screenshot (up to 4MB), the customer phone, the address and the timeline. Anyone with an order code can see the proof screenshot and the phone. The phone check on /wave-proof is useless because the phone is public here (Tracking.jsx even pre-fills it). Fix: return a whitelisted projection, drop wave_proof.image (send only status/reject_reason/kind/amount), and mask the phone.", "priority": "HIGH"},
+      {"endpoint": "PATCH /api/orders/{oid}/status-v3 (livree)", "issue": "The auto-invoice upsert uses status 'payee' if payment_status=='paye' or True. It is always 'payee', so an unverified Wave order that is delivered gets a PAID invoice. Remove 'or True'.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/orders/{oid}/wave-verify", "issue": "Accept does not require a proof or payment_status=='preuve_envoyee'. A manager can 'accept' any unpaid order (even COD, with no proof) and mark it paye. Add a guard: wave_proof must exist with status en_attente."},
+      {"endpoint": "POST /api/auth/rider-login-pin", "issue": "The rate-limit key uses the first X-Forwarded-For entry, which the client controls, so the 8/15min limit can be bypassed by rotating that header. With a 4-digit PIN across all riders, brute force is cheap. Use the last trusted proxy hop / request.client, or also add a global counter."},
+      {"endpoint": "WhatsApp templates (_wa_message_for_status assignee)", "issue": "For non-COD orders it says 'Déjà payée, aucun paiement à prévoir.', even when a Wave order is still unverified or the proof was refused."},
+      {"endpoint": "POST /api/public/orders", "issue": "(Pre-existing) The item price is trusted from the client body; it is not read from db.products. A customer can order at price 1."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "lib/format.js payInfo / WaveProofCard", "issue": "payment_status 'acompte_recu' falls back to 'Payé' (green). After a deposit is accepted, the console card shows 'Payé' while only 6000 of 20000 FCFA was received. Add an 'Acompte reçu' case.", "selector": "[data-testid='wave-pay-status']", "priority": "MEDIUM"},
+      {"component": "WavePayBox (tracking, deposit)", "issue": "After the deposit is accepted, it shows 'Paiement Wave confirmé par la boutique' with no remaining amount. It should say 'Acompte reçu · reste X FCFA à la livraison'.", "selector": "[data-testid='wave-status-paid']", "priority": "LOW"},
+      {"component": "Tracking Historique", "issue": "The proof, accept and reject timeline entries show only the status label, so 'À confirmer' appears twice. The note 'Preuve de paiement Wave envoyée…' is not displayed.", "selector": "Historique", "priority": "LOW"},
+      {"component": "WaveProofCard", "issue": "The 'Acompte non payé' branch can never be reached: it returns null when payment_method!=='wave' and there is no proof, so deposit orders with no proof show no card.", "selector": "[data-testid='wave-proof-card']", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "WavePayBox mobile 390px", "issues": ["The amount '7 000 FCFA' and the order reference wrap onto 2 lines; add whitespace-nowrap or stack the label above the value."]},
+      {"screen": "WaveProofCard", "issues": ["window.confirm/prompt are used for accept/reject; a shadcn AlertDialog with a reason textarea would match the app."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_wave_proof_rider_pin.py", "/app/test_reports/pytest/iter81.xml"],
+  "action_items": [
+    "HIGH: Restrict GET /api/orders/track/{code} to a safe projection (no wave_proof.image, masked phone, no checkout_key).",
+    "HIGH: Remove 'or True' in the status-v3 auto-invoice status so unverified Wave orders get 'a_payer'.",
+    "wave-verify accept: require an existing pending proof.",
+    "payInfo: handle 'acompte_recu' (label 'Acompte reçu'); tracking deposit message should show the remaining balance.",
+    "WhatsApp assignee template: do not say 'Déjà payée' for unverified Wave orders.",
+    "Rider PIN rate limit: do not trust the client-supplied first X-Forwarded-For value.",
+    "Show the timeline notes on Tracking."
+  ],
+  "critical_code_review_comments": [
+    "deps.require_role lets sales/stock/CM inherit 'manager' for any route in their allow-list. Every new manager-only endpoint under /api/orders must be added to the DENY list in role_access.py, which is easy to forget (wave-verify was missed). Consider an explicit 'manager_only' marker instead.",
+    "rider_login_pin runs bcrypt verify for every rider on each attempt (O(riders)). This is fine now but slow with many riders.",
+    "public_payment_config hardcodes a fallback Wave link URL in code."
+  ],
+  "updated_files": ["/app/backend/role_access.py (added /wave-verify to the sales DENY regex)", "/app/backend/tests/test_wave_proof_rider_pin.py"],
+  "success_rate": {"backend": "88% (15/17; the 2 failures are the track leak and the invoice 'payee')", "frontend": "95%"},
+  "test_credentials": "From /app/memory/test_credentials.md; rider1 PIN 5555 works",
+  "seed_data_creation": "None kept. All TEST_ orders, stock movements, notifications and rider-pin login_attempts were deleted; site_settings payments/wave_number/wave_name were restored from a backup.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run tests/test_wave_proof_rider_pin.py with '-n 0' (pytest.ini adds xdist; the rate-limit test is better run serially). Console login is at /console/connexion (use the first input + password, button 'Se connecter'); admin needs no punch. To see orders in rider Courses, set rider_id plus a created_at of today."
+}

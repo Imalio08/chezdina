@@ -648,7 +648,7 @@ def _wa_message_for_status(order: dict, status: str) -> Optional[str]:
         return f"{base}\nVotre commande {code} est prête ! Elle part en livraison très bientôt vers {zone}. 📦"
     if status == "assignee":
         extra = f" avec notre livreur {rider}" if rider else ""
-        return f"{base}\nVotre commande {code} est en route{extra}. Il vous appellera à l'approche. {'Préparez ' + str(total) + ' FCFA en espèces.' if is_cod else 'Déjà payée, aucun paiement à prévoir.'} 🛵"
+        return f"{base}\nVotre commande {code} est en route{extra}. Il vous appellera à l'approche. {'Préparez ' + str(total) + ' FCFA en espèces.' if is_cod else ('Déjà payée, aucun paiement à prévoir.' if order.get('payment_status') == 'paye' else 'Votre paiement Wave est en cours de vérification.')} 🛵"
     if status == "en_livraison":
         return f"{base}\nVotre colis {code} est en livraison. {'À encaisser : ' + str(total) + ' FCFA.' if is_cod else ''} 📍"
     if status == "livree":
@@ -5485,7 +5485,7 @@ async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Dep
             "id": new_id(), "number": f"INV-{int(time.time())%1000000}", "order_id": oid, "order_code": o.get("code"),
             "customer": o.get("customer"), "items": o.get("items"), "subtotal": o.get("subtotal"),
             "delivery_fee": o.get("delivery_fee",0), "discount": o.get("discount",0), "total": o.get("total"),
-            "status": "payee" if o.get("payment_status") == "paye" or True else "a_payer",
+            "status": "payee" if o.get("payment_status") == "paye" or o.get("payment_method") != "wave" else "a_payer",
             "created_at": now_iso(), "generated_by": "auto"
         }}, upsert=True)
     from routers.wallet import on_order_status

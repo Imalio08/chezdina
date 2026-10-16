@@ -21,13 +21,13 @@ export const needsWave = (o) => o && (o.payment_method === "wave" || o.status ==
 
 function Copyable({ value, testid }) {
   const copy = () => { navigator.clipboard?.writeText(value); toast.success("Copié"); };
-  return <span className="font-mono font-bold text-base inline-flex items-center gap-2">{value}<button type="button" onClick={copy} className="text-[#b02a2a]" data-testid={testid}><Copy size={13}/></button></span>;
+  return <span className="font-mono font-bold text-base inline-flex items-center gap-2 whitespace-nowrap">{value}<button type="button" onClick={copy} className="text-[#b02a2a]" data-testid={testid}><Copy size={13}/></button></span>;
 }
 
 function Instructions({ cfg, code, amount }) {
   return (
     <div className="bg-[#fff5f5] p-4 rounded-lg space-y-2 text-sm" data-testid="wave-instructions">
-      <div className="flex justify-between items-center"><span className="text-[#666]">Montant à envoyer</span><span className="font-serif text-2xl text-[#b02a2a] tabular font-bold" data-testid="wave-amount">{fcfa(amount)}</span></div>
+      <div className="flex justify-between items-center"><span className="text-[#666]">Montant à envoyer</span><span className="font-serif text-2xl text-[#b02a2a] tabular font-bold whitespace-nowrap" data-testid="wave-amount">{fcfa(amount)}</span></div>
       {cfg.wave_number && <div className="flex justify-between items-center gap-2"><span className="text-[#666]">Numéro Wave{cfg.wave_name ? ` · ${cfg.wave_name}` : ""}</span><Copyable value={cfg.wave_number} testid="wave-copy-number"/></div>}
       <div className="flex justify-between items-center gap-2"><span className="text-[#666]">Référence à indiquer</span><Copyable value={code} testid="wave-copy-ref"/></div>
       {cfg.wave_link && <a href={cfg.wave_link} target="_blank" rel="noreferrer" className="dina-btn-primary w-full justify-center mt-1" data-testid="wave-pay-link"><ExternalLink size={14}/>Payer {fcfa(amount)} avec Wave</a>}
@@ -72,7 +72,7 @@ export default function WavePayBox({ order, phone, onChange }) {
   const deposit = order.status === "en_attente_acompte";
   const amount = deposit ? order.deposit_required : order.total;
   const ps = order.payment_status;
-  if (ps === "paye" || ps === "acompte_recu") return <div className="flex items-center gap-2 text-sm text-[#1f8a4c] font-semibold" data-testid="wave-status-paid"><CheckCircle2 size={16}/>Paiement Wave confirmé par la boutique</div>;
+  if (ps === "paye" || ps === "acompte_recu") return <div className="flex items-center gap-2 text-sm text-[#1f8a4c] font-semibold" data-testid="wave-status-paid"><CheckCircle2 size={16}/>{ps === "acompte_recu" ? `Acompte reçu · reste ${fcfa((order.total || 0) - (order.deposit_paid || 0))} à la livraison` : "Paiement Wave confirmé par la boutique"}</div>;
   if (ps === "preuve_envoyee") return (
     <div className="flex items-start gap-2 text-sm bg-[#fff7e6] text-[#8a5a00] rounded-lg p-3" data-testid="wave-status-pending">
       <Clock size={16} className="mt-0.5 shrink-0"/><div><b>Preuve envoyée · en attente de vérification</b><div className="text-xs mt-0.5">La boutique vérifie la réception sur Wave. Votre commande sera marquée payée dès validation.</div></div>
