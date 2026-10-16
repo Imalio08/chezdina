@@ -71,7 +71,7 @@ export default function MarquesV2({ embedded }) {
                     {b.logo ? <img src={b.logo} alt="" className="w-full h-full object-contain" /> : <span className="font-serif text-xl text-[#b02a2a] font-bold">{(b.name || "?")[0]}</span>}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-semibold truncate">{b.name}</div>
+                    <div className="font-semibold leading-tight break-words">{b.name}</div>
                     <div className="text-[11px] text-[#666]">{b.product_count || 0} produits</div>
                   </div>
                 </div>
@@ -116,9 +116,9 @@ function KpiMini({ label, v, c, i: Icon, sub }) {
     <div className="dina-card-white p-3 min-w-0" data-testid={`kpi-${label.toLowerCase().replace(/\s/g, '-').replace(/\./g, '').replace(/\//g, '-')}`}>
       <div className="flex items-center gap-1.5 mb-1.5">
         {Icon && <Icon size={11} style={{ color: c }} />}
-        <div className="text-[10px] uppercase tracking-wide text-[#666] font-semibold truncate">{label}</div>
+        <div className="text-[10px] uppercase tracking-wide text-[#666] font-semibold leading-tight">{label}</div>
       </div>
-      <div className="font-serif tabular leading-none text-xl truncate" style={{ color: c }}>{v}</div>
+      <div className="font-serif tabular leading-tight text-lg break-words" style={{ color: c }}>{v}</div>
       {sub && <div className="text-[10px] text-[#999] tabular mt-0.5 truncate">{sub}</div>}
     </div>
   );
@@ -185,7 +185,7 @@ function BrandDetail({ bid, onBack, onEdit }) {
           {b.products.map(p => (
             <div key={p.id} className="dina-card-white overflow-hidden" data-testid={`brand-prod-${p.sku}`}>
               <div className="aspect-square bg-[#fff5f5]"><img src={p.image || p.images?.[0]} alt="" className="w-full h-full object-cover" /></div>
-              <div className="p-2"><div className="text-[11px] font-medium line-clamp-2 leading-tight min-h-[2.2em]">{p.name}</div><div className="text-xs tabular font-bold text-[#b02a2a] mt-1">{fcfa(p.price)}</div></div>
+              <div className="p-2"><div className="text-[11px] font-medium leading-tight break-words min-h-[2.2em]" title={p.name}>{p.name}</div><div className="text-xs tabular font-bold text-[#b02a2a] mt-1">{fcfa(p.price)}</div></div>
             </div>
           ))}
           {(b.products || []).length === 0 && <div className="col-span-full text-sm text-[#666] py-6 text-center">Aucun produit pour cette marque</div>}

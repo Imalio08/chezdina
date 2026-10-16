@@ -19,7 +19,7 @@ export default function Nouveautes() {
         {items.map(p => (
           <Link key={p.id} to={`/product/${p.id}`} className="block" data-testid={`new-${p.id}`}>
             <div className="aspect-[3/4] bg-[#fff5f5] rounded overflow-hidden"><img src={p.image || p.images?.[0]} alt={p.name} className="w-full h-full object-cover"/></div>
-            <div className="mt-2 text-sm font-medium truncate">{p.name}</div>
+            <div className="mt-2 text-sm font-medium leading-snug break-words">{p.name}</div>
             <div className="text-sm font-serif text-[#b02a2a]">{fcfa(p.price)}</div>
           </Link>
         ))}

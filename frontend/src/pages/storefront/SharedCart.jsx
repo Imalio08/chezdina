@@ -70,7 +70,7 @@ export default function SharedCart() {
         {items.map((it, i) => (
           <div key={i} className="p-3 flex items-center gap-3">
             <div className="w-14 h-14 rounded bg-[#fff5f5] overflow-hidden shrink-0">{it.image && <img src={it.image} alt="" className="w-full h-full object-cover"/>}</div>
-            <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{it.name}</div><div className="text-xs text-[#666]">{[it.size, it.color].filter(Boolean).join(" · ")} · {fcfa(it.price)}</div></div>
+            <div className="flex-1 min-w-0"><div className="text-sm font-medium leading-tight break-words">{it.name}</div><div className="text-xs text-[#666]">{[it.size, it.color].filter(Boolean).join(" · ")} · {fcfa(it.price)}</div></div>
             <div className="flex items-center gap-1"><button onClick={()=>upd(i,it.qty-1)} className="w-7 h-7 border rounded"><Minus size={10} className="mx-auto"/></button><span className="w-7 text-center tabular text-sm">{it.qty}</span><button onClick={()=>upd(i,it.qty+1)} className="w-7 h-7 border rounded"><Plus size={10} className="mx-auto"/></button></div>
             <button onClick={()=>rm(i)} className="text-[#c62828]" data-testid={`sc-rm-${i}`}><X size={14}/></button>
           </div>

@@ -278,9 +278,9 @@ export default function RiderShell() {
                 : <div className="w-9 h-9 rounded-full grid place-items-center text-sm font-bold text-white" style={{ background: primary }}>{(brandName[0] || "D").toUpperCase()}</div>)
           }
           <div className="min-w-0">
-            <div className="font-serif text-sm leading-none truncate" data-testid="rider-greeting">{subst(greetingTpl)}</div>
-            <div className="text-[10px] text-[#999] flex items-center gap-1 whitespace-nowrap min-w-0" data-testid="rider-gps-indicator">
-              <span className="truncate">{subst(subtitleTpl)}</span>
+            <div className="font-serif text-sm leading-tight break-words" data-testid="rider-greeting">{subst(greetingTpl)}</div>
+            <div className="text-[10px] text-[#999] flex items-center gap-x-1 flex-wrap leading-tight min-w-0" data-testid="rider-gps-indicator">
+              <span>{subst(subtitleTpl)}</span>
               {gpsState.denied ? (
                 <span className="text-[#c62828]" title="Autorisez la géolocalisation pour un suivi en direct">· ⚠ GPS refusé</span>
               ) : gpsState.live ? (

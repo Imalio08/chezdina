@@ -49,7 +49,7 @@ export default function SearchBar() {
                 <div className="p-2">{res.products.map(p => (
                   <Link key={p.id} to={`/product/${p.id}`} onClick={() => { addRecent(p.name); setOpen(false); }} className="flex gap-2 items-center p-2 hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] rounded-lg" data-testid={`search-prod-${p.id}`}>
                     <img src={p.image} alt="" className="w-10 h-12 object-cover rounded" />
-                    <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{p.name}</div><div className="text-[11px] text-[#999]">{p.brand}</div></div>
+                    <div className="flex-1 min-w-0"><div className="text-sm font-medium leading-tight break-words">{p.name}</div><div className="text-[11px] text-[#999]">{p.brand}</div></div>
                     <div className="tabular text-sm font-bold text-[#b02a2a]">{fcfa(p.price)}</div>
                   </Link>
                 ))}</div>

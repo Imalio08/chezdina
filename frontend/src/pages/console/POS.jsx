@@ -201,7 +201,7 @@ function POSInner() {
               {shortcuts.map(p => (
                 <button key={p.id} onClick={()=>setSheetProduct(p)} className="shrink-0 w-32 bg-white dark:bg-[#141414] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl overflow-hidden hover:border-[#b02a2a] text-left" data-testid={`shortcut-${p.id}`}>
                   <div className="aspect-square bg-[#fff5f5]"><img src={p.image} alt="" className="w-full h-full object-cover"/></div>
-                  <div className="p-1.5"><div className="text-[11px] font-medium line-clamp-1">{p.name}</div><div className="flex justify-between items-center mt-0.5"><span className="tabular text-xs font-bold text-[#b02a2a]">{fcfa(p.price)}</span><span className="text-[9px] text-[#1f8a4c]"><Flame size={8} className="inline"/>{p.sold_count}</span></div></div>
+                  <div className="p-1.5"><div className="text-[11px] font-medium leading-tight break-words" title={p.name}>{p.name}</div><div className="flex justify-between items-center mt-0.5"><span className="tabular text-xs font-bold text-[#b02a2a]">{fcfa(p.price)}</span><span className="text-[9px] text-[#1f8a4c]"><Flame size={8} className="inline"/>{p.sold_count}</span></div></div>
                 </button>
               ))}
             </div>
@@ -239,7 +239,7 @@ function POSInner() {
                   return (
                     <tr key={p.id} className={`border-b border-[#f0f0f0] dark:border-[#2a2a2a] hover:bg-[#fff5f5] dark:hover:bg-[#2a1818] ${waitlist?"opacity-50":""}`} data-testid={`pos-row-${p.id}`}>
                       <td className="px-2 py-1.5"><div className="w-10 h-10 rounded bg-[#fff5f5] overflow-hidden"><img src={p.image || p.images?.[0]} alt="" className="w-full h-full object-cover" loading="lazy"/></div></td>
-                      <td className="px-2 py-1.5"><div className="font-medium leading-tight line-clamp-2">{p.name}</div><div className="text-[10px] text-[#999]">{p.brand} · {p.category} · <code>{p.sku}</code></div></td>
+                      <td className="px-2 py-1.5"><div className="font-medium leading-tight break-words">{p.name}</div><div className="text-[10px] text-[#999]">{p.brand} · {p.category} · <code>{p.sku}</code></div></td>
                       <td className="px-2 py-1.5">
                         <div className="flex flex-wrap gap-0.5">{(p.sizes||[]).slice(0,8).map(s => {
                           const stk = Number(p.stock_by_size?.[s] ?? 0);
@@ -286,7 +286,7 @@ function POSInner() {
                 </div>
                 <div className="p-2">
                   <div className="text-[9px] text-[#999] font-semibold truncate">{p.brand}</div>
-                  <div className="text-xs font-medium leading-tight line-clamp-2 min-h-[2.1em]">{p.name}</div>
+                  <div className="text-xs font-medium leading-tight break-words min-h-[2.1em]" title={p.name}>{p.name}</div>
                   <div className="flex items-center justify-between mt-1">
                     <div><span className="tabular text-xs font-bold text-[#b02a2a]">{fcfa(p.price)}</span>{promo && <span className="text-[9px] text-[#999] line-through tabular ml-1">{fcfa(p.price_old)}</span>}</div>
                     <span className={`text-[9px] tabular ${totalStk<5?"text-[#c62828]":"text-[#1f8a4c]"}`}>{totalStk===0?"Rupture":totalStk<=3?`${totalStk}`:`✓`}</span>
@@ -405,7 +405,7 @@ function POSInner() {
               return (
                 <div key={it.key} className={`flex items-center gap-2 py-2 border-b border-[#f0f0f0] dark:border-[#2a2a2a] ${over?"bg-[#fff5f5] dark:bg-[#2a1818]":""}`}>
                   <div className="w-11 h-11 rounded bg-[#fff5f5] dark:bg-[#2a1818] overflow-hidden shrink-0"><img src={it.image} alt="" className="w-full h-full object-cover"/></div>
-                  <div className="flex-1 min-w-0"><div className="text-sm font-medium truncate">{it.name}</div><div className="text-xs text-[#666] truncate">{[it.size,it.color].filter(Boolean).join(" · ")} · {fcfa(it.price)}</div><div className={`text-[10px] ${over?"text-[#c62828] font-bold":stockLeft<=2?"text-[#e4991e]":"text-[#1f8a4c]"}`}>{over ? `⚠ Dépasse le stock (${stockLeft})` : stockLeft !== null ? `Reste ${stockLeft} en stock` : ""}</div></div>
+                  <div className="flex-1 min-w-0"><div className="text-sm font-medium leading-tight break-words">{it.name}</div><div className="text-xs text-[#666] truncate">{[it.size,it.color].filter(Boolean).join(" · ")} · {fcfa(it.price)}</div><div className={`text-[10px] ${over?"text-[#c62828] font-bold":stockLeft<=2?"text-[#e4991e]":"text-[#1f8a4c]"}`}>{over ? `⚠ Dépasse le stock (${stockLeft})` : stockLeft !== null ? `Reste ${stockLeft} en stock` : ""}</div></div>
                   <div className="flex items-center gap-1"><button onClick={()=>updateCartQty(it.key,it.qty-1)} className="w-6 h-6 border rounded"><Minus size={10} className="mx-auto"/></button><span className="w-6 text-center tabular text-sm">{it.qty}</span><button onClick={()=>updateCartQty(it.key,it.qty+1)} className="w-6 h-6 border rounded"><Plus size={10} className="mx-auto"/></button></div>
                   <button onClick={()=>removeFromCart(it.key)} className="text-[#c62828]"><Trash2 size={14}/></button>
                 </div>

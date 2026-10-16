@@ -347,15 +347,15 @@ export default function ConsoleLayout() {
           >
             <Menu size={20}/>
           </button>
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 shrink-0 lg:hidden">
             {logo ? <img src={logo} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0"/> : <div className="w-9 h-9 rounded-lg bg-[#fde8e8] dark:bg-[#2a1818] grid place-items-center font-serif text-[#b02a2a] font-bold text-sm shrink-0">CD</div>}
-            <div className="font-serif text-lg leading-none hidden sm:block"><span className="truncate block max-w-[180px]">{site.name || "Chez Dina"}</span><span className="block text-[10px] text-[#999] tracking-widest uppercase mt-0.5">Console</span></div>
+            <div className="font-serif text-lg leading-none hidden md:block"><span className="truncate block max-w-[180px]">{site.name || "Chez Dina"}</span><span className="block text-[10px] text-[#999] tracking-widest uppercase mt-0.5">Console</span></div>
           </div>
-          <div className="flex-1 min-w-0 max-w-xl mx-1 md:mx-4 relative">
+          <div className="flex-1 min-w-[140px] max-w-xl mx-1 md:mx-3 relative">
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]"/>
-              <input className="dina-input pl-9 pr-16" placeholder="Rechercher produits, variantes, clientes, commandes…" value={search} onChange={(e)=>doSearch(e.target.value)} data-testid="global-search"/>
-              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden md:inline-flex items-center text-[10px] text-[#999] border border-[#ececec] dark:border-[#2a2a2a] rounded px-1.5 py-0.5">Ctrl+K</kbd>
+              <input className="dina-input pl-9 xl:pr-16" placeholder="Rechercher…" value={search} onChange={(e)=>doSearch(e.target.value)} data-testid="global-search"/>
+              <kbd className="absolute right-2 top-1/2 -translate-y-1/2 hidden xl:inline-flex items-center text-[10px] text-[#999] border border-[#ececec] dark:border-[#2a2a2a] rounded px-1.5 py-0.5">Ctrl+K</kbd>
             </div>
             {searchResults && (
               <div className="absolute top-11 left-0 right-0 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-lg p-2 max-h-96 overflow-y-auto scrollbar-thin z-40" data-testid="search-results">
@@ -369,7 +369,7 @@ export default function ConsoleLayout() {
 
           {/* Quick actions "+" */}
           {QUICK_ACTIONS.some(a => canAccess(user?.role, a.to) && !(a.deny || []).includes(user?.role)) && <div className="relative hidden sm:block">
-            <button onClick={()=>setShowQuickActions(!showQuickActions)} className="dina-chip !bg-[#b02a2a] !text-white !border-[#b02a2a]" data-testid="quick-actions-trigger"><Plus size={13}/>Créer</button>
+            <button onClick={()=>setShowQuickActions(!showQuickActions)} className="dina-chip !bg-[#b02a2a] !text-white !border-[#b02a2a]" data-testid="quick-actions-trigger" title="Créer"><Plus size={13}/><span className="hidden xl:inline">Créer</span></button>
             {showQuickActions && (
               <div className="absolute right-0 top-10 w-56 bg-white dark:bg-[#1a1a1a] border border-[#ececec] dark:border-[#2a2a2a] rounded-xl shadow-xl p-1.5 z-40" data-testid="quick-actions-menu" onMouseLeave={()=>setShowQuickActions(false)}>
                 {QUICK_ACTIONS.filter(a => canAccess(user?.role, a.to) && !(a.deny || []).includes(user?.role)).map(a => (
@@ -381,10 +381,10 @@ export default function ConsoleLayout() {
             )}
           </div>}
 
-          <div className={`dina-chip hidden md:inline-flex ${online?"":"!border-[#c62828] !text-[#c62828]"}`} data-testid="sync-indicator">
-            {online ? <><Wifi size={12}/>En ligne</> : <><WifiOff size={12}/>Hors ligne</>}
+          <div className={`dina-chip hidden md:inline-flex ${online?"":"!border-[#c62828] !text-[#c62828]"}`} data-testid="sync-indicator" title={online ? "En ligne" : "Hors ligne"}>
+            {online ? <><Wifi size={12}/><span className="hidden xl:inline">En ligne</span></> : <><WifiOff size={12}/><span className="hidden xl:inline">Hors ligne</span></>}
           </div>
-          <div className="hidden md:inline-flex"><HelpButton/></div>
+          <div className="hidden lg:inline-flex"><HelpButton/></div>
           {punchAllowed && (
             <button
               onClick={() => setShowPunch(true)}
@@ -392,7 +392,7 @@ export default function ConsoleLayout() {
               data-testid="topbar-punch"
               title={punchStatus?.departure ? "Journée terminée" : punchStatus?.checked_in ? "Pointer le départ" : "Pointer l'arrivée"}
             >
-              <Clock size={12}/><span className="hidden sm:inline">{punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer"}</span>
+              <Clock size={12}/><span className="hidden lg:inline">{punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer"}</span>
             </button>
           )}
           <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip hidden md:inline-flex" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>

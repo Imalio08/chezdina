@@ -1169,5 +1169,14 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Testé : iteration_86 (bug critique Paniers corrigé par le testeur) + corrections vérifiées (marques, ponctualité, KPI en double, capture 1024 px).
 - Reste : noms de produits coupés sur quelques vignettes (Caisse, fiche marque, cartes produit), barre de recherche étroite à 1024 px, en-tête app livreur coupé à 390 px.
 
+
+## 2026-10-16 — Noms en entier + barres d'en-tête
+- Noms de produits sans coupure (retour à la ligne, title au survol) : vignettes Caisse (raccourcis, grille, tableau, panier), cartes produit console, fiche marque + cartes marques, cartes vitrine (ProductCardV2, Nouveautés, Promotions, recherche), panier checkout / panier partagé.
+- Console : logo de la barre du haut masqué quand le menu latéral est visible, libellés Créer / En ligne / Pointer en icône sous xl/lg, recherche ≥ 190 px (236 px à 768, 292 px à 1024), aucun débordement horizontal à 390/768/1024.
+- App livreur : en-tête sur deux lignes, plus de texte coupé à 360 px.
+- Cartes produits console : « Stock 52 · 6 tailles · 3 couleurs · 1 vendu en 30 jours ».
+- Vérifié par captures (768, 1024, 390, 360).
+
+
 - Testé : API (numéro trop court refusé), page Paramètres (pas de sélecteur, enregistrement du nom puis restauration).
 

@@ -22,7 +22,7 @@ export default function Promotions() {
             <Link key={p.id} to={`/product/${p.id}`} className="block relative" data-testid={`promo-${p.id}`}>
               <div className="aspect-[3/4] bg-[#fff5f5] rounded overflow-hidden"><img src={p.image || p.images?.[0]} alt={p.name} className="w-full h-full object-cover"/></div>
               <span className="absolute top-2 left-2 bg-[#b02a2a] text-white text-xs font-bold px-2 py-1 rounded">-{pct}%</span>
-              <div className="mt-2 text-sm font-medium truncate">{p.name}</div>
+              <div className="mt-2 text-sm font-medium leading-snug break-words">{p.name}</div>
               <div className="flex items-baseline gap-2"><span className="text-sm font-serif text-[#b02a2a] font-semibold">{fcfa(p.price)}</span><s className="text-xs text-[#999] tabular">{fcfa(p.compare_at_price)}</s></div>
             </Link>
           );

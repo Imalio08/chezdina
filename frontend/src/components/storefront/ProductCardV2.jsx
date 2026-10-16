@@ -62,7 +62,7 @@ export default function ProductCardV2({ product, flashEndsAt }) {
       </Link>
       <div className="mt-2">
         {product.brand && <div className="text-[10px] text-[#999] uppercase tracking-wide">{product.brand}</div>}
-        <Link to={`/product/${product.id}`} className="text-sm font-medium line-clamp-2 min-h-[2.5em]">{product.name}</Link>
+        <Link to={`/product/${product.id}`} className="text-sm font-medium leading-snug break-words min-h-[2.5em]">{product.name}</Link>
         {colors.length > 0 && (
           <div className="flex items-center gap-1 mt-1">
             {colors.slice(0, 4).map((c, i) => <span key={i} className="w-3.5 h-3.5 rounded-full border border-[#ececec] dark:border-[#2a2a2a]" title={c} style={{ background: cssColor(c) }} />)}

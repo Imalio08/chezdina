@@ -224,12 +224,12 @@ function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap, money })
         </div>
         <div className="p-3">
           <div className="text-[10px] text-[#999] font-semibold uppercase">{p.brand}</div>
-          <div className="text-sm font-medium leading-tight line-clamp-2 min-h-[2.2em]">{p.name}</div>
+          <div className="text-sm font-medium leading-tight break-words min-h-[2.2em]">{p.name}</div>
           <div className="flex items-baseline justify-between mt-1.5">
-            <div><span className="tabular text-sm font-bold text-[#b02a2a]">{fcfa(p.price)}</span>{promo && <span className="text-[10px] text-[#999] line-through tabular ml-1">{fcfa(p.price_old)}</span>}</div>
+            <div className="min-w-0"><span className="tabular text-sm font-bold text-[#b02a2a] whitespace-nowrap">{fcfa(p.price)}</span>{promo && <span className="block text-[10px] text-[#999] line-through tabular whitespace-nowrap">{fcfa(p.price_old)}</span>}</div>
             {money && <span className={`text-[10px] tabular ${m>=40?"text-[#1f8a4c]":m<20?"text-[#c62828]":""}`}>{m}%</span>}
           </div>
-          <div className="flex items-center justify-between mt-1 text-[10px] text-[#999]"><span>Stk <b>{stk}</b> · {(p.sizes||[]).length}t·{(p.colors||[]).length}c</span><span><BarChart3 size={9} className="inline"/> {sales30}/30j</span></div>
+          <div className="flex items-center justify-between flex-wrap gap-x-2 mt-1 text-[10px] text-[#999]"><span>Stock <b>{stk}</b> · {(p.sizes||[]).length} taille{(p.sizes||[]).length > 1 ? "s" : ""} · {(p.colors||[]).length} couleur{(p.colors||[]).length > 1 ? "s" : ""}</span><span><BarChart3 size={9} className="inline"/> {sales30} vendu{sales30 > 1 ? "s" : ""} en 30 jours</span></div>
         </div>
       </button>
       {onEdit && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
