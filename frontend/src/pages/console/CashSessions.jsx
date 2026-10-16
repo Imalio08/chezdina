@@ -121,9 +121,10 @@ export default function CashSessions() {
                 <td className="text-right tabular font-semibold">{s.closing_cash != null ? fcfa(s.closing_cash) : "—"}</td>
                 <td className="text-right tabular">{s.handover_amount != null ? fcfa(s.handover_amount) : "—"}</td>
                 <td className={`text-right tabular font-semibold ${s.validation_gap > 0 ? "text-[#1f8a4c]" : s.validation_gap < 0 ? "text-[#c62828]" : ""}`}>{s.validation_gap != null ? ((s.validation_gap > 0 ? "+" : "") + fcfa(s.validation_gap)) : "—"}</td>
-                <td className="text-right">{s.status === "pending_validation" && isOwner && (
+                <td className="text-right whitespace-nowrap">{s.status === "pending_validation" && isOwner && (<>
                   <button onClick={() => setValidateFor(s)} className="text-[#1f8a4c] text-xs font-semibold hover:underline" data-testid={`cash-validate-${s.id}`}>Valider</button>
-                )}</td>
+                  <button onClick={() => setRejectFor(s)} className="ml-3 text-[#c62828] text-xs font-semibold hover:underline" data-testid={`cash-reject-${s.id}`}>Rejeter</button>
+                </>)}{s.status === "rejected" && <span className="text-[10px] text-[#c62828]" title={s.rejection_reason}>{s.rejection_category || "Rejeté"}</span>}</td>
               </tr>
             ))}</tbody>
           </table>
@@ -132,8 +133,9 @@ export default function CashSessions() {
 
       {current && current.status === "rejected" && current.rejection_reason && (
         <div className="dina-card-white p-4 border-l-4 border-[#c62828]" data-testid="handover-rejected-banner">
-          <div className="flex items-center gap-2 font-semibold mb-1 text-[#c62828]"><XCircle size={14}/>Versement rejeté par le propriétaire</div>
+          <div className="flex items-center gap-2 font-semibold mb-1 text-[#c62828]"><XCircle size={14}/>Versement rejeté par le propriétaire · {current.rejection_category || "Anomalie"}</div>
           <div className="text-sm text-[#1c1c1c] dark:text-white italic">« {current.rejection_reason} »</div>
+          {current.rejection_declared != null && <div className="text-xs mt-1 tabular" data-testid="handover-rejected-amounts">Déclaré {fcfa(current.rejection_declared)} · attendu {fcfa(current.rejection_expected || 0)} · écart <b className={current.rejection_gap < 0 ? "text-[#c62828]" : "text-[#1f8a4c]"}>{current.rejection_gap > 0 ? "+" : ""}{fcfa(current.rejection_gap || 0)}</b></div>}
           <div className="text-xs text-[#666] mt-1">Rejeté par {current.rejected_by} le {dateTimeFmt(current.rejected_at)} — recomptez les espèces et déclarez un nouveau versement.</div>
         </div>
       )}
@@ -149,14 +151,17 @@ export default function CashSessions() {
 
 function RejectHandoverModal({ session, onClose, onDone }) {
   const [reason, setReason] = useState("");
+  const [category, setCategory] = useState("");
+  const [expected, setExpected] = useState(session.expected ?? "");
+  const gap = (session.handover_amount || 0) - (+expected || 0);
   const [submitting, setSubmitting] = useState(false);
   const submit = async () => {
     const r = reason.trim();
+    if (!category) return toast.error("Choisissez le type d'anomalie");
     if (r.length < 5) return toast.error("Un motif clair est obligatoire (min. 5 caractères)");
-    if (!window.confirm(`Rejeter le versement de ${session.handover_by || "la Gérante"} ?\n\nMotif : ${r}`)) return;
     setSubmitting(true);
     try {
-      await api.post(`/cash-sessions/${session.id}/reject-handover`, { reason: r });
+      await api.post(`/cash-sessions/${session.id}/reject-handover`, { reason: r, category, expected: +expected || 0 });
       toast.success("Versement rejeté · la Gérante en est informée");
       onDone();
     } catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
@@ -174,6 +179,13 @@ function RejectHandoverModal({ session, onClose, onDone }) {
           <div className="flex justify-between text-[#666]"><span>Le</span><span>{dateTimeFmt(session.handover_at)}</span></div>
           {session.handover_note && <div className="mt-2 italic">« {session.handover_note} »</div>}
         </div>
+        <label className="text-xs uppercase text-[#666] font-semibold">Montant attendu (FCFA)</label>
+        <input type="number" className="dina-input mt-1 mb-1 tabular" value={expected} onChange={e => setExpected(e.target.value)} data-testid="reject-expected"/>
+        <div className={`text-xs mb-3 tabular ${gap < 0 ? "text-[#c62828]" : gap > 0 ? "text-[#1f8a4c]" : "text-[#666]"}`} data-testid="reject-gap">Écart constaté : {gap > 0 ? "+" : ""}{fcfa(gap)}</div>
+        <label className="text-xs uppercase text-[#666] font-semibold">Type d'anomalie *</label>
+        <div className="grid grid-cols-2 gap-2 mt-1 mb-3">{[["montant", "Montant incorrect"], ["justificatif", "Justificatif manquant"], ["ecart", "Écart de caisse"], ["autre", "Autre anomalie"]].map(([k, l]) => (
+          <button key={k} type="button" onClick={() => setCategory(k)} className={`py-2 rounded-lg border text-xs ${category === k ? "bg-[#c62828] text-white border-[#c62828]" : "border-[#ececec]"}`} data-testid={`reject-cat-${k}`}>{l}</button>
+        ))}</div>
         <label className="text-xs uppercase text-[#666] font-semibold">Motif du rejet (obligatoire) *</label>
         <textarea className="dina-input mt-1 mb-2" rows={3} placeholder="Ex. le montant déposé ne correspond pas aux espèces reçues, 5 000 FCFA en moins" value={reason} onChange={e => setReason(e.target.value)} data-testid="reject-reason" autoFocus/>
         <div className="text-xs text-[#666] mb-4">La Gérante verra ce motif et pourra re-déclarer un versement corrigé.</div>

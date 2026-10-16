@@ -52,6 +52,13 @@ def new_id():
 def now_iso():
     return datetime.now(timezone.utc).isoformat()
 
+async def inc_variant(pid, size, color, qty):
+    if not color:
+        return
+    await db.products.update_one({"id": pid, "variants": {"$elemMatch": {"size": size or "Unique", "color": color}}},
+                                 {"$inc": {"variants.$.stock": qty}})
+
+
 def gen_access_code():
     return str(secrets.randbelow(1_000_000)).zfill(6)
 

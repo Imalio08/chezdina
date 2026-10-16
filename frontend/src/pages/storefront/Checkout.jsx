@@ -9,6 +9,7 @@ import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalL
 import { track } from "@/lib/analytics";
 import { useCustomer } from "@/context/CustomerContext";
 import WavePayBox from "@/components/storefront/WavePayBox";
+import { colorCss } from "@/lib/colors";
 import { DELIVERY_ZONES as ZONES, AddressFields, emptyAddress, validAddress, toPayload, addressLine } from "@/components/storefront/AddressForm";
 
 function AddressChooser({ addresses, choice, setChoice, draft, setDraft, saveNew, setSaveNew }) {
@@ -165,7 +166,7 @@ export default function Checkout() {
                     </>
                   )}
                 </div>
-                <div className="flex-1 min-w-0 overflow-hidden"><div className="font-medium truncate">{it.name}</div><div className="text-xs text-[#666] truncate">{[it.size, it.color].filter(Boolean).join(" · ")}</div><div className="tabular text-sm font-semibold mt-1">{fcfa(it.price)}</div></div>
+                <div className="flex-1 min-w-0 overflow-hidden"><div className="font-medium truncate">{it.name}</div><div className="text-xs text-[#666] truncate flex items-center gap-1.5">{it.size && it.size !== "Unique" && <span>{it.size}</span>}{it.color && <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded-full border border-[#ddd] inline-block" style={{ background: colorCss(it.color) }}/>{it.color}</span>}</div><div className="tabular text-sm font-semibold mt-1">{fcfa(it.price)}</div></div>
                 <div className="flex items-center gap-2 shrink-0">
                   <input type="number" min="1" className="dina-input !w-14 text-center tabular !px-1" value={it.qty} onChange={e=>updateCartQty(it.key, +e.target.value)}/>
                   <button onClick={()=>removeFromCart(it.key)} className="text-[#c62828]" data-testid={`cart-remove-${it.key}`}><Trash2 size={16}/></button>

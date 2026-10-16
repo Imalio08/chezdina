@@ -426,11 +426,77 @@ async def reconcile(sid: str, body: ReconcileIn, user: dict = Depends(require_ro
             "collected": True, "amount": amount, "due": due, "ecart": amount - due,
             "approved_by": approver.get("name"), "approved_by_id": approver.get("id"),
             "note": body.note or "", "at": now_iso(),
+            "history": ((rec.get(body.order_id) or {}).get("history") or [] if isinstance(rec.get(body.order_id), dict) else []) + [{"decision": "valide", "amount": amount, "by": approver.get("name"), "at": now_iso()}],
         }
     else:
         rec[body.order_id] = {"collected": False, "at": now_iso()}
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"reconciliations": rec}})
     return {"ok": True, "reconciliation": rec[body.order_id]}
+
+
+REJECT_CATS = {"montant": "Montant incorrect", "justificatif": "Justificatif manquant", "ecart": "Écart de caisse", "autre": "Autre anomalie"}
+
+
+@router.post("/delivery-sessions/{sid}/reject-versement")
+async def reject_versement(sid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin", "manager"))):
+    s = await db.delivery_sessions.find_one({"id": sid})
+    if not s:
+        raise HTTPException(404)
+    if s.get("closed"):
+        raise HTTPException(400, "Journée clôturée")
+    oid = body.get("order_id")
+    if oid not in (s.get("orders") or []):
+        raise HTTPException(404, "Commande absente de cette journée")
+    reason = (body.get("reason") or "").strip()
+    cat = body.get("category") if body.get("category") in REJECT_CATS else None
+    if not cat or len(reason) < 3:
+        raise HTTPException(400, "Type d'anomalie et motif obligatoires")
+    o = await db.orders.find_one({"id": oid}) or {}
+    due = o.get("total", 0) if o.get("payment_method") == "cod" else 0
+    declared = body.get("declared")
+    declared = float(declared) if declared not in (None, "") else None
+    rec = s.get("reconciliations", {})
+    prev = rec.get(oid) if isinstance(rec.get(oid), dict) else {}
+    entry = {"decision": "rejete", "category": cat, "category_label": REJECT_CATS[cat], "reason": reason, "declared": declared, "due": due,
+             "ecart": (declared - due) if declared is not None else None, "by": user.get("name"), "by_id": user.get("id"), "at": now_iso()}
+    rec[oid] = {"collected": False, "rejected": True, **{k: entry[k] for k in ("category", "category_label", "reason", "declared", "due", "ecart")},
+                "rejected_by": entry["by"], "rejected_at": entry["at"], "history": (prev.get("history") or []) + [entry]}
+    await db.delivery_sessions.update_one({"id": sid}, {"$set": {"reconciliations": rec}})
+    from routers.notify import notify
+    await notify("rider", s["rider_id"], f"Versement rejeté · {o.get('code')}", f"{REJECT_CATS[cat]} : {reason}", "/riders/solde", "versement", o.get("code"), f"vrej:{sid}:{oid}:{entry['at']}")
+    return {"ok": True, "reconciliation": rec[oid]}
+
+
+@router.get("/riders/me/versements-rejetes")
+async def my_rejected_versements(user: dict = Depends(get_user)):
+    rows = []
+    async for s in db.delivery_sessions.find({"rider_id": user["id"], "closed": {"$ne": True}}):
+        for oid, r in (s.get("reconciliations") or {}).items():
+            if isinstance(r, dict) and r.get("rejected"):
+                o = await db.orders.find_one({"id": oid}, {"code": 1, "customer.name": 1})
+                rows.append({"session_id": s["id"], "order_id": oid, "code": (o or {}).get("code"), "customer": ((o or {}).get("customer") or {}).get("name"),
+                             **{k: r.get(k) for k in ("category_label", "reason", "declared", "due", "ecart", "rejected_by", "rejected_at", "resubmitted")}})
+    return rows
+
+
+@router.post("/riders/me/versements/{sid}/{oid}/resubmit")
+async def resubmit_versement(sid: str, oid: str, body: Dict[str, Any], user: dict = Depends(get_user)):
+    s = await db.delivery_sessions.find_one({"id": sid, "rider_id": user["id"]})
+    r = ((s or {}).get("reconciliations") or {}).get(oid)
+    if not s or not isinstance(r, dict) or not r.get("rejected"):
+        raise HTTPException(404, "Aucun versement rejeté à corriger")
+    try:
+        amount = float(body.get("amount"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Montant invalide")
+    sub = {"amount": amount, "note": (body.get("note") or "").strip()[:300], "at": now_iso()}
+    await db.delivery_sessions.update_one({"id": sid}, {"$set": {f"reconciliations.{oid}.resubmitted": sub},
+                                                       "$push": {f"reconciliations.{oid}.history": {"decision": "resoumis", **sub, "by": user.get("name")}}})
+    o = await db.orders.find_one({"id": oid}, {"code": 1}) or {}
+    from routers.notify import notify_staff
+    await db.notifications.insert_one({"id": new_id(), "type": "versement", "title": f"Versement corrigé · {o.get('code')}", "msg": f"{user.get('name')} redéclare {int(amount)} FCFA", "color": "#e4991e", "at": now_iso(), "link": "/console/livraisons"})
+    await notify_staff(f"Versement corrigé · {o.get('code')}", f"{user.get('name')} redéclare {int(amount)} FCFA", "/console/livraisons")
+    return {"ok": True, "resubmitted": sub}
 
 
 @router.patch("/delivery-sessions/{sid}/close")

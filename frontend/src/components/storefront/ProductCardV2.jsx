@@ -5,6 +5,7 @@ import { fcfa } from "@/lib/format";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import SmartImage from "@/components/shared/SmartImage";
+import { colorCss } from "@/lib/colors";
 
 const KEY = "dina_favs";
 const getFavs = () => { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { return []; } };
@@ -97,6 +98,5 @@ export default function ProductCardV2({ product, flashEndsAt }) {
 }
 
 function cssColor(name) {
-  const map = { noir: "#1c1c1c", blanc: "#fff", beige: "#e8d4b8", rouge: "#c62828", bleu: "#2563eb", vert: "#1f8a4c", rose: "#ec4899", gris: "#999", marron: "#8b4513", or: "#d4af37", argent: "#c0c0c0", nude: "#f3dcc4", camel: "#c19a6b", bordeaux: "#800020" };
-  return map[(name || "").toLowerCase()] || "#999";
+  return colorCss(name);
 }

@@ -6,6 +6,7 @@ import { useApp } from "@/context/AppContext";
 import { toast } from "sonner";
 import { MessageCircle, ShoppingBag, ChevronLeft, ChevronRight, Star, Check, Bell, Play } from "lucide-react";
 import { hasRealVariants, availableColorsForSize, availableSizesForColor, stockFor, comboExists } from "@/lib/variants";
+import { ColorSwatch } from "@/lib/colors";
 import { track } from "@/lib/analytics";
 import SmartImage from "@/components/shared/SmartImage";
 
@@ -122,7 +123,7 @@ export default function ProductPage() {
           <div className="tabular text-2xl font-semibold mt-3">{fcfa(p.price)}</div>
           <p className="text-sm text-[#666] mt-4 leading-relaxed">{p.description}</p>
 
-          {!!visibleSizes.length && (
+          {!!visibleSizes.length && !(visibleSizes.length === 1 && visibleSizes[0] === "Unique") && (
             <div className="mt-6">
               <div className="text-xs uppercase text-[#666] mb-2">{p.category==="Chaussures"?"Pointure":"Taille"}</div>
               <div className="flex gap-2 flex-wrap">
@@ -144,12 +145,12 @@ export default function ProductPage() {
           {!!visibleColors.length && (
             <div className="mt-5">
               <div className="text-xs uppercase text-[#666] mb-2">Couleur · <span className="text-[#1c1c1c] font-medium">{color}</span></div>
-              <div className="flex gap-2 flex-wrap">{visibleColors.map(c => {
+              <div className="flex gap-3 flex-wrap items-center">{visibleColors.map(c => {
                 const exists = !hasRealVariants(p) || !size || comboExists(p, size, c);
                 const stk = hasRealVariants(p) && size ? stockFor(p, size, c) : 1;
                 const out = exists && stk === 0;
                 if (!exists) return null; // never show non-existing combos
-                return <button key={c} onClick={()=>!out && setColor(c)} disabled={out} className={`px-3 h-9 rounded-lg border text-xs ${color===c?"bg-[#1c1c1c] text-white border-[#1c1c1c]":out?"border-[#ececec] text-[#ccc] line-through":"border-[#ececec]"}`} data-testid={`product-color-${c}`}>{c}{out && " · M'alerter"}</button>;
+                return <ColorSwatch key={c} name={c} size={32} selected={color === c} disabled={out} onClick={() => !out && setColor(c)} testid={`product-color-${c}`}/>;
               })}</div>
             </div>
           )}

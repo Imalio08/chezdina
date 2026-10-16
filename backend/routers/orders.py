@@ -15,7 +15,7 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from deps import db, get_user, require_role, clean, new_id, now_iso, gen_code
+from deps import db, get_user, require_role, clean, new_id, now_iso, gen_code, inc_variant
 from models import (
     OrderIn, CashSessionOpenIn, CashSessionCloseIn,
     PinAuthIn, CashMovementIn, HoldIn,
@@ -62,6 +62,7 @@ async def create_order(body: OrderIn, user: dict = Depends(get_user)):
         await db.products.update_one({"id": it.product_id}, {"$inc": {"stock": -it.qty}})
         if it.size:
             await db.products.update_one({"id": it.product_id}, {"$inc": {f"stock_by_size.{it.size}": -it.qty}})
+        await inc_variant(it.product_id, it.size, it.color, -it.qty)
         fresh = await db.products.find_one({"id": it.product_id})
         if fresh:
             total_stk = sum((fresh.get("stock_by_size") or {}).values()) if fresh.get("stock_by_size") else fresh.get("stock", 0)

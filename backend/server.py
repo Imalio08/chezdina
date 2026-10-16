@@ -20,7 +20,7 @@ from deps import (
     client, db, JWT_SECRET, JWT_ALG,
     hash_pw, verify_pw, make_token, make_customer_token,
     new_id, now_iso, gen_access_code, clean,
-    get_user, require_role, get_customer, norm_phone, gen_code,
+    get_user, require_role, get_customer, norm_phone, gen_code, inc_variant,
 )
 # Shared Pydantic models (moved to models.py — P5 Refactor Feb 2026)
 from models import (
@@ -3179,6 +3179,7 @@ async def confirm_shared_cart(sid: str, body: Dict[str, Any]):
         await db.products.update_one({"id": it["product_id"]}, {"$inc": {"stock": -qty}})
         if it.get("size"):
             await db.products.update_one({"id": it["product_id"]}, {"$inc": {f"stock_by_size.{it['size']}": -qty}})
+        await inc_variant(it["product_id"], it.get("size"), it.get("color"), -qty)
         await _record_stock_mov(it["product_id"], it.get("size"), -qty, "Vente panier partagé", sc.get("created_by_name"), code)
     await db.shared_carts.update_one({"id": sid}, {"$set": {"confirmed": True, "confirmed_at": now_iso(), "order_id": doc["id"]}})
     return {"ok": True, "code": code, "order_id": doc["id"]}
@@ -3869,6 +3870,7 @@ async def public_create_order(body: OrderIn, request: Request):
         await db.products.update_one({"id": it.product_id}, {"$inc": {"stock": -it.qty}})
         if it.size:
             await db.products.update_one({"id": it.product_id}, {"$inc": {f"stock_by_size.{it.size}": -it.qty}})
+        await inc_variant(it.product_id, it.size, it.color, -it.qty)
         await _record_stock_mov(it.product_id, it.size, -it.qty, "Commande en ligne", body.customer.get("name") if body.customer else None, code)
     if body.customer and body.customer.get("id"):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}})
@@ -5242,7 +5244,7 @@ async def declare_handover(sid: str, body: Dict[str,Any], user: dict = Depends(g
     """Gérante declares the amount handed to the owner. Session awaits owner validation."""
     s = await db.cash_sessions.find_one({"id": sid})
     if not s: raise HTTPException(404)
-    await db.cash_sessions.update_one({"id": sid}, {"$set": {
+    await db.cash_sessions.update_one({"id": sid}, {"$push": {"handover_history": {"decision": "declare", "amount": int(body.get("amount", 0)), "note": body.get("note", ""), "by": user.get("name"), "at": now_iso()}}, "$set": {
         "handover_amount": int(body.get("amount",0)), "handover_at": now_iso(), "handover_by": user.get("name"),
         "handover_note": body.get("note",""), "status": "pending_validation"
     }})
@@ -5255,11 +5257,12 @@ async def validate_handover(sid: str, body: Dict[str,Any], user: dict = Depends(
     """Owner validates the handover; session becomes 'closed' or 'gap'."""
     s = await db.cash_sessions.find_one({"id": sid})
     if not s: raise HTTPException(404)
+    if s.get("status") != "pending_validation": raise HTTPException(400, "Aucun versement en attente de contrôle")
     expected = int(body.get("expected", s.get("handover_amount",0)))
     actual = int(body.get("actual", s.get("handover_amount",0)))
     gap = actual - expected
     status = "validated" if gap == 0 else "gap"
-    await db.cash_sessions.update_one({"id": sid}, {"$set": {
+    await db.cash_sessions.update_one({"id": sid}, {"$push": {"handover_history": {"decision": "valide", "declared": s.get("handover_amount"), "expected": expected, "actual": actual, "gap": gap, "by": user.get("name"), "at": now_iso()}}, "$set": {
         "validated_at": now_iso(), "validated_by": user.get("name"), "validation_gap": gap,
         "validation_note": body.get("note",""), "status": status, "closed_at": now_iso()
     }})
@@ -5274,12 +5277,21 @@ async def reject_handover(sid: str, body: Dict[str,Any], user: dict = Depends(re
     """Owner rejects the handover with a mandatory reason. Session reverts to open so the Gérante can re-declare."""
     s = await db.cash_sessions.find_one({"id": sid})
     if not s: raise HTTPException(404)
+    if s.get("status") != "pending_validation": raise HTTPException(400, "Aucun versement en attente de contrôle")
     reason = (body.get("reason") or "").strip()
     if not reason: raise HTTPException(400, "Motif de rejet obligatoire")
-    await db.cash_sessions.update_one({"id": sid}, {"$set": {
+    cats = {"montant": "Montant incorrect", "justificatif": "Justificatif manquant", "ecart": "Écart de caisse", "autre": "Autre anomalie"}
+    cat = body.get("category") if body.get("category") in cats else "autre"
+    declared = s.get("handover_amount")
+    expected = body.get("expected")
+    expected = int(expected) if expected not in (None, "") else int(s.get("expected") or 0)
+    gap = (int(declared) - expected) if declared is not None else None
+    entry = {"decision": "rejete", "category": cat, "category_label": cats[cat], "reason": reason, "declared": declared, "expected": expected, "gap": gap,
+             "declared_at": s.get("handover_at"), "declared_by": s.get("handover_by"), "by": user.get("name"), "by_id": user.get("id"), "at": now_iso()}
+    await db.cash_sessions.update_one({"id": sid}, {"$push": {"handover_history": entry}, "$set": {
         "status": "rejected",
         "rejected_at": now_iso(), "rejected_by": user.get("name"),
-        "rejection_reason": reason,
+        "rejection_reason": reason, "rejection_category": cats[cat], "rejection_declared": declared, "rejection_expected": expected, "rejection_gap": gap,
         # Clear handover so the Gérante can submit again
         "handover_amount": None, "handover_at": None, "handover_by": None, "handover_note": None,
     }})
@@ -5287,11 +5299,14 @@ async def reject_handover(sid: str, body: Dict[str,Any], user: dict = Depends(re
     await db.notifications.insert_one({
         "id": new_id(), "type": "handover_rejected",
         "title": "Versement rejeté",
-        "msg": f"{user.get('name')} a rejeté votre versement : {reason}",
+        "msg": f"{user.get('name')} a rejeté votre versement ({cats[cat]}) : {reason}",
         "color": "#c62828", "at": now_iso(),
         "link": f"/console/sessions-caisse?focus={sid}",
         "target_user_id": s.get("opened_by_id"),
     })
+    if s.get("opened_by_id"):
+        from routers.notify import notify
+        await notify("staff", s["opened_by_id"], "Versement rejeté", f"{cats[cat]} : {reason}", f"/console/sessions-caisse?focus={sid}", "versement", sid, f"hrej:{sid}:{entry['at']}")
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.reject_handover","entity_id":sid,"after":{"reason":reason},"at":now_iso()})
     return {"ok": True, "reason": reason}
 
