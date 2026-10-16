@@ -13,6 +13,31 @@ from fastapi import APIRouter, Depends, HTTPException
 from deps import db, get_user, require_role, clean, new_id, now_iso
 
 router = APIRouter(prefix="/api", tags=["attendance"])
+PRESENCE_ROLES = ("manager", "sales", "stock_keeper", "community_manager")
+
+
+async def _presence_roles() -> list:
+    s = await db.site_settings.find_one({"id": "main"}, {"presence_roles": 1}) or {}
+    return [r for r in (s.get("presence_roles") or []) if r in PRESENCE_ROLES]
+
+
+async def presence_viewer(user: dict = Depends(get_user)) -> dict:
+    if user.get("role") == "admin" or user.get("role") in await _presence_roles():
+        return user
+    raise HTTPException(403, "Présences réservées à la propriétaire et aux rôles qu'elle autorise")
+
+
+@router.get("/attendance/access")
+async def presence_access(user: dict = Depends(get_user)):
+    roles = await _presence_roles()
+    return {"allowed": user.get("role") == "admin" or user.get("role") in roles, "roles": roles if user.get("role") == "admin" else None}
+
+
+@router.patch("/attendance/access")
+async def set_presence_access(body: Dict[str, Any], user: dict = Depends(require_role("admin"))):
+    roles = [r for r in (body.get("roles") or []) if r in PRESENCE_ROLES]
+    await db.site_settings.update_one({"id": "main"}, {"$set": {"presence_roles": roles}}, upsert=True)
+    return {"ok": True, "roles": roles}
 
 
 @router.get("/attendance/me")
@@ -82,7 +107,7 @@ async def check_in(body: Dict[str, Any], user: dict = Depends(get_user)):
 
 
 @router.get("/attendance/today")
-async def attendance_today(user: dict = Depends(require_role("admin", "manager"))):
+async def attendance_today(user: dict = Depends(presence_viewer)):
     today = datetime.now(timezone.utc).date().isoformat()
     rows = await db.attendance.find({"day": today}).sort("at", -1).to_list(200)
     all_employees = await db.users.find(
@@ -94,7 +119,7 @@ async def attendance_today(user: dict = Depends(require_role("admin", "manager")
 
 
 @router.get("/attendance/calendar/{eid}")
-async def attendance_calendar(eid: str, month: Optional[str] = None, user: dict = Depends(require_role("admin", "manager"))):
+async def attendance_calendar(eid: str, month: Optional[str] = None, user: dict = Depends(presence_viewer)):
     """Per-day status for a given employee and month (YYYY-MM)."""
     now = datetime.now(timezone.utc)
     ym = month or now.strftime("%Y-%m")
@@ -113,7 +138,7 @@ async def attendance_calendar(eid: str, month: Optional[str] = None, user: dict 
 
 
 @router.get("/attendance/stats/{eid}")
-async def attendance_stats(eid: str, days: int = 30, user: dict = Depends(require_role("admin", "manager"))):
+async def attendance_stats(eid: str, days: int = 30, user: dict = Depends(presence_viewer)):
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
     rows = await db.attendance.find({"user_id": eid, "day": {"$gte": cutoff}}).to_list(1000)
     worked_days = len({r["day"] for r in rows if r["kind"] == "arrival"})
@@ -138,7 +163,7 @@ async def attendance_stats(eid: str, days: int = 30, user: dict = Depends(requir
 
 
 @router.get("/attendance/all-stats")
-async def attendance_all_stats(days: int = 30, user: dict = Depends(require_role("admin", "manager"))):
+async def attendance_all_stats(days: int = 30, user: dict = Depends(presence_viewer)):
     """Bulk ponctualité/retards/absences per employee for CSV/PDF export."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
     employees = await db.users.find(

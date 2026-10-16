@@ -13,6 +13,14 @@ ADDENDA = [
             S(["Cliquez sur « Ouvrir une session »", "Choisissez la gérante responsable", "Vérifiez la date (aujourd'hui ou une date passée)",
                "Comptez le tiroir et saisissez le fond de caisse (ex. 50,000 FCFA)", "Tapez le PIN de la gérante choisie puis « Ouvrir la session »"]),
             INFO("Les chiffres de Sessions de caisse se mettent à jour automatiquement toutes les 10 secondes.")]},
+        {"id": "add-pos-session-banner", "heading": "Bandeau de session en haut de la Caisse", "blocks": [
+            T("En haut de la Caisse, un bandeau indique l'état de la session : « Session ouverte depuis 8h02 · [Gérante] » avec le bouton « Fermer la session », ou « Aucune session ouverte » avec le bouton « Ouvrir la session »."),
+            S(["Sans session ouverte, les ventes sont bloquées", "« Fermer la session » demande le montant compté et le PIN, comme dans Sessions de caisse",
+               "Sessions de caisse reste la page de suivi : historique, versements, validation ou rejet par la propriétaire"])]},
+        {"id": "add-handover-reject", "heading": "Validation ou rejet du versement de la gérante", "blocks": [
+            S(["La propriétaire ouvre Sessions de caisse et choisit « Valider » ou « Rejeter » (aussi depuis l'historique)",
+               "Rejet : type d'anomalie (montant incorrect, justificatif manquant, écart de caisse, autre), montant attendu, écart calculé et motif obligatoires",
+               "La gérante est notifiée, voit le motif, les montants et l'écart, corrige puis déclare à nouveau son versement"])]},
         {"id": "add-pos-grid", "heading": "Trouver et ajouter un produit rapidement", "blocks": [
             S(["Faites défiler la liste des produits (grille ou liste)", "Touchez le bouton rouge « + » sur la carte",
                "Sans taille ni couleur : l'article est ajouté directement", "Sinon : choisissez la taille et la couleur dans la fenêtre"]),
@@ -50,6 +58,10 @@ ADDENDA = [
             S(["Onglet Réconciliation de la journée", "Pour chaque commande livrée payée à la livraison : « Marquer versé », montant reçu + PIN gérante",
                "Quand tout est « Versé », cliquez « Clôturer la journée »"]),
             INFO("La clôture est bloquée tant qu'une livraison payée à la livraison reste « Non versé ». Les commandes reportées ne comptent pas.")]},
+        {"id": "add-versement-reject", "heading": "Rejeter un versement livreur", "blocks": [
+            S(["À côté de « Valider », le bouton « Rejeter » ouvre une fenêtre : type d'anomalie, montant remis (écart calculé) et motif obligatoires",
+               "Le livreur est notifié et voit le rejet dans Profil › Mon solde ; il envoie une correction avec le bon montant",
+               "La console affiche « Corrigé : X FCFA » ; validez ensuite le versement. Un versement rejeté n'est jamais compté comme validé"])]},
         {"id": "add-print-all", "heading": "Imprimer toutes les feuilles de route", "blocks": [
             S(["Journées de livraison › « Imprimer toutes les feuilles »", "Un PDF est généré avec une page par livreur ayant des courses aujourd'hui"])]},
     ]),
@@ -61,6 +73,12 @@ ADDENDA = [
             T("La réception d'un bon de commande fournisseur (sans écart, ou après validation des écarts) ajoute le stock et crée une ligne « Réception BC-… » dans l'historique du produit.")]},
     ]),
     ("param", [
+        {"id": "add-console-nav-2026", "heading": "Organisation du menu de la console", "blocks": [
+            S(["Ventes › Opportunités : 3 sous-onglets (Liste d'attente, Demandes hors catalogue, Paniers abandonnés) et des indicateurs communs : demandes en attente, demandes hors catalogue, paniers abandonnés, valeur à récupérer, taux de récupération",
+               "Produits & achats › Catégories & marques : sous-onglets Catégories, Collections et Marques",
+               "Équipe › Présences : historique, retards, absences, heures travaillées et statistiques ; visible par la propriétaire et les rôles qu'elle coche en haut de la page. Le bouton de pointage reste dans la barre du haut pour tout le monde",
+               "Paramètres › Sécurité & audit : réglages de sécurité et Journal d'audit, réservés à la propriétaire"]),
+            TIP("Les montants trop longs s'affichent en format court (ex. 77,4 M FCFA) : survolez ou touchez la carte pour voir le montant exact.")]},
         {"id": "add-notifs", "heading": "Notifications ciblées et sons", "blocks": [
             T("Un clic sur une notification ouvre directement l'élément : commande, produit, cliente, avis, approbation ou session de caisse."),
             S(["Un son court accompagne chaque nouvelle notification", "Un son distinct signale une réponse de cliente ou de livreur",

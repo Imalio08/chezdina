@@ -6,7 +6,7 @@ import { Plus, Trash2, Pencil, X, ChevronLeft, Package, TrendingUp, Percent, Tro
 import ImageUpload from "@/components/shared/ImageUpload";
 import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
 
-export default function MarquesV2() {
+export default function MarquesV2({ embedded }) {
   const [brands, setBrands] = useState([]);
   const [kpis, setKpis] = useState(null);
   const [edit, setEdit] = useState(null);
@@ -41,7 +41,7 @@ export default function MarquesV2() {
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div><h1 className="font-serif text-3xl">Marques</h1><p className="text-sm text-[#666]">{brands.length} marques · suivi CA 30 jours et marge</p></div>
+        <div>{!embedded && <h1 className="font-serif text-3xl">Marques</h1>}<p className="text-sm text-[#666]">{brands.length} marques · suivi du chiffre d'affaires sur 30 jours et de la marge</p></div>
         <button onClick={() => { setEdit(null); setOpen(true); }} className="dina-btn-primary !min-h-[40px]" data-testid="marque-new"><Plus size={14} />Nouvelle marque</button>
       </div>
 

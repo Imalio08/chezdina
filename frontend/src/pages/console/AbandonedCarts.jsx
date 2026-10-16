@@ -24,7 +24,7 @@ const CHANNELS = [
 
 const STATUS_LABEL = { nouveau: "Nouveau", relance: "Relancé", recupere: "Récupéré", expire: "Expiré" };
 
-export default function AbandonedCarts() {
+export default function AbandonedCarts({ embedded }) {
   const [carts, setCarts] = useState([]);
   const [selected, setSelected] = useState([]);
   const [detailId, setDetailId] = useState(null);
@@ -53,17 +53,17 @@ export default function AbandonedCarts() {
   return (
     <div className="space-y-5" data-testid="abandoned-carts-page">
       <div className="flex items-center justify-between flex-wrap gap-2">
-        <div><h1 className="font-serif text-3xl">Paniers abandonnés</h1><p className="text-sm text-[#666]">Récupérez le chiffre d'affaires perdu</p></div>
+        {!embedded && <div><h1 className="font-serif text-3xl">Paniers abandonnés</h1><p className="text-sm text-[#666]">Récupérez le chiffre d'affaires perdu</p></div>}
         <button onClick={()=>setRelaunchFor("all")} className="dina-btn-primary !min-h-[40px]" data-testid="relaunch-all"><Target size={14}/>+ Créer une offre de relance</button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <KPICard testid="ac-count" label="Paniers abandonnés" value={carts.length} icon={ShoppingBag} color="#e4991e"/>
-        <KPICard testid="ac-value" label="Valeur totale" value={fcfa(total)} icon={DollarSign} color="#b02a2a"/>
+        <KPICard testid="ac-value" label="Valeur totale" value={fcfaCompact(total)} valueFull={fcfa(total)} icon={DollarSign} color="#b02a2a"/>
         <KPICard testid="ac-relaunched" label="Relancés" value={relaunched} icon={MessageSquare} color="#5867fd"/>
         <KPICard testid="ac-recovered" label="Récupérés" value={recovered} icon={CheckCircle} color="#1f8a4c"/>
-        <KPICard testid="ac-rate" label="Taux récupération" value={`${rate}%`} color="#1f8a4c"/>
-        <KPICard testid="ac-ca" label="CA récupéré" value={fcfa(recoveredCA)} color="#1f8a4c"/>
+        <KPICard testid="ac-rate" label="Taux de récupération" value={`${rate}%`} color="#1f8a4c"/>
+        <KPICard testid="ac-ca" label="Chiffre d'affaires récupéré" value={fcfaCompact(recoveredCA)} valueFull={fcfa(recoveredCA)} color="#1f8a4c"/>
       </div>
 
       {selected.length > 0 && (

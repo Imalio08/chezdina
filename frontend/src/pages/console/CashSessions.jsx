@@ -267,7 +267,7 @@ export function OpenModal({ user, onCancel, onDone }) {
   );
 }
 
-function CloseModal({ session, onClose, onDone }) {
+export function CloseModal({ session, onClose, onDone }) {
   const [closing, setClosing] = useState(0);
   const [pin, setPin] = useState("");
   const [note, setNote] = useState("");

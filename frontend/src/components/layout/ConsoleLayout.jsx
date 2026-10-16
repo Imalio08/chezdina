@@ -29,8 +29,7 @@ const SECTIONS = [
     { to: "/console/commandes", icon: Receipt, label: "Commandes" },
     { to: "/console/commandes?tab=confirmee", icon: Package, label: "À préparer", only: ["stock_keeper"] },
     { to: "/console/sessions-caisse", icon: ClipboardList, label: "Sessions de caisse" },
-    { to: "/console/liste-attente", icon: Hourglass, label: "Liste d'attente" },
-    { to: "/console/paniers-abandonnes", icon: ShoppingCart, label: "Paniers abandonnés" },
+    { to: "/console/opportunites", icon: Hourglass, label: "Opportunités" },
   ]},
   { label: "Livraison", items: [
     { to: "/console/livraisons", icon: Truck, label: "Journées de livraison" },
@@ -39,8 +38,7 @@ const SECTIONS = [
   ]},
   { label: "Produits & achats", items: [
     { to: "/console/produits", icon: Package, label: "Produits" },
-    { to: "/console/marques", icon: Tag, label: "Marques" },
-    { to: "/console/categories", icon: Layers, label: "Catégories & collections" },
+    { to: "/console/categories", icon: Layers, label: "Catégories & marques" },
     { to: "/console/fournisseurs", icon: Building2, label: "Fournisseurs" },
     { to: "/console/achats", icon: ShoppingBag, label: "Approvisionnements" },
     { to: "/console/stock", icon: Boxes, label: "Stock & inventaires" },
@@ -62,9 +60,7 @@ const SECTIONS = [
     { to: "/console/equipe", icon: UserCog, label: "Employés" },
     { to: "/console/roles", icon: Shield, label: "Rôles & permissions", adminOnly: true },
     { to: "/console/approbations", icon: CheckCircle2, label: "À approuver", adminOnly: true },
-    { to: "/console/audit", icon: ClipboardList, label: "Journal d'audit", adminOnly: true },
-    { to: "/console/pointage", icon: Calendar, label: "Pointage (kiosk)" },
-    { to: "/console/presence", icon: UserCheck, label: "Historique pointages" },
+    { to: "/console/presences", icon: UserCheck, label: "Présences", presence: true },
   ]},
   { label: "Site vitrine", items: [
     { to: "/console/site?tab=apparence", icon: Palette, label: "Apparence" },
@@ -161,8 +157,14 @@ export default function ConsoleLayout() {
   const unreadCount = notifs.filter(n => !readIds.has(n.id)).length;
 
   // RBAC — redirect user away from forbidden pages
+  const [presenceOk, setPresenceOk] = useState(false);
+  useEffect(() => { if (user?.role) api.get("/attendance/access").then(r => setPresenceOk(!!r.data?.allowed)).catch(() => {}); }, [user?.role]);
   useEffect(() => {
     if (!user?.role) return;
+    if (/^\/console\/presences?(\/|$)/.test(pathname) && user.role !== "admin") {
+      api.get("/attendance/access").then(r => { if (!r.data?.allowed) nav(landingFor(user.role), { replace: true }); }).catch(() => {});
+      return;
+    }
     if (!canAccess(user.role, pathname)) {
       const dest = landingFor(user.role);
       if (dest !== pathname) nav(dest, { replace: true });
@@ -275,7 +277,7 @@ export default function ConsoleLayout() {
             const items = sec.items
               .filter(it => !it.adminOnly || isAdmin)
               .filter(it => !it.only || it.only.includes(user?.role))
-              .filter(it => canAccess(user?.role, it.to));
+              .filter(it => canAccess(user?.role, it.to, { presence: presenceOk }));
             if (items.length === 0) return null;
             return (
               <div key={sec.label || `top-${items[0]?.to}`} className="mb-1">

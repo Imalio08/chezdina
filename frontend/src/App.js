@@ -62,6 +62,7 @@ import ProfitLoss from "@/pages/console/ProfitLoss";
 import DeliveryDays from "@/pages/console/DeliveryDays";
 import Riders from "@/pages/console/Riders";
 import Zones from "@/pages/console/Zones";
+import Opportunites from "@/pages/console/Opportunites";
 import Waitlist from "@/pages/console/Waitlist";
 import AbandonedCarts from "@/pages/console/AbandonedCarts";
 import Pointage from "@/pages/console/Pointage";
@@ -248,11 +249,12 @@ export default function App() {
               <Route path="journees-livraison" element={<ErrorBoundary><Deliveries/></ErrorBoundary>} />
               <Route path="livreurs" element={<ErrorBoundary><Riders/></ErrorBoundary>} />
               <Route path="zones" element={<ErrorBoundary><Zones/></ErrorBoundary>} />
-              <Route path="marques" element={<ErrorBoundary><Marques/></ErrorBoundary>} />
+              <Route path="marques" element={<Navigate to="/console/categories?tab=marques" replace/>} />
               <Route path="categories" element={<ErrorBoundary><CategoriesCollections/></ErrorBoundary>} />
-              <Route path="liste-attente" element={<ErrorBoundary><Waitlist/></ErrorBoundary>} />
+              <Route path="opportunites" element={<ErrorBoundary><Opportunites/></ErrorBoundary>} />
+              <Route path="liste-attente" element={<Navigate to="/console/opportunites?tab=attente" replace/>} />
               <Route path="fournisseurs" element={<ErrorBoundary><Suppliers/></ErrorBoundary>} />
-              <Route path="paniers-abandonnes" element={<ErrorBoundary><AbandonedCarts/></ErrorBoundary>} />
+              <Route path="paniers-abandonnes" element={<Navigate to="/console/opportunites?tab=paniers" replace/>} />
               <Route path="parrainage" element={<ErrorBoundary><Referrals/></ErrorBoundary>} />
               <Route path="campagnes" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
               <Route path="campagnes-whatsapp" element={<ErrorBoundary><Campagnes/></ErrorBoundary>} />
@@ -261,9 +263,10 @@ export default function App() {
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
               <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
               <Route path="approbations" element={<ErrorBoundary><Approvals/></ErrorBoundary>} />
-              <Route path="audit" element={<ErrorBoundary><Audit/></ErrorBoundary>} />
+              <Route path="audit" element={<Navigate to="/console/parametres?tab=securite" replace/>} />
               <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
-              <Route path="presence" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
+              <Route path="presences" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
+              <Route path="presence" element={<Navigate to="/console/presences" replace/>} />
               <Route path="apparence" element={<Navigate to="/console/site?tab=apparence" replace/>} />
               <Route path="accueil" element={<Navigate to="/console/site?tab=accueil" replace/>} />
               <Route path="apercu" element={<Navigate to="/" replace/>} />

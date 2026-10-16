@@ -33,6 +33,7 @@ export const PATH_ROLES = {
   "/console/preparation": [M, S, K],
   "/console/sessions-caisse": [M],
   "/console/liste-attente": [M, S],
+  "/console/opportunites": [M, S],
   "/console/paniers-abandonnes": [M, S],
   "/console/livraisons": [M],
   "/console/journees-livraison": [M],
@@ -68,6 +69,7 @@ export const PATH_ROLES = {
   "/console/resultat": [],
   "/console/equipe": [],
   "/console/presence": [],
+  "/console/presences": [],
   "/console/livreur-app": [],
   "/console/integrations": [],
   "/console/parametres": [],
@@ -78,11 +80,12 @@ export const PATH_ROLES = {
 };
 
 /** Returns true if the role can access the given path. */
-export function canAccess(role, pathname) {
+export function canAccess(role, pathname, extra = {}) {
   if (!role) return false;
   if (role === "admin") return true;
   if (!pathname) return false;
   const path = pathname.split("?")[0];
+  if (extra.presence && /^\/console\/presences?(\/|$)/.test(path)) return true;
   const keys = Object.keys(PATH_ROLES).sort((a, b) => b.length - a.length);
   for (const key of keys) {
     if (path === key || path.startsWith(key + "/")) {

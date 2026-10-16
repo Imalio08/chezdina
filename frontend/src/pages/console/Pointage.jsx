@@ -5,6 +5,31 @@ import { jsPDF } from "jspdf";
 import { openPdf } from "@/components/shared/PdfPreview";
 import { Users, Clock, AlertTriangle, Download, FileText, Target, Save } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
+import { useAuth } from "@/context/AuthContext";
+import { Link } from "react-router-dom";
+
+const ROLE_LABELS = { manager: "Gérante", sales: "Vendeuse", stock_keeper: "Magasinier", community_manager: "Community manager" };
+
+function PresenceAccess() {
+  const { user } = useAuth();
+  const [roles, setRoles] = useState(null);
+  useEffect(() => { if (user?.role === "admin") api.get("/attendance/access").then(r => setRoles(r.data?.roles || [])).catch(() => {}); }, [user?.role]);
+  if (user?.role !== "admin" || !roles) return null;
+  const toggle = async (r) => {
+    const next = roles.includes(r) ? roles.filter(x => x !== r) : [...roles, r];
+    try { await api.patch("/attendance/access", { roles: next }); setRoles(next); toast.success("Accès aux Présences mis à jour"); }
+    catch { toast.error("Modification impossible"); }
+  };
+  return (
+    <div className="dina-card-white p-3 flex items-center gap-2 flex-wrap text-xs" data-testid="presence-access">
+      <span className="font-semibold">Qui peut voir les Présences :</span><span className="dina-chip">Propriétaire</span>
+      {Object.entries(ROLE_LABELS).map(([k, l]) => (
+        <label key={k} className="inline-flex items-center gap-1 cursor-pointer"><input type="checkbox" className="accent-[#b02a2a]" checked={roles.includes(k)} onChange={() => toggle(k)} data-testid={`presence-role-${k}`}/>{l}</label>
+      ))}
+      <Link to="/console/pointage" className="ml-auto text-[#b02a2a] hover:underline" data-testid="presence-kiosk-link">Ouvrir le kiosque de pointage →</Link>
+    </div>
+  );
+}
 
 export default function Pointage() {
   const [today, setToday] = useState(null);
@@ -133,10 +158,11 @@ export default function Pointage() {
 
   return (
     <div className="space-y-5" data-testid="pointage-page">
+      <PresenceAccess/>
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-serif text-3xl">Historique pointages</h1>
-          <p className="text-sm text-[#666]">Présence, retards, absences et ponctualité par employé</p>
+          <h1 className="font-serif text-3xl">Présences</h1>
+          <p className="text-sm text-[#666]">Historique, retards, absences, heures travaillées et statistiques par employé · le pointage se fait depuis le bouton de la barre du haut</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <select value={periodDays} onChange={e => setPeriodDays(+e.target.value)} className="dina-input !h-9 text-sm" data-testid="period-days">

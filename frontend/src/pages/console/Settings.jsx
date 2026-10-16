@@ -8,6 +8,7 @@ import {
   Smartphone, GripVertical, Plus, X, RotateCcw,
 } from "lucide-react";
 import SaveButton from "@/components/shared/SaveButton";
+import Audit from "@/pages/console/Audit";
 
 const SAVED_MSG = "Modifications enregistrées";
 const ERROR_MSG = "Erreur · modifications non enregistrées";
@@ -23,7 +24,7 @@ const TABS = [
   { id: "integrations", label: "Intégrations", icon: Plug },
   { id: "equipe", label: "Équipe & horaires", icon: Users },
   { id: "pointage", label: "Pointage", icon: Clock },
-  { id: "securite", label: "Sécurité", icon: Shield },
+  { id: "securite", label: "Sécurité & audit", icon: Shield },
   { id: "donnees", label: "Données", icon: Database },
 ];
 
@@ -77,7 +78,7 @@ export default function Settings() {
           {tab === "integrations" && <IntegrationsTab />}
           {tab === "equipe" && <EquipeTab />}
           {tab === "pointage" && <PointageTab />}
-          {tab === "securite" && <SecuriteTab />}
+          {tab === "securite" && <><SecuriteTab /><div className="mt-6"><Audit /></div></>}
           {tab === "donnees" && <DonneesTab />}
         </main>
       </div>

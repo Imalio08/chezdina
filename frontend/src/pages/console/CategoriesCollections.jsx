@@ -4,17 +4,24 @@ import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, X, ChevronRight, ChevronDown, Eye, EyeOff, Layers, FolderTree, Package, Image as ImageIcon, Trophy, Calendar } from "lucide-react";
 import ImageUpload from "@/components/shared/ImageUpload";
+import { useSearchParams } from "react-router-dom";
+import MarquesV2 from "@/pages/console/MarquesV2";
+
+const CC_TABS = { cats: "Catégories", cols: "Collections", marques: "Marques" };
 
 export default function CategoriesCollections() {
-  const [tab, setTab] = useState("cats");
+  const [sp, setSp] = useSearchParams();
+  const tab = CC_TABS[sp.get("tab")] ? sp.get("tab") : "cats";
+  const setTab = (t) => setSp({ tab: t }, { replace: true });
   return (
     <div className="space-y-5">
-      <div><h1 className="font-serif text-3xl">Catégories & collections</h1><p className="text-sm text-[#666]">Structurez votre catalogue en catégories hiérarchiques et créez des sélections mises en avant</p></div>
+      <div><h1 className="font-serif text-3xl">Catégories & marques</h1><p className="text-sm text-[#666]">Catégories hiérarchiques, collections mises en avant et marques du catalogue</p></div>
       <div className="flex gap-1 bg-[#f5f5f5] dark:bg-[#1a1a1a] p-1 rounded-lg w-fit">
         <button onClick={() => setTab("cats")} className={`px-4 py-1.5 text-sm rounded-md flex items-center gap-1 ${tab === "cats" ? "bg-white dark:bg-[#2a2a2a] shadow-sm font-semibold" : ""}`} data-testid="cc-tab-cats"><FolderTree size={11} />Catégories</button>
         <button onClick={() => setTab("cols")} className={`px-4 py-1.5 text-sm rounded-md flex items-center gap-1 ${tab === "cols" ? "bg-white dark:bg-[#2a2a2a] shadow-sm font-semibold" : ""}`} data-testid="cc-tab-cols"><Layers size={11} />Collections</button>
+        <button onClick={() => setTab("marques")} className={`px-4 py-1.5 text-sm rounded-md flex items-center gap-1 ${tab === "marques" ? "bg-white dark:bg-[#2a2a2a] shadow-sm font-semibold" : ""}`} data-testid="cc-tab-marques"><Package size={11} />Marques</button>
       </div>
-      {tab === "cats" ? <CategoriesTab /> : <CollectionsTab />}
+      {tab === "cats" ? <CategoriesTab /> : tab === "cols" ? <CollectionsTab /> : <MarquesV2 embedded />}
     </div>
   );
 }

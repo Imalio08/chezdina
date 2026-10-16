@@ -14,8 +14,9 @@ const SOURCE_LABEL = { site: "Site vitrine", pos: "Caisse (POS)", search: "Reche
 const SOURCE_ICON = { site: Globe, pos: Store, search: SearchIcon, console: Hash };
 const SOURCE_COLOR = { site: "#5867fd", pos: "#b02a2a", search: "#e4991e", console: "#666" };
 
-export default function Waitlist() {
-  const [tab, setTab] = useState("groups");
+export default function Waitlist({ embedded, section }) {
+  const [tabState, setTab] = useState("groups");
+  const tab = section || tabState;
   const [data, setData] = useState(null);
   const [out, setOut] = useState(null);
   const [open, setOpen] = useState(null);
@@ -39,19 +40,19 @@ export default function Waitlist() {
 
   return (
     <div className="space-y-5" data-testid="waitlist-page">
-      <div><h1 className="font-serif text-3xl">Liste d'attente</h1><p className="text-sm text-[#666]">Clientes qui attendent un produit, une taille ou une couleur</p></div>
+      {!embedded && <div><h1 className="font-serif text-3xl">Liste d'attente</h1><p className="text-sm text-[#666]">Clientes qui attendent un produit, une taille ou une couleur</p></div>}
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      {(!embedded || section === "groups") && <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPICard testid="wl-pending" label="Demandes en attente" value={data.pending} icon={BellRing} color="#e4991e"/>
         <KPICard testid="wl-prods" label="Produits concernés" value={data.products_affected} icon={Package} color="#5867fd"/>
         <KPICard testid="wl-clients" label="Clientes concernées" value={data.customers_total} icon={Users} color="#b02a2a"/>
         <KPICard testid="wl-conv" label="Conversion après retour" value={`${data.conversion_pct}%`} icon={ShoppingBag} color="#1f8a4c"/>
-      </div>
+      </div>}
 
-      <div className="flex gap-1 bg-[#f5f5f5] dark:bg-[#1a1a1a] p-1 rounded-lg w-fit">
+      {!embedded && <div className="flex gap-1 bg-[#f5f5f5] dark:bg-[#1a1a1a] p-1 rounded-lg w-fit">
         <button onClick={()=>setTab("groups")} className={`px-3 py-1.5 text-sm rounded-md ${tab==="groups"?"bg-white dark:bg-[#2a2a2a] shadow-sm font-semibold":""}`} data-testid="wl-tab-groups">Groupés par produit ({data.groups?.length||0})</button>
         <button onClick={()=>setTab("ooc")} className={`px-3 py-1.5 text-sm rounded-md ${tab==="ooc"?"bg-white dark:bg-[#2a2a2a] shadow-sm font-semibold":""}`} data-testid="wl-tab-ooc">Demandes hors catalogue ({out?.total||0})</button>
-      </div>
+      </div>}
 
       {tab === "groups" && (
         <div className="grid md:grid-cols-2 gap-3">

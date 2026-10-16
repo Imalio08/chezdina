@@ -85,7 +85,7 @@ export default function Audit() {
     <div className="space-y-5" data-testid="audit-page">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
-          <h1 className="font-serif text-3xl">Journal d'audit</h1>
+          <h2 className="font-serif text-2xl">Journal d'audit</h2>
           <p className="text-sm text-[#666]">Toutes les actions sensibles · modifications des rôles, caisse, stock, approbations</p>
         </div>
         <button onClick={exportXlsx} className="dina-btn-secondary !min-h-[40px]" data-testid="audit-export"><FileSpreadsheet size={14}/>Export Excel</button>

@@ -17,7 +17,7 @@ from deps import db, get_user
 LIMITED_ROLES = ("sales", "stock_keeper", "community_manager")
 READ = ("GET", "HEAD")
 
-COMMON = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in", "/api/attendance/today-kiosk", "/api/me/",
+COMMON = ("/api/auth/", "/api/attendance/", "/api/attendance/me", "/api/attendance/check-in", "/api/attendance/today-kiosk", "/api/me/",
           "/api/notifications", "/api/manual", "/api/users/me", "/api/push/", "/api/public/", "/api/dashboard/role",
           "/api/orders-messages")
 COMMON_READ = ("/api/business", "/api/brands", "/api/categories", "/api/products", "/api/stock", "/api/zones")

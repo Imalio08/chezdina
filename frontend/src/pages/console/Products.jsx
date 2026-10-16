@@ -3,7 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
-import { fcfa } from "@/lib/format";
+import { fcfa, fcfaCompact } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Download, Pencil, Eye, Trash2, Copy, Archive, Tag, Package, AlertTriangle, Clock, BarChart3, DollarSign, Percent, CheckCircle, XCircle, ChevronDown, Search } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
@@ -127,9 +127,9 @@ export default function Products() {
           <KpiMini label="En attente" v={kpis.liste_attente} c="#e4991e"/>
           <KpiMini label="Rupture" v={kpis.rupture} c="#c62828"/>
           <KpiMini label="Stock bas" v={kpis.stock_bas} c="#e4991e"/>
-          {kpis.valeur_cout != null && <KpiMini label="Val. coût" v={fcfa(kpis.valeur_cout)} c="#5867fd" small/>}
-          <KpiMini label="Val. vente" v={fcfa(kpis.valeur_vente)} c="#b02a2a" small/>
-          {kpis.marge_moyenne != null && <KpiMini label="Marge moy." v={`${kpis.marge_moyenne}%`} c="#1f8a4c"/>}
+          {kpis.valeur_cout != null && <KpiMini label="Valeur au coût" v={fcfaCompact(kpis.valeur_cout)} full={fcfa(kpis.valeur_cout)} c="#5867fd" small/>}
+          <KpiMini label="Valeur de vente" v={fcfaCompact(kpis.valeur_vente)} full={fcfa(kpis.valeur_vente)} c="#b02a2a" small/>
+          {kpis.marge_moyenne != null && <KpiMini label="Marge moyenne" v={`${kpis.marge_moyenne}%`} c="#1f8a4c"/>}
         </div>
       )}
 
@@ -239,11 +239,11 @@ function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap, money })
   );
 }
 
-function KpiMini({ label, v, c, small }) {
+function KpiMini({ label, v, c, small, full }) {
   return (
-    <div className="dina-card-white p-3 min-w-0" data-testid={`kpi-${label.toLowerCase().replace(/\s/g,'-').replace(/\./g,'')}`}>
-      <div className="text-[10px] uppercase tracking-wide text-[#666] font-semibold truncate">{label}</div>
-      <div className={`font-serif tabular leading-none mt-1.5 truncate ${small ? "text-lg" : "text-2xl"}`} style={{ color: c }}>{v}</div>
+    <div className="dina-card-white p-3 min-w-0" title={full || undefined} data-testid={`kpi-${label.toLowerCase().replace(/\s/g,'-').replace(/\./g,'')}`}>
+      <div className="text-[10px] uppercase tracking-wide text-[#666] font-semibold leading-tight">{label}</div>
+      <div className={`font-serif tabular leading-tight mt-1.5 break-words ${small ? "text-base" : "text-2xl"}`} style={{ color: c }}>{v}</div>
     </div>
   );
 }
