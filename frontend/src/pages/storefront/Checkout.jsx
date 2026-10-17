@@ -11,6 +11,7 @@ import { useCustomer } from "@/context/CustomerContext";
 import WavePayBox from "@/components/storefront/WavePayBox";
 import { colorCss } from "@/lib/colors";
 import { DELIVERY_ZONES as ZONES, AddressFields, emptyAddress, validAddress, toPayload, addressLine } from "@/components/storefront/AddressForm";
+import { useLocate } from "@/components/storefront/GeoHelp";
 
 function AddressChooser({ addresses, choice, setChoice, draft, setDraft, saveNew, setSaveNew }) {
   return (
@@ -98,15 +99,8 @@ export default function Checkout() {
   }
   const remaining = total - expectedDeposit;
 
-  const locate = () => {
-    if (!navigator.geolocation) return toast.error("Géolocalisation non disponible");
-    setLocating(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => { setCoords({ lat: pos.coords.latitude, lng: pos.coords.longitude }); toast.success("Position captée"); setLocating(false); },
-      () => { toast.error("Impossible de localiser — autorisez la géolocalisation"); setLocating(false); },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  };
+  const geo = useLocate((c) => { setCoords(c); toast.success("Position enregistrée"); });
+  const locate = geo.locate;
 
   const openMap = () => {
     const c = coords || ABIDJAN;
@@ -195,7 +189,8 @@ export default function Checkout() {
           <div>
             <div className="text-xs uppercase text-[#666] mb-2 flex items-center gap-1"><MapPin size={12}/>Position GPS (recommandé pour une livraison précise)</div>
             <div className="flex gap-2">
-              <button type="button" onClick={locate} disabled={locating} className="dina-btn-secondary flex-1 !min-h-[40px] text-sm" data-testid="checkout-locate"><Navigation2 size={14}/>{locating?"Localisation…":coords?"Repositionner":"Utiliser ma position actuelle"}</button>
+              <button type="button" onClick={locate} disabled={geo.busy} className="dina-btn-secondary flex-1 !min-h-[40px] text-sm" data-testid="checkout-locate"><Navigation2 size={14}/>{geo.busy?"Localisation…":coords?"Repositionner":"Utiliser ma position actuelle"}</button>
+              <button type="button" onClick={geo.openMap} className="dina-btn-secondary !min-h-[40px] text-sm" data-testid="checkout-map-pick">Carte</button>{geo.ui}
               {coords && <button type="button" onClick={openMap} className="dina-btn-secondary !min-h-[40px] text-sm" data-testid="checkout-map-view">Voir sur Maps</button>}
             </div>
             {coords ? (

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { toast } from "sonner";
 import { MapPin, Navigation2, X } from "lucide-react";
+import { useLocate } from "@/components/storefront/GeoHelp";
 
 export const DELIVERY_ZONES = {"Cocody":1500,"Riviera":2000,"Angré":2000,"Plateau":1000,"Marcory":1500,"Zone 4":1500,"Treichville":1500,"Koumassi":2000,"Yopougon":2500,"Abobo":3000,"Adjamé":1500,"Port-Bouët":2500,"Bingerville":3000,"Songon":3500,"Grand-Bassam":5000};
 export const LABELS = ["Maison", "Bureau", "Famille", "Autre"];
@@ -29,16 +30,21 @@ export function MiniMap({ lat, lng, height = 160 }) {
 
 // Address fields (label, zone, quartier, rue, repères, GPS). Used inline at checkout and in the modal.
 export function AddressFields({ v, setV, showDefault = true }) {
-  const [busy, setBusy] = useState(false);
+  const geo = useLocate((c) => { setV(x => ({ ...x, ...c })); toast.success("Position enregistrée"); });
+  const busy = geo.busy;
   const set = (k) => (e) => setV({ ...v, [k]: e.target.value });
   return (
     <div className="space-y-2" data-testid="address-fields">
+      {geo.ui}
       <div className="flex gap-1.5 flex-wrap">
         {LABELS.map(l => <button key={l} type="button" onClick={() => setV({ ...v, label: l })} className={`px-3 py-1.5 rounded-full text-xs border ${v.label === l ? "bg-[#1c1c1c] text-white border-[#1c1c1c]" : "border-[#ececec]"}`} data-testid={`addr-label-${l}`}>{l}</button>)}
       </div>
-      <button type="button" onClick={() => locateMe(c => setV({ ...v, ...c }), setBusy)} disabled={busy} className="dina-btn-secondary w-full !min-h-[40px] text-sm" data-testid="addr-locate">
+      <div className="flex gap-2">
+      <button type="button" onClick={geo.locate} disabled={busy} className="dina-btn-secondary flex-1 !min-h-[40px] text-sm" data-testid="addr-locate">
         <Navigation2 size={14}/>{busy ? "Localisation…" : v.lat ? "Repositionner ma position GPS" : "Utiliser ma position GPS"}
       </button>
+      <button type="button" onClick={geo.openMap} className="dina-btn-secondary !min-h-[40px] text-sm" data-testid="addr-map-pick"><MapPin size={14}/>Carte</button>
+      </div>
       {v.lat ? <MiniMap lat={v.lat} lng={v.lng}/> : <div className="text-[11px] text-[#666] bg-[#fff5f5] rounded-lg p-2.5 flex gap-2"><MapPin size={12} className="mt-0.5 text-[#b02a2a] shrink-0"/>Facultatif mais recommandé : le livreur vous trouve plus vite.</div>}
       <select className="dina-input" value={v.zone} onChange={set("zone")} data-testid="addr-zone">
         <option value="">Commune / zone…</option>

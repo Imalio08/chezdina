@@ -14,6 +14,9 @@ import { playChime } from "@/lib/notifySound";
 import { getVisitorId } from "@/lib/analytics";
 import { REF_KEY } from "@/pages/storefront/Invitation";
 import { WalletLedger, SOURCE_LABEL } from "@/components/shared/WalletLedger";
+import PhotoCropModal from "@/components/storefront/PhotoCropModal";
+import InstallGuide, { isIOS, isStandalone } from "@/components/storefront/InstallGuide";
+import { localFavorites, setLocalFavorites, toggleFavorite } from "@/components/storefront/ProductCardV2";
 import {
   User, Package, MessageSquare, Star, Ticket, Heart, Eye, Gift, UserPlus, Wallet,
   MapPin, Settings, Shield, LogOut, Camera, Phone, MessageCircle, Download,
@@ -250,25 +253,30 @@ function Overview() {
   const { customer, setCustomer, refresh } = useCustomer();
   const [showEdit, setShowEdit] = useState(null); // "info" | "address" | "prefs"
   const fileRef = useRef(null);
+  const [cropSrc, setCropSrc] = useState(null);
   const defaultAddr = (customer.addresses || []).find(a => a.default) || (customer.addresses || [])[0];
 
   const onPhoto = (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (f.size > 2 * 1024 * 1024) return toast.error("Max 2 Mo");
+    if (f.size > 15 * 1024 * 1024) return toast.error("Photo trop lourde (max 15 Mo)");
     const reader = new FileReader();
-    reader.onload = async () => {
-      try {
-        await api.post("/public/account/photo", { photo: reader.result });
-        setCustomer({ ...customer, photo: reader.result });
-        toast.success("Photo mise à jour");
-      } catch { toast.error("Erreur upload"); }
-    };
+    reader.onload = () => setCropSrc(reader.result);
     reader.readAsDataURL(f);
+    e.target.value = "";
+  };
+  const savePhoto = async (photo) => {
+    try {
+      await api.post("/public/account/photo", { photo });
+      setCustomer({ ...customer, photo });
+      setCropSrc(null);
+      toast.success("Photo mise à jour");
+    } catch { toast.error("La photo n'a pas pu être enregistrée · réessayez"); }
   };
 
   return (
     <div className="space-y-4" data-testid="overview">
+      {cropSrc && <PhotoCropModal src={cropSrc} onClose={() => setCropSrc(null)} onDone={savePhoto}/>}
       {/* Infos personnelles card */}
       <Card title="Informations personnelles" icon={User} onEdit={() => setShowEdit("info")} testId="card-info">
         <div className="flex gap-4 items-start">
@@ -525,10 +533,19 @@ function OrderDetail() {
       </div>
 
       <div className="flex gap-2">
-        <a href={`${process.env.REACT_APP_BACKEND_URL}/api/orders/${o.id}/invoice`} target="_blank" rel="noreferrer" className="dina-btn-secondary flex-1" data-testid="download-invoice"><Download size={14}/> Télécharger la facture</a>
+        <button onClick={() => openInvoice(o.code)} className="dina-btn-secondary flex-1" data-testid="download-invoice"><Download size={14}/> Télécharger la facture</button>
       </div>
     </div>
   );
+}
+
+async function openInvoice(code) {
+  const w = window.open("", "_blank");
+  try {
+    const r = await api.get(`/public/account/order/${code}/invoice`, { responseType: "text" });
+    const url = URL.createObjectURL(new Blob([r.data], { type: "text/html" }));
+    if (w) w.location.href = url; else window.location.href = url;
+  } catch { if (w) w.close(); toast.error("Facture indisponible · réessayez"); }
 }
 
 function KV({ label, value }) {
@@ -649,6 +666,7 @@ function MessagesPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const [threads, setThreads] = useState([]);
+  const [cat, setCat] = useState("boutique");
   const [active, setActive] = useState(null);
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState(null);
@@ -686,7 +704,14 @@ function MessagesPage() {
   return (
     <div className="grid md:grid-cols-[260px_1fr] gap-4 md:min-h-[70vh]" data-testid="messages-page">
       <div className={`dina-card-white p-2 overflow-y-auto ${id ? "hidden md:block" : ""}`}>
-        {threads.map(t => {
+        <div className="grid grid-cols-2 gap-1 p-1 bg-[#f5f5f5] rounded-lg mb-2" data-testid="msg-categories">
+          {[["boutique", "Boutique"], ["livreur", "Livreur"]].map(([k, l]) => {
+            const n = threads.filter(t => isRiderThread(t) === (k === "livreur")).reduce((s, t) => s + (t.unread || 0), 0);
+            return <button key={k} onClick={() => setCat(k)} className={`py-1.5 rounded-md text-sm ${cat === k ? "bg-white shadow font-semibold text-[#b02a2a]" : "text-[#666]"}`} data-testid={`msg-cat-${k}`}>{l}{n > 0 && <span className="ml-1 bg-[#b02a2a] text-white text-[9px] rounded-full px-1.5">{n}</span>}</button>;
+          })}
+        </div>
+        {threads.filter(t => isRiderThread(t) === (cat === "livreur")).length === 0 && <div className="text-xs text-[#999] text-center py-6" data-testid="msg-cat-empty">{cat === "livreur" ? "Aucun message de livreur" : "Aucun message de la boutique"}</div>}
+        {threads.filter(t => isRiderThread(t) === (cat === "livreur")).map(t => {
           const other = t.with || (t.participants || []).find(p => p.id !== customer.id) || {};
           const last = t.last_message || (t.messages || [])[t.messages?.length - 1];
           const unread = t.unread ?? (t.messages || []).filter(m => !(m.read_by || []).includes(customer.id)).length;
@@ -730,6 +755,8 @@ function MessagesPage() {
     </div>
   );
 }
+
+const isRiderThread = (t) => (t.with?.kind === "rider") || /livreur/.test(t.kind || "") && !/boutique/.test(t.kind || "") || t.kind === "rider_customer";
 
 /* -------- Reviews pending -------- */
 function ReviewsPending() {
@@ -777,21 +804,31 @@ function Vouchers() {
   const [list, setList] = useState([]);
   useEffect(() => { api.get("/public/account/vouchers").then(r=>setList(r.data)).catch(()=>setList([])); }, []);
   if (!list.length) return <EmptyState icon={Ticket} title="Aucun bon d'achat" subtitle="Vos bons d'achat gagnés apparaîtront ici"/>;
-  return <div className="space-y-2">{list.map(v => <div key={v.id} className="dina-card-white p-4 flex justify-between"><div><div className="font-serif text-lg">{v.code}</div><div className="text-xs text-[#666]">Valide jusqu'au {dateFmt(v.ends_at)}</div></div><div className="font-semibold tabular text-[#b02a2a]">{fcfa(v.amount)}</div></div>)}</div>;
+  const copy = (c) => { navigator.clipboard?.writeText(c); toast.success("Code copié · à saisir au paiement"); };
+  return <div className="space-y-2" data-testid="vouchers-list">{list.map(v => <div key={v.id} className="dina-card-white p-4 flex items-center gap-3" data-testid={`voucher-${v.code}`}><Ticket size={18} className="text-[#b02a2a] shrink-0"/><div className="flex-1 min-w-0"><div className="font-mono font-bold text-lg break-all">{v.code}</div><div className="text-xs text-[#666]">{v.kind === "promo" ? "Code promo boutique" : "Bon personnel"}{v.ends_at ? ` · valide jusqu'au ${dateFmt(v.ends_at)}` : ""}{v.min_order ? ` · dès ${fcfa(v.min_order)}` : ""}</div></div><div className="text-right shrink-0"><div className="font-semibold tabular text-[#b02a2a]">{v.type === "percent" ? `-${v.value} %` : v.type === "free_shipping" ? "Livraison offerte" : fcfa(v.amount || v.value)}</div><button onClick={() => copy(v.code)} className="text-xs underline text-[#666]" data-testid={`voucher-copy-${v.code}`}>Copier</button></div></div>)}</div>;
 }
 
 function Favorites() {
   const [list, setList] = useState([]);
-  useEffect(() => { api.get("/public/account/favorites").then(r=>setList(r.data || [])).catch(()=>setList([])); }, []);
+  const load = async () => {
+    try {
+      const local = localFavorites();
+      if (local.length) await api.post("/public/account/favorites/merge", { product_ids: local });
+      const r = await api.get("/public/account/favorites");
+      setList(r.data || []); setLocalFavorites((r.data || []).map(p => p.id));
+    } catch { setList([]); }
+  };
+  useEffect(() => { load(); }, []);
+  const remove = (id) => { toggleFavorite(id); setList(l => l.filter(p => p.id !== id)); };
   if (!list.length) return <EmptyState icon={Heart} title="Aucun favori" subtitle="Cliquez sur le cœur pour ajouter"/>;
-  return <div className="grid grid-cols-2 md:grid-cols-3 gap-3">{list.map(p => <Link key={p.id} to={`/product/${p.id}`} className="dina-card-white p-3"><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium truncate">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link>)}</div>;
+  return <div className="grid grid-cols-2 md:grid-cols-3 gap-3" data-testid="favorites-list">{list.map(p => <div key={p.id} className="dina-card-white p-3 relative" data-testid={`favorite-${p.id}`}><Link to={`/product/${p.id}`}><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium break-words">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link><button onClick={() => remove(p.id)} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/90 grid place-items-center shadow" data-testid={`favorite-remove-${p.id}`}><Heart size={14} fill="#b02a2a" stroke="#b02a2a"/></button></div>)}</div>;
 }
 
 function RecentlyViewed() {
   const [list, setList] = useState([]);
   useEffect(() => { api.get("/public/account/recently-viewed").then(r=>setList(r.data || [])).catch(()=>setList([])); }, []);
   if (!list.length) return <EmptyState icon={Eye} title="Aucun produit vu" subtitle="Les produits consultés apparaîtront ici"/>;
-  return <div className="grid grid-cols-2 md:grid-cols-3 gap-3">{list.map(p => <Link key={p.id} to={`/product/${p.id}`} className="dina-card-white p-3"><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium truncate">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link>)}</div>;
+  return <div className="grid grid-cols-2 md:grid-cols-3 gap-3" data-testid="recent-list">{list.map(p => <Link key={p.id} to={`/product/${p.id}`} className="dina-card-white p-3" data-testid={`recent-${p.id}`}><img src={p.image} alt={p.name} className="w-full aspect-square object-cover rounded mb-2"/><div className="text-sm font-medium break-words">{p.name}</div><div className="text-xs text-[#b02a2a] font-semibold">{fcfa(p.price)}</div></Link>)}</div>;
 }
 
 function useWallet() {
@@ -851,7 +888,7 @@ function Referral() {
   useEffect(() => { loadRef(); }, []); // eslint-disable-line
   if (!d) return <div className="dina-card-white p-6 text-sm text-[#666]">Chargement…</div>;
   if (d.error) return <LoadError retry={loadRef}/>;
-  const link = `${window.location.origin}/invitation/${d.code}`;
+  const link = `${window.location.origin}/api/public/share/invitation/${d.code}`;
   const msg = `Je t'invite chez Chez Dina 👗 Crée ton compte avec mon lien et reçois ${fcfa(d.rules.filleul)} sur ta première commande : ${link}`;
   const copy = (t) => { navigator.clipboard?.writeText(t); toast.success("Copié !"); };
   const share = async () => { if (navigator.share) { try { await navigator.share({ title: "Chez Dina", text: msg }); } catch {} } else window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank"); };
@@ -966,14 +1003,16 @@ function NotificationsPage() {
   const [d, setD] = useState({ items: [], unread: 0 });
   const [pushOn, setPushOn] = useState(pushGranted());
   useEffect(() => { api.get("/public/account/notifications").then(r => { setD(r.data); if (r.data.unread) api.post("/public/account/notifications/read").catch(() => {}); }).catch(() => {}); }, []);
+  const iosNeedsInstall = isIOS() && !isStandalone();
   const activate = async () => { const r = await enablePush("/public/account/push/subscribe").catch(() => ({ ok: false })); if (r.ok) { setPushOn(true); toast.success("Notifications activées sur cet appareil"); } else toast.error(pushErrorText(r.reason)); };
   return (
     <div className="space-y-3" data-testid="notifications-page">
       <div className="dina-card-white p-4 flex items-center gap-3 flex-wrap">
         <Bell size={18} className="text-[#b02a2a]"/>
         <div className="flex-1 min-w-[180px] text-sm">{pushOn ? "Notifications activées sur cet appareil." : "Recevez une alerte sur votre téléphone : réponse du livreur ou de la boutique, avancement de votre commande."}</div>
-        {!pushOn && <button onClick={activate} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="push-enable">Activer</button>}
+        {!pushOn && !iosNeedsInstall && <button onClick={activate} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="push-enable">Activer</button>}
       </div>
+      <InstallGuide/>
       {d.items.length === 0 ? <div className="dina-card-white p-8 text-center text-sm text-[#666]" data-testid="notifications-empty">Aucune notification pour le moment</div> : d.items.map(n => (
         <button key={n.id} onClick={() => n.link && nav(n.link)} className={`dina-card-white p-4 w-full text-left flex gap-3 ${n.read ? "" : "border-l-4 !border-l-[#b02a2a]"}`} data-testid={`notification-${n.id}`}>
           <div className="flex-1 min-w-0"><div className="font-semibold text-sm">{n.title}</div><div className="text-sm text-[#666] break-words">{n.msg}</div></div>

@@ -98,7 +98,7 @@ export default function Home() {
         </div>
       </section>
 
-      <Row title="Bons plans" eyebrow="Promotions" products={bonsPlans} link="/bons-plans" />
+      <Row title="Promotions" eyebrow="En ce moment" products={bonsPlans} link="/promotions" />
       <Row title="Nouveautés" eyebrow="Fraîchement arrivé" products={nouveautes} link="/catalog?sort=new" />
 
       {categories.slice(0, 4).map(c => <Row key={c} title={c} products={byCat(c)} link={`/catalog?cat=${encodeURIComponent(c)}`} />)}

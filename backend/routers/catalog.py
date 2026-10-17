@@ -73,7 +73,8 @@ async def public_products(q: Optional[str] = None, category: Optional[str] = Non
         f["name"] = {"$regex": q, "$options": "i"}
     if category and category != "all":
         f["category"] = category
-    return clean(await db.products.find(f).to_list(500))
+    from routers.storefront_extras import promo_fields
+    return clean([promo_fields(p) for p in await db.products.find(f).to_list(500)])
 
 
 # ---------- Brands ----------

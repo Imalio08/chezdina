@@ -15,8 +15,14 @@ export function toggleFavorite(id) {
   const list = getFavs(); const i = list.indexOf(id);
   if (i >= 0) list.splice(i, 1); else list.push(id);
   setFavs(list); window.dispatchEvent(new Event("favs-changed"));
+  let logged = false;
+  try { logged = !!JSON.parse(localStorage.getItem("dina_customer") || "null")?.token; } catch { /* ignore */ }
+  if (logged) api.post("/public/account/favorites/toggle", { product_id: id, state: i < 0 ? "add" : "remove" }).catch(() => {});
+  toast.success(i < 0 ? "Ajouté aux favoris" : "Retiré des favoris");
   return i < 0;
 }
+export const localFavorites = getFavs;
+export const setLocalFavorites = (list) => { setFavs(list); window.dispatchEvent(new Event("favs-changed")); };
 
 export default function ProductCardV2({ product, flashEndsAt }) {
   const [favs, setFavsState] = useState(getFavs());
@@ -24,10 +30,10 @@ export default function ProductCardV2({ product, flashEndsAt }) {
   const navTo = useNavigate();
   useEffect(() => { const h = () => setFavsState(getFavs()); window.addEventListener("favs-changed", h); return () => window.removeEventListener("favs-changed", h); }, []);
   const fav = favs.includes(product.id);
-  const discount = product.compare_at ? Math.round((1 - product.price / product.compare_at) * 100) : 0;
+  const discount = product.compare_at > product.price ? Math.round((1 - product.price / product.compare_at) * 100) : (product.promo_pct || 0);
   const badges = [];
+  if (discount >= 1) badges.push({ k: "disc", t: `-${discount} %`, c: "#c62828" });
   if (flashEndsAt) badges.push({ k: "flash", t: "Flash", c: "#e4991e" });
-  if (discount >= 10) badges.push({ k: "disc", t: `-${discount}%`, c: "#c62828" });
   if (product.is_new) badges.push({ k: "new", t: "Nouveau", c: "#1f8a4c" });
   if (product.sold_count >= 50) badges.push({ k: "top", t: "Top vente", c: "#5867fd" });
   if (product.stock > 0 && product.stock <= 2) badges.push({ k: "low", t: `Plus que ${product.stock}`, c: "#b02a2a" });
@@ -52,7 +58,7 @@ export default function ProductCardV2({ product, flashEndsAt }) {
           <SmartImage src={product.image} alt={product.name} fallbackText={product.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
           {product.images?.[1] && <SmartImage src={product.images[1]} alt="" fallbackText={product.name} className="hidden md:block absolute inset-0 w-full h-full object-cover opacity-0 group-hover:opacity-100 transition" />}
           <div className="absolute top-2 left-2 flex flex-col gap-1">
-            {shown.map(b => <span key={b.k} className="text-[10px] font-semibold text-white px-1.5 py-0.5 rounded" style={{ background: b.c }}>{b.t}</span>)}
+            {shown.map(b => <span key={b.k} className="text-[10px] font-semibold text-white px-1.5 py-0.5 rounded" style={{ background: b.c }} data-testid={`badge-${b.k}-${product.id}`}>{b.t}</span>)}
           </div>
           <button onClick={(e) => { e.preventDefault(); toggleFavorite(product.id); }} className="absolute top-2 right-2 w-8 h-8 rounded-full bg-white/90 dark:bg-black/60 grid place-items-center shadow" data-testid={`fav-${product.id}`}>
             <Heart size={14} fill={fav ? "#b02a2a" : "none"} stroke={fav ? "#b02a2a" : "currentColor"} />

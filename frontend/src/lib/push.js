@@ -15,7 +15,7 @@ export async function enablePush(endpoint, silent = false) {
 }
 
 export const pushErrorText = (reason) => ({
-  unsupported: "Votre navigateur ne gère pas les notifications. Sur iPhone : ajoutez l'app à l'écran d'accueil (iOS 16.4+).",
+  unsupported: "Sur iPhone, ajoutez d'abord Chez Dina à l'écran d'accueil (Partager › Sur l'écran d'accueil), puis activez les notifications depuis l'icône.",
   denied: "Notifications bloquées · autorisez-les dans les réglages du navigateur.",
   no_vapid: "Notifications push non configurées.",
 }[reason] || "Activation impossible");

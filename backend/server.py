@@ -479,8 +479,14 @@ async def account_submit_review(body: Dict[str,Any], c: dict = Depends(get_custo
 
 @api.get("/public/account/vouchers")
 async def account_vouchers(c: dict = Depends(get_customer)):
-    rows = await db.vouchers.find({"customer_id": c["id"]}).sort("created_at", -1).to_list(100)
-    return clean(rows)
+    rows = clean(await db.vouchers.find({"customer_id": c["id"]}).sort("created_at", -1).to_list(100))
+    now = now_iso()
+    for p in await db.promotions.find({"active": True, "code": {"$nin": [None, ""]}}).to_list(50):
+        if p.get("ends_at") and p["ends_at"] < now:
+            continue
+        rows.append({"id": p["id"], "code": p["code"], "kind": "promo", "type": p.get("type"), "value": p.get("value"),
+                     "amount": p.get("value") if p.get("type") != "percent" else None, "ends_at": p.get("ends_at"), "min_order": p.get("min_order")})
+    return rows
 
 # ---------- Rider live position: moved to routers/riders.py — P5 Refactor Feb 2026 ----------
 
@@ -3359,8 +3365,9 @@ async def account_fav_toggle(body: Dict[str, Any], c: dict = Depends(get_custome
     if not pid: raise HTTPException(400, "product_id requis")
     cust = await db.customers.find_one({"id": c["id"]})
     favs = set((cust or {}).get("favorites") or [])
-    if pid in favs: favs.remove(pid); state = "removed"
-    else: favs.add(pid); state = "added"
+    want = body.get("state")
+    if want == "add" or (want != "remove" and pid not in favs): favs.add(pid); state = "added"
+    else: favs.discard(pid); state = "removed"
     await db.customers.update_one({"id": c["id"]}, {"$set": {"favorites": list(favs)}})
     return {"ok": True, "state": state, "favorites": list(favs)}
 
@@ -3829,7 +3836,8 @@ async def update_business(body: Dict[str,Any], user: dict = Depends(require_role
 async def public_product(pid: str):
     p = await db.products.find_one({"id": pid})
     if not p: raise HTTPException(404)
-    return clean(p)
+    from routers.storefront_extras import promo_fields
+    return clean(promo_fields(p))
 
 @api.post("/public/orders")
 async def public_create_order(body: OrderIn, request: Request):
@@ -5812,6 +5820,8 @@ from routers.wave_pay import router as wave_router  # noqa: E402
 app.include_router(wave_router)
 from routers.rider_offline import router as rider_offline_router  # noqa: E402
 app.include_router(rider_offline_router)
+from routers.storefront_extras import router as storefront_extras_router  # noqa: E402
+app.include_router(storefront_extras_router)
 app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:

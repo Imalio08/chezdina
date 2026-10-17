@@ -5,9 +5,11 @@
 let deferredInstall = null;
 
 export function registerSW() {
+  window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); deferredInstall = e; window.dispatchEvent(new Event("pwa-install-ready")); });
   if (!("serviceWorker" in navigator)) return;
   navigator.serviceWorker.register("/sw.js").catch(() => {});
 }
+export const canInstall = () => !!deferredInstall;
 export function listenInstallPrompt(onReady) {
   window.addEventListener("beforeinstallprompt", (e) => {
     e.preventDefault();

@@ -41,6 +41,7 @@ export default function ProductPage() {
       const prod = r.data;
       setP(prod);
       track("product_view", { product_id: id, value: prod.price });
+      try { if (JSON.parse(localStorage.getItem("dina_customer") || "null")?.token) api.post("/public/account/recently-viewed", { product_id: id }).catch(() => {}); } catch { /* ignore */ }
       // Preselect from first enabled variant (if any) to ensure a valid combo
       const firstVariant = (prod.variants || []).find(v => v.enabled && (v.stock ?? 0) > 0) || (prod.variants || []).find(v => v.enabled);
       if (firstVariant) {
@@ -92,6 +93,7 @@ export default function ProductPage() {
         <div>
           <div className="relative aspect-[4/5] bg-[#fff5f5] rounded-2xl overflow-hidden group">
             <SmartImage src={current} alt={p.name} fallbackText={p.name} className="w-full h-full object-cover" data-testid="product-main-image"/>
+            {p.compare_at > p.price && <span className="absolute top-3 left-3 bg-[#c62828] text-white text-sm font-bold px-2.5 py-1 rounded-lg shadow" data-testid="product-promo-sticker">-{Math.round((1 - p.price / p.compare_at) * 100)} %</span>}
             {gallery.length > 1 && (
               <>
                 <button onClick={prev} className="absolute left-3 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-white/90 grid place-items-center shadow" data-testid="product-prev"><ChevronLeft size={16}/></button>
@@ -120,7 +122,7 @@ export default function ProductPage() {
           <div className="text-xs text-[#b02a2a] uppercase tracking-wide">{p.brand} · {p.category}</div>
           <h1 className="font-serif text-3xl mt-1">{p.name}</h1>
           <div className="flex items-center gap-2 mt-2"><Stars value={p.rating_avg||0}/><span className="text-xs text-[#666]">{p.rating_avg||"—"} · {p.rating_count||0} avis</span></div>
-          <div className="tabular text-2xl font-semibold mt-3">{fcfa(p.price)}</div>
+          <div className="flex items-baseline gap-2 mt-3 flex-wrap" data-testid="product-price"><span className={`tabular text-2xl font-semibold ${p.compare_at > p.price ? "text-[#c62828]" : ""}`}>{fcfa(p.price)}</span>{p.compare_at > p.price && <><s className="tabular text-base text-[#999]" data-testid="product-old-price">{fcfa(p.compare_at)}</s><span className="text-xs font-semibold text-[#c62828]">Promotion</span></>}</div>
           <p className="text-sm text-[#666] mt-4 leading-relaxed">{p.description}</p>
 
           {!!visibleSizes.length && !(visibleSizes.length === 1 && visibleSizes[0] === "Unique") && (
