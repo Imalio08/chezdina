@@ -117,21 +117,80 @@ def _score(orders, reviews, sessions, weights):
     }
 
 
+REPORT_KINDS = {"panne_moto": "Panne moto", "accident": "Accident", "client_injoignable": "Client injoignable",
+                "client_agressif": "Client agressif", "colis_endommage": "Colis endommagé", "autre": "Autre"}
+REPORT_URGENCY = {"faible": "Faible", "moyenne": "Moyenne", "haute": "Haute", "critique": "Critique"}
+REPORT_STATUS = {"nouveau": "Envoyé", "pris_en_charge": "Pris en charge", "resolu": "Résolu"}
+
+
 @router.post("/rider/report")
 async def rider_report(body: Dict[str, Any], user: dict = Depends(get_user)):
     if user.get("role") != "rider":
         raise HTTPException(403, "Réservé aux livreurs")
-    details = (body.get("details") or "").strip()[:500]
+    details = (body.get("details") or "").strip()[:1000]
     if not details:
         raise HTTPException(400, "Décrivez le problème")
-    kind = (body.get("kind") or "autre").strip()[:60]
+    kind = body.get("kind") if body.get("kind") in REPORT_KINDS else "autre"
+    urgency = body.get("urgency") if body.get("urgency") in REPORT_URGENCY else "moyenne"
+    photo = body.get("photo") or None
+    if photo and (not str(photo).startswith("data:image/") or len(photo) > 2_500_000):
+        raise HTTPException(400, "Photo invalide ou trop lourde")
+    order = None
+    if body.get("order_id"):
+        order = await db.orders.find_one({"id": body["order_id"], "rider_id": user["id"]}, {"id": 1, "code": 1})
+        if not order:
+            raise HTTPException(404, "Commande introuvable")
+    loc = None
+    if body.get("lat") is not None and body.get("lng") is not None:
+        loc = {"lat": float(body["lat"]), "lng": float(body["lng"]), "acc": body.get("acc")}
+    at = now_iso()
+    doc = {
+        "id": new_id(), "rider_id": user["id"], "rider_name": user.get("name"), "rider_phone": user.get("phone"),
+        "kind": kind, "kind_label": REPORT_KINDS[kind], "urgency": urgency, "details": details, "photo": photo,
+        "order_id": order and order["id"], "order_code": order and order.get("code"), "location": loc,
+        "status": "nouveau", "history": [{"status": "nouveau", "at": at, "by": user.get("name")}], "created_at": at,
+    }
+    await db.rider_reports.insert_one(doc)
+    title = f"{'URGENT · ' if urgency in ('haute', 'critique') else ''}Signalement livreur · {REPORT_KINDS[kind]}"
+    msg = f"{user.get('name')} ({REPORT_URGENCY[urgency]}){' · ' + order['code'] if order else ''} : {details}"
     await db.notifications.insert_one({
-        "id": new_id(), "type": "rider_report", "title": f"Signalement livreur {user.get('name')} : {kind}",
-        "msg": details, "color": "#c62828", "at": now_iso(), "link": f"/console/livreurs/{user.get('id')}",
+        "id": new_id(), "type": "rider_report", "title": title, "msg": msg[:300], "color": "#c62828", "at": at,
+        "link": "/console/livreurs?signalements=1",
     })
     from routers.notify import notify_staff
-    await notify_staff(f"Signalement livreur · {kind}", f"{user.get('name')} : {details}", f"/console/livreurs/{user.get('id')}")
-    return {"ok": True}
+    await notify_staff(title, msg, "/console/livreurs?signalements=1")
+    doc.pop("_id", None)
+    return doc
+
+
+@router.get("/rider/reports")
+async def my_reports(user: dict = Depends(get_user)):
+    rows = await db.rider_reports.find({"rider_id": user["id"]}, {"photo": 0}).sort("created_at", -1).to_list(100)
+    return clean(rows)
+
+
+@router.get("/rider-reports")
+async def list_reports(status: Optional[str] = None, user: dict = Depends(require_role("admin", "manager"))):
+    f: Dict[str, Any] = {"status": status} if status else {}
+    return clean(await db.rider_reports.find(f).sort("created_at", -1).to_list(300))
+
+
+@router.patch("/rider-reports/{rid}")
+async def update_report(rid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin", "manager"))):
+    status = body.get("status")
+    if status not in REPORT_STATUS:
+        raise HTTPException(400, "Statut invalide")
+    r = await db.rider_reports.find_one({"id": rid})
+    if not r:
+        raise HTTPException(404, "Signalement introuvable")
+    note = (body.get("note") or "").strip()[:500]
+    entry = {"status": status, "at": now_iso(), "by": user.get("name"), "note": note}
+    await db.rider_reports.update_one({"id": rid}, {"$set": {"status": status, "updated_at": entry["at"]}, "$push": {"history": entry}})
+    from routers.notify import notify
+    await notify("rider", r["rider_id"], f"Signalement {REPORT_STATUS[status].lower()}",
+                 f"{r.get('kind_label')} · {note or REPORT_STATUS[status]}", "/riders/signalements", "info", None,
+                 f"report:{rid}:{status}:{entry['at']}")
+    return clean(await db.rider_reports.find_one({"id": rid}))
 
 
 
@@ -177,7 +236,7 @@ async def rider_today(user: dict = Depends(get_user)):
         p = o.get("proof") or {}
         if o.get("status") == "livree" and o.get("payment_method") == "cod":
             collected += p.get("amount_collected") or o.get("total", 0)
-    counts = {"a_livrer": 0, "en_route": 0, "livrees": 0, "annulees": 0, "reportees": 0, "echecs": 0}
+    counts = {"a_livrer": 0, "en_route": 0, "livrees": 0, "annulees": 0, "reportees": 0, "echecs": 0, "annulees_retournees": 0}
     for o in orders:
         s = o.get("status")
         if s in ("confirmee", "prete", "assignee"):
@@ -192,22 +251,66 @@ async def rider_today(user: dict = Depends(get_user)):
             counts["reportees"] += 1
         elif s == "echouee":
             counts["echecs"] += 1
+        if s in ("annulee", "retournee", "refusee"):
+            counts["annulees_retournees"] += 1
     return {"orders": clean(orders), "counts": counts, "to_collect": to_collect, "collected": collected, "balance_to_hand_over": collected}
 
 
 @router.get("/riders/me/history")
 async def rider_history(user: dict = Depends(get_user), days: int = 30):
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-    sessions = await db.delivery_sessions.find({"rider_id": user["id"], "date": {"$gte": cutoff[:10]}}).sort("date", -1).to_list(100)
+    cutoff = (datetime.now(timezone.utc) - timedelta(days=days - 1)).isoformat()[:10]
+    sessions = await db.delivery_sessions.find({"rider_id": user["id"], "date": {"$gte": cutoff}}).to_list(200)
+    orders = await db.orders.find({"rider_id": user["id"]}, {"_id": 0, "id": 1, "code": 1, "status": 1, "total": 1, "customer": 1, "delivery_zone": 1,
+                                  "payment_method": 1, "proof": 1, "timeline": 1, "assigned_at": 1, "created_at": 1}).to_list(3000)
+    by_id = {o["id"]: o for o in orders}
+    days_map: Dict[str, Dict[str, Any]] = {}
+    placed = set()
     for s in sessions:
-        for o in (s.get("orders_detail") or []):
-            cust = o.get("customer") or {}
-            ph = cust.get("phone", "")
-            digits = "".join(c for c in ph if c.isdigit())
-            if len(digits) >= 4:
-                cust["phone_masked"] = f"{digits[:2]} •• •• •• {digits[-2:]}"
-                cust["phone"] = None
-    return clean(sessions)
+        d = days_map.setdefault(s["date"], {"id": s["id"], "date": s["date"], "reconciliations": s.get("reconciliations") or {}, "closed": s.get("closed"), "orders_detail": []})
+        for oid in s.get("orders") or []:
+            if oid in by_id and oid not in placed:
+                d["orders_detail"].append(by_id[oid]); placed.add(oid)
+    for o in orders:
+        day = (o.get("assigned_at") or o.get("created_at") or "")[:10]
+        if o["id"] in placed or day < cutoff:
+            continue
+        days_map.setdefault(day, {"id": f"day-{day}", "date": day, "reconciliations": {}, "closed": None, "orders_detail": []})["orders_detail"].append(o)
+    out = []
+    for d in sorted(days_map.values(), key=lambda x: x["date"], reverse=True):
+        for o in d["orders_detail"]:
+            reasons = [t.get("reason") for t in (o.pop("timeline", None) or []) if t.get("reason")]
+            o["last_reason"] = reasons[-1] if reasons else None
+            o["customer"] = _mask_customer(o.get("customer"))
+        dl = [o for o in d["orders_detail"] if o.get("status") == "livree"]
+        d["delivered_count"] = len(dl)
+        d["collected_total"] = sum((o.get("proof") or {}).get("amount_collected") or o.get("total", 0) for o in dl if o.get("payment_method") == "cod")
+        for o in d["orders_detail"]:
+            o.pop("proof", None)
+        out.append(d)
+    return out
+
+
+def _mask_customer(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    c = dict(c or {})
+    digits = "".join(ch for ch in (c.get("phone") or "") if ch.isdigit())
+    c["phone_masked"] = f"{digits[:2]} •• •• •• {digits[-2:]}" if len(digits) >= 4 else None
+    c["phone"] = None
+    return {k: c.get(k) for k in ("name", "phone_masked", "address", "quartier", "zone", "landmark")}
+
+
+@router.get("/riders/me/orders/{oid}")
+async def rider_order_detail(oid: str, user: dict = Depends(get_user)):
+    o = await db.orders.find_one({"id": oid, "rider_id": user["id"]})
+    if not o:
+        raise HTTPException(404, "Commande introuvable")
+    proof = o.get("proof") or {}
+    keep = ("id", "code", "status", "created_at", "assigned_at", "delivered_at", "delivery_date", "delivery_slot", "delivery_zone",
+            "delivery_address", "items", "subtotal", "delivery_fee", "discount", "total", "payment_method", "payment_status", "note")
+    out = {k: o.get(k) for k in keep}
+    out["customer"] = _mask_customer(o.get("customer"))
+    out["proof"] = {k: proof.get(k) for k in ("method", "at", "amount_collected", "photo")} if proof else None
+    out["timeline"] = [{k: t.get(k) for k in ("status", "at", "by", "reason")} for t in (o.get("timeline") or [])]
+    return clean(out)
 
 
 # ---------- Deliveries ----------

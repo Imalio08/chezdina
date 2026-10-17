@@ -80,13 +80,6 @@ export default function Profil() {
     try { const r = await api.post("/rider/conversations/store"); nav(`/riders/messages/${r.data.id}`); }
     catch { toast.error("Impossible d'ouvrir la conversation · réessayez"); }
   };
-  const reportIssue = async () => {
-    const kind = prompt("Type de problème (panne moto, accident, client agressif, colis endommagé) ?") || "autre";
-    const details = prompt("Décrivez brièvement :") || "";
-    if (!details) return;
-    try { await api.post("/rider/report", { kind, details }); toast.success("Gérante alertée"); }
-    catch { toast.error("Signalement non envoyé · réessayez"); }
-  };
   return (
     <div className="space-y-3" data-testid="rider-profil">
       <div className="flex items-center gap-3 px-1 pt-1" data-testid="profil-header">
@@ -104,7 +97,7 @@ export default function Profil() {
         <Row icon={Star} label="Avis clients" sub={score ? (score.stats?.reviews ? `${score.stats.reviews} avis · ${score.stats.rating_avg}★` : "Aucun avis pour le moment") : null} onClick={() => nav("/riders/avis")} testid="profil-row-avis"/>
         <Row icon={Wallet} label="Mon solde" sub={today ? `À remettre : ${fcfa(today.balance_to_hand_over || 0)}` : null} onClick={() => nav("/riders/solde")} testid="profil-row-solde"/>
         <Row icon={Phone} label="Contacter la gérante" sub="Appel, WhatsApp ou message" onClick={() => setContact(true)} testid="profil-row-contact"/>
-        <Row icon={AlertTriangle} label="Signaler un problème" sub="Panne, accident, colis abîmé…" onClick={reportIssue} testid="profil-report" danger/>
+        <Row icon={AlertTriangle} label="Signaler un problème" sub="Panne, accident, client injoignable… et suivi" onClick={() => nav("/riders/signalements")} testid="profil-report" danger/>
         <Row icon={Settings} label="Paramètres" sub="Photo, nom, téléphone, thème" onClick={() => nav("/riders/parametres")} testid="profil-row-parametres"/>
         {punch?.checked_in && !punch?.departure && <Row icon={LogOut} label="Pointer mon départ" sub="Fin de journée" onClick={() => window.dispatchEvent(new Event("rider-open-punch"))} testid="profil-row-depart"/>}
       </div>

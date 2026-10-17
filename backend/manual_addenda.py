@@ -115,6 +115,13 @@ ADDENDA = [
                "Rien n'est perdu si l'app est fermée ou si le téléphone redémarre avant la synchronisation"]),
             INFO("Si la boutique a modifié une commande pendant que vous étiez hors ligne (réaffectée, annulée…), c'est la version de la boutique qui compte : vous recevez une notification et votre action reste visible dans l'historique de la commande pour vérification."),
             TIP("Ouvrez l'app une fois connecté au début de la journée (ou pointez votre arrivée) pour que tout soit téléchargé.")]},
+        {"id": "add-rider-checkin-reports", "heading": "Pointage caméra, historique et signalements", "blocks": [
+            S(["Pointage : la caméra avant s'ouvre et vous vous voyez à l'écran ; si l'accès est refusé, un message explique comment l'autoriser (iPhone : Réglages › Safari › Caméra ; Android : cadenas › Autorisations › Caméra), puis touchez « Réessayer »",
+               "Courses : la carte « Annulées / Retournées » compte les commandes du jour annulées, retournées ou refusées",
+               "Profil › Historique : touchez une journée pour voir ses commandes, puis une commande pour voir son détail complet (articles, adresse, paiement, suivi) en lecture seule",
+               "Profil › Signaler un problème : type (panne moto, accident, client injoignable, client agressif, colis endommagé, autre), commande concernée (facultatif), description, photo et urgence ; votre position est jointe automatiquement",
+               "La gérante est alertée immédiatement ; le statut de votre signalement (Envoyé, Pris en charge, Résolu) et sa réponse s'affichent sous « Mes signalements »"]),
+            INFO("Côté console : Livraison › Livreurs affiche le bloc « Signalements livreurs » pour prendre en charge, répondre et marquer résolu.")]},
     ]),
 ]
 

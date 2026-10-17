@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { fcfa, statusLabel, statusColor, dateFmt } from "@/lib/format";
-import { ChevronDown, ChevronUp, Clock, Check } from "lucide-react";
+import { ChevronDown, ChevronUp, ChevronRight, Clock, Check } from "lucide-react";
 import SubPage from "@/components/rider/SubPage";
+import OrderReadOnly from "@/components/rider/OrderReadOnly";
 
 const PERIODS = [{ v: 1, label: "Aujourd'hui" }, { v: 7, label: "Semaine" }, { v: 30, label: "Mois" }, { v: 90, label: "3 mois" }];
 
@@ -11,6 +12,7 @@ export default function Historique() {
   const [tab, setTab] = useState("toutes");
   const [period, setPeriod] = useState(30);
   const [openIds, setOpenIds] = useState({});
+  const [detail, setDetail] = useState(null);
   useEffect(() => { api.get(`/riders/me/history?days=${period}`).then(r => setSessions(r.data)).catch(() => { }); }, [period]);
 
   const matchTab = (o) => tab === "toutes" || (tab === "livrees" && o.status === "livree") || (tab === "annulees" && o.status === "annulee") || (tab === "reportees" && o.status === "reportee") || (tab === "echecs" && o.status === "echouee");
@@ -43,11 +45,11 @@ export default function Historique() {
           const ecart = recVals.reduce((a, r) => a + (typeof r === "object" ? r.ecart || 0 : 0), 0);
           return (
             <div key={s.id} className="dina-card-white overflow-hidden" data-testid={`hist-day-${s.date}`}>
-              <button className="w-full p-3 flex items-center gap-2" onClick={() => setOpenIds({ ...openIds, [s.id]: !open })}>
+              <button className="w-full p-3 flex items-center gap-2" data-testid={`hist-day-toggle-${s.date}`} onClick={() => setOpenIds({ ...openIds, [s.id]: !open })}>
                 <Clock size={14} className="text-[#666]" />
                 <div className="flex-1 text-left">
                   <div className="font-semibold text-sm">{s.date}</div>
-                  <div className="text-[11px] text-[#666]">{s.delivered_count || 0} livrées · encaissé {fcfa(s.collected_total || 0)}</div>
+                  <div className="text-[11px] text-[#666]">{(s.orders_detail || []).length} commande(s) · {s.delivered_count || 0} livrées · encaissé {fcfa(s.collected_total || 0)}</div>
                 </div>
                 <span className={`dina-chip text-[10px] ${ecart === 0 ? "!text-[#1f8a4c] !border-[#1f8a4c]" : "!text-[#c62828] !border-[#c62828]"}`}>{ecart === 0 ? <><Check size={9} />Validée</> : `Écart ${fcfa(ecart)}`}</span>
                 {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -56,15 +58,16 @@ export default function Historique() {
                 <div className="border-t border-[#ececec] dark:border-[#2a2a2a] p-3 space-y-1.5">
                   {orders.length === 0 ? <div className="text-xs text-[#666] text-center py-4">Aucune commande dans ce filtre</div> :
                     orders.map(o => (
-                      <div key={o.id} className="flex items-center gap-2 text-xs py-1.5 border-b border-[#f5f5f5] dark:border-[#2a2a2a] last:border-0">
-                        <div className="flex-1">
+                      <button key={o.id} onClick={() => setDetail(o.id)} className="w-full text-left flex items-center gap-2 text-xs py-1.5 border-b border-[#f5f5f5] dark:border-[#2a2a2a] last:border-0" data-testid={`hist-order-${o.code}`}>
+                        <div className="flex-1 min-w-0">
                           <div className="font-medium">{o.code} · {(o.customer?.name || "").split(" ")[0]}</div>
                           <div className="text-[10px] text-[#999]">{o.customer?.phone_masked || o.delivery_zone}</div>
                           {o.last_reason && <div className="text-[10px] italic text-[#c62828]">« {o.last_reason} »</div>}
                         </div>
                         <span className="dina-chip text-[9px]" style={{ color: statusColor[o.status] }}>{statusLabel[o.status]}</span>
                         <div className="tabular font-semibold">{fcfa(o.total)}</div>
-                      </div>
+                        <ChevronRight size={13} className="text-[#bbb] shrink-0" />
+                      </button>
                     ))}
                 </div>
               )}
@@ -72,6 +75,7 @@ export default function Historique() {
           );
         })}
       </div>
+      {detail && <OrderReadOnly orderId={detail} onClose={() => setDetail(null)} />}
     </SubPage>
   );
 }

@@ -3,7 +3,7 @@ import { toast } from "sonner";
 import { playChime, setSoundEnabled } from "@/lib/notifySound";
 import { NavLink, Outlet, useNavigate, useLocation } from "react-router-dom";
 
-const PROFIL_SUB = /^\/riders\/(historique|performance|avis|solde|parametres)/;
+const PROFIL_SUB = /^\/riders\/(historique|performance|avis|solde|parametres|signalements)/;
 import {
   Package, Map, History, Trophy, User, LogOut, Clock,
   HelpCircle, Phone, MessageCircle, Info, ExternalLink, Megaphone, Star, Heart, Home, Settings as SettingsIcon

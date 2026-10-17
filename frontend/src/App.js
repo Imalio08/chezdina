@@ -44,6 +44,7 @@ import RiderPerformance from "@/pages/rider/Performance";
 import RiderProfil from "@/pages/rider/Profil";
 import RiderAvis from "@/pages/rider/Avis";
 import RiderSolde from "@/pages/rider/Solde";
+import RiderSignalements from "@/pages/rider/Signalements";
 import RiderParametres from "@/pages/rider/Parametres";
 import RiderMessages from "@/pages/rider/Messages";
 import RiderNotifications from "@/pages/rider/Notifications";
@@ -192,6 +193,7 @@ export default function App() {
               <Route path="profil" element={<ErrorBoundary><RiderProfil /></ErrorBoundary>} />
               <Route path="avis" element={<ErrorBoundary><RiderAvis /></ErrorBoundary>} />
               <Route path="solde" element={<ErrorBoundary><RiderSolde /></ErrorBoundary>} />
+              <Route path="signalements" element={<ErrorBoundary><RiderSignalements /></ErrorBoundary>} />
               <Route path="parametres" element={<ErrorBoundary><RiderParametres /></ErrorBoundary>} />
               <Route path="messages" element={<ErrorBoundary><RiderMessages /></ErrorBoundary>} />
               <Route path="messages/:id" element={<ErrorBoundary><RiderMessages /></ErrorBoundary>} />

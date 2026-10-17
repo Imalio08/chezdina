@@ -111,6 +111,7 @@ export default function Courses() {
         <KPI label="À encaisser" v={fcfa(d.to_collect)} c="#b02a2a" wide />
         <KPI label="Encaissé" v={fcfa(d.collected)} c="#1f8a4c" wide />
         <KPI label="À remettre" v={fcfa(d.balance_to_hand_over)} c="#b02a2a" wide />
+        <KPI label="Annulées / Retournées" v={d.counts.annulees_retournees ?? (d.orders || []).filter(o => ["annulee", "retournee", "refusee"].includes(o.status)).length} c="#c62828" testid="kpi-annulees-retournees" />
       </div>
 
       <div className="flex gap-1 overflow-x-auto scrollbar-thin pb-1 -mx-3 px-3" data-testid="rider-filters">
@@ -148,9 +149,9 @@ function PostponeForm({ onCancel, onConfirm }) {
   );
 }
 
-function KPI({ label, v, c, wide }) {
+function KPI({ label, v, c, wide, testid }) {
   return (
-    <div className={`dina-card-white p-3 ${wide ? "" : ""}`}>
+    <div className={`dina-card-white p-3 ${wide ? "" : ""}`} data-testid={testid}>
       <div className="text-[10px] uppercase text-[#999]">{label}</div>
       <div className="font-serif text-xl tabular mt-0.5" style={{ color: c }}>{v}</div>
     </div>

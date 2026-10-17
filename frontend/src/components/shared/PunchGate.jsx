@@ -1,4 +1,5 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useFrontCamera } from "@/lib/useFrontCamera";
 import { Camera, CheckCircle2, Loader2, LogOut, RotateCcw, AlertTriangle, Clock } from "lucide-react";
 import { toast } from "sonner";
 import api from "@/lib/api";
@@ -7,33 +8,18 @@ import { useAuth } from "@/context/AuthContext";
 // Full-screen mandatory arrival punch (selfie) for console staff subject to attendance.
 export default function PunchGate() {
   const { user, setUser, logout } = useAuth();
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
-  const [camError, setCamError] = useState("");
-  const [ready, setReady] = useState(false);
+  const cam = useFrontCamera();
+  const camError = cam.error, ready = cam.ready;
   const [snapshot, setSnapshot] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const stop = () => { streamRef.current?.getTracks().forEach(t => t.stop()); streamRef.current = null; setReady(false); };
-  const start = useCallback(async () => {
-    setCamError(""); setSnapshot(null);
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 480, height: 360 }, audio: false });
-      streamRef.current = s;
-      if (videoRef.current) { videoRef.current.srcObject = s; await videoRef.current.play().catch(() => {}); }
-      setReady(true);
-    } catch {
-      setCamError("Caméra indisponible ou refusée. Autorisez l'accès à la caméra dans votre navigateur, puis réessayez.");
-    }
-  }, []);
-  useEffect(() => { start(); return stop; }, [start]);
+  const start = () => { setSnapshot(null); cam.start(); };
+  useEffect(() => { cam.start(); }, []); // eslint-disable-line
 
   const snap = () => {
-    const v = videoRef.current; if (!v) return;
-    const c = document.createElement("canvas"); c.width = 320; c.height = 240;
-    c.getContext("2d").drawImage(v, 0, 0, 320, 240);
-    setSnapshot(c.toDataURL("image/jpeg", 0.6)); stop();
+    const img = cam.capture(); if (!img) return;
+    setSnapshot(img); cam.stop();
   };
 
   const submit = async () => {
@@ -57,7 +43,7 @@ export default function PunchGate() {
         <div className="aspect-[4/3] bg-black rounded-xl overflow-hidden mb-3 relative">
           {snapshot
             ? <img src={snapshot} alt="Selfie" className="w-full h-full object-cover scale-x-[-1]" data-testid="punch-gate-snapshot"/>
-            : <video ref={videoRef} playsInline muted className="w-full h-full object-cover scale-x-[-1]" data-testid="punch-gate-video"/>}
+            : <video ref={cam.videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" data-testid="punch-gate-video"/>}
           {camError && !snapshot && <div className="absolute inset-0 grid place-items-center p-4 text-center text-white text-xs bg-black/80" data-testid="punch-gate-cam-error"><div><AlertTriangle size={22} className="mx-auto mb-2 text-[#ffb3b3]"/>{camError}</div></div>}
         </div>
         {error && <div className="mb-3 p-2.5 rounded-lg bg-[#fde8e8] text-[#b02a2a] text-xs flex gap-2" data-testid="punch-gate-error"><AlertTriangle size={14} className="shrink-0 mt-0.5"/>{error}</div>}

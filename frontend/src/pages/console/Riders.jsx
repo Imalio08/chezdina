@@ -5,6 +5,7 @@ import { fcfa } from "@/lib/format";
 import { Users, TrendingUp, Star, Wallet, Package, X, Phone, MessageCircle, MessageSquare } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
 import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
+import RiderReportsPanel from "@/components/riders/RiderReportsPanel";
 
 export default function Riders() {
   const nav = useNavigate();
@@ -51,6 +52,8 @@ export default function Riders() {
         <KPICard testid="r-score" label="Score moyen" value={`${avg}/100`} icon={Star} color="#f4b12c"/>
         <KPICard testid="r-balance" label="Soldes à régler" value={fcfa(0)} icon={Wallet} color="#e4991e"/>
       </div>
+
+      <RiderReportsPanel autoOpen={new URLSearchParams(window.location.search).get("signalements") === "1"}/>
 
       {view === "grid" ? (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">

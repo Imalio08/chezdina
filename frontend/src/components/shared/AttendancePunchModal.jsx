@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Camera, CheckCircle2, Loader2, X, LogIn, LogOut, RotateCcw } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Camera, CheckCircle2, Loader2, X, LogIn, LogOut, RotateCcw, AlertTriangle } from "lucide-react";
+import { useFrontCamera } from "@/lib/useFrontCamera";
 import { toast } from "sonner";
 import api from "@/lib/api";
 
@@ -12,13 +13,11 @@ import api from "@/lib/api";
  */
 export default function AttendancePunchModal({ open, onClose, onDone }) {
   const [kind, setKind] = useState("arrival"); // arrival | departure
-  const [stream, setStream] = useState(null);
+  const cam = useFrontCamera();
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState(null);
   const [pin, setPin] = useState("");
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
 
   useEffect(() => {
     if (!open) return;
@@ -34,40 +33,18 @@ export default function AttendancePunchModal({ open, onClose, onDone }) {
         }
       } catch {}
     })();
-    (async () => {
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 480, height: 360 }, audio: false });
-        if (!active) { s.getTracks().forEach(t => t.stop()); return; }
-        setStream(s);
-        if (videoRef.current) { videoRef.current.srcObject = s; videoRef.current.play().catch(() => {}); }
-      } catch {
-        toast.error("Autorisez la caméra pour pointer");
-      }
-    })();
-    return () => { active = false; };
-  }, [open]);
-
-  // Stop the camera when the modal closes
-  useEffect(() => {
-    if (!open && stream) { stream.getTracks().forEach(t => t.stop()); setStream(null); setSnapshot(null); }
+    setSnapshot(null);
+    cam.start();
+    return () => { active = false; cam.stop(); };
   }, [open]); // eslint-disable-line
 
   const snap = () => {
-    const v = videoRef.current; const c = canvasRef.current;
-    if (!v || !c) return;
-    c.width = 320; c.height = 240;
-    c.getContext("2d").drawImage(v, 0, 0, 320, 240);
-    setSnapshot(c.toDataURL("image/jpeg", 0.6));
-    stream?.getTracks().forEach(t => t.stop()); setStream(null);
+    const img = cam.capture();
+    if (!img) return toast.error("La caméra n'est pas encore prête");
+    setSnapshot(img); cam.stop();
   };
 
-  const retake = async () => {
-    setSnapshot(null);
-    try {
-      const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
-      setStream(s); if (videoRef.current) videoRef.current.srcObject = s;
-    } catch {}
-  };
+  const retake = () => { setSnapshot(null); cam.start(); };
 
   const submit = async () => {
     if (!snapshot) return toast.error("Prenez votre selfie");
@@ -118,16 +95,19 @@ export default function AttendancePunchModal({ open, onClose, onDone }) {
 
         <div className="aspect-[4/3] bg-black rounded-xl overflow-hidden relative mb-3">
           {!snapshot ? (
-            <video ref={videoRef} playsInline muted className="w-full h-full object-cover scale-x-[-1]" data-testid="punch-video"/>
+            <video ref={cam.videoRef} autoPlay playsInline muted className="w-full h-full object-cover scale-x-[-1]" data-testid="punch-video"/>
           ) : (
             <img src={snapshot} alt="selfie" className="w-full h-full object-cover scale-x-[-1]" data-testid="punch-snapshot"/>
           )}
-          <canvas ref={canvasRef} className="hidden"/>
+          {!snapshot && !cam.ready && !cam.error && <div className="absolute inset-0 grid place-items-center text-white/80 text-xs"><span className="flex items-center gap-2"><Loader2 size={14} className="animate-spin"/>Ouverture de la caméra…</span></div>}
+          {!snapshot && cam.error && <div className="absolute inset-0 grid place-items-center p-4 text-center text-white text-xs bg-black/85 overflow-y-auto" data-testid="punch-cam-error"><div><AlertTriangle size={22} className="mx-auto mb-2 text-[#ffb3b3]"/>{cam.error}</div></div>}
         </div>
 
         {!snapshot ? (
-          <button onClick={snap} disabled={!stream} className="dina-btn-primary w-full !min-h-[46px]" data-testid="punch-snap">
-            <Camera size={16}/>Prendre le selfie
+          cam.error
+            ? <button onClick={cam.start} className="dina-btn-primary w-full !min-h-[46px]" data-testid="punch-retry-camera"><RotateCcw size={16}/>Réessayer</button>
+            : <button onClick={snap} disabled={!cam.ready} className="dina-btn-primary w-full !min-h-[46px]" data-testid="punch-snap">
+            <Camera size={16}/>{cam.ready ? "Prendre le selfie" : "Ouverture de la caméra…"}
           </button>
         ) : (
           <div className="space-y-2">
