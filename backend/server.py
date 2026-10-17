@@ -464,6 +464,10 @@ async def account_submit_review(body: Dict[str,Any], c: dict = Depends(get_custo
     rating = int(body.get("rating") or 0)
     comment = (body.get("comment") or "").strip()
     if not pid or not (1 <= rating <= 5): raise HTTPException(400, "Produit et note (1-5) requis")
+    if not await db.orders.find_one({"customer.id": c["id"], "status": "livree", "items.product_id": pid}, {"_id": 1}):
+        raise HTTPException(403, "Vous pouvez noter uniquement un article reçu")
+    if await db.order_ratings.find_one({"customer_id": c["id"], "product_ids": pid}, {"_id": 1}):
+        raise HTTPException(409, "Vous avez déjà noté cet article")
     doc = {"id": new_id(), "product_id": pid, "customer_id": c["id"],
            "customer_name": c.get("name"), "rating": rating, "comment": comment,
            "approved": True, "hidden": False, "created_at": now_iso()}

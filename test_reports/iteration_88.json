@@ -1,0 +1,45 @@
+{
+  "summary": "Tested the Chez Dina storefront and customer account changes. Backend: 13/13 pytest pass. Promo fields: 26/38 products have compare_at and promo_pct, and the formula checks out. The customer invoice returns HTML, is created when missing, is the same on a second call, gives 404 for another customer or an unknown order and 401 without auth. The share/invitation OG page has og:title 'Awa vous invite chez Chez Dina', a description with the code and 1 000 FCFA, and an absolute og:image that returns image/jpeg, plus a redirect. favorites/toggle add/remove works and is idempotent. The vouchers endpoint lists 4 promo codes. Frontend at mobile 390px, logged in as Awa: these work — heart -> Favoris -> remove, viewed products in Vus récemment, Avis submission (TEST review deleted afterwards), Bons d'achat list, Boutique/Livreur message tabs, invoice opening in a new blob tab as HTML (no JSON), iOS install guide shown and push button hidden with an iPhone UA, photo crop with zoom/rotate/save, GPS-denied help with iPhone and Android steps, map fallback, the Carte button, checkout-map-pick (guest), promo badges on home/catalog/promotions (26), sticker and old price on the product page, Promotions row on home, and the referral link pointing to /api/public/share/invitation/{code}. Found 2 real bugs: wrong value labels on vouchers, and a store thread shown under the Livreur tab.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/public/account/reviews", "issue": "Does not check that the customer actually bought the product (or has a delivered order containing it) and does not prevent duplicate reviews. Any logged-in customer can post unlimited reviews on any product id."},
+      {"endpoint": "POST /api/messagerie conversations", "issue": "Conversation 'kind' is taken from body without checking it against the participants. Conversation c4581e25 has kind 'cliente_livreur' but its participants are store + customer."},
+      {"endpoint": "Data", "issue": "Promo code 'TEST2POUR1' (type bogo) is active and shown to real customers in Bons d'achat. An old review 'TEST_review excellent' by TEST_Cliente (id ec1b9c90..., 2026-10-05) is left in db.reviews. Neither was created by me."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AccountShell Vouchers (/compte/bons-achat)", "issue": "The value label only handles percent and 'free_shipping'. The backend promotion type is 'free_delivery', so LIVRAISON shows '0 FCFA' instead of 'Livraison offerte'. bogo TEST2POUR1 shows '100 FCFA'. Map free_delivery -> 'Livraison offerte' and bogo -> '2 pour 1' or similar.", "selector": "[data-testid=voucher-LIVRAISON]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Messages Boutique/Livreur tabs", "issue": "isRiderThread (AccountShell.jsx:759) uses kind.includes('livreur') even when the other participant is a store. Awa's thread with 'Aïcha Ouattara' (participant kind 'store', conversation kind 'cliente_livreur') shows under Livreur, and Boutique shows empty. Fix: when t.with?.kind or the non-customer participant kind exists, use it to decide (rider -> Livreur, store/staff -> Boutique), and fall back to kind only otherwise.", "affected_selectors": ["msg-cat-boutique", "msg-cat-livreur"]}
+    ],
+    "design_issues": [
+      {"screen": "Address map picker", "issues": ["When the map is opened with addr-map-pick/checkout-map-pick after a GPS point is already set, MapPicker gets no 'initial' prop. The existing pin is not shown and the map recenters on Abidjan. Pass the current lat/lng to useLocate/MapPicker."]},
+      {"screen": "Product 'Escarpins Vernis Nude'", "issues": ["The main image shows red patent pumps and a black bag, which does not match the 'Nude' name (data/content)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter88_storefront_extras.py", "/app/test_reports/pytest/pytest_iter88.xml"],
+  "action_items": [
+    "Vouchers UI: handle type 'free_delivery' (and 'bogo') in the value label",
+    "Messages: classify threads by the other participant's kind first (store -> Boutique)",
+    "Remove or deactivate the TEST2POUR1 promo and the leftover TEST_review excellent review",
+    "Optional: pass the current coords as initial to MapPicker; add a purchase check and a duplicate check on POST /public/account/reviews",
+    "Update /app/memory/test_credentials.md: the Test Pack6 access code is now 373492 (changed 2026-10-06), not 368567"
+  ],
+  "critical_code_review_comments": [
+    "storefront_extras._ensure_invoice: the number INV-{time%1e6} can collide across orders. Use a counter, as /invoices/from-order does, for consistent numbering.",
+    "share_invitation builds origin from the x-forwarded-host header (fine behind ingress). Unknown referral codes still render 'Une amie vous invite' with 200, which is acceptable.",
+    "/public/account/favorites returns raw products without promo_fields, so the favorites list shows no promo/old price. Apply promo_fields there and in recently-viewed for consistency.",
+    "Favorites page merges localStorage favs into the account on every load. On a shared device, another person's guest favorites get merged into the logged-in account.",
+    "AccountShell.jsx is 1083 lines; split it into page modules."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter88_storefront_extras.py"],
+  "success_rate": {"backend": "100% (13/13)", "frontend": "~92% (12/13 flows fully correct; vouchers labels and message categorization buggy)"},
+  "test_credentials": "Awa +225 07 85 55 58 88 / 386436 works. Test Pack6 +225 07 00 00 11 22: the code in the credentials file (368567) is invalid; the DB code is 373492.",
+  "seed_data_creation": "None kept. Cleaned up: TEST_review iter88 review + order_ratings deleted; Awa photo unset (she had none before); Awa recently_viewed reset to []; favorites added in tests removed; no address saved; no order placed.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Customer account routes: /compte (menu), /compte/profil (overview, photo-upload-btn), /compte/favoris, /compte/vus-recemment, /compte/avis, /compte/bons-achat, /compte/messages, /compte/notifications, /compte/parrainage, /compte/adresses, /compte/commandes/{code}. Awa's delivered order is DN-261006-9041, which has a pending review for product f934ace0 (the product no longer exists in db.products). Headless Chromium denies geolocation by default, so geo-help appears. For the iOS test, create a new context with an iPhone UA via page.context.browser.new_context."
+}

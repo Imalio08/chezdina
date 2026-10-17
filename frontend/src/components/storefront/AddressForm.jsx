@@ -30,7 +30,7 @@ export function MiniMap({ lat, lng, height = 160 }) {
 
 // Address fields (label, zone, quartier, rue, repères, GPS). Used inline at checkout and in the modal.
 export function AddressFields({ v, setV, showDefault = true }) {
-  const geo = useLocate((c) => { setV(x => ({ ...x, ...c })); toast.success("Position enregistrée"); });
+  const geo = useLocate((c) => { setV(x => ({ ...x, ...c })); toast.success("Position enregistrée"); }, v.lat ? { lat: v.lat, lng: v.lng } : null);
   const busy = geo.busy;
   const set = (k) => (e) => setV({ ...v, [k]: e.target.value });
   return (

@@ -70,7 +70,7 @@ export function GeoHelpModal({ onClose, onRetry, onManual }) {
 }
 
 /** Hook: GPS with help modal + manual map fallback. Render `ui` somewhere in the component. */
-export function useLocate(onOk) {
+export function useLocate(onOk, current) {
   const [busy, setBusy] = useState(false);
   const [help, setHelp] = useState(false);
   const [picker, setPicker] = useState(false);
@@ -85,7 +85,7 @@ export function useLocate(onOk) {
   };
   const ui = <>
     {help && <GeoHelpModal onClose={() => setHelp(false)} onRetry={locate} onManual={() => { setHelp(false); setPicker(true); }} />}
-    {picker && <MapPicker onClose={() => setPicker(false)} onPick={(c) => { setPicker(false); onOk(c); }} />}
+    {picker && <MapPicker initial={current} onClose={() => setPicker(false)} onPick={(c) => { setPicker(false); onOk(c); }} />}
   </>;
   return { locate, busy, openMap: () => setPicker(true), ui };
 }

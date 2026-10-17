@@ -1193,3 +1193,15 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Signalements : page /riders/signalements (type, urgence, commande 48 h, description, photo, position auto) + suivi (Envoyé / Pris en charge / Résolu + réponse gérante). Collection rider_reports ; console Livreurs › bloc « Signalements livreurs » (GET/PATCH /rider-reports, photo à la demande, actualisation 60 s) ; livreur notifié à chaque changement.
 - Tests : iteration_87 (backend 13/14 → corrigé, 14/14 ; frontend 100 %).
 
+## 2026-10-17 — Vitrine & espace cliente
+- Photo de profil : recadrage rond, zoom, rotation (PhotoCropModal, react-easy-crop).
+- GPS refusé : aide iPhone/Android + placement manuel sur carte (GeoHelp.jsx : useLocate, MapPicker) dans adresses et checkout.
+- Facture cliente : GET /api/public/account/order/{code}/invoice (HTML imprimable, générée si absente).
+- Messages : onglets Boutique / Livreur.
+- PWA : InstallGuide (guide iPhone « Ajouter à l'écran d'accueil », bouton Installer Android), beforeinstallprompt capturé dans registerSW.
+- Favoris synchronisés avec le compte (toggle state add/remove + fusion locale) ; Vus récemment suivis à l'ouverture produit ; Bons d'achat listent les codes promo actifs ; avis limités aux articles reçus, sans doublon.
+- Aperçu parrainage : /api/public/share/invitation/{code} (balises OG : image produit, nom boutique, offre) puis redirection.
+- Promotions : promo_fields normalise price_old/compare_at_price → compare_at + promo_pct ; sticker « -X % » sur cartes et fiche produit ; section « Promotions » sur l'accueil ; page /promotions en cartes.
+- Tests : iteration_88 (backend 13/13 ; 2 bugs front corrigés ensuite : libellés bons, catégorie messages).
+
+

@@ -756,7 +756,7 @@ function MessagesPage() {
   );
 }
 
-const isRiderThread = (t) => (t.with?.kind === "rider") || /livreur/.test(t.kind || "") && !/boutique/.test(t.kind || "") || t.kind === "rider_customer";
+const isRiderThread = (t) => t.with?.kind ? t.with.kind === "rider" : (t.kind === "rider_customer" || (/livreur/.test(t.kind || "") && !/boutique/.test(t.kind || "")));
 
 /* -------- Reviews pending -------- */
 function ReviewsPending() {
@@ -805,7 +805,7 @@ function Vouchers() {
   useEffect(() => { api.get("/public/account/vouchers").then(r=>setList(r.data)).catch(()=>setList([])); }, []);
   if (!list.length) return <EmptyState icon={Ticket} title="Aucun bon d'achat" subtitle="Vos bons d'achat gagnés apparaîtront ici"/>;
   const copy = (c) => { navigator.clipboard?.writeText(c); toast.success("Code copié · à saisir au paiement"); };
-  return <div className="space-y-2" data-testid="vouchers-list">{list.map(v => <div key={v.id} className="dina-card-white p-4 flex items-center gap-3" data-testid={`voucher-${v.code}`}><Ticket size={18} className="text-[#b02a2a] shrink-0"/><div className="flex-1 min-w-0"><div className="font-mono font-bold text-lg break-all">{v.code}</div><div className="text-xs text-[#666]">{v.kind === "promo" ? "Code promo boutique" : "Bon personnel"}{v.ends_at ? ` · valide jusqu'au ${dateFmt(v.ends_at)}` : ""}{v.min_order ? ` · dès ${fcfa(v.min_order)}` : ""}</div></div><div className="text-right shrink-0"><div className="font-semibold tabular text-[#b02a2a]">{v.type === "percent" ? `-${v.value} %` : v.type === "free_shipping" ? "Livraison offerte" : fcfa(v.amount || v.value)}</div><button onClick={() => copy(v.code)} className="text-xs underline text-[#666]" data-testid={`voucher-copy-${v.code}`}>Copier</button></div></div>)}</div>;
+  return <div className="space-y-2" data-testid="vouchers-list">{list.map(v => <div key={v.id} className="dina-card-white p-4 flex items-center gap-3" data-testid={`voucher-${v.code}`}><Ticket size={18} className="text-[#b02a2a] shrink-0"/><div className="flex-1 min-w-0"><div className="font-mono font-bold text-lg break-all">{v.code}</div><div className="text-xs text-[#666]">{v.kind === "promo" ? "Code promo boutique" : "Bon personnel"}{v.ends_at ? ` · valide jusqu'au ${dateFmt(v.ends_at)}` : ""}{v.min_order ? ` · dès ${fcfa(v.min_order)}` : ""}</div></div><div className="text-right shrink-0"><div className="font-semibold tabular text-[#b02a2a]">{v.type === "percent" ? `-${v.value} %` : ["free_shipping", "free_delivery"].includes(v.type) ? "Livraison offerte" : v.type === "bogo" ? "2 pour 1" : fcfa(v.amount || v.value)}</div><button onClick={() => copy(v.code)} className="text-xs underline text-[#666]" data-testid={`voucher-copy-${v.code}`}>Copier</button></div></div>)}</div>;
 }
 
 function Favorites() {

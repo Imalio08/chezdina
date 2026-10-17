@@ -99,7 +99,7 @@ export default function Checkout() {
   }
   const remaining = total - expectedDeposit;
 
-  const geo = useLocate((c) => { setCoords(c); toast.success("Position enregistrée"); });
+  const geo = useLocate((c) => { setCoords(c); toast.success("Position enregistrée"); }, coords);
   const locate = geo.locate;
 
   const openMap = () => {
