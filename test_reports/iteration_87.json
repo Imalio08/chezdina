@@ -1,0 +1,42 @@
+{
+  "summary": "Tested the 4 rider requests on backend and frontend. Backend: 13/14 pytest pass in test_rider_reports_history.py. Covered: POST /rider/report (full payload with order, photo and location; an invalid kind becomes 'autre' and an invalid urgency becomes 'moyenne'; empty details 400; another rider's order 404; bad photo 400; manager 403); GET /rider/reports (own reports only, no photo); GET /rider-reports (manager and admin OK, rider 403, status filter works); PATCH status flow nouveau -> pris_en_charge -> resolu (history grows, rider user_notification created, invalid status 400, unknown id 404, rider 403); staff notification gets the URGENT prefix; /riders/me/today counts include annulees_retournees; /riders/me/history?days=90 returns days with orders_detail (sorted newest first, customer phone masked, no proof or timeline); /riders/me/orders/{oid} works for the owner and returns 404 for rider2 or an unknown id. The only failure: lat/lng that are not numbers give a 500. Frontend (390x844 rider, 1920 console): ALL flows pass. Camera: with the fake camera the video plays (640px, srcObject set, not paused); snap gives the snapshot and the PIN field; retake re-attaches the stream to the remounted video; closing and reopening works. With getUserMedia forced to fail with NotAllowedError, the modal shows punch-cam-error with the iPhone/Android steps and a Réessayer button, and no black screen. Courses: kpi-annulees-retournees is shown next to À remettre. Historique: 3-month period shows 8 days; a day opens with 6 orders; the order sheet shows Lecture seule, customer with masked phone, address, slot, 2 items, total and timeline; the only button is close. Signalements: kind validation toast; kind, urgency, description, photo upload with preview and automatic location (accuracy 20 m); submit -> item with status 'Envoyé'. Console /console/livreurs (manager): panel shows 1 en cours; photo and map link shown; Prendre en charge and Marquer résolu with notes work; after resolve the count is 0 and the report is still visible under Voir tout. The rider then sees 2 notifications (pris en charge, résolu), status 'Résolu' and the manager's note. All TEST data was cleaned up (rider_reports, notifications, user_notifications, the manager attendance punch made for the test).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/rider/report", "issue": "lat/lng that are not numbers (e.g. 'abc') cause float() ValueError -> 500. Wrap in try/except and return 400, or ignore the location."},
+      {"endpoint": "GET /api/rider-reports", "issue": "Returns the full photo dataURL (up to 2.5 MB each) for up to 300 reports. The payload will get very heavy. Leave out the photo in the list and serve it on demand (GET /rider-reports/{id}/photo), or cap the photo size."},
+      {"endpoint": "_mask_customer", "issue": "Masking keeps the first 2 digits, which are the country code for +225 numbers. Result: '22 •• •• •• 03', which is useless. Strip the 225 prefix before masking (e.g. '07 •• •• •• 03')."},
+      {"endpoint": "GET /api/riders/me/history", "issue": "days has no bounds (days=0 or a negative value moves the cutoff into the future). Clamp it to 1..365."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Rider Historique", "issues": ["The day chip shows 'Validée' when there are no reconciliations (ecart defaults to 0), even for days with orders still 'Affectée' or 'En livraison'. Misleading: only show it when the session is closed or reconciled.", "Day header shows a raw ISO date '2026-10-10'. Use a French format such as 'ven. 10 oct.'.", "The 'Annulées' filter tab ignores retournee/refusee, which is inconsistent with the new Annulées/Retournées KPI.", "Address in OrderReadOnly repeats the commune ('Yopougon · près de la pharmacie · Yopougon') because quartier and zone are both added. Remove duplicates."]},
+      {"screen": "Rider Signalements", "issues": ["The order dropdown only lists TODAY's orders (/riders/me/today), so a problem about yesterday's delivery cannot be linked. Consider the last 48h of orders.", "The form is always open on load and pushes 'Mes signalements' below the fold. A rider coming from a notification to check follow-up must scroll. Collapse the form when reports exist or when coming from the notification link."]},
+      {"screen": "Console RiderReportsPanel", "issues": ["No polling: new reports only appear after a page reload (the bell notification is the only live signal).", "The row toggle button has no data-testid (only the wrapper console-report-{id})."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_rider_reports_history.py", "/app/test_reports/pytest/pytest_rider_reports.xml"],
+  "action_items": [
+    "POST /rider/report: validate lat/lng (400 instead of 500)",
+    "Leave the photo out of the GET /rider-reports list (payload size)",
+    "_mask_customer: strip the +225 country code before masking",
+    "Historique: show 'Validée' only for closed or reconciled days, use a French date label, include retournee/refusee in the Annulées filter",
+    "Optional: useFrontCamera.start() race. If the modal closes or the component unmounts while getUserMedia is waiting (permission prompt), the stream is assigned after stop() and never stopped (camera LED stays on). Use a cancelled/generation flag and stop late streams. Also add a timeout fallback (~8s) if 'playing' never fires, so iOS users do not wait on 'Ouverture de la caméra…' forever."
+  ],
+  "critical_code_review_comments": [
+    "useFrontCamera: start() has no cancel token, so a stream from an earlier call that resolves late can leak (two quick start() calls via Réessayer, or unmount while pending).",
+    "useFrontCamera: 'ready' only switches on onplaying. There is no timeout or error path when autoplay is blocked, so the spinner shows forever with no Réessayer button.",
+    "rider_today.to_collect still counts COD totals for retournee/refusee/echouee orders (it only excludes livree/annulee).",
+    "RiderReportsPanel imports constants from the pages/rider/Signalements page module. Move KINDS/URGENCY/REPORT_STATUS to lib/ so the console bundle does not pull in the rider page."
+  ],
+  "updated_files": ["/app/backend/tests/test_rider_reports_history.py"],
+  "success_rate": {"backend": "93% (13/14)", "frontend": "100%"},
+  "test_credentials": "rider1@dinastore.ci / Rider123!, manager.cocody@dinastore.ci / Manager123! (punched with tests/ui_punch.py, the punch was deleted afterwards), admin aouattaraesca@gmail.com / Admin123!",
+  "seed_data_creation": "None kept. TEST_ rider_reports, notifications, user_notifications and the manager's test attendance were deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run the new test with `pytest tests/test_rider_reports_history.py -n 0` (pytest.ini uses xdist loadscope, and the module fixture is shared across classes). The fixture punches the manager's arrival (otherwise 428) and deletes it in teardown. The headless browser has a fake camera (green test pattern). To simulate denial, use add_init_script to override navigator.mediaDevices.getUserMedia so it rejects with DOMException NotAllowedError. On the console login page the inputs have no type=email; use 'form input' nth(0)/nth(1). rider1 has no orders today, so the report order dropdown only shows 'Aucune'."
+}

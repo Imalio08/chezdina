@@ -15,7 +15,7 @@ export default function Historique() {
   const [detail, setDetail] = useState(null);
   useEffect(() => { api.get(`/riders/me/history?days=${period}`).then(r => setSessions(r.data)).catch(() => { }); }, [period]);
 
-  const matchTab = (o) => tab === "toutes" || (tab === "livrees" && o.status === "livree") || (tab === "annulees" && o.status === "annulee") || (tab === "reportees" && o.status === "reportee") || (tab === "echecs" && o.status === "echouee");
+  const matchTab = (o) => tab === "toutes" || (tab === "livrees" && o.status === "livree") || (tab === "annulees" && ["annulee", "retournee", "refusee"].includes(o.status)) || (tab === "reportees" && o.status === "reportee") || (tab === "echecs" && o.status === "echouee");
 
   const totalDeliv = sessions.reduce((s, x) => s + (x.delivered_count || 0), 0);
   const totalColl = sessions.reduce((s, x) => s + (x.collected_total || 0), 0);
@@ -33,7 +33,7 @@ export default function Historique() {
         {PERIODS.map(p => <button key={p.v} onClick={() => setPeriod(p.v)} className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${period === p.v ? "bg-[#1c1c1c] text-white dark:bg-white dark:text-[#1c1c1c] border-transparent" : "border-[#ececec]"}`} data-testid={`hist-period-${p.v}`}>{p.label}</button>)}
       </div>
       <div className="flex gap-1 overflow-x-auto scrollbar-thin -mx-3 px-3">
-        {[["toutes","Toutes"],["livrees","Livrées"],["annulees","Annulées"],["reportees","Reportées"],["echecs","Échecs"]].map(([k,label]) => <button key={k} onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${tab === k ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec]"}`} data-testid={`hist-tab-${k}`}>{label}</button>)}
+        {[["toutes","Toutes"],["livrees","Livrées"],["annulees","Annulées / Retournées"],["reportees","Reportées"],["echecs","Échecs"]].map(([k,label]) => <button key={k} onClick={() => setTab(k)} className={`px-3 py-1.5 rounded-full text-xs whitespace-nowrap border ${tab === k ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec]"}`} data-testid={`hist-tab-${k}`}>{label}</button>)}
       </div>
 
       <div className="space-y-2">
@@ -48,10 +48,11 @@ export default function Historique() {
               <button className="w-full p-3 flex items-center gap-2" data-testid={`hist-day-toggle-${s.date}`} onClick={() => setOpenIds({ ...openIds, [s.id]: !open })}>
                 <Clock size={14} className="text-[#666]" />
                 <div className="flex-1 text-left">
-                  <div className="font-semibold text-sm">{s.date}</div>
+                  <div className="font-semibold text-sm first-letter:uppercase">{new Date(`${s.date}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })}</div>
                   <div className="text-[11px] text-[#666]">{(s.orders_detail || []).length} commande(s) · {s.delivered_count || 0} livrées · encaissé {fcfa(s.collected_total || 0)}</div>
                 </div>
-                <span className={`dina-chip text-[10px] ${ecart === 0 ? "!text-[#1f8a4c] !border-[#1f8a4c]" : "!text-[#c62828] !border-[#c62828]"}`}>{ecart === 0 ? <><Check size={9} />Validée</> : `Écart ${fcfa(ecart)}`}</span>
+                {recVals.length > 0 || s.closed ? <span className={`dina-chip text-[10px] ${ecart === 0 ? "!text-[#1f8a4c] !border-[#1f8a4c]" : "!text-[#c62828] !border-[#c62828]"}`}>{ecart === 0 ? <><Check size={9} />Validée</> : `Écart ${fcfa(ecart)}`}</span>
+                  : <span className="dina-chip text-[10px] !text-[#999]">Non clôturée</span>}
                 {open ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
               </button>
               {open && (

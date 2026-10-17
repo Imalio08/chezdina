@@ -20,7 +20,8 @@ export default function OrderReadOnly({ orderId, onClose }) {
   const [err, setErr] = useState("");
   useEffect(() => { api.get(`/riders/me/orders/${orderId}`).then(r => setO(r.data)).catch(e => setErr(e?.response?.data?.detail || "Commande indisponible")); }, [orderId]);
   const c = o?.customer || {};
-  const addr = [o?.delivery_address, c.address, c.quartier, o?.delivery_zone].filter(Boolean);
+  const addr = [o?.delivery_address, c.address, c.quartier, o?.delivery_zone].filter(Boolean)
+    .filter((p, i, arr) => !arr.slice(0, i).some(q => q.toLowerCase().includes(p.toLowerCase())));
   return (
     <div className="fixed inset-0 bg-black/60 z-[90] grid place-items-end" onClick={onClose} data-testid="hist-order-sheet">
       <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl w-full max-h-[90vh] overflow-y-auto p-4 pb-8 space-y-3" onClick={e => e.stopPropagation()}>

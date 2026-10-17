@@ -103,12 +103,12 @@ function ReportItem({ r }) {
 export default function Signalements() {
   const [reports, setReports] = useState([]);
   const [orders, setOrders] = useState([]);
-  const [showForm, setShowForm] = useState(true);
-  const load = () => api.get("/rider/reports").then(r => setReports(r.data || [])).catch(() => {});
-  useEffect(() => { load(); api.get("/riders/me/today").then(r => setOrders(r.data?.orders || [])).catch(() => {}); }, []);
+  const [showForm, setShowForm] = useState(null);
+  const load = () => api.get("/rider/reports").then(r => { setReports(r.data || []); setShowForm(v => v ?? !(r.data || []).length); }).catch(() => setShowForm(v => v ?? true));
+  useEffect(() => { load(); api.get("/riders/me/history?days=2").then(r => setOrders((r.data || []).flatMap(d => d.orders_detail || []))).catch(() => {}); }, []);
   return (
     <SubPage title="Signaler un problème" testid="rider-signalements-page">
-      {showForm ? <ReportForm orders={orders} onSent={() => { setShowForm(false); load(); }}/> :
+      {showForm === null ? null : showForm ? <ReportForm orders={orders} onSent={() => { setShowForm(false); load(); }}/> :
         <button onClick={() => setShowForm(true)} className="dina-btn-primary w-full !min-h-[46px]" data-testid="report-new"><AlertTriangle size={15}/>Nouveau signalement</button>}
       <div className="text-[10px] uppercase font-semibold text-[#999] px-1 pt-2">Mes signalements</div>
       {reports.length === 0 ? <div className="text-center text-sm text-[#666] py-6" data-testid="report-empty">Aucun signalement</div> :

@@ -9,6 +9,8 @@ function ReportRow({ r, onSaved }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState(null);
+  useEffect(() => { if (open && r.has_photo && !photo) api.get(`/rider-reports/${r.id}/photo`).then(x => setPhoto(x.data?.photo)).catch(() => {}); }, [open]); // eslint-disable-line
   const [sLabel, sColor] = REPORT_STATUS[r.status] || [r.status, "#666"];
   const u = URGENCY.find(x => x[0] === r.urgency) || ["", r.urgency, "#666"];
   const save = async (status) => {
@@ -18,7 +20,7 @@ function ReportRow({ r, onSaved }) {
   };
   return (
     <div className="border-b border-[#f0f0f0] dark:border-[#2a2a2a] last:border-0" data-testid={`console-report-${r.id}`}>
-      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 p-3 text-left">
+      <button onClick={() => setOpen(!open)} className="w-full flex items-center gap-2 p-3 text-left" data-testid={`console-report-toggle-${r.id}`}>
         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: u[2] }}/>
         <div className="flex-1 min-w-0">
           <div className="text-sm font-semibold">{r.kind_label} · {r.rider_name}{r.order_code ? ` · ${r.order_code}` : ""}</div>
@@ -30,7 +32,7 @@ function ReportRow({ r, onSaved }) {
       {open && (
         <div className="px-3 pb-3 space-y-2 text-sm">
           <div className="break-words">{r.details}</div>
-          {r.photo && <a href={r.photo} target="_blank" rel="noreferrer"><img src={r.photo} alt="" className="max-h-48 rounded-lg" data-testid={`console-report-photo-${r.id}`}/></a>}
+          {photo && <a href={photo} target="_blank" rel="noreferrer"><img src={photo} alt="" className="max-h-48 rounded-lg" data-testid={`console-report-photo-${r.id}`}/></a>}
           {r.location && <a className="text-xs text-[#b02a2a] inline-flex items-center gap-1 underline" target="_blank" rel="noreferrer" href={`https://www.google.com/maps?q=${r.location.lat},${r.location.lng}`} data-testid={`console-report-map-${r.id}`}><MapPin size={12}/>Voir la position</a>}
           {r.rider_phone && <div className="text-xs text-[#666]">Tél. livreur : <a href={`tel:${r.rider_phone}`} className="underline">{r.rider_phone}</a></div>}
           <div className="text-[11px] text-[#999] space-y-0.5">{(r.history || []).map((h, i) => <div key={i}>{dateTimeFmt(h.at)} · {(REPORT_STATUS[h.status] || [h.status])[0]} · {h.by}{h.note ? ` — ${h.note}` : ""}</div>)}</div>
@@ -52,7 +54,7 @@ export default function RiderReportsPanel({ autoOpen }) {
   const [rows, setRows] = useState([]);
   const [all, setAll] = useState(false);
   const load = () => api.get("/rider-reports").then(r => setRows(r.data || [])).catch(() => {});
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, []);
   const open = rows.filter(r => r.status !== "resolu");
   const shown = all ? rows : open;
   if (!rows.length && !autoOpen) return null;

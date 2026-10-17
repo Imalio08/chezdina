@@ -1185,3 +1185,11 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - PosPasteWA.jsx : après choix manuel d'un produit, sélecteurs Taille et Couleur (stock par option, épuisé désactivé, présélection si une seule valeur). « Remplir le panier » bloqué tant que taille/couleur manquent.
 - Vérifié par capture (session de caisse TEST temporaire, supprimée ensuite).
 
+
+## 2026-10-17 — App livreur : caméra, KPI annulées, historique détaillé, signalements
+- Caméra de pointage : hook `lib/useFrontCamera.js` (callback ref, contraintes de repli, messages iPhone/Android si refus, bouton Réessayer) utilisé par AttendancePunchModal et PunchGate.
+- Courses : KPI « Annulées / Retournées » (counts.annulees_retournees dans /riders/me/today).
+- Historique : /riders/me/history reconstruit les journées depuis les commandes du livreur (orders_detail était vide) ; dates en français ; « Non clôturée » si pas de rapprochement ; fiche commande lecture seule (GET /riders/me/orders/{oid}, OrderReadOnly.jsx).
+- Signalements : page /riders/signalements (type, urgence, commande 48 h, description, photo, position auto) + suivi (Envoyé / Pris en charge / Résolu + réponse gérante). Collection rider_reports ; console Livreurs › bloc « Signalements livreurs » (GET/PATCH /rider-reports, photo à la demande, actualisation 60 s) ; livreur notifié à chaque changement.
+- Tests : iteration_87 (backend 13/14 → corrigé, 14/14 ; frontend 100 %).
+

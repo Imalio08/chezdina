@@ -141,8 +141,10 @@ async def rider_report(body: Dict[str, Any], user: dict = Depends(get_user)):
         if not order:
             raise HTTPException(404, "Commande introuvable")
     loc = None
-    if body.get("lat") is not None and body.get("lng") is not None:
+    try:
         loc = {"lat": float(body["lat"]), "lng": float(body["lng"]), "acc": body.get("acc")}
+    except (KeyError, TypeError, ValueError):
+        loc = None
     at = now_iso()
     doc = {
         "id": new_id(), "rider_id": user["id"], "rider_name": user.get("name"), "rider_phone": user.get("phone"),
@@ -172,7 +174,19 @@ async def my_reports(user: dict = Depends(get_user)):
 @router.get("/rider-reports")
 async def list_reports(status: Optional[str] = None, user: dict = Depends(require_role("admin", "manager"))):
     f: Dict[str, Any] = {"status": status} if status else {}
-    return clean(await db.rider_reports.find(f).sort("created_at", -1).to_list(300))
+    rows = await db.rider_reports.find(f, {"photo": 0}).sort("created_at", -1).to_list(300)
+    with_photo = {r["id"] async for r in db.rider_reports.find({**f, "photo": {"$ne": None}}, {"id": 1})}
+    for r in rows:
+        r["has_photo"] = r["id"] in with_photo
+    return clean(rows)
+
+
+@router.get("/rider-reports/{rid}/photo")
+async def report_photo(rid: str, user: dict = Depends(require_role("admin", "manager"))):
+    r = await db.rider_reports.find_one({"id": rid}, {"photo": 1})
+    if not r:
+        raise HTTPException(404, "Signalement introuvable")
+    return {"photo": r.get("photo")}
 
 
 @router.patch("/rider-reports/{rid}")
@@ -258,6 +272,7 @@ async def rider_today(user: dict = Depends(get_user)):
 
 @router.get("/riders/me/history")
 async def rider_history(user: dict = Depends(get_user), days: int = 30):
+    days = max(1, min(days, 365))
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days - 1)).isoformat()[:10]
     sessions = await db.delivery_sessions.find({"rider_id": user["id"], "date": {"$gte": cutoff}}).to_list(200)
     orders = await db.orders.find({"rider_id": user["id"]}, {"_id": 0, "id": 1, "code": 1, "status": 1, "total": 1, "customer": 1, "delivery_zone": 1,
@@ -293,6 +308,8 @@ async def rider_history(user: dict = Depends(get_user), days: int = 30):
 def _mask_customer(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     c = dict(c or {})
     digits = "".join(ch for ch in (c.get("phone") or "") if ch.isdigit())
+    if digits.startswith("225") and len(digits) > 10:
+        digits = digits[3:]
     c["phone_masked"] = f"{digits[:2]} •• •• •• {digits[-2:]}" if len(digits) >= 4 else None
     c["phone"] = None
     return {k: c.get(k) for k in ("name", "phone_masked", "address", "quartier", "zone", "landmark")}
