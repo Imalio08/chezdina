@@ -79,6 +79,24 @@ async def product_labels(pid: str, user: dict = Depends(get_user)):
     return {"name": p.get("name"), "sku": p.get("sku"), "price": p.get("price"), "labels": out}
 
 
+@router.get("/purchase-orders/{pid}/labels")
+async def po_labels(pid: str, user: dict = Depends(get_user)):
+    """One label per unit received, with the same code as expected at preparation."""
+    po = await db.purchase_orders.find_one({"id": pid})
+    if not po:
+        raise HTTPException(404, "Commande fournisseur introuvable")
+    pids = [it.get("product_id") for it in po.get("items") or []]
+    prods = {p["id"]: p for p in await db.products.find({"id": {"$in": pids}}).to_list(500)}
+    out = []
+    for it in po.get("items") or []:
+        qty = int(next((it[k] for k in ("qty_counted", "qty_received", "qty") if it.get(k) is not None), 0) or 0)
+        p = prods.get(it.get("product_id"), {"name": it.get("product_name"), "sku": it.get("sku")})
+        e = expected(p, {"name": it.get("product_name") or p.get("name"), "size": it.get("size"), "color": it.get("color"), "product_id": it.get("product_id"), "sku": it.get("sku")})
+        out += [{"code": e["code"], "name": it.get("product_name") or p.get("name"), "size_tag": _size_tag(p, it.get("size")),
+                 "color": it.get("color"), "price": p.get("price")} for _ in range(max(0, qty))]
+    return {"number": po.get("number"), "supplier": po.get("supplier_name"), "labels": out}
+
+
 @router.get("/orders/{oid}/prep")
 async def get_prep(oid: str, user: dict = Depends(get_user)):
     o = await db.orders.find_one({"id": oid})

@@ -125,9 +125,17 @@ async def close_rider_customer_convs(order_id: str) -> None:
 
 
 # ---------- Customer thread helpers ----------
+def _conv_match(r: Dict[str, Any], q: str) -> bool:
+    q = (q or "").strip().lower()
+    if not q:
+        return True
+    hay = " ".join([str(r.get("order_code") or "")] + [str(p.get("name") or "") for p in r.get("participants") or []]).lower()
+    return q in hay or any(q in (m.get("text") or "").lower() for m in r.get("messages") or [])
+
+
 @router.get("/public/account/threads")
-async def account_threads(c: dict = Depends(get_customer)):
-    rows = await db.conversations.find({"participants.id": c["id"]}).sort("updated_at", -1).to_list(100)
+async def account_threads(q: str = "", c: dict = Depends(get_customer)):
+    rows = [r for r in await db.conversations.find({"participants.id": c["id"]}).sort("updated_at", -1).to_list(100) if _conv_match(r, q)]
     out = []
     for r in rows:
         parts = r.get("participants") or []
@@ -443,8 +451,8 @@ async def _after_order_msg(conv: Dict[str, Any], party: str, user: dict, preview
 
 # ---------- Rider inbox (all conversations involving the rider) ----------
 @router.get("/rider/conversations")
-async def rider_conversations(user: dict = Depends(get_user)):
-    rows = await db.conversations.find({"participants.id": user["id"]}).sort("updated_at", -1).to_list(200)
+async def rider_conversations(q: str = "", user: dict = Depends(get_user)):
+    rows = [r for r in await db.conversations.find({"participants.id": user["id"]}).sort("updated_at", -1).to_list(200) if _conv_match(r, q)]
     out = []
     for r in rows:
         msgs = r.get("messages") or []

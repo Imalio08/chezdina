@@ -682,7 +682,9 @@ function MessagesPage() {
   const msgCount = active?.messages?.length || 0;
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [msgCount, id]);
 
-  const loadThreads = async () => { try { const r = await api.get("/public/account/threads"); setThreads(r.data); } catch {} };
+  const [tq, setTq] = useState("");
+  const loadThreads = async (s = tq) => { try { const r = await api.get("/public/account/threads", { params: s.trim() ? { q: s.trim() } : {} }); setThreads(r.data); } catch {} };
+  useEffect(() => { const t = setTimeout(() => loadThreads(tq), 300); return () => clearTimeout(t); }, [tq]); // eslint-disable-line
   const loadActive = async () => {
     if (!id) { setActive(null); return; }
     try {
@@ -715,6 +717,7 @@ function MessagesPage() {
             return <button key={k} onClick={() => setCat(k)} className={`py-1.5 rounded-md text-sm ${cat === k ? "bg-white shadow font-semibold text-[#b02a2a]" : "text-[#666]"}`} data-testid={`msg-cat-${k}`}>{l}{n > 0 && <span className="ml-1 bg-[#b02a2a] text-white text-[9px] rounded-full px-1.5">{n}</span>}</button>;
           })}
         </div>
+        <input type="search" value={tq} onChange={e => setTq(e.target.value)} placeholder="Nom, n° de commande ou message…" className="dina-input w-full mb-2 !py-2" data-testid="msg-search"/>
         {(() => { const n = threads.filter(t => t.archived).length; return (
           <button onClick={() => setShowArch(v => !v)} className={`w-full mb-2 py-1.5 rounded-md text-xs border inline-flex items-center justify-center gap-1 ${showArch ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec] text-[#666]"}`} data-testid="msg-archived-toggle"><Archive size={12}/>{showArch ? "Voir les conversations actives" : `Archivées${n ? ` (${n})` : ""}`}</button>); })()}
         {threads.filter(t => !!t.archived === showArch && isRiderThread(t) === (cat === "livreur")).length === 0 && <div className="text-xs text-[#999] text-center py-6" data-testid="msg-cat-empty">{showArch ? "Aucune conversation archivée" : cat === "livreur" ? "Aucun message de livreur" : "Aucun message de la boutique"}</div>}

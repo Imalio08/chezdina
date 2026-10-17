@@ -8,6 +8,8 @@ import ViewToggle, { useStoredView } from "@/components/shared/ViewToggle";
 import jsPDF from "jspdf";
 import { openPdf } from "@/components/shared/PdfPreview";
 import * as XLSX from "xlsx";
+import { printPOLabels } from "@/lib/printLabels";
+const printReceptionLabels = (id) => printPOLabels(id).catch(e => toast.error(e?.message || "Impression des étiquettes impossible"));
 
 const STATUSES = ["brouillon", "commande", "recu_partiel", "recu", "cloture"];
 const STATUS_LABEL = { brouillon: "Brouillon", commande: "Commandé", en_attente: "Commandé", recu_partiel: "Reçu partiellement", recu: "Reçu", receptionne: "Reçu", cloture: "Clôturé" };
@@ -121,9 +123,9 @@ export default function PurchaseOrders() {
 
   if (detail) return (
     <>
-      <PoDetail poId={detail} onBack={() => { setDetail(null); load(); }} onEdit={(p) => { setEdit(p); setOpen(true); setDetail(null); }} onReceive={(p) => { setReceive(p); setDetail(null); }} onPdf={printPdf} onXlsx={exportXlsx} onQr={openQrLabels} user={user} />
+      <PoDetail poId={detail} onBack={() => { setDetail(null); load(); }} onEdit={(p) => { setEdit(p); setOpen(true); setDetail(null); }} onReceive={(p) => { setReceive(p); setDetail(null); }} onPdf={printPdf} onXlsx={exportXlsx} onQr={(p) => printReceptionLabels(p.id)} user={user} />
       {labels && <LabelsPrintModal labels={labels} onClose={() => setLabels(null)} />}
-      {receive && <BlindReceive po={receive} user={user} onClose={() => setReceive(null)} onDone={() => { setReceive(null); load(); }} />}
+      {receive && <BlindReceive po={receive} user={user} onClose={() => setReceive(null)} onDone={() => { const id = receive.id; setReceive(null); load(); printReceptionLabels(id); }} />}
     </>
   );
 
@@ -195,7 +197,7 @@ export default function PurchaseOrders() {
       )}
 
       {open && <PoForm initial={edit} sups={sups} products={products} onSave={save} onClose={() => { setOpen(false); setEdit(null); }} />}
-      {receive && <BlindReceive po={receive} user={user} onClose={() => setReceive(null)} onDone={() => { setReceive(null); load(); }} />}
+      {receive && <BlindReceive po={receive} user={user} onClose={() => setReceive(null)} onDone={() => { const id = receive.id; setReceive(null); load(); printReceptionLabels(id); }} />}
       {labels && <LabelsPrintModal labels={labels} onClose={() => setLabels(null)} />}
     </div>
   );
@@ -307,7 +309,7 @@ function PoDetail({ poId, onBack, onEdit, onReceive, onPdf, onXlsx, onQr, user }
             <button onClick={() => onPdf(po, "bon_commande")} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="po-pdf-cmd"><Printer size={12} />PDF commande</button>
             {po.status !== "brouillon" && <button onClick={() => onPdf(po, "bon_reception")} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="po-pdf-rcpt"><Printer size={12} />PDF réception</button>}
             <button onClick={() => onXlsx(po)} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="po-xlsx"><FileSpreadsheet size={12} />Excel</button>
-            <button onClick={() => onQr(po)} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="po-qr"><QrCode size={12} />Étiquettes QR</button>
+            <button onClick={() => onQr(po)} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="po-qr"><QrCode size={12} />Étiquettes QR des pièces reçues</button>
             {!readonly && user?.role === "admin" && <button onClick={() => onEdit(po)} className="dina-btn-secondary !min-h-[36px] text-xs"><Pencil size={12} />Modifier</button>}
             {!readonly && <button onClick={() => onReceive(po)} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="po-receive"><Package size={12} />Réceptionner</button>}
           </div>

@@ -1,0 +1,398 @@
+{
+ "console-prep": {
+  "image": "/manual/console-prep.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Scanner l'étiquette",
+    "x": 40.0,
+    "y": 24.8,
+    "w": 37.7,
+    "h": 4.0
+   },
+   {
+    "n": 2,
+    "label": "Ou taper le code",
+    "x": 78.0,
+    "y": 24.8,
+    "w": 37.7,
+    "h": 4.0
+   },
+   {
+    "n": 3,
+    "label": "Article + code attendu",
+    "x": 59.0,
+    "y": 61.4,
+    "w": 78.6,
+    "h": 9.4
+   },
+   {
+    "n": 4,
+    "label": "Actif quand tout est vérifié",
+    "x": 39.1,
+    "y": 74.7,
+    "w": 39.2,
+    "h": 5.3
+   },
+   {
+    "n": 5,
+    "label": "Fiche colis",
+    "x": 78.9,
+    "y": 74.7,
+    "w": 39.4,
+    "h": 5.3
+   }
+  ],
+  "ratio": 1.6
+ },
+ "console-product-labels": {
+  "image": "/manual/console-product-labels.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "1 étiquette par variante",
+    "x": 48.5,
+    "y": 28.4,
+    "w": 11.8,
+    "h": 5.1
+   },
+   {
+    "n": 2,
+    "label": "1 par pièce en stock",
+    "x": 62.0,
+    "y": 28.4,
+    "w": 14.2,
+    "h": 5.1
+   }
+  ],
+  "ratio": 1.6
+ },
+ "console-products": {
+  "image": "/manual/console-products.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Voir",
+    "x": 6.2,
+    "y": 11.9,
+    "w": 9.7,
+    "h": 1.8
+   },
+   {
+    "n": 2,
+    "label": "Modifier",
+    "x": 98,
+    "y": 43.9,
+    "w": 2.5,
+    "h": 4.0
+   },
+   {
+    "n": 3,
+    "label": "Supprimer",
+    "x": 98,
+    "y": 43.9,
+    "w": 2.5,
+    "h": 4.0
+   }
+  ],
+  "ratio": 1.6
+ },
+ "console-coordonnees": {
+  "image": "/manual/console-coordonnees.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Position actuelle",
+    "x": 49.2,
+    "y": 48.2,
+    "w": 18.2,
+    "h": 4.7
+   },
+   {
+    "n": 2,
+    "label": "Placer sur la carte",
+    "x": 65.2,
+    "y": 48.2,
+    "w": 12.7,
+    "h": 4.7
+   },
+   {
+    "n": 3,
+    "label": "Horaires lun → dim",
+    "x": 68.1,
+    "y": 98,
+    "w": 57.6,
+    "h": 55.6
+   }
+  ],
+  "ratio": 1.6
+ },
+ "console-livraison-slots": {
+  "image": "/manual/console-livraison-slots.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Créneaux par jour",
+    "x": 68.1,
+    "y": 56.4,
+    "w": 57.6,
+    "h": 33.6
+   }
+  ],
+  "ratio": 1.6
+ },
+ "console-pointage": {
+  "image": "/manual/console-pointage.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Horaires du rôle",
+    "x": 49.3,
+    "y": 50.4,
+    "w": 18.2,
+    "h": 4.7
+   },
+   {
+    "n": 2,
+    "label": "Jours travaillés",
+    "x": 68.1,
+    "y": 55.1,
+    "w": 55.8,
+    "h": 2.9
+   }
+  ],
+  "ratio": 1.6
+ },
+ "console-messagerie": {
+  "image": "/manual/console-messagerie.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Nom, n° commande ou texte",
+    "x": 30.8,
+    "y": 20.9,
+    "w": 20.4,
+    "h": 3.3
+   },
+   {
+    "n": 2,
+    "label": "Conversations archivées",
+    "x": 83.1,
+    "y": 12.9,
+    "w": 11.5,
+    "h": 5.1
+   }
+  ],
+  "ratio": 1.6
+ },
+ "console-livreurs": {
+  "image": "/manual/console-livreurs.jpg",
+  "callouts": [],
+  "ratio": 1.6
+ },
+ "console-achats": {
+  "image": "/manual/console-achats.jpg",
+  "callouts": [],
+  "ratio": 1.6
+ },
+ "rider-courses": {
+  "image": "/manual/rider-courses.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Annulées / Retournées",
+    "x": 74.0,
+    "y": 32.2,
+    "w": 45.9,
+    "h": 7.7
+   }
+  ],
+  "ratio": 0.46208530805687204
+ },
+ "rider-historique": {
+  "image": "/manual/rider-historique.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Journée",
+    "x": 50.0,
+    "y": 49.1,
+    "w": 87.2,
+    "h": 9.1
+   },
+   {
+    "n": 2,
+    "label": "Touchez pour le détail",
+    "x": 50.0,
+    "y": 58.8,
+    "w": 81.0,
+    "h": 7.2
+   }
+  ],
+  "ratio": 0.46208530805687204
+ },
+ "rider-signalement": {
+  "image": "/manual/rider-signalement.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Type",
+    "x": 19.2,
+    "y": 23.2,
+    "w": 25.6,
+    "h": 3.6
+   },
+   {
+    "n": 2,
+    "label": "Urgence",
+    "x": 54.5,
+    "y": 35.0,
+    "w": 16.2,
+    "h": 3.6
+   },
+   {
+    "n": 3,
+    "label": "Photo",
+    "x": 50.0,
+    "y": 69.0,
+    "w": 87.2,
+    "h": 5.2
+   },
+   {
+    "n": 4,
+    "label": "Position auto",
+    "x": 50.0,
+    "y": 75.2,
+    "w": 87.2,
+    "h": 4.3
+   },
+   {
+    "n": 5,
+    "label": "Envoyer",
+    "x": 50.0,
+    "y": 81.6,
+    "w": 87.2,
+    "h": 5.7
+   }
+  ],
+  "ratio": 0.46208530805687204
+ },
+ "rider-messages": {
+  "image": "/manual/rider-messages.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Rechercher",
+    "x": 36.2,
+    "y": 23.8,
+    "w": 64.1,
+    "h": 5.0
+   },
+   {
+    "n": 2,
+    "label": "Archivées",
+    "x": 83.1,
+    "y": 23.8,
+    "w": 25.6,
+    "h": 3.1
+   }
+  ],
+  "ratio": 0.46208530805687204
+ },
+ "store-home": {
+  "image": "/manual/store-home.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Bandeau défilant",
+    "x": 50.0,
+    "y": 2,
+    "w": 93.8,
+    "h": 1.9
+   }
+  ],
+  "ratio": 0.46208530805687204
+ },
+ "store-product-promo": {
+  "image": "/manual/store-product-promo.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Réduction",
+    "x": 13.8,
+    "y": 22.0,
+    "w": 13.3,
+    "h": 3.3
+   },
+   {
+    "n": 2,
+    "label": "Ancien prix barré",
+    "x": 58.8,
+    "y": 98,
+    "w": 26.9,
+    "h": 2.8
+   }
+  ],
+  "ratio": 0.46208530805687204
+ },
+ "store-account-messages": {
+  "image": "/manual/store-account-messages.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "Boutique",
+    "x": 29.0,
+    "y": 27.4,
+    "w": 41.0,
+    "h": 4.0
+   },
+   {
+    "n": 2,
+    "label": "Livreur",
+    "x": 71.0,
+    "y": 27.4,
+    "w": 41.0,
+    "h": 4.0
+   },
+   {
+    "n": 3,
+    "label": "Rechercher",
+    "x": 50.0,
+    "y": 33.3,
+    "w": 85.1,
+    "h": 5.0
+   },
+   {
+    "n": 4,
+    "label": "Archivées",
+    "x": 50.0,
+    "y": 38.5,
+    "w": 85.1,
+    "h": 3.6
+   }
+  ],
+  "ratio": 0.46208530805687204
+ },
+ "store-account-address": {
+  "image": "/manual/store-account-address.jpg",
+  "callouts": [
+   {
+    "n": 1,
+    "label": "GPS",
+    "x": 37.7,
+    "y": 48.5,
+    "w": 65.1,
+    "h": 4.7
+   },
+   {
+    "n": 2,
+    "label": "Carte",
+    "x": 83.6,
+    "y": 48.5,
+    "w": 22.6,
+    "h": 4.7
+   }
+  ],
+  "ratio": 0.46208530805687204
+ }
+}

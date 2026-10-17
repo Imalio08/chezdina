@@ -9,6 +9,7 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import * as Lucide from "lucide-react";
 import AnnotatedScreenshot from "@/components/manual/AnnotatedScreenshot";
+import PhotoAnnotated from "@/components/manual/PhotoAnnotated";
 
 export default function ManuelModule() {
   const { number } = useParams();
@@ -187,6 +188,7 @@ function Block({ b }) {
       {b.caption && <div className="p-2 bg-[#fafafa] text-xs text-[#666]">{b.caption}</div>}
     </div>
   );
+  if (b.type === "photo") return <PhotoAnnotated image={b.image} callouts={b.callouts || []} caption={b.caption}/>;
   if (b.type === "annotated") return (
     <AnnotatedScreenshot screen={b.screen} callouts={b.callouts || []} caption={b.caption}/>
   );

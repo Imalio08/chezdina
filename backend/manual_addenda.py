@@ -125,6 +125,120 @@ ADDENDA = [
     ]),
 ]
 
+import json as _json  # noqa: E402
+import os as _os  # noqa: E402
+
+_SHOTS_PATH = _os.path.join(_os.path.dirname(__file__), "manual_shots.json")
+_SHOTS = _json.load(open(_SHOTS_PATH)) if _os.path.exists(_SHOTS_PATH) else {}
+
+
+def P(shot: str, caption: str):
+    s = _SHOTS.get(shot) or {}
+    return {"type": "photo", "image": s.get("image", f"/manual/{shot}.jpg"), "callouts": s.get("callouts", []), "caption": caption}
+
+
+ADDENDA += [
+    ("prise en main", [
+        {"id": "add-v2-all-platforms", "heading": "Nouveautés communes : console, app livreur, site", "blocks": [
+            T("Ces règles s'appliquent partout, sur ordinateur, tablette et téléphone (y compris l'application installée sur l'écran d'accueil)."),
+            S(["Plus de zoom automatique : en touchant un champ, l'écran ne grossit plus ; tous les champs sont lisibles en 16 px",
+               "iPhone (encoche, coins arrondis) : rien n'est coupé sur les côtés, les marges latérales sont conservées sur chaque page",
+               "Bandeaux longs (« Livraison 24h à Abidjan… », « Boutique fermée actuellement… ») : si le texte dépasse l'écran, il défile de droite à gauche",
+               "Option choisie toujours visible : la case sélectionnée (Oui / Non, taille, couleur, filtre, mode de paiement…) prend un fond coloré",
+               "Messagerie : chaque conversation peut être archivée puis désarchivée ; le filtre « Archivées » les regroupe ; un nouveau message la fait revenir dans les conversations actives",
+               "Recherche dans les messages : tapez un nom, un numéro de commande (ex. DN-261017-2366) ou un mot du message"]),
+            P("console-messagerie", "Console › Messagerie : recherche et conversations archivées"),
+            TIP("Sur iPhone, ajoutez le site à l'écran d'accueil (Partager › Sur l'écran d'accueil) pour recevoir les notifications.")]},
+    ]),
+    ("caisse", [
+        {"id": "add-v2-paste-variant", "heading": "Commande depuis un message : choisir taille et couleur", "blocks": [
+            S(["Collez le message de la cliente puis « Analyser »", "Si un article n'est pas reconnu, choisissez le produit à la main dans la liste",
+               "Deux listes apparaissent : Taille… et Couleur… avec le stock de chaque option (les options épuisées sont grisées)",
+               "« Remplir le panier » reste bloqué tant que la taille et la couleur ne sont pas choisies"])]},
+        {"id": "add-v2-shared-cart", "heading": "Panier partagé : parcours complet de la cliente", "blocks": [
+            S(["À la Caisse, « Partager le panier » génère un lien à envoyer par WhatsApp",
+               "La cliente ouvre le lien, vérifie les articles et peut réduire les quantités ou retirer un article (jamais augmenter)",
+               "Elle saisit son nom et son téléphone, choisit « À la livraison / Au retrait » ou « Wave », puis confirme",
+               "Wave : le numéro Wave de la boutique s'affiche, elle paie et envoie la capture ; la gérante vérifie puis marque « Paiement reçu »",
+               "La commande apparaît aussitôt dans Commandes au statut « Confirmée » et une notification est envoyée à l'équipe"]),
+            INFO("Un panier préparé en caisse sans livraison devient une commande « Retrait en boutique » à préparer.")]},
+    ]),
+    ("préparer", [
+        {"id": "add-v2-prep-codes", "heading": "Préparation : chaque article vérifié par son code", "blocks": [
+            T("Une commande ne peut plus passer « Prête » sans que chaque pièce ait été vérifiée avec le code de son étiquette. Il n'existe plus de validation manuelle."),
+            P("console-prep", "Écran « Préparer » : une ligne par article avec photo, taille, couleur, quantité et code attendu"),
+            S(["Depuis une commande « À préparer », cliquez « Préparer » (ou « Reprendre »)",
+               "La caméra s'ouvre directement : scannez le QR code ou le code-barres de l'étiquette",
+               "Si le scan ne marche pas : onglet « Taper le code » et saisissez le code imprimé (ex. DEMO-100-37-NOIR)",
+               "Bon article : la ligne devient verte (pour une quantité 2, il faut 2 vérifications)",
+               "Mauvais article : refus avec le message « Mauvais article : attendu Mules Raphia Naturel · Noir · P37 »",
+               "Quand tout est vert : « Marquer comme prête » s'active, puis « Imprimer la fiche colis » en un clic"]),
+            INFO("Chaque vérification (scan ou code tapé, code, personne, heure, réussite ou refus) est inscrite dans le journal en bas de l'écran et dans le journal d'audit.")]},
+    ]),
+    ("produits", [
+        {"id": "add-v2-labels", "heading": "Imprimer les étiquettes QR d'un produit", "blocks": [
+            P("console-product-labels", "Fiche produit : boutons d'impression des étiquettes"),
+            S(["Ouvrez la fiche du produit dans Produits", "« Étiquettes QR » : une étiquette par taille et couleur",
+               "« Étiquettes × stock » : une étiquette par pièce en stock", "La fenêtre d'impression s'ouvre (A4, 3 colonnes) : imprimez ou enregistrez en PDF"]),
+            TIP("Le code imprimé est exactement celui demandé à la préparation : SKU-TAILLE-COULEUR (ex. DEMO-100-37-NOIR).")]},
+        {"id": "add-v2-products-actions", "heading": "Liste des produits : boutons d'action et promotions", "blocks": [
+            P("console-products", "Vue Tableau : Voir, Modifier, Supprimer alignés"),
+            S(["En vue Tableau, chaque ligne a trois boutons carrés : Voir, Modifier, Supprimer", "En vue Grille, le crayon Modifier est toujours visible sur la carte",
+               "Un produit avec un ancien prix supérieur au prix actuel affiche « -X % » sur la carte et la fiche, avec le prix barré",
+               "Ces produits apparaissent dans la section « Promotions » de l'accueil du site et sur la page Promotions"])]},
+    ]),
+    ("fournisseurs", [
+        {"id": "add-v2-reception-labels", "heading": "Étiquettes des pièces reçues", "blocks": [
+            S(["Ouvrez la commande fournisseur et cliquez « Réceptionner », comptez les pièces puis validez",
+               "Dès la réception enregistrée, la fenêtre d'impression des étiquettes s'ouvre : une étiquette QR par pièce reçue",
+               "Pour réimprimer plus tard : bouton « Étiquettes QR des pièces reçues » sur la commande"]),
+            INFO("Les codes des étiquettes de réception sont les mêmes que ceux demandés à la préparation des commandes.")]},
+    ]),
+    ("pointage", [
+        {"id": "add-v2-work-hours", "heading": "Horaires de travail par rôle et par employé", "blocks": [
+            P("console-pointage", "Paramètres › Pointage : horaires et jours par rôle, horaires personnels"),
+            S(["Paramètres › Pointage : chaque rôle (y compris ceux créés plus tard) a son heure d'arrivée, de départ, sa tolérance de retard et ses jours travaillés",
+               "Enregistrez avec « Enregistrer la configuration »",
+               "Bloc « Horaires spécifiques par employé » : « Définir des horaires » remplace ceux du rôle pour cette personne",
+               "« Revenir au rôle » supprime les horaires personnels"]),
+            INFO("Le retard est calculé avec les horaires personnels s'ils existent, sinon avec ceux du rôle ; aucun retard n'est compté un jour non travaillé.")]},
+    ]),
+    ("paramètres", [
+        {"id": "add-v2-store-gps-hours", "heading": "Coordonnées : position GPS et horaires d'ouverture", "blocks": [
+            P("console-coordonnees", "Paramètres › Coordonnées"),
+            S(["Depuis la boutique, touchez « Utiliser ma position actuelle » ou « Placer sur la carte » puis touchez l'emplacement exact",
+               "La position sert à la page Contact du site (carte + itinéraire) et à l'app livreur (repère de la boutique)",
+               "Horaires d'ouverture : pour chaque jour, cochez Ouvert, saisissez début et fin ; « Ajouter une plage » pour une pause de midi ; « Copier partout » applique le jour à la semaine",
+               "Cliquez « Enregistrer »"])]},
+        {"id": "add-v2-delivery-slots", "heading": "Créneaux de livraison par jour", "blocks": [
+            P("console-livraison-slots", "Paramètres › Livraison : grille des créneaux"),
+            S(["Pour chaque jour : ouvert ou fermé", "Un ou plusieurs créneaux avec un nom facultatif (ex. Matin) et les heures de début et de fin", "Enregistrez"])]},
+    ]),
+    ("livreur", [
+        {"id": "add-v2-rider-screens", "heading": "App livreur en images", "blocks": [
+            P("rider-courses", "Courses : la carte « Annulées / Retournées »"),
+            P("rider-historique", "Profil › Historique : journées et commandes en lecture seule"),
+            P("rider-signalement", "Profil › Signaler un problème"),
+            P("rider-messages", "Messages : recherche et archives"),
+            S(["Messages : la barre de recherche trouve une conversation par nom, numéro de commande ou texte",
+               "Le bouton à droite de chaque conversation l'archive ; « Archivées » affiche les conversations archivées et permet de les désarchiver"])]},
+    ]),
+    ("site vitrine", [
+        {"id": "add-v2-storefront", "heading": "Site et espace cliente : nouveautés", "blocks": [
+            P("store-home", "Accueil : bandeau défilant, stickers promotion et section Promotions"),
+            P("store-product-promo", "Fiche produit en promotion"),
+            P("store-account-messages", "Mon compte › Messages : Boutique / Livreur, recherche, archives"),
+            P("store-account-address", "Adresse : GPS ou placement sur la carte"),
+            S(["Photo de profil : après le choix de la photo, la cliente la recadre (zoom, rotation) avant d'enregistrer",
+               "GPS refusé : une fenêtre explique comment autoriser la position sur iPhone et Android, et propose « Placer ma position sur la carte »",
+               "« Télécharger la facture » ouvre la facture (créée automatiquement si besoin) prête à imprimer ou enregistrer en PDF",
+               "Messages rangés en deux onglets : Boutique et Livreur, avec recherche et archives",
+               "Notifications : sur Android, bouton « Installer » et activation dans le navigateur ; sur iPhone, guide « Ajouter Chez Dina à l'écran d'accueil »",
+               "Favoris, Vus récemment, Bons d'achat (codes promo actifs à copier) et Avis à donner fonctionnent sur téléphone",
+               "Lien de parrainage : l'aperçu WhatsApp/Facebook montre une photo produit, le nom de la boutique et l'offre de bienvenue"])]},
+    ]),
+]
+
 
 async def apply_manual_addenda() -> int:
     mods = await db.manual_modules.find({}).sort("number", 1).to_list(100)

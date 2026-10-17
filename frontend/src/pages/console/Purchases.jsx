@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
+import { printPOLabels } from "@/lib/printLabels";
 import { Plus, Pencil, Trash2, X, ChevronRight, ChevronLeft, Printer, QrCode, Check, Package } from "lucide-react";
 
 const COUNTRIES = ["CI", "TR", "CN", "AE", "FR", "MA", "GH", "SN"];
@@ -41,7 +42,8 @@ export default function Purchases() {
     try {
       const r = await api.post(`/purchase-orders/${po.id}/receive`, { items, extra_costs: extras, note });
       toast.success(`${r.data.labels.length} étiquettes générées`);
-      setReceive(null); setLabels(r.data.labels); load();
+      setReceive(null); load();
+      printPOLabels(po.id).catch(() => setLabels(r.data.labels));
     } catch { toast.error("Erreur réception"); }
   };
 

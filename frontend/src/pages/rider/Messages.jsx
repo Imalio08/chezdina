@@ -20,10 +20,13 @@ function Inbox() {
   const [opening, setOpening] = useState(false);
   const [showArch, setShowArch] = useState(false);
   const [tick, setTick] = useState(0);
+  const [q, setQ] = useState("");
+  const [qd, setQd] = useState("");
+  useEffect(() => { const t = setTimeout(() => setQd(q.trim()), 300); return () => clearTimeout(t); }, [q]);
   useEffect(() => {
-    const load = () => api.get("/rider/conversations").then(r => { setList(r.data); kvSet("inbox", r.data).catch(() => {}); }).catch(async () => { const c = await kvGet("inbox").catch(() => null); setList(l => l || c || []); });
+    const load = () => api.get("/rider/conversations", { params: qd ? { q: qd } : {} }).then(r => { setList(r.data); if (!qd) kvSet("inbox", r.data).catch(() => {}); }).catch(async () => { const c = await kvGet("inbox").catch(() => null); setList(l => l || c || []); });
     load(); const t = setInterval(load, 10000); return () => clearInterval(t);
-  }, [tick]);
+  }, [tick, qd]);
   const archive = async (c, archived) => {
     try { await api.patch(`/rider/conversations/${c.id}/archive`, { archived }); toast.success(archived ? "Conversation archivée" : "Conversation désarchivée"); setTick(x => x + 1); }
     catch { toast.error("Action impossible · réessayez"); }
@@ -53,10 +56,11 @@ function Inbox() {
           </button>
         ))}
       </div>
-      <div className="flex justify-end px-1">
+      <div className="flex items-center gap-2 px-1">
+        <input type="search" value={q} onChange={e => setQ(e.target.value)} placeholder="Nom, n° de commande ou message…" className="dina-input flex-1 !py-2" data-testid="rider-inbox-search"/>
         <button onClick={() => setShowArch(v => !v)} className={`text-[11px] font-semibold px-3 py-1 rounded-full border inline-flex items-center gap-1 ${showArch ? "bg-[color:var(--rider-primary)] text-white border-transparent" : "border-[#ececec] dark:border-[#2a2a2a] text-[#666]"}`} data-testid="rider-inbox-archived-toggle"><Archive size={12}/>Archivées{archCount ? ` (${archCount})` : ""}</button>
       </div>
-      {!shown.length && <div className="text-center text-sm text-[#666] py-12" data-testid="rider-inbox-empty"><MessageSquare size={36} className="mx-auto text-[#ccc] mb-2"/>{showArch ? "Aucune conversation archivée" : tab === "clientes" ? "Aucun message de cliente pour le moment" : "Aucun message de la boutique pour le moment"}</div>}
+      {!shown.length && <div className="text-center text-sm text-[#666] py-12" data-testid="rider-inbox-empty"><MessageSquare size={36} className="mx-auto text-[#ccc] mb-2"/>{showArch ? "Aucune conversation archivée" : qd ? `Aucun résultat pour « ${qd} »` : tab === "clientes" ? "Aucun message de cliente pour le moment" : "Aucun message de la boutique pour le moment"}</div>}
       {shown.map(c => (
         <div key={c.id} className="flex items-stretch gap-1.5">
         <button onClick={() => nav(`/riders/messages/${c.id}`)} className="flex-1 min-w-0 text-left bg-white dark:bg-[#1a1a1a] rounded-xl p-3 border border-[#ececec] dark:border-[#2a2a2a] flex gap-3" data-testid={`rider-conv-${c.id}`}>

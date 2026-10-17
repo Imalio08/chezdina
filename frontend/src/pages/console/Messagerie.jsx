@@ -179,9 +179,11 @@ export default function Messagerie() {
     if (filter === "livreurs" && c.kind !== "boutique_livreur") return false;
     if (filter === "unread" && !c.unread) return false;
     if (q) {
+      const s = q.toLowerCase();
       const names = (c.participants || []).map(p => p.name || "").join(" ").toLowerCase();
-      const inMsgs = (c.messages || []).some(m => (m.text || "").toLowerCase().includes(q.toLowerCase()));
-      if (!names.includes(q.toLowerCase()) && !inMsgs) return false;
+      const code = `${c.order_code || ""} ${(c.order_codes || []).join(" ")}`.toLowerCase();
+      const inMsgs = (c.messages || []).some(m => (m.text || "").toLowerCase().includes(s)) || (c.last_message?.text || "").toLowerCase().includes(s);
+      if (!names.includes(s) && !code.includes(s) && !inMsgs) return false;
     }
     return true;
   });
@@ -268,7 +270,7 @@ export default function Messagerie() {
         <div className="dina-card-white p-3 flex flex-col min-h-0">
           <div className="relative mb-2">
             <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[#999]"/>
-            <input className="dina-input pl-7 !py-1.5 text-xs" placeholder="Rechercher nom ou message…" value={q} onChange={e => setQ(e.target.value)} data-testid="msg-search"/>
+            <input className="dina-input pl-7 !py-1.5 text-xs" placeholder="Nom, n° de commande ou message…" value={q} onChange={e => setQ(e.target.value)} data-testid="msg-search"/>
           </div>
           <div className="flex gap-1 mb-2 text-[11px] flex-wrap">
             {[["all","Toutes"],["clientes","Clientes"],["livreurs","Livreurs"],["unread","Non lus"]].map(([k,l]) => (
