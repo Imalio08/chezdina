@@ -55,9 +55,9 @@ export default function OpeningHoursBanner() {
   };
   return (
     <div className="bg-[#fff5f5] dark:bg-[#2a1818] border-b border-[#fde8e8] dark:border-[#4a2828] text-[#b02a2a] px-4 py-2 flex items-center justify-between text-xs" data-testid="hours-banner">
-      <div className="flex items-center gap-2 min-w-0">
+      <div className="flex items-center gap-2 min-w-0 flex-1">
         <Clock size={13} className="shrink-0"/>
-        <span className="truncate"><b>Boutique fermée actuellement</b> · {nextLabel || "nous rouvrirons bientôt"}{countdownMin != null && ` · ${fmtCountdown(countdownMin)}`}</span>
+        <Marquee className="flex-1" testid="hours-banner-text"><b>Boutique fermée actuellement</b> · {nextLabel || "nous rouvrirons bientôt"}{countdownMin != null && ` · ${fmtCountdown(countdownMin)}`}</Marquee>
       </div>
       <button onClick={() => { sessionStorage.setItem("dina_hours_dismissed", "1"); setDismissed(true); }} className="shrink-0 text-[#b02a2a] hover:opacity-70" aria-label="Fermer"><X size={13}/></button>
     </div>

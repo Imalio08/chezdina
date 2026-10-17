@@ -257,7 +257,7 @@ export default function Messagerie() {
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowArchived(!showArchived)} className={`dina-btn-secondary !min-h-[40px] ${showArchived ? "!bg-[#fff5f5] !text-[#b02a2a] !border-[#b02a2a]" : ""}`} data-testid="msg-toggle-archive">
-            {showArchived ? <><ArchiveRestore size={14}/>Voir actives</> : <><Archive size={14}/>Archives ({archived.length})</>}
+            {showArchived ? <><ArchiveRestore size={14}/>Voir actives</> : <><Archive size={14}/>Archivées ({archived.length})</>}
           </button>
           <button onClick={() => setBroadcastOpen(true)} className="dina-btn-primary !min-h-[40px]" data-testid="msg-broadcast"><Megaphone size={14}/>Diffusion</button>
         </div>

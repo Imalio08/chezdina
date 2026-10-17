@@ -4,6 +4,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---- Mobile: no auto-zoom, safe areas, no horizontal cut ---- */
+html, body { max-width: 100%; overflow-x: clip; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+@media (display-mode: standalone) { body { padding-top: env(safe-area-inset-top); } }
+img, video, iframe { max-width: 100%; }
+@media (max-width: 1024px), (hover: none) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea { font-size: 16px !important; }
+}
+button, a, label { touch-action: manipulation; }
+
+/* ---- Marquee for long banners ---- */
+@keyframes dina-marquee { from { transform: translateX(var(--mq-start, 100%)); } to { transform: translateX(-100%); } }
+.dina-marquee-run { padding-left: 100%; animation: dina-marquee linear infinite; will-change: transform; --mq-start: 0%; }
+@media (prefers-reduced-motion: reduce) { .dina-marquee-run { animation-duration: 40s !important; } }
+
+/* ---- Clearly visible selected state ---- */
+button.border-\[\#b02a2a\].text-\[\#b02a2a\], label.border-\[\#b02a2a\], button.border-\[\#b02a2a\].font-semibold,
+[aria-pressed="true"], [role="radio"][aria-checked="true"], [role="tab"][aria-selected="true"], [data-state="on"] {
+  background-color: #fde8e8 !important;
+}
+html.dark button.border-\[\#b02a2a\].text-\[\#b02a2a\], html.dark label.border-\[\#b02a2a\], html.dark button.border-\[\#b02a2a\].font-semibold,
+html.dark [aria-pressed="true"], html.dark [role="radio"][aria-checked="true"], html.dark [role="tab"][aria-selected="true"], html.dark [data-state="on"] {
+  background-color: #3a1c1c !important;
+}
+
 :root {
   --dina-black: #1c1c1c;
   --dina-yellow: #b02a2a;

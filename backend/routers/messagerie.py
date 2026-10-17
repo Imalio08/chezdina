@@ -137,9 +137,28 @@ async def account_threads(c: dict = Depends(get_customer)):
         out.append({
             "id": r.get("id"), "kind": r.get("kind"), "order_id": r.get("order_id"),
             "with": other, "last_message": last, "unread": unread,
-            "updated_at": r.get("updated_at"),
+            "updated_at": r.get("updated_at"), "archived": c["id"] in (r.get("archived_for") or []),
         })
     return clean(out)
+
+
+async def _archive_for(cid: str, uid: str, archived: bool):
+    r = await db.conversations.find_one({"id": cid, "participants.id": uid}, {"id": 1})
+    if not r:
+        raise HTTPException(404, "Conversation introuvable")
+    op = {"$addToSet": {"archived_for": uid}} if archived else {"$pull": {"archived_for": uid}}
+    await db.conversations.update_one({"id": cid}, op)
+    return {"ok": True, "archived": archived}
+
+
+@router.patch("/public/account/threads/{cid}/archive")
+async def account_archive(cid: str, body: Dict[str, Any], c: dict = Depends(get_customer)):
+    return await _archive_for(cid, c["id"], bool(body.get("archived", True)))
+
+
+@router.patch("/rider/conversations/{cid}/archive")
+async def rider_archive(cid: str, body: Dict[str, Any], user: dict = Depends(get_user)):
+    return await _archive_for(cid, user["id"], bool(body.get("archived", True)))
 
 
 @router.post("/public/account/thread/rider/{order_code}")
@@ -432,6 +451,7 @@ async def rider_conversations(user: dict = Depends(get_user)):
         other = next((p for p in r.get("participants") or [] if p.get("id") != user["id"]), {})
         out.append({"id": r["id"], "kind": r.get("kind"), "order_code": r.get("order_code"), "closed": r.get("closed", False),
                     "with": other, "last_message": msgs[-1] if msgs else None, "updated_at": r.get("updated_at"),
+                    "archived": user["id"] in (r.get("archived_for") or []),
                     "unread": sum(1 for m in msgs if user["id"] not in (m.get("read_by") or []))})
     return clean(out)
 

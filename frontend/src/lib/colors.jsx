@@ -13,6 +13,7 @@ export function ColorSwatch({ name, size = 28, selected, disabled, onClick, test
       className={`relative rounded-full transition-transform ${selected ? "ring-2 ring-offset-2 ring-[#1c1c1c] dark:ring-white" : ""} ${disabled ? "opacity-30 cursor-not-allowed" : "hover:scale-110"}`}
       style={{ width: size, height: size, background: colorCss(name), border: isWhite ? "1px solid #ddd" : "1px solid transparent" }}>
       {disabled && <span className="absolute inset-0 flex items-center justify-center"><span className="block w-full h-px bg-[#666] rotate-45"/></span>}
+      {selected && !disabled && <span className="absolute inset-0 grid place-items-center" aria-hidden><span className="w-[55%] h-[55%] rounded-full bg-[#b02a2a] text-white grid place-items-center text-[10px] font-bold shadow">✓</span></span>}
     </button>
   );
 }

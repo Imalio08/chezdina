@@ -20,7 +20,7 @@ import { localFavorites, setLocalFavorites, toggleFavorite } from "@/components/
 import {
   User, Package, MessageSquare, Star, Ticket, Heart, Eye, Gift, UserPlus, Wallet,
   MapPin, Settings, Shield, LogOut, Camera, Phone, MessageCircle, Download,
-  ChevronRight, Pencil, Plus, Check, X, AlertCircle, ArrowLeft, Clock, Bell
+  ChevronRight, Pencil, Plus, Check, X, AlertCircle, ArrowLeft, Clock, Bell, Archive, ArchiveRestore
 } from "lucide-react";
 
 const MENU = [
@@ -667,6 +667,11 @@ function MessagesPage() {
   const nav = useNavigate();
   const [threads, setThreads] = useState([]);
   const [cat, setCat] = useState("boutique");
+  const [showArch, setShowArch] = useState(false);
+  const archiveThread = async (t, archived) => {
+    try { await api.patch(`/public/account/threads/${t.id}/archive`, { archived }); toast.success(archived ? "Conversation archivée" : "Conversation désarchivée"); loadThreads(); }
+    catch { toast.error("Action impossible · réessayez"); }
+  };
   const [active, setActive] = useState(null);
   const [text, setText] = useState("");
   const [photo, setPhoto] = useState(null);
@@ -710,13 +715,16 @@ function MessagesPage() {
             return <button key={k} onClick={() => setCat(k)} className={`py-1.5 rounded-md text-sm ${cat === k ? "bg-white shadow font-semibold text-[#b02a2a]" : "text-[#666]"}`} data-testid={`msg-cat-${k}`}>{l}{n > 0 && <span className="ml-1 bg-[#b02a2a] text-white text-[9px] rounded-full px-1.5">{n}</span>}</button>;
           })}
         </div>
-        {threads.filter(t => isRiderThread(t) === (cat === "livreur")).length === 0 && <div className="text-xs text-[#999] text-center py-6" data-testid="msg-cat-empty">{cat === "livreur" ? "Aucun message de livreur" : "Aucun message de la boutique"}</div>}
-        {threads.filter(t => isRiderThread(t) === (cat === "livreur")).map(t => {
+        {(() => { const n = threads.filter(t => t.archived).length; return (
+          <button onClick={() => setShowArch(v => !v)} className={`w-full mb-2 py-1.5 rounded-md text-xs border inline-flex items-center justify-center gap-1 ${showArch ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec] text-[#666]"}`} data-testid="msg-archived-toggle"><Archive size={12}/>{showArch ? "Voir les conversations actives" : `Archivées${n ? ` (${n})` : ""}`}</button>); })()}
+        {threads.filter(t => !!t.archived === showArch && isRiderThread(t) === (cat === "livreur")).length === 0 && <div className="text-xs text-[#999] text-center py-6" data-testid="msg-cat-empty">{showArch ? "Aucune conversation archivée" : cat === "livreur" ? "Aucun message de livreur" : "Aucun message de la boutique"}</div>}
+        {threads.filter(t => !!t.archived === showArch && isRiderThread(t) === (cat === "livreur")).map(t => {
           const other = t.with || (t.participants || []).find(p => p.id !== customer.id) || {};
           const last = t.last_message || (t.messages || [])[t.messages?.length - 1];
           const unread = t.unread ?? (t.messages || []).filter(m => !(m.read_by || []).includes(customer.id)).length;
           return (
-            <button key={t.id} onClick={() => nav(`/compte/messages/${t.id}`)} className={`w-full text-left p-2.5 rounded-lg hover:bg-[#fff5f5] ${id === t.id ? "bg-[#fff5f5]" : ""}`} data-testid={`thread-${t.id}`}>
+            <div key={t.id} className="flex items-center gap-1">
+            <button onClick={() => nav(`/compte/messages/${t.id}`)} className={`flex-1 min-w-0 text-left p-2.5 rounded-lg hover:bg-[#fff5f5] ${id === t.id ? "bg-[#fff5f5]" : ""}`} data-testid={`thread-${t.id}`}>
               <div className="flex gap-2 items-start">
                 <div className="w-8 h-8 rounded-full bg-[#fde8e8] text-[#b02a2a] font-semibold text-xs grid place-items-center shrink-0">{other.name?.[0] || "?"}</div>
                 <div className="flex-1 min-w-0">
@@ -728,6 +736,8 @@ function MessagesPage() {
                 </div>
               </div>
             </button>
+            <button onClick={() => archiveThread(t, !t.archived)} className="w-9 h-9 shrink-0 rounded-lg grid place-items-center text-[#666] hover:bg-[#fff5f5]" title={t.archived ? "Désarchiver" : "Archiver"} aria-label={t.archived ? "Désarchiver" : "Archiver"} data-testid={`thread-archive-${t.id}`}>{t.archived ? <ArchiveRestore size={15}/> : <Archive size={15}/>}</button>
+            </div>
           );
         })}
       </div>

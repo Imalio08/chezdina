@@ -6,6 +6,7 @@ import { useApp } from "@/context/AppContext";
 import { useCustomer } from "@/context/CustomerContext";
 import useSiteTheme from "@/hooks/useSiteTheme";
 import api from "@/lib/api";
+import Marquee from "@/components/shared/Marquee";
 import { FacebookLogo, WhatsappLogo, TiktokLogo } from "@/components/shared/BrandIcons";
 
 const SOCIAL_ICONS = {
@@ -84,7 +85,7 @@ export default function StorefrontLayout() {
 
   return (
     <div className="min-h-screen bg-white dark:bg-[#0f0f0f] text-[#1c1c1c] dark:text-[#f0f0f0]">
-      <div className="bg-[#b02a2a] text-white text-center text-xs py-1.5">Livraison 24h à Abidjan · Paiement à la livraison · WhatsApp 0777 92 61 79</div>
+      <div className="bg-[#b02a2a] text-white text-xs py-1.5 px-3"><Marquee className="text-center" testid="promo-banner">Livraison 24h à Abidjan · Paiement à la livraison · WhatsApp 0777 92 61 79</Marquee></div>
       <header className="sticky top-0 z-30 bg-white dark:bg-[#141414] border-b border-[#ececec] dark:border-[#2a2a2a]">
         <div className="max-w-6xl mx-auto px-3 sm:px-4 h-16 sm:h-20 flex items-center gap-1.5 sm:gap-3 md:gap-4">
           <Link to="/" className="flex items-center gap-2 shrink-0" data-testid="storefront-logo">

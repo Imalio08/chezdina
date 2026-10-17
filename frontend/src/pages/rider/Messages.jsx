@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
 import { toast } from "sonner";
-import { ArrowLeft, MessageSquare, Store, Package } from "lucide-react";
+import { ArrowLeft, MessageSquare, Store, Package, Archive, ArchiveRestore } from "lucide-react";
 import { notifsChanged } from "@/pages/rider/Notifications";
 import { dateTimeFmt } from "@/lib/format";
 import { MessagePhotos, PhotoLightbox } from "@/components/shared/OrderThread";
@@ -18,10 +18,16 @@ function Inbox() {
   const [list, setList] = useState(null);
   const [tab, setTab] = useState(() => sessionStorage.getItem("rider_inbox_tab") || "clientes");
   const [opening, setOpening] = useState(false);
+  const [showArch, setShowArch] = useState(false);
+  const [tick, setTick] = useState(0);
   useEffect(() => {
     const load = () => api.get("/rider/conversations").then(r => { setList(r.data); kvSet("inbox", r.data).catch(() => {}); }).catch(async () => { const c = await kvGet("inbox").catch(() => null); setList(l => l || c || []); });
     load(); const t = setInterval(load, 10000); return () => clearInterval(t);
-  }, []);
+  }, [tick]);
+  const archive = async (c, archived) => {
+    try { await api.patch(`/rider/conversations/${c.id}/archive`, { archived }); toast.success(archived ? "Conversation archivée" : "Conversation désarchivée"); setTick(x => x + 1); }
+    catch { toast.error("Action impossible · réessayez"); }
+  };
   const pick = (t) => { setTab(t); sessionStorage.setItem("rider_inbox_tab", t); };
   const writeStore = async () => {
     setOpening(true);
@@ -29,7 +35,9 @@ function Inbox() {
     catch { toast.error("Impossible d'ouvrir la conversation · réessayez"); } finally { setOpening(false); }
   };
   if (!list) return <div className="text-center text-sm text-[#666] py-10">Chargement…</div>;
-  const groups = { clientes: list.filter(isClient), boutique: list.filter(c => !isClient(c)) };
+  const live = list.filter(c => !!c.archived === showArch);
+  const groups = { clientes: live.filter(isClient), boutique: live.filter(c => !isClient(c)) };
+  const archCount = list.filter(c => c.archived).length;
   const unread = (arr) => arr.reduce((s, c) => s + (c.unread || 0), 0);
   const shown = groups[tab];
   return (
@@ -45,9 +53,13 @@ function Inbox() {
           </button>
         ))}
       </div>
-      {!shown.length && <div className="text-center text-sm text-[#666] py-12" data-testid="rider-inbox-empty"><MessageSquare size={36} className="mx-auto text-[#ccc] mb-2"/>{tab === "clientes" ? "Aucun message de cliente pour le moment" : "Aucun message de la boutique pour le moment"}</div>}
+      <div className="flex justify-end px-1">
+        <button onClick={() => setShowArch(v => !v)} className={`text-[11px] font-semibold px-3 py-1 rounded-full border inline-flex items-center gap-1 ${showArch ? "bg-[color:var(--rider-primary)] text-white border-transparent" : "border-[#ececec] dark:border-[#2a2a2a] text-[#666]"}`} data-testid="rider-inbox-archived-toggle"><Archive size={12}/>Archivées{archCount ? ` (${archCount})` : ""}</button>
+      </div>
+      {!shown.length && <div className="text-center text-sm text-[#666] py-12" data-testid="rider-inbox-empty"><MessageSquare size={36} className="mx-auto text-[#ccc] mb-2"/>{showArch ? "Aucune conversation archivée" : tab === "clientes" ? "Aucun message de cliente pour le moment" : "Aucun message de la boutique pour le moment"}</div>}
       {shown.map(c => (
-        <button key={c.id} onClick={() => nav(`/riders/messages/${c.id}`)} className="w-full text-left bg-white dark:bg-[#1a1a1a] rounded-xl p-3 border border-[#ececec] dark:border-[#2a2a2a] flex gap-3" data-testid={`rider-conv-${c.id}`}>
+        <div key={c.id} className="flex items-stretch gap-1.5">
+        <button onClick={() => nav(`/riders/messages/${c.id}`)} className="flex-1 min-w-0 text-left bg-white dark:bg-[#1a1a1a] rounded-xl p-3 border border-[#ececec] dark:border-[#2a2a2a] flex gap-3" data-testid={`rider-conv-${c.id}`}>
           <div className="w-9 h-9 rounded-full bg-[color:var(--rider-accent)] text-[color:var(--rider-primary)] font-bold text-sm grid place-items-center shrink-0">{(c.with?.name || "?")[0]}</div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between gap-2">
@@ -58,6 +70,8 @@ function Inbox() {
             <div className="text-xs text-[#666] truncate">{c.last_message?.text || (c.last_message ? "📷 Photo" : "Nouvelle conversation")}</div>
           </div>
         </button>
+        <button onClick={() => archive(c, !c.archived)} className="w-11 shrink-0 rounded-xl border border-[#ececec] dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] grid place-items-center text-[#666]" title={c.archived ? "Désarchiver" : "Archiver"} aria-label={c.archived ? "Désarchiver" : "Archiver"} data-testid={`rider-conv-archive-${c.id}`}>{c.archived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
+        </div>
       ))}
     </div>
   );
