@@ -188,7 +188,7 @@ function Block({ b }) {
       {b.caption && <div className="p-2 bg-[#fafafa] text-xs text-[#666]">{b.caption}</div>}
     </div>
   );
-  if (b.type === "photo") return <PhotoAnnotated image={b.image} callouts={b.callouts || []} caption={b.caption}/>;
+  if (b.type === "photo") return <PhotoAnnotated image={b.image} callouts={b.callouts || []} caption={b.caption} ratio={b.ratio}/>;
   if (b.type === "annotated") return (
     <AnnotatedScreenshot screen={b.screen} callouts={b.callouts || []} caption={b.caption}/>
   );

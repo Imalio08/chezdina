@@ -704,7 +704,7 @@ function MessagesPage() {
     catch (e) { toast.error(e.response?.data?.detail || "Message non envoyé · réessayez"); } finally { setSending(false); }
   };
 
-  if (!threads.length && !id) {
+  if (!threads.length && !id && !tq.trim()) {
     return <EmptyState icon={MessageSquare} title="Aucun message" subtitle="Les messages de la boutique et du livreur apparaîtront ici"/>;
   }
 
@@ -720,7 +720,7 @@ function MessagesPage() {
         <input type="search" value={tq} onChange={e => setTq(e.target.value)} placeholder="Nom, n° de commande ou message…" className="dina-input w-full mb-2 !py-2" data-testid="msg-search"/>
         {(() => { const n = threads.filter(t => t.archived).length; return (
           <button onClick={() => setShowArch(v => !v)} className={`w-full mb-2 py-1.5 rounded-md text-xs border inline-flex items-center justify-center gap-1 ${showArch ? "bg-[#b02a2a] text-white border-[#b02a2a]" : "border-[#ececec] text-[#666]"}`} data-testid="msg-archived-toggle"><Archive size={12}/>{showArch ? "Voir les conversations actives" : `Archivées${n ? ` (${n})` : ""}`}</button>); })()}
-        {threads.filter(t => !!t.archived === showArch && isRiderThread(t) === (cat === "livreur")).length === 0 && <div className="text-xs text-[#999] text-center py-6" data-testid="msg-cat-empty">{showArch ? "Aucune conversation archivée" : cat === "livreur" ? "Aucun message de livreur" : "Aucun message de la boutique"}</div>}
+        {threads.filter(t => !!t.archived === showArch && isRiderThread(t) === (cat === "livreur")).length === 0 && <div className="text-xs text-[#999] text-center py-6" data-testid="msg-cat-empty">{showArch ? "Aucune conversation archivée" : tq.trim() ? `Aucun résultat pour « ${tq.trim()} »` : cat === "livreur" ? "Aucun message de livreur" : "Aucun message de la boutique"}</div>}
         {threads.filter(t => !!t.archived === showArch && isRiderThread(t) === (cat === "livreur")).map(t => {
           const other = t.with || (t.participants || []).find(p => p.id !== customer.id) || {};
           const last = t.last_message || (t.messages || [])[t.messages?.length - 1];

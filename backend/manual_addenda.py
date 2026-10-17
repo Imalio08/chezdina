@@ -134,7 +134,7 @@ _SHOTS = _json.load(open(_SHOTS_PATH)) if _os.path.exists(_SHOTS_PATH) else {}
 
 def P(shot: str, caption: str):
     s = _SHOTS.get(shot) or {}
-    return {"type": "photo", "image": s.get("image", f"/manual/{shot}.jpg"), "callouts": s.get("callouts", []), "caption": caption}
+    return {"type": "photo", "image": s.get("image", f"/manual/{shot}.jpg"), "callouts": s.get("callouts", []), "caption": caption, "ratio": s.get("ratio")}
 
 
 ADDENDA += [

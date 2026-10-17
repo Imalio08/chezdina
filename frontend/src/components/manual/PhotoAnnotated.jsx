@@ -1,9 +1,9 @@
 import React from "react";
 
 /** Real screenshot with numbered markers (x/y/w/h in % of the image) and a legend. */
-export default function PhotoAnnotated({ image, callouts = [], caption }) {
+export default function PhotoAnnotated({ image, callouts = [], caption, ratio }) {
   return (
-    <figure className="rounded-xl overflow-hidden border border-[#ececec] dark:border-[#2a2a2a] bg-[#fafafa] dark:bg-[#141414]" data-testid="manual-photo">
+    <figure className={`rounded-xl overflow-hidden border border-[#ececec] dark:border-[#2a2a2a] bg-[#fafafa] dark:bg-[#141414] ${ratio && ratio < 1 ? "max-w-[380px] mx-auto" : ""}`} data-testid="manual-photo">
       <div className="relative">
         <img src={image} alt={caption || "Capture d'écran"} className="w-full block" loading="lazy"/>
         {callouts.map(c => (

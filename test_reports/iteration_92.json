@@ -1,0 +1,44 @@
+{
+  "summary": "Iteration 92: tested conversation search (console, rider app, customer space), PO reception QR labels (API + console reprint button), and the updated user manual (add-v2 sections + annotated screenshots). Backend 18/18 pytest pass. Frontend: console search works (name/order/message text incl. older messages); rider search works server-side with debounce and shows 'Aucun résultat pour « … »'; po-qr opens a blob window with 3 .lb labels with QR svg, code DN-10000-42-MARINE; manual modules 1,2,3,6,7,12,13,14,15 have the add-v2-* sections, all 15 /manual/*.jpg return 200 and render with markers + legend; module 3 shows 'Préparation : chaque article vérifié par son code' with console-prep.jpg. One real UI bug found in the customer messages search (no-result state hides the search box).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/purchase-orders/{pid}/labels", "issue": "qty falls back to the ordered 'qty' when qty_counted/qty_received are missing. BC-2026-208 shows 'Qté reçue —' in the detail screen but gets 3 labels. The labels are meant to be for received pieces only, so the code should fall back to 0 (or require status recu/receptionne) rather than the ordered qty. Unreceived POs tested (BC-2025-100, BC-2025-107) correctly return 0 labels."},
+      {"endpoint": "GET /api/purchase-orders/{pid}/labels vs /api/orders/{oid}/prep", "issue": "When the product doc is missing (the example PO 80be8b95 points to deleted product 924d4191) or the product has no sku, the label code is built from the PO line sku (DN-10000-42-MARINE). The prep expected_code for an order line of the same product has no sku ('38-DORÉ' on order DN-260713-1163), so a reception label would be rejected at preparation. For existing products with a sku the codes match: same expected() function, 0 mismatches over 5 live PO lines. 10 of 15 PO lines reference deleted products."},
+      {"endpoint": "GET /api/public/account/threads", "issue": "Rows are limited to 100 before filtering (rider endpoint: 200), so older conversations can never be found by search. Not an issue at current data volume."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "AccountShell Messages (/compte/messages)", "issue": "If a search matches no thread at all (e.g. 'zzqxw'), `if (!threads.length && !id)` (AccountShell.jsx ~line 707) replaces the whole panel with the EmptyState 'Aucun message … Continuer mes achats'. The search input disappears, so the customer cannot clear the query without leaving the page. Fix: add `&& !tq.trim()` to the condition and show 'Aucun résultat pour « … »' in the list.", "selector": "[data-testid='msg-search']", "priority": "HIGH"}
+    ],
+    "integration_issues": [
+      {"flow": "BlindReceive completion -> auto label print", "issue": "printPOLabels runs window.open from onDone, after the awaited blind-receive POST, so it is outside the click gesture. If the browser blocks the popup (w === null), openSheet runs `window.location.href = blobUrl`, which navigates the console away to the label sheet. Not executed, to avoid receiving a real PO. Suggest opening the window synchronously in the submit click handler, or falling back to the in-app labels modal (Purchases.jsx already does this with setLabels).", "affected_selectors": ["[data-testid='blind-receive']"]}
+    ],
+    "design_issues": [
+      {"screen": "/console/manuel/15 (and other mobile screenshots)", "issues": ["The portrait rider screenshots (390px wide) are stretched to the full manual column width (~1000px), so they look blurry/pixelated and very tall. Cap the width of portrait photos (e.g. max-w-[380px] mx-auto)."]},
+      {"screen": "Rider /riders/messages (390px)", "issues": ["The search placeholder 'Nom, n° de commande ou message…' is cut off ('Nom, n° de commande ou') because the Archivées button sits next to it. The customer search at 260px is also cut off."]},
+      {"screen": "Console messagerie / customer messages", "issues": ["The no-result state shows a generic 'Aucune conversation' / 'Aucun message de la boutique' instead of 'Aucun résultat pour « … »' (the rider app does this correctly).", "Search is accent-sensitive ('nadege' does not match 'Nadège'); consider NFD normalisation."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter92_search_labels.py", "/app/test_reports/pytest/pytest_iter92.xml"],
+  "action_items": [
+    "AccountShell.jsx: do not replace the messages panel with EmptyState while a search query is active (keep msg-search visible, show 'Aucun résultat pour « … »').",
+    "po_labels: use qty_counted/qty_received only (fallback 0, not ordered qty), so 'pièces reçues' really means received.",
+    "po_labels/expected(): make the label code and the prep expected code agree when the product has no sku or is missing (e.g. also accept the PO-line sku variant in prep accepted codes, or build both from the same source).",
+    "BlindReceive onDone: avoid the window.location.href fallback when the popup is blocked; open the window during the click or show the in-app labels modal.",
+    "Manual: cap the width of portrait (mobile) screenshots."
+  ],
+  "critical_code_review_comments": [
+    "printLabels.openSheet: when window.open returns null, `window.location.href = url` replaces the console SPA; prefer a toast or modal fallback.",
+    "Customer threads output has no order_code field; matching on the order code only works because the participant name/order_code exist in the DB doc, and the UI cannot show which order matched.",
+    "Customer Messages: unread badges and the 'Archivées (n)' count are computed from the filtered list, so they change while searching (minor)."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter92_search_labels.py"],
+  "success_rate": {"backend": "100% (18/18)", "frontend": "~88% (1 UI bug in customer search empty state)"},
+  "seed_data_creation": "None. No messages sent, no PO received or modified.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Console login at /console/connexion (first input = email, then the 'Se connecter' button). Rider PIN login at /riders/connexion with rider-pin-key-5 x4 + rider-pin-submit. Customer login at /compte (account-phone/account-code/account-login). Console conv rows: [data-testid^=msg-conv-]; rider rows: [data-testid^=rider-conv-]; customer rows: [data-testid^=thread-]. PO BC-2026-208 (80be8b95) references a deleted product. PO bead8701 is a received PO with an existing product (code DEMO-100-37). Manual images are lazy loaded; scroll them into view before checking naturalWidth. Auth playbook items were not re-tested this iteration (only login).",
+  "test_credentials": "From /app/memory/test_credentials.md: admin aouattaraesca@gmail.com/Admin123!, rider PIN 5555, customer Awa +225 07 85 55 58 88 / 386436"
+}

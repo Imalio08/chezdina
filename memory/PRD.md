@@ -1233,4 +1233,11 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Tests : iteration_91 (backend 11/11, frontend 95 % → bug Marquee et désarchivage corrigés).
 
 
+## 2026-10-17 — Recherche messages, étiquettes réception, manuel illustré
+- Recherche conversations : param q sur /rider/conversations et /public/account/threads (nom, n° commande, texte) ; champs de recherche app livreur et espace cliente ; console étendue au n° de commande.
+- Étiquettes réception : GET /purchase-orders/{pid}/labels (1 étiquette par pièce reçue, code identique à la préparation) ; impression auto après réception + bouton « Étiquettes QR des pièces reçues » (printPOLabels, pop-up bloquée → message, plus de navigation forcée).
+- Manuel : 12 nouvelles sections add-v2-* (modules 1,2,3,6,7,12,13,14,15) avec vraies captures annotées (bloc « photo », PhotoAnnotated.jsx, /frontend/public/manual/*.jpg, positions dans backend/manual_shots.json). Recapture : `python3 /app/scripts/manual_capture.py` (playwright installé dans le pod, hors requirements).
+- Tests : iteration_92 (backend 18/18 ; bug recherche cliente sans résultat corrigé ; captures portrait limitées à 380 px).
+
+
 

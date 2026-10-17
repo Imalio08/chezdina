@@ -28,7 +28,8 @@ function openSheet(w, title, rows, subtitle) {
 <body><div class="bar">${esc(subtitle)} <button onclick="print()">Imprimer</button></div>
 <div class="g">${cards}</div><script>setTimeout(function(){print()},400)</script></body></html>`;
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-  if (w) w.location.href = url; else window.location.href = url;
+  if (w) { w.location.href = url; return; }
+  if (!window.open(url, "_blank")) throw new Error("Pop-up bloquée · autorisez les pop-ups puis réimprimez les étiquettes");
 }
 
 /** One QR label per size/colour (codes = preparation codes). perPiece → one label per unit in stock. */

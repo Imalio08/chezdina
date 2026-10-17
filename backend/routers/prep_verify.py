@@ -88,8 +88,9 @@ async def po_labels(pid: str, user: dict = Depends(get_user)):
     pids = [it.get("product_id") for it in po.get("items") or []]
     prods = {p["id"]: p for p in await db.products.find({"id": {"$in": pids}}).to_list(500)}
     out = []
+    received = po.get("status") in ("recu", "receptionne", "recu_partiel", "cloture")
     for it in po.get("items") or []:
-        qty = int(next((it[k] for k in ("qty_counted", "qty_received", "qty") if it.get(k) is not None), 0) or 0)
+        qty = int(next((it[k] for k in ("qty_counted", "qty_received") if it.get(k) is not None), it.get("qty") if received else 0) or 0)
         p = prods.get(it.get("product_id"), {"name": it.get("product_name"), "sku": it.get("sku")})
         e = expected(p, {"name": it.get("product_name") or p.get("name"), "size": it.get("size"), "color": it.get("color"), "product_id": it.get("product_id"), "sku": it.get("sku")})
         out += [{"code": e["code"], "name": it.get("product_name") or p.get("name"), "size_tag": _size_tag(p, it.get("size")),
