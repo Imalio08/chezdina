@@ -14,10 +14,14 @@ def _n(x) -> str:
     return re.sub(r"\s+", "", str(x or "")).upper()
 
 
+SHOE_WORDS = ("chauss", "mule", "escarpin", "sandale", "basket", "talon", "ballerine", "botte", "derby", "mocassin")
+
+
 def _size_tag(product: Dict[str, Any], size) -> str:
     if not size:
         return ""
-    return f"P{size}" if (product.get("category") or "").lower().startswith("chauss") else f"T{size}"
+    text = f"{product.get('category') or ''} {product.get('name') or ''}".lower()
+    return f"P{size}" if any(w in text for w in SHOE_WORDS) else f"T{size}"
 
 
 def expected(product: Dict[str, Any], item: Dict[str, Any]) -> Dict[str, Any]:
@@ -31,6 +35,9 @@ def expected(product: Dict[str, Any], item: Dict[str, Any]) -> Dict[str, Any]:
     if not (size or color) or len({(x.get("size"), x.get("color")) for x in product.get("variants") or []}) <= 1:
         ok |= {sku, _n(product.get("barcode")), _n(product.get("ean"))}
     ok.discard("")
+    if not display:
+        display = _n(f"ID-{(item.get('product_id') or 'X')[:8]}")
+    ok.add(display)
     label = " · ".join(x for x in (item.get("name") or product.get("name"), color, _size_tag(product, size)) if x)
     return {"code": display, "accepted": ok, "label": label}
 

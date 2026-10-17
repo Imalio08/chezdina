@@ -1205,3 +1205,10 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Tests : iteration_88 (backend 13/13 ; 2 bugs front corrigés ensuite : libellés bons, catégorie messages).
 
 
+
+## 2026-10-17 — Préparation : vérification obligatoire par code
+- routers/prep_verify.py : GET /orders/{oid}/prep (lignes + code attendu + journal), POST /orders/{oid}/prep/verify {code, method scan|saisie} ; code attendu = code variante ou SKU-TAILLE-COULEUR (SKU|taille|couleur accepté) ; refus « Mauvais article : attendu … · couleur · P/T taille » ; journal prep_checks + audit_log.
+- status-v3 « prete » refusé tant que toutes les pièces ne sont pas vérifiées côté serveur ; override manuel supprimé.
+- components/orders/PrepRunner.jsx : caméra ouverte par défaut, mode « Taper le code », lignes vertes, journal, « Marquer comme prête » + « Imprimer la fiche colis ».
+- Tests : iteration_89 (backend 15/15, frontend 100 %) ; préfixe P pour chaussures (mules, escarpins…) ajouté ensuite.
+

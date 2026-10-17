@@ -1,0 +1,36 @@
+{
+  "summary": "Tested order preparation with per-item code verification. Backend: 15/15 pytest pass (/app/backend/tests/test_prep_verify.py). GET /prep returns lines with expected_code DEMO-100-37-NOIR, label 'Mules Raphia Naturel · Noir · T37', qty, done and log, with no 'accepted' leak. A wrong code returns ok:false with 'Mauvais article : attendu Mules Raphia Naturel · Noir · T37'. These spellings are all accepted: SKU-SIZE-COLOR, SKU|size|color, lowercase, and codes with leading/trailing spaces. done increments correctly, and an extra scan beyond qty gets 'Déjà vérifié … article en trop'. Status moves confirmee to en_preparation on the first ok. prep_checks and audit_log record method, by and at. status-v3 'prete' returns 400 'Articles non vérifiés par code : … 1/2' until all lines are verified, and client-sent scanned_items/manual flags are ignored. Legacy PATCH /status 'prete' is blocked. Verify after 'prete' returns 400, an unknown order returns 404, and calls without auth return 401/403. Frontend, admin at desktop 1920 (Commandes tab 'À préparer', search, then order-prepare-TEST-PREP-1) and tablet 768 (OrderDetail /console/commandes/TEST-PREP-1): the runner shows photo, size, color, qty and expected code. Camera scan is the default mode; headless Chromium has a fake camera, so the camera started and prep-camera-error did not appear. Typing a wrong code shows prep-refusal with the exact message. Typing the correct code twice (button and Enter key) turns the line green (prep-line-ok-0), and the input is then hidden. prep-mark-ready is disabled before and enabled after; clicking it gives toast 'Commande prête ✓' and DB status prete. prep-print-slip opens the fiche-colis-TEST-PREP-1.pdf preview with Télécharger/Imprimer. prep-log lists 'Code tapé', code, user name and time. No 'Manuel' button or prep-manual-* testid appears in the active UI. The od-status-prete chip on OrderDetail is refused with 'Passez par l'écran de préparation (scan)…'. Auth basics: bcrypt $2b$ hash and access_token cookie set on login.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/orders/{oid}/prep/verify", "issue": "A line whose product no longer exists and has no sku/size/color (e.g. TEST-PREP-2, product_id 'x') gets expected_code '' and an empty accepted set. It can never be verified, so the order can never be marked 'prete'. There is no admin path and no clear UI message (the line just shows 'Code attendu :' blank)."},
+      {"endpoint": "POST /api/orders/{oid}/prep/verify", "issue": "The done count is computed with read-then-$push (not atomic). Two concurrent scans at done=qty-1 could both be accepted (done > qty). This is low risk, but a conditional update would fix it."},
+      {"endpoint": "expected() size tag", "issue": "The P/T size prefix depends on category starting with 'chauss'. Product 'Mules Raphia Naturel' is in category 'Cabas', so its label shows 'T37' instead of 'P37'. This is a data issue but worth knowing: the spec example uses P39."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "PrepRunner footer", "issues": ["prep-print-slip uses dina-btn-secondary and looks fully enabled while disabled (no reduced opacity/cursor). prep-mark-ready does show a faded disabled state, so the two are inconsistent."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_prep_verify.py", "/app/test_reports/pytest/pytest_prep_verify.xml"],
+  "action_items": [
+    "Remove dead LegacyPrepRunner (Preparation.jsx lines ~189-359). It still contains the 'Manuel' override button (prep-manual-*) and sends scanned/manual flags. It is unused today (the backend ignores those flags anyway) but it risks being re-wired.",
+    "Handle lines with no resolvable expected code: show a clear error, or allow a fallback code such as product id/name, so orders are not stuck.",
+    "Give prep-print-slip a visible disabled style.",
+    "Optional: make the prep_checks increment atomic to prevent over-verification under concurrent scans."
+  ],
+  "critical_code_review_comments": [
+    "Preparation.jsx is 359 lines, ~170 of them dead legacy code (LegacyPrepRunner) that still includes the removed manual override.",
+    "GET /orders/{oid}/prep has no role check (any authenticated user, including rider/customer tokens if accepted by get_user, can read lines). verify enforces PREP_ROLES.",
+    "OrderDetail passes {...order, status:'en_preparation'} to PrepRunner, which is fine. When all items are verified the input/refusal area is hidden, so a stray extra scan is not possible from the UI."
+  ],
+  "updated_files": ["/app/backend/tests/test_prep_verify.py"],
+  "success_rate": {"backend": "100%", "frontend": "100%"},
+  "seed_data_creation": "Used the provided TEST_prep_order / TEST_prep_order2. At the end both orders were deleted, along with 18 audit_log entries with entity_id ^TEST_prep.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_prep_verify.py expects order id TEST_prep_order (code TEST-PREP-1, status confirmee, 1 item product 6edcb788-e83f-4dec-8a66-855e25544719 'Mules Raphia Naturel' size 37 color Noir qty 2 price 1000). That order was deleted after the run, so re-insert it before re-running. Staff login UI: first input = email, input[type=password], button 'Se connecter'. Orders search testid ends with '-q'."
+}

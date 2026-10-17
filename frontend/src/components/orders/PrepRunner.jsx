@@ -143,7 +143,7 @@ export default function PrepRunner({ order, onBack }) {
         {!allDone && <div className="text-xs text-[#666] flex items-center gap-1"><AlertTriangle size={12} className="text-[#e4991e]"/>Chaque article doit être vérifié avec son code ({lines.length - doneCount} restant{lines.length - doneCount > 1 ? "s" : ""})</div>}
         <div className="flex gap-2">
           {!ready && <button onClick={markReady} disabled={!allDone || busy} className="dina-btn-primary flex-1 !min-h-[48px]" data-testid="prep-mark-ready"><Package size={16}/>{busy ? "Enregistrement…" : "Marquer comme prête"}</button>}
-          <button onClick={() => slip(order).catch(() => toast.error("Impression impossible"))} disabled={!allDone} className={`${ready ? "dina-btn-primary" : "dina-btn-secondary"} flex-1 !min-h-[48px]`} data-testid="prep-print-slip"><Printer size={16}/>Imprimer la fiche colis</button>
+          <button onClick={() => slip(order).catch(() => toast.error("Impression impossible"))} disabled={!allDone} className={`${ready ? "dina-btn-primary" : "dina-btn-secondary"} flex-1 !min-h-[48px] disabled:opacity-40 disabled:cursor-not-allowed`} data-testid="prep-print-slip"><Printer size={16}/>Imprimer la fiche colis</button>
           {ready && <button onClick={onBack} className="dina-btn-secondary !min-h-[48px]" data-testid="prep-done-back">Terminer</button>}
         </div>
       </div>
