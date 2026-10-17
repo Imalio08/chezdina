@@ -6,6 +6,8 @@ import { Check, Package, ScanLine, AlertTriangle, ArrowLeft, Keyboard, LayoutGri
 import { useNavigate } from "react-router-dom";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS, slotOf } from "@/components/shared/OrderFilters";
 import { downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import PrepRunner from "@/components/orders/PrepRunner";
+export { PrepRunner };
 
 const PREP_STATUSES = ["nouvelle", "confirmee", "en_preparation", "prete"];
 const KANBAN_COLS = [["nouvelle", "Nouvelles", "#0021cc"], ["confirmee", "Confirmées", "#5867fd"], ["en_preparation", "En préparation", "#e4991e"], ["prete", "Prêtes", "#1f8a4c"]];
@@ -183,7 +185,8 @@ const MANUAL_REASONS = [
   "Scan refusé plusieurs fois",
 ];
 
-export function PrepRunner({ order, onBack }) {
+// eslint-disable-next-line no-unused-vars
+function LegacyPrepRunner({ order, onBack }) {
   // Each item line gets: scanned (boolean), manual (boolean), reason (string)
   const [lines, setLines] = useState(() => (order.items || []).map((it, i) => ({ idx: i, item: it, done: 0, scanned: false, manual: false, reason: "" })));
   const [scanBuffer, setScanBuffer] = useState("");

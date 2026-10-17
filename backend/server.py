@@ -5534,27 +5534,15 @@ async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Dep
             raise HTTPException(400, "Raison obligatoire pour cette action (override)")
     # Preparation control: 'prete' requires scanned items match
     if new_status == "prete":
-        scanned = body.get("scanned_items") or []
-        items = o.get("items", [])
-        if len(scanned) != len(items):
-            raise HTTPException(400, f"Scan incomplet : {len(scanned)}/{len(items)} articles")
-        for it, s in zip(items, scanned):
-            if s.get("manual"):
-                if not (s.get("manual_reason") or "").strip():
-                    raise HTTPException(400, f"Motif obligatoire pour la validation manuelle de {it.get('name')}")
-                continue
-            done = int(s.get("scanned_qty") or 0)
-            if not s.get("scanned") or done < int(it.get("qty") or 1):
-                raise HTTPException(400, f"{it.get('name')} : {done}/{int(it.get('qty') or 1)} scanné(s)")
+        from routers.prep_verify import prep_complete
+        missing = await prep_complete(o)
+        if missing:
+            raise HTTPException(400, "Articles non vérifiés par code : " + " ; ".join(missing))
     if new_status == "annulee" and o.get("status") != "annulee":
         await _restock_order(o)
     patch = {"status": new_status, "updated_at": now_iso()}
     if new_status == "prete":
-        sc = body.get("scanned_items") or []
-        patch["prep_scan"] = {"items": sc, "by": user.get("name"), "at": now_iso()}
-        manual = [f"{(o.get('items') or [{}])[i].get('name', '?')} : {s.get('manual_reason')}" for i, s in enumerate(sc) if s.get("manual")]
-        if manual and not reason:
-            reason = "Validation manuelle · " + " ; ".join(manual)
+        patch["prep_scan"] = {"items": [c for c in (o.get("prep_checks") or []) if c.get("ok")], "by": user.get("name"), "at": now_iso()}
     if new_status == "livree":
         patch["delivered_at"] = now_iso()
         if o.get("payment_method") != "wave": patch["payment_status"] = "paye"
@@ -5826,6 +5814,8 @@ from routers.rider_offline import router as rider_offline_router  # noqa: E402
 app.include_router(rider_offline_router)
 from routers.storefront_extras import router as storefront_extras_router  # noqa: E402
 app.include_router(storefront_extras_router)
+from routers.prep_verify import router as prep_verify_router  # noqa: E402
+app.include_router(prep_verify_router)
 app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:
