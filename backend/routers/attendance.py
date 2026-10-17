@@ -78,7 +78,7 @@ async def check_in(body: Dict[str, Any], user: dict = Depends(get_user)):
     late = False
     late_min = 0
     day_key = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
-    if kind == "arrival" and (not hours.get("days") or day_key in hours["days"]):
+    if kind == "arrival" and day_key in (hours.get("days") or ["mon", "tue", "wed", "thu", "fri", "sat"]):
         oh, om = (hours.get("open", "08:00").split(":") + ["00"])[:2]
         open_dt = now.replace(hour=int(oh), minute=int(om), second=0, microsecond=0)
         tol = int(hours.get("tolerance_min", 10))

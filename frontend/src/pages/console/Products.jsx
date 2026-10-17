@@ -234,7 +234,7 @@ function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap, money })
           <div className="flex items-center justify-between flex-wrap gap-x-2 mt-1 text-[10px] text-[#999]"><span>Stock <b>{stk}</b> · {(p.sizes||[]).length} taille{(p.sizes||[]).length > 1 ? "s" : ""} · {(p.colors||[]).length} couleur{(p.colors||[]).length > 1 ? "s" : ""}</span><span><BarChart3 size={9} className="inline"/> {sales30} vendu{sales30 > 1 ? "s" : ""} en 30 jours</span></div>
         </div>
       </button>
-      {onEdit && <div className="absolute top-2 right-2 flex gap-1">
+      {onEdit && <div className={`absolute ${promo ? "top-9" : "top-2"} right-2 flex gap-1`}>
         <button onClick={onEdit} className="w-9 h-9 rounded-lg bg-white/95 dark:bg-[#2a2a2a] shadow grid place-items-center text-[#1c1c1c] dark:text-white hover:text-[#b02a2a] transition-colors" title="Modifier" aria-label="Modifier" data-testid={`card-edit-${p.sku}`}><Pencil size={16}/></button>
       </div>}
     </div>

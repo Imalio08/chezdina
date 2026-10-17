@@ -23,7 +23,7 @@ export default function WeekGrid({ value = {}, onChange, testid = "week", defaul
   const upd = (k, i, patch) => { const d = dayOf(value[k]); set(k, { ...d, slots: d.slots.map((s, j) => j === i ? { ...s, ...patch } : s) }); };
   const add = (k) => { const d = dayOf(value[k]); const last = d.slots[d.slots.length - 1]; set(k, { closed: false, slots: [...d.slots, last ? { start: last.end, end: last.end } : { ...defaultSlot }] }); };
   const rm = (k, i) => { const d = dayOf(value[k]); const slots = d.slots.filter((_, j) => j !== i); set(k, { closed: !slots.length, slots }); };
-  const copyAll = (k) => { const src = pack(dayOf(value[k])); onChange(Object.fromEntries(DAYS.map(d => [d.k, d.k === "sun" && k !== "sun" ? (value.sun || src) : src]))); };
+  const copyAll = (k) => { const src = pack(dayOf(value[k])); onChange(Object.fromEntries(DAYS.map(d => [d.k, d.k === "sun" && k !== "sun" ? (value.sun || { closed: true, slots: [], open: "", close: "" }) : src]))); };
   return (
     <div className="rounded-lg border border-[#ececec] dark:border-[#2a2a2a] divide-y divide-[#ececec] dark:divide-[#2a2a2a]" data-testid={`${testid}-grid`}>
       {DAYS.map(({ k, label }) => {

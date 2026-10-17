@@ -1,0 +1,53 @@
+{
+  "summary": "Tested 5 Chez Dina fixes: shared cart, product action icons, store GPS, week grids for opening hours and delivery slots, and attendance hours. All 5 work end to end. Backend: 11/11 pytest pass (/app/backend/tests/test_shared_cart_hours.py). Shared-cart confirm: order status 'confirmee'; store cart -> mode pickup, delivery cart -> mode delivery with fee; qty changes and removals are honoured; client-sent price is ignored (stored 29500 used); missing phone -> 400; empty items -> 400; double confirm -> 400, and GET then returns already_confirmed with the order code; unknown id -> 404. Stock, stock_by_size, stock_movements and the notification are written, and the order appears in GET /api/orders. hours-config lists the custom role 'vendeuse' and excludes admin. PATCH /users/{uid}/working-hours clamps tolerance to 240, filters invalid days, null resets it, unknown uid -> 404. Check-in lateness uses personal hours over role hours. Frontend: (1) Shared cart at 390px: +qty, remove line, name/phone, Wave -> sc-confirmed with sc-order-code, Wave box (amount, reference, proof upload; proof POST returns 200 preuve_envoyee); COD on a delivery cart shows 'Vous paierez à la livraison'; confirming without a phone shows a toast; both orders show in /console/commandes (search works). (2) Products table: view/edit/delete are 36x36, in one row at the same y; card-edit is visible without hover and opens the edit modal. (3) Coordonnées: store-locate with mocked geolocation fills the coords; map-picker click + confirm changes them; Saturday got 2 ranges; save + reload keeps everything. /api/public/business returns lat/lng. /contact shows contact-map with marker, contact-directions, and 'Samedi — 10:00 → 13:00 · 15:00 → 19:00'. (4) Livraison: dslots labels and ranges and 'Copier partout' work; saved to site.delivery.week_slots and slots ['Matin 09:00-12:00','Soir 17:00-20:00']; kept after reload. (5) Pointage: roles include Vendeuse (custom) with open/close/tolerance + 7 day chips; employee hours edit -> save shows '· personnel'; reset returns to role hours. All test data cleaned up and original settings restored (details in seed_data_creation).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/public/shared-cart/{id}/confirm", "issue": "Customer can raise qty above what staff prepared, and stock is not checked, so product/variant stock can go negative. Consider capping qty at the stored qty or checking available stock."},
+      {"endpoint": "POST /api/attendance/check-in", "issue": "Role hours saved without 'days' are applied every day, including Sunday, but the Pointage UI (HoursFields) shows Mon–Sat as the default. The Sunday lateness flag does not match what the admin sees. Persist days on save or apply the same default on the backend."},
+      {"endpoint": "GET /api/attendance/hours-config (non-admin)", "issue": "Returns 428 'Pointage d'arrivée requis' instead of 403 for a staff member who has not checked in, because the attendance gate runs before the role check. Not a leak, but the error is misleading."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Products grid ProductCard", "issue": "Always-visible card-edit button (absolute top-2 right-2) sits exactly on the promo '-X%' badge (also top-2 right-2), so the discount badge is hidden on promo products (e.g. DN-16787).", "selector": "[data-testid='card-edit-DN-16787']", "priority": "MEDIUM"},
+      {"component": "WeekGrid copyAll", "issue": "'Copier partout' says 'sauf dimanche', but when Sunday has no value yet (fresh delivery slots), Sunday also gets the copied day and is set to Ouvert. When value.sun is undefined it should stay closed.", "selector": "[data-testid='dslots-copy-mon']", "priority": "LOW"},
+      {"component": "OpeningHoursBanner", "issue": "Uses only the legacy open/close (first start, last end), so a midday break (e.g. Sat 13:00–15:00) is treated as open and the 'Boutique fermée' banner does not show. It should read the slots.", "selector": "[data-testid='hours-banner']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Shared cart reload after confirm", "issue": "Reloading /panier-partage/{id} after a Wave confirm shows only 'Déjà confirmé · N°'. There is no Wave box and no link to /suivi/{code}, so a customer who closes the page cannot easily upload her proof. Add a 'Suivre / payer' button.", "affected_selectors": []},
+      {"flow": "Wave box number", "issue": "The Wave merchant number is not shown because cfg.wave_number is not set in the payment settings (this is configuration, not code). Amount, reference and proof upload work.", "affected_selectors": ["[data-testid='wave-copy-number']"]},
+      {"flow": "Delivery slots usage", "issue": "site.delivery.week_slots/slots are saved, but no storefront checkout or POS screen reads them (grep finds them only in Settings and OrderFilters). Wire them into the checkout/POS slot picker if that was intended.", "affected_selectors": []}
+    ],
+    "design_issues": [
+      {"screen": "Store map picker (Coordonnées)", "issues": ["Copy is customer-oriented: 'Placer ma position' and 'Touchez la carte à l'endroit exact de livraison'. It should read e.g. 'Placer la boutique'."]},
+      {"screen": "Console Commandes", "issues": ["Canal column shows the raw slug 'Shared_cart' instead of 'Panier partagé'."]},
+      {"screen": "Pointage roles", "issues": ["Custom role 'vendeuse' (label 'Vendeuse') looks identical to the built-in 'sales' role (also 'Vendeuse'), which is confusing.", "Custom roles are unchecked by default (not in enabled_roles)."]},
+      {"screen": "Business data", "issues": ["Business doc contains leftover test values (phone +2250700000000, email test_waved@dinastore.ci, RCCM-TEST-001, address 'address Cocody') from earlier iterations. These were left untouched."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_shared_cart_hours.py", "/app/test_reports/pytest/pytest_shared_cart_hours.xml"],
+  "action_items": [
+    "Products grid: move card-edit (or the promo badge) so they no longer overlap",
+    "Shared cart: cap the customer qty at the stored qty and/or check stock before decrementing",
+    "Already-confirmed shared-cart page: add a 'Suivre la commande / payer Wave' link to /suivi/{code}",
+    "WeekGrid copyAll: keep Sunday closed when value.sun is undefined",
+    "OpeningHoursBanner: respect multiple slots (breaks)",
+    "Attendance: align the default working days between the UI (Mon–Sat) and check-in (all days when days is missing)",
+    "Show 'Panier partagé' as the channel label in Commandes; adjust the map-picker copy for the store context",
+    "Optional: use the delivery week_slots in the checkout/POS slot selector"
+  ],
+  "critical_code_review_comments": [
+    "confirm_shared_cart keys items by (product_id,size,color); duplicate lines with the same key in the stored cart collapse into one qty",
+    "rider/Carte.jsx fetches /public/business once at module level and mutates the module variable BASE; the component does not re-render when it resolves, so the store marker can stay at the default coordinates on the first render",
+    "Settings.jsx is 958 lines; split the tabs into separate files",
+    "PATCH /business accepts an arbitrary dict with no Pydantic validation (lat/lng are not range-checked)"
+  ],
+  "updated_files": ["/app/backend/tests/test_shared_cart_hours.py"],
+  "success_rate": {"backend": "100% (11/11)", "frontend": "95% (all requested flows pass; 1 medium + 2 low UI bugs)"},
+  "test_credentials": "Admin aouattaraesca@gmail.com / Admin123!; stock@dinastore.ci / Stock123! (used for the check-in lateness test)",
+  "seed_data_creation": "Created TEST_SC/TEST_UI shared carts and orders (DN-261017-6322 wave, DN-261017-2851 cod + 2 pytest orders) on product 2c2005f5 (DN-16787). All deleted; stock, stock_by_size and variants restored (stock 52, verified equal to the before snapshot); stock_movements and notifications deleted. Business lat/lng removed (originally absent); site opening_hours/delivery and business working_hours restored from /tmp/orig.json; employee personal hours reset; test attendance rows deleted.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "test_shared_cart_hours.py self-cleans: it restores stock and deletes orders, carts and attendance. The check-in test skips if the stock user already has attendance today. Non-admin staff get 428 until they check in. Mock geolocation with context.grant_permissions + set_geolocation; map picker = [data-testid=map-picker] .leaflet-container click, then map-picker-confirm. Settings tabs open via ?tab=coordonnees|livraison|pointage. Products table toggle = view-table, grid toggle = view-grid."
+}

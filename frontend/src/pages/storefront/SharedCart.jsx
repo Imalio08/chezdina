@@ -31,7 +31,7 @@ export default function SharedCart() {
   if (!data) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
   if (data.error) return <div className="min-h-screen grid place-items-center text-sm text-[#c62828]">Panier introuvable</div>;
   if (data.expired) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Ce lien a expiré. Contactez la boutique pour recréer votre panier.</div>;
-  if (data.already) return <div className="min-h-screen grid place-items-center p-6 text-center"><div><Check size={48} className="text-[#1f8a4c] mx-auto mb-3"/><div className="font-serif text-2xl mb-2">Déjà confirmé</div><div className="text-sm text-[#666]">Commande N° <b>{data.code}</b></div></div></div>;
+  if (data.already) return <div className="min-h-screen grid place-items-center p-6 text-center"><div><Check size={48} className="text-[#1f8a4c] mx-auto mb-3"/><div className="font-serif text-2xl mb-2">Déjà confirmé</div><div className="text-sm text-[#666] mb-4">Commande N° <b>{data.code}</b></div>{data.code && <button onClick={() => nav(`/suivi/${data.code}`)} className="dina-btn-primary" data-testid="sc-already-track">Suivre / payer ma commande</button>}</div></div>;
 
   const subtotal = items.reduce((s,x)=>s+(Number(x.qty)||1)*(Number(x.price)||0),0);
   const isDelivery = data.mode === "delivery";

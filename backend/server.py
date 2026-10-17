@@ -3186,7 +3186,7 @@ async def confirm_shared_cart(sid: str, body: Dict[str, Any]):
     base = sc.get("items", [])
     if body.get("items") is not None:
         keep = {(x.get("product_id"), x.get("size"), x.get("color")): max(0, int(x.get("qty") or 0)) for x in body["items"] if isinstance(x, dict)}
-        items = [{**it, "qty": keep[(it.get("product_id"), it.get("size"), it.get("color"))]} for it in base
+        items = [{**it, "qty": min(keep[(it.get("product_id"), it.get("size"), it.get("color"))], int(it.get("qty") or 1))} for it in base
                  if keep.get((it.get("product_id"), it.get("size"), it.get("color")))]
     else:
         items = [dict(it) for it in base]

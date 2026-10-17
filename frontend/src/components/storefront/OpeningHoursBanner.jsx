@@ -23,7 +23,9 @@ export default function OpeningHoursBanner() {
   const toMin = (hhmm) => { if (!hhmm) return null; const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
   const openMin = toMin(today.open);
   const closeMin = toMin(today.close);
-  const isClosed = today.closed || openMin == null || closeMin == null || nowMin < openMin || nowMin >= closeMin;
+  const daySlots = (today.slots || []).map(s => [toMin(s.start), toMin(s.end)]).filter(([a, b]) => a != null && b != null);
+  const inBreak = daySlots.length > 1 && !daySlots.some(([a, b]) => nowMin >= a && nowMin < b);
+  const isClosed = today.closed || openMin == null || closeMin == null || nowMin < openMin || nowMin >= closeMin || inBreak;
   if (!isClosed) return null;
 
   // Find next opening + countdown

@@ -1217,3 +1217,12 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - lib/printLabels.js : fenêtre d'impression A4 (3 colonnes, 62×32 mm) avec QR, nom, couleur · taille, prix, code ; « Étiquettes QR » (1 par variante) et « Étiquettes × stock » (1 par pièce en stock) sur la fiche produit console (ProductDetail.jsx et ProductDetailView.jsx).
 
 
+## 2026-10-17 — Panier partagé, icônes Produits, GPS boutique, grilles horaires, horaires de pointage
+- Panier partagé : confirmation robuste (prix du panier stocké, qté plafonnée, téléphone requis, retrait = pickup « confirmee », plus de « livree » direct), Wave avec preuve, notification console, lien « Suivre / payer » ; fix KPI top produits (qty manquante).
+- Produits : boutons Voir/Modifier/Supprimer 36 px alignés ; bouton modifier des cartes toujours visible.
+- Coordonnées : StoreLocation (GPS actuel ou épingle carte) → business.lat/lng exposés par /public/business ; Contact (carte + itinéraire), app livreur (repère boutique, origine).
+- WeekGrid (lun→dim, ouvert/fermé, plusieurs plages) pour horaires d'ouverture (site.opening_hours, compatible open/close) et créneaux de livraison (site.delivery.week_slots + slots) ; bandeau fermé gère les pauses.
+- Pointage : rôles dynamiques (GET /attendance/hours-config, rôles créés inclus), jours travaillés, horaires personnels (PATCH /users/{uid}/working-hours) prioritaires sur le rôle.
+- Tests : iteration_90 (backend 11/11, frontend 95 % → bugs mineurs corrigés).
+
+
