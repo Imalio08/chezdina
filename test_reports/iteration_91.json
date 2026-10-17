@@ -1,0 +1,39 @@
+{
+  "summary": "Tested the Chez Dina mobile and messaging fixes. Backend: per-user archive for riders and customers plus the console archive, 11/11 pytest pass. Frontend: archive and unarchive work in the rider app, the customer space and the console. No horizontal overflow at 390/430 px on 9 storefront pages, 7 logged-in account and checkout pages, 7 rider pages and 7 console pages. All inputs are 16px or larger on mobile and the viewport meta is correct. The two banners scroll on mobile and are static on desktop after a fresh load. Selected states are visible on storefront and console. I found and fixed one CRITICAL bug: OpeningHoursBanner.jsx used <Marquee> without importing it, so the storefront home page crashed ('Marquee is not defined') whenever the shop was closed. One minor Marquee bug is still open.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "rider / customer send-message endpoints", "issue": "The per-user 'archived_for' list is never cleared when a new message arrives. Sends only reset the global 'archived' flag. So a conversation a rider or customer archived stays hidden under 'Archivées' even after the other side replies, unlike the console behaviour. Consider $pull of the recipient ids from archived_for on send (product decision)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OpeningHoursBanner.jsx", "issue": "FIXED BY TESTER: missing `import Marquee from '@/components/shared/Marquee'` crashed the storefront home page (runtime error overlay 'Marquee is not defined') when the shop was closed.", "selector": "[data-testid='hours-banner-text']", "priority": "CRITICAL (fixed)"},
+      {"component": "components/shared/Marquee.jsx", "issue": "Once scrolling starts, it never stops. measure() uses inner.scrollWidth, and the running span has padding-left:100%, so the measured width is always bigger than the box. Reproduced on the home page at 1920 -> 390 -> 1920: promo-banner and hours-banner-text keep scrolling on desktop. Fresh desktop loads are static as expected. This also hits phone rotation (portrait -> landscape) and tablets. Fix: subtract getComputedStyle(inner).paddingLeft from scrollWidth, or measure a separate unpadded span.", "selector": "[data-testid='promo-banner'] .dina-marquee-run", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Product page color swatch", "issues": ["The selected check mark is a #b02a2a circle, so on red or bordeaux swatches ('Rouge', 'Bordeaux') it nearly blends in. Only the ring makes the selection visible. Consider a white or dark check background on dark or red colors."]},
+      {"screen": "Console /console/messagerie", "issues": ["The per-row archive buttons (msg-archive-{id}) only show on hover, so they are not reachable by tap on touch devices. The in-thread 'thread-archive' button works."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter91_archive.py", "/app/test_reports/pytest/pytest_iter91.xml"],
+  "action_items": [
+    "Fix Marquee.jsx measuring so it can switch back to static: exclude padding-left from the measured width.",
+    "Decide whether a new incoming message should clear per-user archived_for (rider and customer inboxes).",
+    "Optional: make the color swatch check mark readable on red or bordeaux colors; make console row archive buttons visible on touch devices."
+  ],
+  "critical_code_review_comments": [
+    "OpeningHoursBanner used Marquee without importing it (fixed). Add the ESLint rule react/jsx-no-undef so a build/lint check catches this kind of mistake.",
+    "Global CSS rule `button.border-[#b02a2a].text-[#b02a2a]` with background !important is broad and couples styling to Tailwind class names. It works today (no button found with these classes permanently on), but a future static outline button with these classes would look 'selected' all the time.",
+    "_archive_for is fine: 404 when the user is not a participant, idempotent $addToSet/$pull."
+  ],
+  "updated_files": ["/app/frontend/src/components/storefront/OpeningHoursBanner.jsx", "/app/backend/tests/test_iter91_archive.py"],
+  "success_rate": {"backend": "100%", "frontend": "95%"},
+  "test_credentials": "Used /app/memory/test_credentials.md: admin, rider PIN 5555/5556, Awa, Mariam (demo). Staff login page is /console/connexion; rider login page is /riders.",
+  "seed_data_creation": "None. Every archive state I changed was restored (unarchived). No messages sent.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Regression file: test_iter91_archive.py. The console row archive button only shows on hover; click it through JS. The overflow check walks ancestors because html/body use overflow-x:clip, so scrollWidth alone always equals innerWidth. Re-check the Marquee resize behaviour after the main agent's fix.",
+  "rca of the issue": "Home crash: OpeningHoursBanner.jsx line 60 renders <Marquee> but the import was never added. It only appeared when the shop was closed (outside opening hours), which is why it could be missed. Marquee latching: when running, the span has class dina-marquee-run with padding-left:100%, so on resize i.scrollWidth = box width + text width, which is always larger than the box, and dur never goes back to 0."
+}

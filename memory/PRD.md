@@ -1225,4 +1225,12 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Pointage : rôles dynamiques (GET /attendance/hours-config, rôles créés inclus), jours travaillés, horaires personnels (PATCH /users/{uid}/working-hours) prioritaires sur le rôle.
 - Tests : iteration_90 (backend 11/11, frontend 95 % → bugs mineurs corrigés).
 
+## 2026-10-17 — Toutes plateformes : archives messagerie, zoom, safe areas, bandeaux défilants, sélection visible
+- Archive par utilisateur (archived_for) : PATCH /rider/conversations/{cid}/archive, /public/account/threads/{cid}/archive ; filtre « Archivées » app livreur + espace cliente ; console renommée « Archivées » ; un nouveau message désarchive.
+- Viewport (maximum-scale=1, viewport-fit=cover), champs ≥ 16 px sur mobile, safe areas iPhone, overflow-x clip.
+- Marquee.jsx : bandeaux « Livraison 24h… » et « Boutique fermée… » défilent de droite à gauche seulement s'ils dépassent.
+- Sélection visible : fond coloré global (boutons/labels sélectionnés, aria-pressed, radios, onglets) ; coche sur pastilles couleur.
+- Tests : iteration_91 (backend 11/11, frontend 95 % → bug Marquee et désarchivage corrigés).
+
+
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { Clock, X } from "lucide-react";
+import Marquee from "@/components/shared/Marquee";
 
 /**
  * Banner shown on storefront when the shop is closed based on site_settings.opening_hours.

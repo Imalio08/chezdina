@@ -106,7 +106,7 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
             raise HTTPException(400, "Conversation fermée")
         await db.conversations.update_one(
             {"id": conv["id"]},
-            {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}},
+            {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False, "archived_for": []}},
         )
     preview = msg["text"][:80] or "📷 Pièce jointe"
     if cust_id:
@@ -333,7 +333,7 @@ async def customer_send(body: Dict[str, Any], c: dict = Depends(get_customer)):
         "text": body.get("text", ""), "image": body.get("image"), "attachments": atts,
         "read_by": [c["id"]],
     }
-    await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}})
+    await db.conversations.update_one({"id": conv_id}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False, "archived_for": []}})
     preview = (msg["text"] or "📷 Photo")[:80]
     rider = next((p for p in conv.get("participants") or [] if p.get("kind") == "rider"), None)
     if conv.get("kind") == "livreur_cliente" and rider:
@@ -422,7 +422,7 @@ async def send_order_thread(oid: str, party: str, body: Dict[str, Any], user: di
     is_rider = user.get("role") == "rider"
     msg = {"id": new_id(), "at": now_iso(), "from_id": user["id"], "from_name": user.get("name"),
            "from_kind": "rider" if is_rider else "store", "text": text, "attachments": atts, "read_by": [user["id"]], "reactions": {}}
-    await db.conversations.update_one({"id": conv["id"]}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}})
+    await db.conversations.update_one({"id": conv["id"]}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False, "archived_for": []}})
     await _after_order_msg(conv, party, user, text or "📷 Photo")
     return {"ok": True, "conversation_id": conv["id"], "message": msg}
 
@@ -498,7 +498,7 @@ async def rider_conversation_send(cid: str, body: Dict[str, Any], user: dict = D
         raise HTTPException(400, "Message vide")
     msg = {"id": new_id(), "at": now_iso(), "from_id": user["id"], "from_name": user.get("name"), "from_kind": "rider",
            "text": text, "attachments": atts, "read_by": [user["id"]], "reactions": {}}
-    await db.conversations.update_one({"id": cid}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False}})
+    await db.conversations.update_one({"id": cid}, {"$push": {"messages": msg}, "$set": {"updated_at": now_iso(), "archived": False, "archived_for": []}})
     key = conv.get("key") or ""
     party = "rider_customer" if conv.get("kind") == "livreur_cliente" else "rider"
     if key.startswith("order:"):

@@ -9,7 +9,7 @@ export default function Marquee({ children, className = "", speed = 40, testid }
     const measure = () => {
       const b = box.current, i = inner.current;
       if (!b || !i) return;
-      const w = i.scrollWidth;
+      const w = i.scrollWidth - (parseFloat(getComputedStyle(i).paddingLeft) || 0);
       setDur(w > b.clientWidth + 2 ? Math.max(6, (w + b.clientWidth) / speed) : 0);
     };
     measure();
