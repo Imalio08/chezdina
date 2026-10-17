@@ -8,6 +8,9 @@ import {
   Smartphone, GripVertical, Plus, X, RotateCcw,
 } from "lucide-react";
 import SaveButton from "@/components/shared/SaveButton";
+import WeekGrid from "@/components/shared/WeekGrid";
+import StoreLocation from "@/components/settings/StoreLocation";
+import { HoursFields, EmployeeHours, useHoursConfig } from "@/components/settings/AttendanceHours";
 import Audit from "@/pages/console/Audit";
 
 const SAVED_MSG = "Modifications enregistrées";
@@ -159,22 +162,32 @@ function IdentiteTab() {
 /* -------- Coordonnées -------- */
 function CoordonneesTab() {
   const [b, setB] = useState({});
+  const [oh, setOh] = useState({});
   const [saving, setSaving] = useState(false);
-  useEffect(() => { api.get("/business").then(r => setB(r.data || {})).catch(() => {}); }, []);
-  const save = async () => { if (saving) return; setSaving(true); try { await api.patch("/business", b); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); } };
+  useEffect(() => {
+    api.get("/business").then(r => setB(r.data || {})).catch(() => {});
+    api.get("/public/site").then(r => setOh(r.data?.opening_hours || {})).catch(() => {});
+  }, []);
+  const save = async () => {
+    if (saving) return; setSaving(true);
+    try { await Promise.all([api.patch("/business", b), api.patch("/site", { opening_hours: oh })]); toast.success(SAVED_MSG); }
+    catch { toast.error(ERROR_MSG); } finally { setSaving(false); }
+  };
   const upd = (k, v) => setB({...b, [k]: v});
   return (
     <div className="dina-card-white p-5 space-y-3" data-testid="tab-coordonnees">
       <div className="font-serif text-xl">Coordonnées</div>
       <textarea className="dina-input" rows={2} placeholder="Adresse complète" value={b.address || ""} onChange={e => upd("address", e.target.value)} data-testid="biz-address"/>
+      <StoreLocation value={{ lat: b.lat, lng: b.lng }} onChange={(c) => setB(x => ({ ...x, ...c }))}/>
       <div className="grid grid-cols-2 gap-2">
         <input className="dina-input" placeholder="Téléphone" value={b.phone || ""} onChange={e => upd("phone", e.target.value)} data-testid="biz-phone"/>
         <input className="dina-input" placeholder="WhatsApp" value={b.whatsapp || ""} onChange={e => upd("whatsapp", e.target.value)}/>
         <input className="dina-input" placeholder="Email" value={b.email || ""} onChange={e => upd("email", e.target.value)}/>
-        <input className="dina-input" placeholder="Horaires (ex: Lun-Sam 9h-19h)" value={b.hours || ""} onChange={e => upd("hours", e.target.value)}/>
         <input className="dina-input" placeholder="RCCM" value={b.rccm || ""} onChange={e => upd("rccm", e.target.value)}/>
         <input className="dina-input" placeholder="NCC" value={b.ncc || ""} onChange={e => upd("ncc", e.target.value)}/>
       </div>
+      <div className="text-sm font-semibold pt-2">Horaires d'ouverture</div>
+      <WeekGrid value={oh} onChange={setOh} testid="opening"/>
       <SaveButton loading={saving} onClick={save} testid="coordonnees-save"/>
     </div>
   );
@@ -221,7 +234,12 @@ function LivraisonTab() {
   const [s, setS] = useState({ score_weights: { on_time: 40, no_cancel: 30, rating: 20, proof: 10 }, proof_threshold: 50000, slots: ["Matin 9h-12h","Après-midi 14h-18h","Soir 18h-21h"] });
   const [saving, setSaving] = useState(false);
   useEffect(() => { api.get("/public/site").then(r => setS({...s, ...(r.data?.delivery || {})})).catch(() => {}); /* eslint-disable-next-line */ }, []);
-  const save = async () => { if (saving) return; setSaving(true); try { await api.patch("/site", { delivery: s }); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); } };
+  const save = async () => {
+    if (saving) return; setSaving(true);
+    const ws = s.week_slots || {};
+    const labels = [...new Set(Object.values(ws).filter(d => !d.closed).flatMap(d => (d.slots || []).map(x => `${x.label ? x.label + " " : ""}${x.start}-${x.end}`)))];
+    try { await api.patch("/site", { delivery: { ...s, slots: labels.length ? labels : s.slots } }); toast.success(SAVED_MSG); } catch { toast.error(ERROR_MSG); } finally { setSaving(false); }
+  };
   const w = s.score_weights || { on_time:40, no_cancel:30, rating:20, proof:10 };
   const total = Object.values(w).reduce((a,b)=>a+b,0);
   return (
@@ -236,7 +254,8 @@ function LivraisonTab() {
 
       <div className="dina-card-white p-5 space-y-3">
         <div className="font-serif text-xl">Créneaux de livraison</div>
-        <input className="dina-input" value={(s.slots || []).join(", ")} onChange={e => setS({...s, slots: e.target.value.split(",").map(x => x.trim()).filter(Boolean)})} data-testid="livraison-slots"/>
+        <p className="text-xs text-[#666]">Pour chaque jour : ouvert ou fermé et un ou plusieurs créneaux (nom facultatif, heure de début et de fin).</p>
+        <WeekGrid value={s.week_slots || {}} onChange={(v) => setS({ ...s, week_slots: v })} testid="dslots" slotLabel defaultSlot={{ label: "Matin", start: "09:00", end: "12:00" }}/>
       </div>
 
       <div className="dina-card-white p-5 space-y-3">
@@ -432,6 +451,9 @@ const ROLE_OPTS = [
 ];
 
 function PointageTab() {
+  const hc = useHoursConfig();
+  const roleList = hc.roles.length ? hc.roles : ROLE_OPTS;
+  const roleLabel = (k) => (roleList.find(r => r.key === k) || {}).label || k;
   const [cfg, setCfg] = useState({ enabled: true, enabled_roles: ROLE_OPTS.map(r => r.key) });
   const [hours, setHours] = useState({});
   const [saving, setSaving] = useState(false);
@@ -451,10 +473,6 @@ function PointageTab() {
         ? c.enabled_roles.filter(x => x !== key)
         : [...c.enabled_roles, key],
     }));
-  };
-
-  const setHour = (role, k, v) => {
-    setHours(h => ({ ...h, [role]: { ...(h[role] || {}), [k]: v } }));
   };
 
   const save = async () => {
@@ -488,10 +506,10 @@ function PointageTab() {
 
       <div className="dina-card-white p-5 space-y-3">
         <div className="font-serif text-xl">Qui peut pointer et horaires de travail</div>
-        <p className="text-xs text-[#666]">Activez les rôles autorisés et définissez leurs horaires + tolérance de retard.</p>
+        <p className="text-xs text-[#666]">Activez les rôles autorisés et définissez leurs horaires, jours travaillés et tolérance de retard. Les rôles créés plus tard apparaissent ici automatiquement.</p>
 
         <div className="space-y-2 mt-3">
-          {ROLE_OPTS.map(r => {
+          {roleList.map(r => {
             const on = cfg.enabled_roles.includes(r.key);
             const h = hours[r.key] || { open: "08:00", close: "19:00", tolerance_min: 10 };
             return (
@@ -503,19 +521,7 @@ function PointageTab() {
                   </label>
                   {on && <span className="text-[10px] text-[#1f8a4c] uppercase font-semibold">Autorisé</span>}
                 </div>
-                {on && (
-                  <div className="grid grid-cols-3 gap-2">
-                    <label className="text-xs text-[#666]">Ouverture
-                      <input type="time" className="dina-input" value={h.open || "08:00"} onChange={e => setHour(r.key, "open", e.target.value)} data-testid={`role-open-${r.key}`}/>
-                    </label>
-                    <label className="text-xs text-[#666]">Fermeture
-                      <input type="time" className="dina-input" value={h.close || "19:00"} onChange={e => setHour(r.key, "close", e.target.value)} data-testid={`role-close-${r.key}`}/>
-                    </label>
-                    <label className="text-xs text-[#666]">Tolérance (min)
-                      <input type="number" min="0" max="120" className="dina-input tabular" value={h.tolerance_min ?? 10} onChange={e => setHour(r.key, "tolerance_min", +e.target.value || 0)} data-testid={`role-tol-${r.key}`}/>
-                    </label>
-                  </div>
-                )}
+                {on && <HoursFields h={h} set={(p) => setHours(x => ({ ...x, [r.key]: { ...(x[r.key] || {}), ...h, ...p } }))} testid={`role-${r.key}`}/>}
               </div>
             );
           })}
@@ -523,6 +529,7 @@ function PointageTab() {
       </div>
 
       <SaveButton loading={saving} onClick={save} testid="pointage-save">Enregistrer la configuration</SaveButton>
+      <EmployeeHours employees={hc.employees} roleHours={hours} roleLabel={roleLabel} onSaved={hc.reload}/>
     </div>
   );
 }

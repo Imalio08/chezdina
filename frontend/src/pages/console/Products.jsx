@@ -193,9 +193,11 @@ export default function Products() {
                   <td><span className="dina-chip !py-0.5 !px-2 text-[10px]" style={{color:STATUS_COLOR[status],borderColor:STATUS_COLOR[status]}}>{STATUS_LABEL[status]||"Actif"}</span></td>
                   <td className="text-right tabular text-[#666]">{sales30}</td>
                   <td className="text-right whitespace-nowrap">
-                    <button onClick={()=>setDetailId(p.id)} className="text-[#5867fd] mr-1.5" title="Voir" data-testid={`view-${p.sku}`}><Eye size={14}/></button>
-                    {canEdit && <button onClick={()=>setEditId(p.id)} className="text-[#0021cc] mr-1.5" title="Modifier" data-testid={`edit-product-${p.sku}`}><Pencil size={14}/></button>}
-                    {money && <button onClick={()=>del(p.id)} className="text-[#c62828]" title="Supprimer"><Trash2 size={14}/></button>}
+                    <div className="inline-flex items-center gap-1 justify-end">
+                      <button onClick={()=>setDetailId(p.id)} className="w-9 h-9 rounded-lg border border-[#ececec] dark:border-[#2a2a2a] grid place-items-center text-[#5867fd] hover:bg-[#f0f2ff] dark:hover:bg-[#1c1f33] transition-colors" title="Voir" aria-label="Voir" data-testid={`view-${p.sku}`}><Eye size={17}/></button>
+                      {canEdit && <button onClick={()=>setEditId(p.id)} className="w-9 h-9 rounded-lg border border-[#ececec] dark:border-[#2a2a2a] grid place-items-center text-[#1c1c1c] dark:text-white hover:bg-[#f5f5f5] dark:hover:bg-[#2a2a2a] transition-colors" title="Modifier" aria-label="Modifier" data-testid={`edit-product-${p.sku}`}><Pencil size={16}/></button>}
+                      {money && <button onClick={()=>del(p.id)} className="w-9 h-9 rounded-lg border border-[#ececec] dark:border-[#2a2a2a] grid place-items-center text-[#c62828] hover:bg-[#fde8e8] dark:hover:bg-[#2a1818] transition-colors" title="Supprimer" aria-label="Supprimer" data-testid={`delete-product-${p.sku}`}><Trash2 size={16}/></button>}
+                    </div>
                   </td>
                 </tr>
               );
@@ -232,8 +234,8 @@ function ProductCard({ p, selected, onToggle, onOpen, onEdit, salesMap, money })
           <div className="flex items-center justify-between flex-wrap gap-x-2 mt-1 text-[10px] text-[#999]"><span>Stock <b>{stk}</b> · {(p.sizes||[]).length} taille{(p.sizes||[]).length > 1 ? "s" : ""} · {(p.colors||[]).length} couleur{(p.colors||[]).length > 1 ? "s" : ""}</span><span><BarChart3 size={9} className="inline"/> {sales30} vendu{sales30 > 1 ? "s" : ""} en 30 jours</span></div>
         </div>
       </button>
-      {onEdit && <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1">
-        <button onClick={onEdit} className="w-7 h-7 rounded-lg bg-white dark:bg-[#2a2a2a] shadow grid place-items-center" title="Modifier"><Pencil size={11}/></button>
+      {onEdit && <div className="absolute top-2 right-2 flex gap-1">
+        <button onClick={onEdit} className="w-9 h-9 rounded-lg bg-white/95 dark:bg-[#2a2a2a] shadow grid place-items-center text-[#1c1c1c] dark:text-white hover:text-[#b02a2a] transition-colors" title="Modifier" aria-label="Modifier" data-testid={`card-edit-${p.sku}`}><Pencil size={16}/></button>
       </div>}
     </div>
   );

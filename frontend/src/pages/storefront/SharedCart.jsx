@@ -3,7 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
-import { Check, X, Minus, Plus, Truck, Clock } from "lucide-react";
+import { Check, X, Minus, Plus, Truck, Clock, Store } from "lucide-react";
+import WavePayBox from "@/components/storefront/WavePayBox";
 
 const API = process.env.REACT_APP_BACKEND_URL + "/api";
 
@@ -16,12 +17,13 @@ export default function SharedCart() {
   const [confirming, setConfirming] = useState(false);
   const [confirmed, setConfirmed] = useState(null);
   const [brand, setBrand] = useState({ name: "Chez Dina", logo: "" });
+  const [who, setWho] = useState({ name: "", phone: "" });
 
   useEffect(() => {
     axios.get(`${API}/public/shared-cart/${id}`).then(r => {
       if (r.data?.error === "expired") { setData({ expired: true }); return; }
       if (r.data?.error === "already_confirmed") { setData({ already: true, code: r.data.order_code }); return; }
-      setData(r.data); setItems(r.data.items||[]);
+      setData(r.data); setItems(r.data.items||[]); setWho({ name: r.data.customer?.name || "", phone: r.data.customer?.phone || "" });
     }).catch(()=>setData({ error: true }));
     axios.get(`${API}/public/site`).then(r => { const s = r.data || {}; setBrand(b => ({ ...b, logo: s.logo || "", name: s.name || b.name })); }).catch(() => {});
   }, [id]);
@@ -31,28 +33,31 @@ export default function SharedCart() {
   if (data.expired) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Ce lien a expiré. Contactez la boutique pour recréer votre panier.</div>;
   if (data.already) return <div className="min-h-screen grid place-items-center p-6 text-center"><div><Check size={48} className="text-[#1f8a4c] mx-auto mb-3"/><div className="font-serif text-2xl mb-2">Déjà confirmé</div><div className="text-sm text-[#666]">Commande N° <b>{data.code}</b></div></div></div>;
 
-  const subtotal = items.reduce((s,x)=>s+x.qty*x.price,0);
-  const total = subtotal + (data.delivery_fee||0) - (data.discount||0);
+  const subtotal = items.reduce((s,x)=>s+(Number(x.qty)||1)*(Number(x.price)||0),0);
+  const isDelivery = data.mode === "delivery";
+  const total = subtotal + (isDelivery ? (data.delivery_fee||0) : 0) - (data.discount||0);
 
   const upd = (i, qty) => setItems(items.map((it,idx) => idx===i ? {...it, qty: Math.max(1, qty)} : it));
   const rm = (i) => setItems(items.filter((_,idx)=>idx!==i));
 
   const confirm = async () => {
     if (!items.length) return toast.error("Panier vide");
+    if ((who.phone || "").replace(/\D/g, "").length < 8) return toast.error("Indiquez votre numéro de téléphone");
     setConfirming(true);
     try {
-      const { data: r } = await axios.post(`${API}/public/shared-cart/${id}/confirm`, { items, payment_method: paymentMethod });
+      const { data: r } = await axios.post(`${API}/public/shared-cart/${id}/confirm`, { items, payment_method: paymentMethod, customer: who });
       setConfirmed(r);
       toast.success(`Commande ${r.code} confirmée !`);
     } catch(e) { toast.error(e?.response?.data?.detail || "Erreur"); } finally { setConfirming(false); }
   };
 
   if (confirmed) return (
-    <div className="min-h-screen grid place-items-center p-6">
-      <div className="bg-white rounded-2xl p-8 max-w-sm text-center shadow-lg">
+    <div className="min-h-screen grid place-items-center p-6" data-testid="sc-confirmed">
+      <div className="bg-white rounded-2xl p-8 max-w-md w-full text-center shadow-lg">
         <div className="w-16 h-16 rounded-full bg-[#f0f9f4] text-[#1f8a4c] grid place-items-center mx-auto mb-3"><Check size={32}/></div>
-        <div className="font-serif text-2xl mb-1">Merci {data.customer?.name?.split(" ")[0] || ""} !</div>
-        <div className="text-sm text-[#666] mb-4">Votre commande <b>{confirmed.code}</b> est enregistrée.</div>
+        <div className="font-serif text-2xl mb-1">Merci {who.name?.split(" ")[0] || ""} !</div>
+        <div className="text-sm text-[#666] mb-4">Votre commande <b data-testid="sc-order-code">{confirmed.code}</b> est enregistrée · {fcfa(confirmed.order?.total ?? total)}.{paymentMethod === "cod" ? (isDelivery ? " Vous paierez à la livraison." : " Vous paierez au retrait en boutique.") : ""}</div>
+        {paymentMethod === "wave" && confirmed.order && <div className="text-left mb-3"><WavePayBox order={confirmed.order} phone={who.phone} onChange={() => nav(`/suivi/${confirmed.code}`)}/></div>}
         <button onClick={()=>nav(`/suivi/${confirmed.code}`)} className="dina-btn-primary w-full" data-testid="sc-track">Suivre la commande</button>
       </div>
     </div>
@@ -79,17 +84,25 @@ export default function SharedCart() {
 
       <div className="bg-white border border-[#ececec] rounded-xl p-4 mt-4 space-y-1.5 text-sm">
         <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(subtotal)}</span></div>
-        {data.delivery_fee>0 && <div className="flex justify-between"><span className="text-[#666]"><Truck size={11} className="inline mr-1"/>Livraison · {data.zone}</span><span className="tabular">{fcfa(data.delivery_fee)}</span></div>}
+        {isDelivery && data.delivery_fee>0 && <div className="flex justify-between"><span className="text-[#666]"><Truck size={11} className="inline mr-1"/>Livraison · {data.zone}</span><span className="tabular">{fcfa(data.delivery_fee)}</span></div>}
+        {!isDelivery && <div className="flex justify-between text-[#666]"><span><Store size={11} className="inline mr-1"/>Retrait en boutique</span><span>Gratuit</span></div>}
         {data.discount>0 && <div className="flex justify-between text-[#1f8a4c]"><span>Remise</span><span className="tabular">-{fcfa(data.discount)}</span></div>}
         <div className="flex justify-between font-bold text-base pt-2 border-t"><span>Total</span><span className="tabular text-[#b02a2a]">{fcfa(total)}</span></div>
+      </div>
+
+      <div className="bg-white border border-[#ececec] rounded-xl p-4 mt-4 space-y-2" data-testid="sc-contact">
+        <div className="text-[10px] uppercase font-semibold text-[#666]">Vos coordonnées</div>
+        <input className="dina-input" placeholder="Votre nom" value={who.name} onChange={e => setWho({ ...who, name: e.target.value })} data-testid="sc-name"/>
+        <input className="dina-input" type="tel" placeholder="Téléphone (ex : 07 00 00 00 00)" value={who.phone} onChange={e => setWho({ ...who, phone: e.target.value })} data-testid="sc-phone"/>
       </div>
 
       <div className="bg-white border border-[#ececec] rounded-xl p-4 mt-4">
         <div className="text-[10px] uppercase font-semibold text-[#666] mb-2">Mode de paiement</div>
         <div className="grid grid-cols-2 gap-2">
-          <button onClick={()=>setPaymentMethod("cod")} className={`py-2 text-xs rounded-lg border ${paymentMethod==="cod"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="sc-cod">À la livraison</button>
-          <button onClick={()=>setPaymentMethod("wave")} className={`py-2 text-xs rounded-lg border ${paymentMethod==="wave"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="sc-wave">Wave (lien envoyé)</button>
+          <button onClick={()=>setPaymentMethod("cod")} className={`py-2 text-xs rounded-lg border ${paymentMethod==="cod"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="sc-cod">{isDelivery ? "À la livraison" : "Au retrait"}</button>
+          <button onClick={()=>setPaymentMethod("wave")} className={`py-2 text-xs rounded-lg border ${paymentMethod==="wave"?"bg-[#1c1c1c] text-white border-[#1c1c1c]":"border-[#ececec]"}`} data-testid="sc-wave">Wave</button>
         </div>
+        {paymentMethod === "wave" && <div className="text-[11px] text-[#666] mt-2">Après confirmation, le numéro Wave de la boutique s'affiche : payez puis envoyez la capture de paiement.</div>}
       </div>
 
       <button onClick={confirm} disabled={confirming||!items.length} className="dina-btn-primary w-full mt-5 !min-h-[48px]" data-testid="sc-confirm"><Check size={16}/>{confirming?"Confirmation…":`Confirmer ma commande · ${fcfa(total)}`}</button>

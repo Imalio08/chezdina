@@ -22,7 +22,8 @@ function FitBounds({ points }) {
 }
 
 // Fake geocode: distribute orders around Abidjan if no explicit coords (demo)
-const BASE = { lat: 5.345, lng: -4.024 };
+let BASE = { lat: 5.345, lng: -4.024 };
+api.get("/public/business").then(r => { if (r.data?.lat && r.data?.lng) BASE = { lat: r.data.lat, lng: r.data.lng }; }).catch(() => {});
 const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0; return h; };
 const pseudoCoord = (code) => { const h = hash(code || ""); return { lat: BASE.lat + ((h % 300) - 150) / 2000, lng: BASE.lng + (((h >> 8) % 300) - 150) / 2000 }; };
 
@@ -99,6 +100,7 @@ export default function Carte() {
         <MapContainer center={myPos ? [myPos.lat, myPos.lng] : [BASE.lat, BASE.lng]} zoom={13} style={{ height: 420, width: "100%" }} scrollWheelZoom>
           <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OSM' />
           {myPos && <Marker position={[myPos.lat, myPos.lng]} icon={riderIcon}><Popup>Vous êtes ici</Popup></Marker>}
+          <Marker position={[BASE.lat, BASE.lng]} icon={makeIcon("#1c1c1c")}><Popup><div className="text-xs font-semibold">Boutique Chez Dina</div></Popup></Marker>
           {markers.map((o, i) => (
             <Marker key={o.id} position={[o._pos.lat, o._pos.lng]} icon={optimized ? makeNumIcon(CLR[o._k], o._n) : makeIcon(CLR[o._k] || "#999")} eventHandlers={{ click: () => setSelected(o) }}>
               <Popup><div className="text-xs"><div className="font-semibold">{o.code}</div><div>{(o.customer?.name || "").split(" ")[0]} · {o.delivery_zone}</div></div></Popup>

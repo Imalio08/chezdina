@@ -73,10 +73,12 @@ async def check_in(body: Dict[str, Any], user: dict = Depends(get_user)):
         raise HTTPException(409, "Pointez d'abord votre arrivée")
     now = datetime.now(timezone.utc)
     biz = await db.business.find_one({"id": "main"}) or {}
-    hours = (biz.get("working_hours") or {}).get(user.get("role", "")) or {"open": "08:00", "tolerance_min": 10}
+    own = ((await db.users.find_one({"id": user["id"]}, {"working_hours": 1})) or {}).get("working_hours")
+    hours = own or (biz.get("working_hours") or {}).get(user.get("role", "")) or {"open": "08:00", "tolerance_min": 10}
     late = False
     late_min = 0
-    if kind == "arrival":
+    day_key = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"][now.weekday()]
+    if kind == "arrival" and (not hours.get("days") or day_key in hours["days"]):
         oh, om = (hours.get("open", "08:00").split(":") + ["00"])[:2]
         open_dt = now.replace(hour=int(oh), minute=int(om), second=0, microsecond=0)
         tol = int(hours.get("tolerance_min", 10))
@@ -111,7 +113,7 @@ async def attendance_today(user: dict = Depends(presence_viewer)):
     today = datetime.now(timezone.utc).date().isoformat()
     rows = await db.attendance.find({"day": today}).sort("at", -1).to_list(200)
     all_employees = await db.users.find(
-        {"role": {"$in": ["manager", "rider", "caissiere", "sales", "stock_keeper", "community_manager"]}, "active": True}
+        {"role": {"$nin": ["admin", "customer"]}, "active": True}
     ).to_list(200)
     present_ids = {r["user_id"] for r in rows if r["kind"] == "arrival"}
     not_checked = [{"id": u["id"], "name": u["name"], "role": u["role"]} for u in all_employees if u["id"] not in present_ids]
@@ -167,7 +169,7 @@ async def attendance_all_stats(days: int = 30, user: dict = Depends(presence_vie
     """Bulk ponctualité/retards/absences per employee for CSV/PDF export."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).date().isoformat()
     employees = await db.users.find(
-        {"role": {"$in": ["manager", "sales", "stock_keeper", "community_manager", "rider"]}, "active": True},
+        {"role": {"$nin": ["admin", "customer"]}, "active": True},
         {"id": 1, "name": 1, "role": 1},
     ).to_list(500)
     out = []
@@ -212,6 +214,36 @@ async def update_geofence(body: Dict[str, Any], user: dict = Depends(require_rol
 async def update_working_hours(body: Dict[str, Any], user: dict = Depends(require_role("admin"))):
     await db.business.update_one({"id": "main"}, {"$set": {"working_hours": body.get("working_hours") or {}}}, upsert=True)
     return {"ok": True}
+
+
+BUILTIN_ROLES = [("manager", "Gérante"), ("sales", "Vendeuse"), ("stock_keeper", "Stock"), ("community_manager", "Community Manager"), ("rider", "Livreur")]
+
+
+@router.get("/attendance/hours-config")
+async def hours_config(user: dict = Depends(require_role("admin"))):
+    """All roles (built-in + created later) and employees with their personal hours override."""
+    roles = [{"key": k, "label": lbl} for k, lbl in BUILTIN_ROLES]
+    known = {r["key"] for r in roles}
+    for r in await db.roles.find({}, {"key": 1, "label": 1, "name": 1}).to_list(100):
+        if r.get("key") and r["key"] not in known and r["key"] not in ("admin", "customer"):
+            roles.append({"key": r["key"], "label": r.get("label") or r.get("name") or r["key"]}); known.add(r["key"])
+    emps = await db.users.find({"role": {"$nin": ["admin", "customer"]}, "active": {"$ne": False}}, {"id": 1, "name": 1, "role": 1, "working_hours": 1}).to_list(500)
+    for u in emps:
+        if u.get("role") and u["role"] not in known:
+            roles.append({"key": u["role"], "label": u["role"]}); known.add(u["role"])
+    return {"roles": roles, "employees": clean(emps)}
+
+
+@router.patch("/users/{uid}/working-hours")
+async def set_user_hours(uid: str, body: Dict[str, Any], user: dict = Depends(require_role("admin"))):
+    wh = body.get("working_hours")
+    if wh:
+        wh = {"open": str(wh.get("open") or "08:00")[:5], "close": str(wh.get("close") or "19:00")[:5],
+              "tolerance_min": max(0, min(240, int(wh.get("tolerance_min") or 0))), "days": [d for d in wh.get("days") or [] if d in ("mon", "tue", "wed", "thu", "fri", "sat", "sun")]}
+    res = await db.users.update_one({"id": uid}, {"$set": {"working_hours": wh}} if wh else {"$unset": {"working_hours": ""}})
+    if not res.matched_count:
+        raise HTTPException(404, "Employé introuvable")
+    return {"ok": True, "working_hours": wh}
 
 
 @router.patch("/business/attendance-config")

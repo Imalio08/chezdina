@@ -2097,9 +2097,10 @@ async def kpis(user: dict = Depends(get_user), period: str = "30d"):
     counts: Dict[str, Dict[str,Any]] = {}
     for o in orders_curr:
         for it in o.get("items", []):
-            k = it["product_id"]
-            if k not in counts: counts[k] = {"id": k, "name": it["name"], "qty": 0, "revenue": 0, "image": it.get("image")}
-            counts[k]["qty"] += it["qty"]; counts[k]["revenue"] += it["qty"]*it["price"]
+            k = it.get("product_id") or it.get("name") or "?"
+            q = int(it.get("qty") or 1)
+            if k not in counts: counts[k] = {"id": k, "name": it.get("name", "?"), "qty": 0, "revenue": 0, "image": it.get("image")}
+            counts[k]["qty"] += q; counts[k]["revenue"] += q * int(it.get("price") or 0)
     top = sorted(counts.values(), key=lambda x: x["qty"], reverse=True)[:10]
 
     # By category table (Row 3)
@@ -3181,22 +3182,51 @@ async def confirm_shared_cart(sid: str, body: Dict[str, Any]):
     if not sc: raise HTTPException(404)
     if sc.get("confirmed"): raise HTTPException(400, "Déjà confirmé")
     if sc.get("expires_at") and sc["expires_at"] < now_iso(): raise HTTPException(400, "Expiré")
-    items = body.get("items") or sc.get("items", [])
-    sub = sum(int(it.get("qty",1))*int(it.get("price",0)) for it in items)
-    fee = int(sc.get("delivery_fee",0)); disc = int(sc.get("discount",0))
+    # Only quantities/removals come from the customer; prices & lines come from the stored cart.
+    base = sc.get("items", [])
+    if body.get("items") is not None:
+        keep = {(x.get("product_id"), x.get("size"), x.get("color")): max(0, int(x.get("qty") or 0)) for x in body["items"] if isinstance(x, dict)}
+        items = [{**it, "qty": keep[(it.get("product_id"), it.get("size"), it.get("color"))]} for it in base
+                 if keep.get((it.get("product_id"), it.get("size"), it.get("color")))]
+    else:
+        items = [dict(it) for it in base]
+    if not items: raise HTTPException(400, "Panier vide")
+    for it in items:
+        it["qty"] = int(it.get("qty") or 1); it["price"] = int(it.get("price") or 0)
+    pay = body.get("payment_method") if body.get("payment_method") in ("cod", "wave", "cash") else "cod"
+    cust = dict(sc.get("customer") or {})
+    for k in ("name", "phone"):
+        if (body.get("customer") or {}).get(k): cust[k] = str(body["customer"][k]).strip()[:80]
+    if not cust.get("phone"): raise HTTPException(400, "Numéro de téléphone requis")
+    cust["phone"] = norm_phone(cust["phone"])
+    known = await db.customers.find_one({"phone": cust["phone"]}, {"id": 1, "name": 1})
+    if known: cust["id"] = known["id"]; cust.setdefault("name", known.get("name"))
+    mode = "delivery" if sc.get("mode") == "delivery" else "pickup"
+    sub = sum(it["qty"] * it["price"] for it in items)
+    fee = int(sc.get("delivery_fee",0)) if mode == "delivery" else 0
+    disc = min(int(sc.get("discount",0)), sub)
     total = sub + fee - disc
     code = gen_code()
+    addr = body.get("address") or sc.get("address")
     doc = {
-        "id": new_id(), "code": code, "items": items, "customer": sc.get("customer"),
-        "channel": "shared_cart", "payment_method": body.get("payment_method","cod"),
+        "id": new_id(), "code": code, "items": items, "customer": cust,
+        "channel": "shared_cart", "payment_method": pay,
         "delivery_zone": sc.get("zone"), "delivery_fee": fee, "discount": disc,
-        "note": sc.get("note",""), "mode": sc.get("mode","delivery"), "store_id":"store-cocody",
-        "subtotal": sub, "total": total, "status":"confirmee" if sc.get("mode")=="delivery" else "livree",
-        "payment_status":"en_attente", "created_at": now_iso(),
+        "delivery_address": addr if isinstance(addr, str) else (addr or {}).get("line") if isinstance(addr, dict) else None,
+        "note": sc.get("note",""), "mode": mode, "store_id":"store-cocody",
+        "subtotal": sub, "total": total, "status": "confirmee",
+        "payment_status":"en_attente", "created_at": now_iso(), "shared_cart_id": sid,
         "created_by": sc.get("created_by_name"), "placed_by_agent": sc.get("created_by_name"),
-        "timeline":[{"status":"confirmee","at":now_iso(),"by":f"Cliente ({sc.get('customer',{}).get('name','?')})"}],
+        "timeline":[{"status":"confirmee","at":now_iso(),"by":f"Cliente ({cust.get('name') or '?'}) · panier partagé"}],
     }
+    res = await db.shared_carts.update_one({"id": sid, "confirmed": False}, {"$set": {"confirmed": True, "confirmed_at": now_iso(), "order_id": doc["id"]}})
+    if not res.modified_count: raise HTTPException(400, "Déjà confirmé")
     await db.orders.insert_one(doc)
+    await db.notifications.insert_one({"id": new_id(), "type": "order", "title": f"Panier partagé confirmé · {code}",
+        "msg": f"{cust.get('name') or cust['phone']} · {total} FCFA · {'Wave' if pay == 'wave' else 'à la livraison' if mode == 'delivery' else 'au retrait'}",
+        "color": "#1f8a4c", "at": now_iso(), "link": f"/console/commandes/{code}"})
+    from routers.notify import notify_staff
+    await notify_staff(f"Panier partagé confirmé · {code}", f"{cust.get('name') or ''} · {total} FCFA", f"/console/commandes/{code}")
     for it in items:
         qty = int(it.get("qty", 1))
         await db.products.update_one({"id": it["product_id"]}, {"$inc": {"stock": -qty}})
@@ -3204,8 +3234,7 @@ async def confirm_shared_cart(sid: str, body: Dict[str, Any]):
             await db.products.update_one({"id": it["product_id"]}, {"$inc": {f"stock_by_size.{it['size']}": -qty}})
         await inc_variant(it["product_id"], it.get("size"), it.get("color"), -qty)
         await _record_stock_mov(it["product_id"], it.get("size"), -qty, "Vente panier partagé", sc.get("created_by_name"), code)
-    await db.shared_carts.update_one({"id": sid}, {"$set": {"confirmed": True, "confirmed_at": now_iso(), "order_id": doc["id"]}})
-    return {"ok": True, "code": code, "order_id": doc["id"]}
+    return {"ok": True, "code": code, "order_id": doc["id"], "order": clean(doc)}
 
 class WaitlistIn(BaseModel):
     product_id: str
@@ -3826,6 +3855,7 @@ async def get_public_business():
         "phone": b.get("phone"),
         "address": b.get("address"),
         "tiktok": b.get("tiktok"),
+        "lat": b.get("lat"), "lng": b.get("lng"),
     }
 
 @api.patch("/business")

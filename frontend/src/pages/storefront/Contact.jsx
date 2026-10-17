@@ -14,7 +14,7 @@ export default function Contact() {
     api.get("/public/site").then(r => {
       const oh = r.data?.opening_hours;
       const DAYS = { mon: "Lundi", tue: "Mardi", wed: "Mercredi", thu: "Jeudi", fri: "Vendredi", sat: "Samedi", sun: "Dimanche" };
-      setHours(Array.isArray(oh) ? oh : oh && typeof oh === "object" ? Object.entries(DAYS).filter(([k]) => oh[k]).map(([k, label]) => ({ day: label, open: !oh[k].closed, start: oh[k].open, end: oh[k].close })) : []);
+      setHours(Array.isArray(oh) ? oh : oh && typeof oh === "object" ? Object.entries(DAYS).filter(([k]) => oh[k]).map(([k, label]) => { const d = oh[k]; const sl = d.slots?.length ? d.slots : (d.open && d.close ? [{ start: d.open, end: d.close }] : []); return { day: label, open: !d.closed && sl.length > 0, start: d.open, end: d.close, ranges: sl.map(s => `${s.start} → ${s.end}`).join(" · ") }; }) : []);
     }).catch(() => {});
   }, []);
 
@@ -39,10 +39,11 @@ export default function Contact() {
           <div className="flex items-start gap-3"><MapPin size={16} className="text-[#b02a2a] mt-0.5"/><div><div className="font-semibold">Adresse</div><div className="text-[#666]">{biz.address || "Cocody, Abidjan"}</div></div></div>
           <div className="flex items-start gap-3"><Phone size={16} className="text-[#b02a2a] mt-0.5"/><div><div className="font-semibold">Téléphone</div><a href={`tel:${biz.phone || "+2250777926179"}`} className="text-[#5867fd] hover:underline">{biz.phone || "+225 07 77 92 61 79"}</a></div></div>
           <div className="flex items-start gap-3"><MessageCircle size={16} className="text-[#1f8a4c] mt-0.5"/><div><div className="font-semibold">WhatsApp</div><a href={waUrl} target="_blank" rel="noreferrer" className="text-[#1f8a4c] hover:underline">Démarrer une conversation</a></div></div>
-          <div className="flex items-start gap-3"><Clock size={16} className="text-[#b02a2a] mt-0.5"/><div><div className="font-semibold">Horaires d'ouverture</div>{hours.length === 0 ? <div className="text-[#666]">Lun–Sam 09:00 → 19:00 · Dim fermé</div> : <ul className="text-[#666]">{hours.map(h => <li key={h.day}>{h.day} — {h.open ? `${h.start} → ${h.end}` : "Fermé"}</li>)}</ul>}</div></div>
+          <div className="flex items-start gap-3"><Clock size={16} className="text-[#b02a2a] mt-0.5"/><div><div className="font-semibold">Horaires d'ouverture</div>{hours.length === 0 ? <div className="text-[#666]">Lun–Sam 09:00 → 19:00 · Dim fermé</div> : <ul className="text-[#666]">{hours.map(h => <li key={h.day}>{h.day} — {h.open ? (h.ranges || `${h.start} → ${h.end}`) : "Fermé"}</li>)}</ul>}</div></div>
         </div>
         <div className="mt-6 rounded-lg overflow-hidden border border-[#ececec]">
-          <iframe title="Carte boutique" src="https://www.openstreetmap.org/export/embed.html?bbox=-4.02%2C5.345%2C-3.98%2C5.375&layer=mapnik&marker=5.36%2C-4.00" width="100%" height="220" frameBorder="0" style={{ border: 0 }}/>
+          <iframe title="Carte boutique" src={biz.lat && biz.lng ? `https://www.openstreetmap.org/export/embed.html?bbox=${biz.lng - 0.006}%2C${biz.lat - 0.004}%2C${biz.lng + 0.006}%2C${biz.lat + 0.004}&layer=mapnik&marker=${biz.lat}%2C${biz.lng}` : "https://www.openstreetmap.org/export/embed.html?bbox=-4.02%2C5.345%2C-3.98%2C5.375&layer=mapnik&marker=5.36%2C-4.00"} width="100%" height="220" frameBorder="0" style={{ border: 0 }} data-testid="contact-map"/>
+          {biz.lat && biz.lng && <a href={`https://www.google.com/maps/dir/?api=1&destination=${biz.lat},${biz.lng}`} target="_blank" rel="noreferrer" className="text-xs text-[#b02a2a] underline inline-flex items-center gap-1 mt-1" data-testid="contact-directions"><MapPin size={12}/>Itinéraire vers la boutique</a>}
         </div>
       </div>
       <div>
