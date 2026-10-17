@@ -64,6 +64,21 @@ async def prep_complete(o: Dict[str, Any]) -> List[str]:
     return [f"{ln['label']} : {min(ln['done'], ln['qty'])}/{ln['qty']}" for ln in await _lines(o) if ln["done"] < ln["qty"]]
 
 
+@router.get("/products/{pid}/labels")
+async def product_labels(pid: str, user: dict = Depends(get_user)):
+    p = await db.products.find_one({"id": pid})
+    if not p:
+        raise HTTPException(404, "Produit introuvable")
+    variants = [v for v in p.get("variants") or [] if v.get("enabled", True)]
+    combos = [(v.get("size"), v.get("color"), int(v.get("stock") or 0)) for v in variants] or [(None, None, int(p.get("stock") or 0))]
+    out = []
+    for size, color, stock in combos:
+        e = expected(p, {"name": p.get("name"), "size": size, "color": color, "product_id": p["id"]})
+        out.append({"code": e["code"], "label": e["label"], "size": size, "color": color, "stock": stock,
+                    "size_tag": _size_tag(p, size)})
+    return {"name": p.get("name"), "sku": p.get("sku"), "price": p.get("price"), "labels": out}
+
+
 @router.get("/orders/{oid}/prep")
 async def get_prep(oid: str, user: dict = Depends(get_user)):
     o = await db.orders.find_one({"id": oid})

@@ -4,6 +4,9 @@ import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Pencil, Copy, Printer, Share2, Tag, Archive, Clock, Package, History, BarChart3, Users, Star, Image as ImageIcon } from "lucide-react";
 import SmartImage from "@/components/shared/SmartImage";
+import { printProductLabels } from "@/lib/printLabels";
+
+const printLabels = (id, perPiece) => printProductLabels(id, { perPiece }).catch(() => toast.error("Impression des étiquettes impossible"));
 
 const STATUS_LABEL = { actif:"Actif", inactif:"Inactif", brouillon:"Brouillon", liste_attente:"Liste d'attente", archive:"Archivé" };
 const STATUS_COLOR = { actif:"#1f8a4c", inactif:"#999", brouillon:"#5867fd", liste_attente:"#e4991e", archive:"#666" };
@@ -48,7 +51,8 @@ export default function ProductDetailView({ productId, onBack, onEdit }) {
         <div className="flex gap-1.5">
           <button onClick={share} className="dina-chip" data-testid="pdv-share"><Share2 size={11}/>Partager</button>
           <button onClick={duplicate} className="dina-chip" data-testid="pdv-duplicate"><Copy size={11}/>Dupliquer</button>
-          <button onClick={()=>window.print()} className="dina-chip"><Printer size={11}/>Étiquettes</button>
+          <button onClick={()=>printLabels(p.id, false)} className="dina-chip" data-testid="pdv-print-labels" title="Une étiquette QR par taille et couleur"><Printer size={11}/>Étiquettes</button>
+          <button onClick={()=>printLabels(p.id, true)} className="dina-chip" data-testid="pdv-print-labels-stock" title="Une étiquette par pièce en stock"><Printer size={11}/>Étiquettes × stock</button>
           <button onClick={()=>toggleStatus(status==="actif"?"inactif":"actif")} className="dina-chip" data-testid="pdv-toggle-status">{status==="actif"?<Archive size={11}/>:<Package size={11}/>}{status==="actif"?"Désactiver":"Activer"}</button>
           <button onClick={()=>onEdit(p.id)} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="pdv-edit"><Pencil size={12}/>Modifier</button>
         </div>

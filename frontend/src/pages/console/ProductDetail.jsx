@@ -5,7 +5,8 @@ import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Pencil, Boxes, TrendingUp, History, Image as ImageIcon } from "lucide-react";
 import SmartImage from "@/components/shared/SmartImage";
-import { SlidersHorizontal, X as XIcon } from "lucide-react";
+import { SlidersHorizontal, X as XIcon, Printer } from "lucide-react";
+import { printProductLabels } from "@/lib/printLabels";
 
 export default function ProductDetail() {
   const { id } = useParams();
@@ -60,7 +61,9 @@ export default function ProductDetail() {
               <div className="font-serif text-3xl">{product.name}</div>
               <div className="text-xs text-[#666] mt-1">SKU {product.sku || "—"} · {product.material || "—"}</div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 flex-wrap">
+              <button onClick={() => printProductLabels(product.id).catch(() => toast.error("Impression impossible"))} className="dina-btn-secondary !min-h-[36px]" data-testid="product-print-labels" title="Une étiquette QR par taille et couleur"><Printer size={13}/>Étiquettes QR</button>
+              <button onClick={() => printProductLabels(product.id, { perPiece: true }).catch(() => toast.error("Impression impossible"))} className="dina-btn-secondary !min-h-[36px]" data-testid="product-print-labels-stock" title="Une étiquette par pièce en stock"><Printer size={13}/>Étiquettes × stock</button>
               <button onClick={() => setAdjOpen(true)} className="dina-btn-secondary !min-h-[36px]" data-testid="product-adjust-stock"><SlidersHorizontal size={13}/>Ajuster stock</button>
               <button onClick={() => nav(`/console/produits?edit=${product.id}`)} className="dina-btn-primary !min-h-[36px]" data-testid="product-edit"><Pencil size={13}/>Modifier</button>
             </div>

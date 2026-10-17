@@ -1212,3 +1212,8 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - components/orders/PrepRunner.jsx : caméra ouverte par défaut, mode « Taper le code », lignes vertes, journal, « Marquer comme prête » + « Imprimer la fiche colis ».
 - Tests : iteration_89 (backend 15/15, frontend 100 %) ; préfixe P pour chaussures (mules, escarpins…) ajouté ensuite.
 
+## 2026-10-17 — Étiquettes QR article
+- GET /api/products/{pid}/labels (prep_verify.py) : code par taille/couleur identique au code attendu en préparation.
+- lib/printLabels.js : fenêtre d'impression A4 (3 colonnes, 62×32 mm) avec QR, nom, couleur · taille, prix, code ; « Étiquettes QR » (1 par variante) et « Étiquettes × stock » (1 par pièce en stock) sur la fiche produit console (ProductDetail.jsx et ProductDetailView.jsx).
+
+
