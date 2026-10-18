@@ -19,7 +19,8 @@ const TABS = [
 export default function StockInventories() {
   const { user } = useAuth();
   const isOwner = user?.role === "admin";
-  const [tab, setTab] = useKeptState("stock-tab", "stock");
+  const [tab, setTab] = useKeptState("stock-tab", () => new URLSearchParams(window.location.search).get("tab") || "stock");
+  useEffect(() => { const t = new URLSearchParams(window.location.search).get("tab"); if (t && TABS.some(x => x.k === t)) setTab(t); }, []); // eslint-disable-line
   const [review, setReview] = useState(null);
   const [products, setProducts] = useState([]);
   const [kpis, setKpis] = useState(null);

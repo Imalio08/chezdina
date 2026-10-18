@@ -1,0 +1,49 @@
+{
+  "summary": "Iteration 97 – tested §8-11. Backend: 16 pytest (roles-permissions level strings fix, roles/all + roles/meta rename/(de)activate with a TEST role + TEST user (403 'Votre rôle est désactivé' then reactivated), unsellable declare/approve/reject/outcomes with stock checks + movements, cash declare-handover analysis/validate/reject on TEST sessions) → 15/16 pass (qty=0 silently becomes 1). UI: Équipe hub (3 tabs, /console/presences + /console/roles redirect, single sidebar entry), roles matrix (47 rows built from menu + 'Autres onglets', change cell → 'Matrice enregistrée'), user-role select from /roles/all, Stock › Non vendables full flow (Gérante declares incl. '+ motif' → owner validates → en réparation → remis en stock, history shown, stock back to 4), cash blind count (no expected shown) → owner validate modal with cash-verdict 'Écart de +1 000 FCFA' + cash-analysis + attention, StoreLocation (geoloc → coords + Google iframe, manual lat/lng incl. comma decimal, invalid → error toast, map pick modal), storefront hours-exception-banner (exception injected in DB), POS pos-stock-rule, manual section add-v3-stock-rule present in module 1. MAIN FAILURE: the opening-hours exceptions editor (exc-date/exc-add-date/…/exc-save) is not reachable anywhere in the console. All test data cleaned; permission matrix, opening_hours, business coords and role_meta restored/verified identical to before.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/stock/unsellable", "issue": "qty=0 is silently converted to 1 (`int(body.get('qty') or 1)`) instead of 400; non-numeric qty → int() ValueError → 500"},
+      {"endpoint": "GET /api/cash-sessions/{sid}/analysis", "issue": "cash_movements/orders are filtered only by time range (opened_at..closed_at or '9999'), not by session/store; for an unvalidated session the window is open-ended so movements after the count are included at validation time"}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OpeningHoursEditor / ExceptionsEditor", "issue": "Exceptional closures / special hours editor is unreachable: OpeningHoursEditor is only used by pages/console/SiteSettings.jsx, which is imported in App.js but never routed (/console/site renders SiteVitrine). Settings › Coordonnées uses WeekGrid (no exceptions UI). exc-date, exc-add-date, exc-closed, exc-special, exc-reason, exc-show, exc-message, exc-save not found on /console/parametres?tab=coordonnees nor /console/site", "selector": "[data-testid=hours-exceptions]", "priority": "HIGH"},
+      {"component": "StockInventories deep link", "issue": "/console/stock?tab=invendables does not open the 'Non vendables' tab (tab state from useKeptState only, ignores ?tab). Notifications for unsellable declarations link to this URL", "selector": "[data-testid=stock-tab-invendables]", "priority": "MEDIUM"},
+      {"component": "WeekGrid (Settings › Coordonnées)", "issue": "copyAll() rebuilds opening_hours from DAYS only → drops opening_hours.exceptions when 'Copier partout' is used, then Save wipes exceptions", "selector": "WeekGrid copy", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Roles permission matrix", "issue": "Matrix is saved but never enforced: backend role_access.py uses hard-coded ROLE_API and api_allowed() returns True for any role not in ROLE_API → a user of a custom role has unrestricted access to every API not guarded by require_role. Frontend canAccess is also hard-coded. The matrix is cosmetic", "affected_selectors": ["[data-testid=roles-matrix]"]}
+    ],
+    "design_issues": [
+      {"screen": "Équipe / user form", "issues": ["Duplicate 'Vendeuse' role: built-in 'sales' (Vendeuse) + legacy custom role key 'vendeuse' (db.roles) both shown in matrix columns and in user-role select"]},
+      {"screen": "Stock › Non vendables row", "issues": ["After 'Réparé · remettre en stock', status line still shows red 'En réparation' (status not updated); only the right label reflects outcome"]},
+      {"screen": "Cash validate modal", "issues": ["'Par moyen de paiement' header shown with no rows when no sales; 'Sorties −0 FCFA'"]},
+      {"screen": "Settings › Coordonnées map pick", "issues": ["Map modal reuses customer copy: 'Placer ma position' / 'Touchez la carte à l'endroit exact de livraison' – should say boutique", "store-lat/store-lng inputs initialised once from value before /business loads → empty even when coordinates exist"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter97_sections8_11.py", "/app/backend/tests/ui_seed_iter97.py", "/app/test_reports/pytest/pytest_iter97.xml"],
+  "action_items": [
+    "Render OpeningHoursEditor (with ExceptionsEditor) in a reachable screen (Settings › Coordonnées instead of / next to WeekGrid, or route SiteSettings) so exc-* controls exist; keep exceptions when WeekGrid copyAll is used",
+    "Make StockInventories honour ?tab= (invendables) so notification links open the right tab",
+    "Validate qty strictly in POST /api/stock/unsellable (reject 0/non-integer with 400)",
+    "Enforce roles_permissions matrix (or at least deny-by-default for unknown/custom roles in role_access.api_allowed)",
+    "Remove/merge duplicate legacy 'vendeuse' custom role vs built-in 'sales'",
+    "Minor: unsellable row status after remis_en_stock; empty by_method section; store map modal wording; StoreLocation manual inputs sync with loaded value"
+  ],
+  "critical_code_review_comments": [
+    "role_access.api_allowed: `if rules is None: return True` gives custom roles full API access – security gap now that roles are dynamic",
+    "RolesPermissions save normalises admin {all:true} into 47 explicit keys and drops unknown keys (shape change on every save)",
+    "Deactivated-role users can still log in (/api/auth/* exempt) and then get 403 on every call – better to reject at login with the 'rôle désactivé' message; inactive_roles cache is per-process (30 s) – stale with multiple workers",
+    "GET /api/stock/unsellable returns full base64 photos for up to 500 rows – consider thumbnails/projection",
+    "server.py ~5950 lines – far over the 700-line guideline"
+  ],
+  "updated_files": ["/app/backend/tests/test_iter97_sections8_11.py", "/app/backend/tests/ui_seed_iter97.py"],
+  "success_rate": {"backend": "94% (15/16)", "frontend": "85% (exceptions editor unreachable; deep link tab)"},
+  "seed_data_creation": "TEST_ product + TEST_ cash sessions + TEST role/user + DB-injected opening_hours exception for today; all deleted. Matrix, opening_hours, business, role_meta verified restored.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run `python tests/ui_seed_iter97.py` (TEST product size 38 ×4 + open TEST cash session) and `python tests/ui_seed_iter97.py clean`. Back up roles_permissions.matrix and site_settings.opening_hours before any UI save and restore after (UI save changes matrix shape). Unsellable approve/outcome buttons appear only after clicking the row header (div.cursor-pointer). Approve/outcome use window.confirm, reject uses window.prompt. Geolocation: context.grant_permissions(['geolocation']) + set_geolocation. Banner test: inject opening_hours.exceptions with today's UTC date.",
+  "test_credentials": "admin aouattaraesca@gmail.com/Admin123!, manager manager.cocody@dinastore.ci/Manager123!"
+}

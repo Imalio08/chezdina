@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import SaveButton from "@/components/shared/SaveButton";
 import WeekGrid from "@/components/shared/WeekGrid";
+import { ExceptionsEditor } from "@/components/storefront/OpeningHoursEditor";
 import StoreLocation from "@/components/settings/StoreLocation";
 import { HoursFields, EmployeeHours, useHoursConfig } from "@/components/settings/AttendanceHours";
 import Audit from "@/pages/console/Audit";
@@ -188,6 +189,7 @@ function CoordonneesTab() {
       </div>
       <div className="text-sm font-semibold pt-2">Horaires d'ouverture</div>
       <WeekGrid value={oh} onChange={setOh} testid="opening"/>
+      <ExceptionsEditor value={oh.exceptions || []} onChange={ex => setOh({ ...oh, exceptions: ex })}/>
       <SaveButton loading={saving} onClick={save} testid="coordonnees-save"/>
     </div>
   );

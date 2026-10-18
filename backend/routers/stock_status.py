@@ -45,7 +45,10 @@ async def declare(body: Dict[str, Any], user: dict = Depends(get_user)):
     p = await db.products.find_one({"id": body.get("product_id")})
     if not p:
         raise HTTPException(404, "Produit introuvable")
-    qty = int(body.get("qty") or 1)
+    try:
+        qty = int(body.get("qty"))
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Quantité invalide")
     if qty < 1:
         raise HTTPException(400, "Quantité invalide")
     if not (body.get("status") or "").strip() or not (body.get("reason") or "").strip():

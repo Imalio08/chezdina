@@ -68,7 +68,7 @@ export default function OpeningHoursEditor({ value = {}, onChange }) {
 }
 
 // Exceptional closures or special hours for given dates, with an optional storefront message
-function ExceptionsEditor({ value, onChange }) {
+export function ExceptionsEditor({ value, onChange }) {
   const [d, setD] = useState({ dates: "", closed: true, open: "", close: "", reason: "", show_message: true, message: "" });
   const [pick, setPick] = useState("");
   const dates = d.dates ? d.dates.split(",") : [];

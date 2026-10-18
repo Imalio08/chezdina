@@ -11,7 +11,7 @@ CANCELLED = ("annulee", "retournee", "refusee", "echouee")
 
 async def analyze(s: Dict[str, Any]) -> Dict[str, Any]:
     start = s["opened_at"]
-    end = s.get("closed_at") or "9999"
+    end = s.get("closed_at") or s.get("handover_at") or "9999"
     rng = {"$gte": start, "$lte": end}
     movs = await db.cash_movements.find({"created_at": rng}).sort("created_at", 1).to_list(1000)
     rider_in = sum(m["amount"] for m in movs if m["type"] == "in" and m.get("kind") == "rider_cod")
