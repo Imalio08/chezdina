@@ -8,14 +8,20 @@
         <link rel="icon" id="dynamic-favicon" type="image/png" href="/icons/icon-192.png" />
         <script>
           (function(){
-            var p = location.pathname, rider = p.indexOf("/rider") === 0;
+            var p = location.pathname, rider = p.indexOf("/rider") === 0, konsole = p.indexOf("/console") === 0;
             try { if (!rider && p === "/login" && localStorage.getItem("dina_app") === "rider") rider = true; } catch(e) {}
             window.__dinaRiderManifest = rider;
+            window.__dinaConsoleManifest = konsole;
             if (rider) {
               document.write('<link rel="apple-touch-icon" id="dynamic-apple-icon" href="/api/public/pwa-icon-rider/192" />');
               document.write('<link rel="manifest" id="dynamic-manifest" href="/api/public/manifest-rider.webmanifest" />');
-              document.write('<meta name="apple-mobile-web-app-title" content="Chez Dina Livreur" />');
-              document.title = "Chez Dina Livreur";
+              document.write('<meta name="apple-mobile-web-app-title" content="Livreur" />');
+              document.title = "Livreur";
+            } else if (konsole) {
+              document.write('<link rel="apple-touch-icon" id="dynamic-apple-icon" href="/api/public/pwa-icon/192" />');
+              document.write('<link rel="manifest" id="dynamic-manifest" href="/api/public/manifest-console.webmanifest" />');
+              document.write('<meta name="apple-mobile-web-app-title" content="Console" />');
+              document.title = "Console";
             } else {
               document.write('<link rel="apple-touch-icon" id="dynamic-apple-icon" href="/icons/icon-192.png" />');
               document.write('<link rel="manifest" id="dynamic-manifest" href="/manifest.json" />');
@@ -41,7 +47,7 @@
         Learn how to configure a non-root public URL by running `npm run build`.
         -->
         <title>Chez Dina — Boutique femme à Abidjan</title>
-        <script>if (location.pathname.indexOf("/rider") === 0) document.title = "Chez Dina Livreur";</script>
+        <script>if (location.pathname.indexOf("/rider") === 0) document.title = "Livreur"; else if (location.pathname.indexOf("/console") === 0) document.title = "Console";</script>
         <script>window.addEventListener("error",function(e){if(e.error instanceof DOMException&&e.error.name==="DataCloneError"&&e.message&&e.message.includes("PerformanceServerTiming")){e.stopImmediatePropagation();e.preventDefault()}},true);</script>
         <script src="https://assets.emergent.sh/scripts/emergent-main.js"></script>
     </head>

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
+import { goBack } from "@/lib/keptState";
 import { fcfa, dateFmt, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Phone, MessageSquare, Copy, Send, X } from "lucide-react";
@@ -63,7 +64,7 @@ export default function CustomerDetail() {
 
   return (
     <div className="space-y-5 font-sora">
-      <button onClick={() => nav("/console/clients")} className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13} />Retour</button>
+      <button onClick={() => goBack(nav, "/console/clients")} data-testid="detail-back" className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13} />Retour</button>
 
       <div className="dina-card-white p-5 flex items-start gap-4 flex-wrap">
         {c.photo ? <SmartImage src={c.photo} alt={c.name} fallbackText={c.name} className="w-20 h-20 rounded-full object-cover" /> : <div className="w-20 h-20 rounded-full bg-[#fff5f5] text-[#b02a2a] grid place-items-center font-serif text-3xl font-bold">{c.name?.[0]}</div>}

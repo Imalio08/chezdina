@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
+import { useDetailParam } from "@/lib/keptState";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, X, ChevronLeft, Building2, Phone, Mail, Globe, MessageCircle, Clock, DollarSign, Package, Lock } from "lucide-react";
@@ -16,7 +17,7 @@ export default function Suppliers() {
   const [kpis, setKpis] = useState(null);
   const [edit, setEdit] = useState(null);
   const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState(null);
+  const [detail, setDetail] = useDetailParam();
   const [view, setView] = useStoredView("suppliers", "grid");
 
   const load = async () => {

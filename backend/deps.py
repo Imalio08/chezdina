@@ -46,6 +46,13 @@ def make_customer_token(cid: str, m: int = 60 * 24 * 30):
         JWT_SECRET, algorithm=JWT_ALG,
     )
 
+def customer_link(path: str, cid: "str | None") -> str:
+    """Append a 30-day sign-in token so the customer lands logged in (Safari on iPhone)."""
+    if not cid:
+        return path
+    t = jwt.encode({"sub": cid, "kind": "customer_link", "exp": datetime.now(timezone.utc) + timedelta(days=30)}, JWT_SECRET, algorithm=JWT_ALG)
+    return f"{path}{'&' if '?' in path else '?'}cl={t}"
+
 def new_id():
     return str(uuid.uuid4())
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
+import { useDetailParam } from "@/lib/keptState";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Trash2, X, Package, Download, Printer, FileSpreadsheet, Eye, Pencil, LayoutGrid, Table as TableIcon, QrCode, CheckSquare, AlertTriangle } from "lucide-react";
@@ -36,7 +37,7 @@ export default function PurchaseOrders() {
   const [view, setView] = useStoredView("po", "kanban");
   const [edit, setEdit] = useState(null);
   const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState(null);
+  const [detail, setDetail] = useDetailParam();
   const [receive, setReceive] = useState(null);
   const [labels, setLabels] = useState(null);
 

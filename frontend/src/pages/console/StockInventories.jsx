@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
+import { useKeptState } from "@/lib/keptState";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Minus, X, Edit, Package, AlertTriangle, Clock, DollarSign, History, ClipboardList, CheckSquare } from "lucide-react";
@@ -15,7 +16,7 @@ const TABS = [
 export default function StockInventories() {
   const { user } = useAuth();
   const isOwner = user?.role === "admin";
-  const [tab, setTab] = useState("stock");
+  const [tab, setTab] = useKeptState("stock-tab", "stock");
   const [products, setProducts] = useState([]);
   const [kpis, setKpis] = useState(null);
   const [adjust, setAdjust] = useState(null);
@@ -24,7 +25,7 @@ export default function StockInventories() {
   const [inventories, setInventories] = useState([]);
   const [newInv, setNewInv] = useState(false);
   const [countInv, setCountInv] = useState(null);
-  const [q, setQ] = useState("");
+  const [q, setQ] = useKeptState("stock-q", "");
 
   const load = async () => {
     const [p, k, r, m, i] = await Promise.all([

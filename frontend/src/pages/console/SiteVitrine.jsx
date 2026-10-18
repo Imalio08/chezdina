@@ -212,7 +212,7 @@ function AccueilTab() {
   return (
     <div>
       <div className="dina-card-white p-4 mb-4">
-        <p className="text-sm text-[#666]">Section builder pré-rempli avec le site actuel. Glissez-déposez pour réordonner, cliquez sur <strong>Éditer</strong> pour modifier, téléversez vos images (jamais d'URL).</p>
+        <p className="text-sm text-[#666]">Voici les blocs de votre site. Faites-les glisser pour changer l'ordre, touchez <strong>Éditer</strong> pour modifier un bloc et ajoutez vos photos depuis votre appareil.</p>
       </div>
       <SectionBuilder/>
     </div>

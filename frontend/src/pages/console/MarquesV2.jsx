@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
+import { useDetailParam } from "@/lib/keptState";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Trash2, Pencil, X, ChevronLeft, Package, TrendingUp, Percent, Trophy } from "lucide-react";
@@ -12,7 +13,7 @@ export default function MarquesV2({ embedded }) {
   const [edit, setEdit] = useState(null);
   const [open, setOpen] = useState(false);
   const [view, setView] = useStoredView("marques", "grid");
-  const [detail, setDetail] = useState(null); // brand id
+  const [detail, setDetail] = useDetailParam();
 
   const load = async () => {
     const [b, k] = await Promise.all([

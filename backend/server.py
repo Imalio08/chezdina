@@ -18,7 +18,7 @@ logger = logging.getLogger("dina")
 # Shared primitives (moved to deps.py — P5 Refactor Feb 2026)
 from deps import (
     client, db, JWT_SECRET, JWT_ALG,
-    hash_pw, verify_pw, make_token, make_customer_token,
+    hash_pw, verify_pw, make_token, make_customer_token, customer_link,
     new_id, now_iso, gen_access_code, clean,
     get_user, require_role, get_customer, norm_phone, gen_code, inc_variant,
 )
@@ -651,18 +651,20 @@ def _wa_message_for_status(order: dict, status: str) -> Optional[str]:
     zone = order.get("delivery_zone") or ""
     rider = order.get("rider_name") or ""
     is_cod = order.get("payment_method") == "cod"
+    cid = (order.get("customer") or {}).get("id")
+    track = "https://chezdina.net" + customer_link(f"/suivi/{code}", cid)
     base = f"Bonjour {first} 👋 Chez Dina."
     if status == "confirmee":
-        return f"{base}\nVotre commande {code} ({total} FCFA) est confirmée. Nous préparons tout avec soin. Merci 💕"
+        return f"{base}\nVotre commande {code} ({total} FCFA) est confirmée. Nous préparons tout avec soin. Merci 💕\nSuivre ma commande : {track}"
     if status == "prete":
         return f"{base}\nVotre commande {code} est prête ! Elle part en livraison très bientôt vers {zone}. 📦"
     if status == "assignee":
         extra = f" avec notre livreur {rider}" if rider else ""
-        return f"{base}\nVotre commande {code} est en route{extra}. Il vous appellera à l'approche. {'Préparez ' + str(total) + ' FCFA en espèces.' if is_cod else ('Déjà payée, aucun paiement à prévoir.' if order.get('payment_status') == 'paye' else 'Votre paiement Wave est en cours de vérification.')} 🛵"
+        return f"{base}\nVotre commande {code} est en route{extra}. Il vous appellera à l'approche. {'Préparez ' + str(total) + ' FCFA en espèces.' if is_cod else ('Déjà payée, aucun paiement à prévoir.' if order.get('payment_status') == 'paye' else 'Votre paiement Wave est en cours de vérification.')} 🛵\nSuivre ma commande : {track}"
     if status == "en_livraison":
         return f"{base}\nVotre colis {code} est en livraison. {'À encaisser : ' + str(total) + ' FCFA.' if is_cod else ''} 📍"
     if status == "livree":
-        return f"{base}\nMerci pour votre commande {code} ! 💐\nNous serions ravies d'avoir votre avis en 10s : https://chezdina.net/noter/{code}"
+        return f"{base}\nMerci pour votre commande {code} ! 💐\nNous serions ravies d'avoir votre avis en 10s : https://chezdina.net{customer_link(f'/noter/{code}', cid)}"
     if status == "echouee":
         return f"{base}\nNous avons rencontré un souci avec votre colis {code}. Nous vous recontactons rapidement pour reprogrammer. Pardon pour la gêne 🙏"
     if status == "annulee":
@@ -692,10 +694,19 @@ async def _enqueue_wa(order: dict, status: str, by_name: Optional[str] = None):
     }
     await db.whatsapp_outbox.insert_one(doc)
 
+def _md_to_wa(s: str) -> str:
+    """Editor formatting (**gras**, *italique*, ~~barré~~, [texte](lien)) → WhatsApp formatting."""
+    import re as _re
+    s = _re.sub(r"\*\*(.+?)\*\*", "\x01\\1\x01", s or "")
+    s = _re.sub(r"\*(.+?)\*", r"_\1_", s)
+    s = _re.sub(r"~~(.+?)~~", r"~\1~", s)
+    s = _re.sub(r"\[([^\]]+)\]\((https?://[^\s)]+)\)", r"\1 (\2)", s)
+    return s.replace("\x01", "*")
+
 def _url_quote(s: str) -> str:
     try:
         from urllib.parse import quote
-        return quote(s, safe="")
+        return quote(_md_to_wa(s), safe="")
     except Exception:
         return s
 
@@ -1811,6 +1822,7 @@ class CampaignIn(BaseModel):
     customer_ids: Optional[List[str]] = None
     text: str
     image: Optional[str] = None
+    attachments: Optional[List[Dict[str, Any]]] = None
     link: Optional[str] = None
     offer: Optional[Dict[str, Any]] = None  # {code, discount_pct|discount_amount, valid_from, valid_to}
     scheduled_at: Optional[str] = None
@@ -1882,7 +1894,7 @@ async def campaigns_send(cid: str, body: Dict[str, Any] | None = None, user: dic
                 }); sent_wa += 1
         if "inapp" in channels and cust.get("msg_consent", True):
             try:
-                await send_message({"customer_id": cid2, "text": msg, "kind": "boutique_cliente"}, user)
+                await send_message({"customer_id": cid2, "text": msg, "attachments": c.get("attachments") or [], "kind": "boutique_cliente"}, user)
                 sent_in += 1
             except Exception:
                 pass
@@ -3166,7 +3178,7 @@ async def pos_create_shared_cart(body: Dict[str, Any], user: dict = Depends(get_
         "confirmed": False, "confirmed_at": None, "order_id": None,
     }
     await db.shared_carts.insert_one(doc)
-    return {"id": doc["id"], "link": f"/panier-partage/{doc['id']}", "expires_at": doc["expires_at"]}
+    return {"id": doc["id"], "link": customer_link(f"/panier-partage/{doc['id']}", (doc.get("customer") or {}).get("id")), "expires_at": doc["expires_at"]}
 
 @api.get("/public/shared-cart/{sid}")
 async def public_shared_cart(sid: str):
@@ -4113,7 +4125,7 @@ async def share_order(body: Dict[str,Any], user: dict = Depends(get_user)):
     oid = body.get("order_id")
     o = await db.orders.find_one({"id": oid})
     if not o: raise HTTPException(404)
-    return {"link": f"/suivi/{o['code']}", "whatsapp_text": f"Bonjour {o.get('customer',{}).get('name','')}, voici votre reçu Chez Dina: {o['code']}"}
+    return {"link": customer_link(f"/suivi/{o['code']}", (o.get("customer") or {}).get("id")), "whatsapp_text": f"Bonjour {o.get('customer',{}).get('name','')}, voici votre reçu Chez Dina: {o['code']}"}
 
 # ---------- AI Ask Dina ----------
 async def _ai_tool_sales(period_days: int = 7) -> str:

@@ -33,7 +33,16 @@ export function CustomerProvider({ children }) {
     } finally { setLoading(false); }
   }, []);
 
-  useEffect(() => { refresh(); }, [refresh]);
+  useEffect(() => {
+    const u = new URL(window.location.href);
+    const t = u.searchParams.get("cl");
+    if (!t) { refresh(); return; }
+    u.searchParams.delete("cl");
+    window.history.replaceState(window.history.state, "", u.pathname + u.search + u.hash);
+    api.post("/public/account/link-login", { t })
+      .then(r => { writeLocal(r.data); setSession(r.data); setCustomer(r.data.customer); setLoading(false); })
+      .catch(() => refresh());
+  }, [refresh]);
 
   const loginDone = (data) => {
     writeLocal(data);

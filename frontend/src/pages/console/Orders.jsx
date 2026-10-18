@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
+import { useKeptState } from "@/lib/keptState";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt, Eye, CheckCircle2, ScanLine, Truck, Wallet } from "lucide-react";
@@ -37,7 +38,7 @@ export default function Orders() {
   const [selected, setSelected] = useState(null);
   const [preview, setPreview] = useState(null);
   const [unread, setUnread] = useState({});
-  const [f, setF] = useState({ ...EMPTY_FILTERS });
+  const [f, setF] = useKeptState("orders-filters", { ...EMPTY_FILTERS });
   const [sel, setSel] = useState(new Set());
   const [prepOrder, setPrepOrder] = useState(null);
   const [assigning, setAssigning] = useState(null);

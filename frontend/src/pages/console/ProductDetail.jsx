@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
+import { goBack } from "@/lib/keptState";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Pencil, Boxes, TrendingUp, History, Image as ImageIcon } from "lucide-react";
@@ -43,7 +44,7 @@ export default function ProductDetail() {
 
   return (
     <div className="space-y-5 font-sora" data-testid="product-detail">
-      <button onClick={() => nav("/console/produits")} className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13}/>Retour au catalogue</button>
+      <button onClick={() => goBack(nav, "/console/produits")} data-testid="detail-back" className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13}/>Retour</button>
 
       <div className="dina-card-white p-5 flex flex-col lg:flex-row gap-5">
         <div className="lg:w-72 shrink-0">

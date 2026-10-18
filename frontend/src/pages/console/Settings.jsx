@@ -318,7 +318,7 @@ function PaiementsTab() {
 
       <div className="dina-card-white p-5 space-y-3">
         <div className="font-serif text-xl">Lien de paiement Wave</div>
-        <div className="text-xs text-[#666]">Utilisé partout où un paiement Wave est demandé (checkout, POS, orders, rider app). Le montant n'est pas inclus — la cliente le tape elle-même.</div>
+        <div className="text-xs text-[#666]">Ce lien sert à chaque paiement Wave : sur le site, en caisse, dans les commandes et chez le livreur. La cliente tape elle-même le montant.</div>
         <input className="dina-input" placeholder="https://pay.wave.com/m/..." value={extra.wave_payment_link} onChange={e => setExtra({...extra, wave_payment_link: e.target.value})} data-testid="wave-payment-link"/>
         <div className="text-[11px] text-[#5867fd]">💡 Affiché avec le montant exact + référence commande à chaque envoi.</div>
         <div className="grid sm:grid-cols-2 gap-2">
@@ -658,7 +658,7 @@ function RiderAppTab() {
             <input ref={logoRef} type="file" accept="image/*" className="hidden" onChange={e => uploadLogo(e.target.files[0])}/>
           </label>
           {cms.logo && <button onClick={() => upd("logo", "")} className="text-[#c62828] text-xs" data-testid="rider-logo-clear">Retirer</button>}
-          <div className="text-[11px] text-[#999] ml-auto">💡 Vide = utilise le logo principal</div>
+          <div className="text-[11px] text-[#999] ml-auto">Sans image ici, le logo de la boutique est utilisé</div>
         </div>
         <div className="grid grid-cols-2 gap-3 mt-2">
           <label className="text-xs text-[#666]">Couleur primaire
@@ -900,7 +900,7 @@ function DonneesTab() {
     <div className="space-y-3" data-testid="tab-donnees">
       <div className="dina-card-white p-5 space-y-2">
         <div className="font-serif text-xl">Export</div>
-        <p className="text-sm text-[#666]">Téléchargez toutes vos données au format JSON (produits, clientes, commandes, dépenses, etc.).</p>
+        <p className="text-sm text-[#666]">Téléchargez une copie de toutes vos données (produits, clientes, commandes, dépenses…).</p>
         <button onClick={exportAll} className="dina-btn-primary" data-testid="export-all"><Database size={14}/> Exporter mes données</button>
       </div>
 
@@ -917,7 +917,7 @@ function DonneesTab() {
 
       <div className="dina-card-white p-5 space-y-2 border-2 border-[#c62828]/30">
         <div className="font-serif text-xl text-[#c62828] flex items-center gap-2"><Shield size={18}/>Préparer pour la production</div>
-        <p className="text-sm text-[#666]">Vide <strong>toutes les données transactionnelles et démo</strong> (produits, commandes, clientes, livraisons, promotions, messages, événements, etc.) en 1 clic.<br/>Garde : <strong>comptes staff, business, paramètres vitrine, boutiques, zones</strong>.</p>
+        <p className="text-sm text-[#666]">Efface en un clic <strong>toutes les ventes et données d'essai</strong> (produits, commandes, clientes, livraisons, promotions, messages…).<br/>Restent en place : <strong>les comptes de l'équipe, les réglages de la boutique et du site, les boutiques et les zones</strong>.</p>
         <div className="text-xs text-[#c62828] bg-[#fff5f5] p-2 rounded">⚠ Action irréversible · à n'exécuter qu'avant le lancement officiel.</div>
         <button onClick={() => { setWipeOpen(true); setWipeInput(""); setWipeResult(null); }} className="dina-btn-danger !min-h-[36px]" data-testid="wipe-for-prod-button"><Trash2 size={14}/> Vider la base avant mise en prod</button>
       </div>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useParams, useLocation, useNavigationType } from "react-router-dom";
 import api from "@/lib/api";
 import { Toaster } from "sonner";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
@@ -111,6 +111,7 @@ import { ImageEditorHost } from "@/components/shared/ImageEditor";
 import { PdfPreviewHost } from "@/components/shared/PdfPreview";
 import RiderLogin from "@/pages/rider/RiderLogin";
 import PunchGate from "@/components/shared/PunchGate";
+import PopupGuard from "@/components/shared/PopupGuard";
 
 function Protected({ children }) {
   const { user, loading } = useAuth();
@@ -146,9 +147,27 @@ function SlugRedirect() {
   return miss ? <Navigate to="/" replace /> : <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
 }
 
+const scrollMemo = {};
 function ScrollToTop() {
-  const { pathname } = useLocation();
-  useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
+  const { pathname, key } = useLocation();
+  const type = useNavigationType();
+  const keyRef = React.useRef(key);
+  useEffect(() => {
+    const f = () => { scrollMemo[keyRef.current] = window.scrollY; };
+    window.addEventListener("scroll", f, { passive: true });
+    return () => window.removeEventListener("scroll", f);
+  }, []);
+  useEffect(() => {
+    keyRef.current = key;
+    if (type === "POP" && scrollMemo[key] != null) {
+      const y = scrollMemo[key];
+      let n = 0;
+      const t = setInterval(() => { window.scrollTo(0, y); if (Math.abs(window.scrollY - y) < 2 || ++n > 20) clearInterval(t); }, 100);
+      return () => clearInterval(t);
+    }
+    window.scrollTo(0, 0);
+  }, [pathname]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { keyRef.current = key; }, [key]);
   return null;
 }
 
@@ -170,6 +189,7 @@ export default function App() {
         <CustomerProvider>
         <BrowserRouter>
           <AppToaster />
+          <PopupGuard />
           <ScrollToTop />
           <ImageEditorHost />
           <PdfPreviewHost />

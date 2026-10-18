@@ -22,13 +22,18 @@ export default function BrandingBootstrapper() {
   const { pathname } = useLocation();
   const [site, setSite] = useState(null);
   const rider = isRiderPath(pathname);
+  const konsole = pathname.startsWith("/console");
   useEffect(() => {
     if (pathname.startsWith("/rider")) localStorage.setItem("dina_app", "rider");
+    else if (pathname.startsWith("/console")) localStorage.setItem("dina_app", "console");
     else localStorage.setItem("dina_app", "store");
-    // iOS reads the manifest only at page load: entering the rider app via in-app navigation
-    // (e.g. /login → /rider) needs one real reload so "Add to Home Screen" picks the rider manifest.
+    // iOS reads the manifest only at page load: entering the rider app or the console via in-app navigation
+    // needs one real reload so "Add to Home Screen" picks the right manifest.
     if (pathname.startsWith("/rider") && window.__dinaRiderManifest === false) {
       window.__dinaRiderManifest = true;
+      window.location.replace(window.location.href);
+    } else if (pathname.startsWith("/console") && window.__dinaConsoleManifest === false) {
+      window.__dinaConsoleManifest = true;
       window.location.replace(window.location.href);
     }
   }, [pathname]);
@@ -46,22 +51,22 @@ export default function BrandingBootstrapper() {
     const fav = document.getElementById("dynamic-favicon");
     if (fav) fav.href = logo;
     const name = site.name || "Chez Dina";
-    const appTitle = rider ? `${name} Livreur` : name;
-    if (rider) document.title = appTitle;
+    const appTitle = rider ? "Livreur" : konsole ? "Console" : name;
+    if (rider || konsole) document.title = appTitle;
     else if (site.name) document.title = `${site.name} — Boutique femme à Abidjan`;
     setMeta("apple-mobile-web-app-capable", "yes");
     setMeta("mobile-web-app-capable", "yes");
     setMeta("apple-mobile-web-app-title", appTitle);
-    const base = rider ? "" : (process.env.REACT_APP_BACKEND_URL || "");
+    const base = rider || konsole ? "" : (process.env.REACT_APP_BACKEND_URL || "");
     const apple = document.getElementById("dynamic-apple-icon") || document.querySelector('link[rel="apple-touch-icon"]');
-    if (apple) apple.href = rider ? `${base}/api/public/pwa-icon-rider/192` : logo;
+    if (apple) apple.href = rider ? `${base}/api/public/pwa-icon-rider/192` : konsole ? `${base}/api/public/pwa-icon/192` : logo;
     const manifest = document.getElementById("dynamic-manifest") || document.querySelector('link[rel="manifest"]');
     if (manifest) {
       if (!manifest.id) manifest.id = "dynamic-manifest";
       const bust = site.updated_at ? `?v=${encodeURIComponent(site.updated_at)}` : "";
-      manifest.href = `${base}/api/public/${rider ? "manifest-rider" : "manifest"}.webmanifest${bust}`;
+      manifest.href = `${base}/api/public/${rider ? "manifest-rider" : konsole ? "manifest-console" : "manifest"}.webmanifest${bust}`;
     }
-  }, [site, rider]);
+  }, [site, rider, konsole]);
 
   return null;
 }

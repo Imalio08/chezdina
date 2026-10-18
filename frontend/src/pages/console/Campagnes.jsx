@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { RichComposer } from "@/components/shared/RichComposer";
+import { useDetailParam } from "@/lib/keptState";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Trash2, X, Send, BarChart3, ChevronLeft, MessageSquare, Phone } from "lucide-react";
@@ -14,7 +16,7 @@ export default function Campagnes() {
   const [customers, setCustomers] = useState([]);
   const [edit, setEdit] = useState(null);
   const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState(null);
+  const [detail, setDetail] = useDetailParam();
 
   const load = async () => {
     const [a, b, c] = await Promise.all([
@@ -122,7 +124,8 @@ function CampaignForm({ initial, segs, customers, onSave, onClose }) {
             {f.target_type === "ids" && <div className="text-xs text-[#666]">{(f.customer_ids || []).length} cliente(s) · utilisez les segments pour un ciblage plus large</div>}
           </div>
 
-          <textarea className="dina-input" rows={4} placeholder="Message... (variables : {prenom}, {code}, {reduction})" value={f.text} onChange={e => upd("text", e.target.value)} data-testid="camp-text" />
+          <RichComposer value={f.text} onChange={v => upd("text", v)} attachments={f.attachments || []} onAttachments={a => upd("attachments", a)} rows={4} placeholder="Bonjour {prenom}… (vous pouvez utiliser {prenom}, {code} et {reduction})" testid="camp-text" />
+          {(f.attachments || []).length > 0 && !(f.channels || []).includes("inapp") && <div className="text-[11px] text-[#e4991e]">Les pièces jointes sont envoyées dans la messagerie du site : cochez aussi ce canal.</div>}
 
           <div>
             <label className="text-[10px] uppercase font-semibold text-[#666] mb-1 block">Image (optionnel)</label>

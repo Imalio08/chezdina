@@ -6,7 +6,7 @@ import { ArrowLeft, MessageSquare, Store, Package, Archive, ArchiveRestore } fro
 import { notifsChanged } from "@/pages/rider/Notifications";
 import { dateTimeFmt } from "@/lib/format";
 import { MessagePhotos, PhotoLightbox } from "@/components/shared/OrderThread";
-import { RichComposer, RichText } from "@/components/shared/RichComposer";
+import { RichComposer, RichText, plainPreview } from "@/components/shared/RichComposer";
 import { kvGet, kvSet, enqueue } from "@/lib/riderOffline";
 
 const KIND = { livreur_cliente: "Cliente", commande_livreur: "Boutique · commande" };
@@ -71,7 +71,7 @@ function Inbox() {
               {c.unread > 0 && <span className="bg-[#b02a2a] text-white text-[10px] rounded-full px-1.5 py-0.5 shrink-0" data-testid={`rider-conv-unread-${c.id}`}>{c.unread}</span>}
             </div>
             <div className="text-[10px] uppercase text-[#999]">{kindLabel(c)}{c.order_code ? ` · ${c.order_code}` : ""}{c.closed ? " · fermée" : ""}</div>
-            <div className="text-xs text-[#666] truncate">{c.last_message?.text || (c.last_message ? "📷 Photo" : "Nouvelle conversation")}</div>
+            <div className="text-xs text-[#666] truncate">{c.last_message?.text ? plainPreview(c.last_message.text) : (c.last_message ? "Pièce jointe" : "Nouvelle conversation")}</div>
           </div>
         </button>
         <button onClick={() => archive(c, !c.archived)} className="w-11 shrink-0 rounded-xl border border-[#ececec] dark:border-[#2a2a2a] bg-white dark:bg-[#1a1a1a] grid place-items-center text-[#666]" title={c.archived ? "Désarchiver" : "Archiver"} aria-label={c.archived ? "Désarchiver" : "Archiver"} data-testid={`rider-conv-archive-${c.id}`}>{c.archived ? <ArchiveRestore size={16}/> : <Archive size={16}/>}</button>
@@ -85,7 +85,7 @@ function Conversation({ id }) {
   const nav = useNavigate();
   const [conv, setConv] = useState(null);
   const [text, setText] = useState("");
-  const [photo, setPhoto] = useState(null);
+  const [atts, setAtts] = useState([]);
   const [zoom, setZoom] = useState(null);
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
@@ -95,17 +95,17 @@ function Conversation({ id }) {
   const count = conv?.messages?.length || 0;
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [count]);
   const send = async () => {
-    if ((!text.trim() && !photo) || sending) return;
+    if ((!text.trim() && !atts.length) || sending) return;
     setSending(true);
+    const attachments = atts;
     try {
-      const r = await api.post(`/rider/conversations/${id}/send`, { text, attachments: photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [] });
-      setText(""); setPhoto(null); setConv(c => ({ ...c, messages: [...(c?.messages || []), r.data.message] }));
+      const r = await api.post(`/rider/conversations/${id}/send`, { text, attachments });
+      setText(""); setAtts([]); setConv(c => ({ ...c, messages: [...(c?.messages || []), r.data.message] }));
     } catch (e) {
       if (!e.response) {
-        const attachments = photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [];
         await enqueue("conv", { conv_id: id, payload: { text, attachments } });
         setConv(c => { const next = { ...c, messages: [...(c?.messages || []), { id: `local_${Date.now()}`, from_kind: "rider", text: `${text} · ⏳ envoi au retour du réseau`, at: new Date().toISOString(), attachments }] }; kvSet(`conv:${id}`, next).catch(() => {}); return next; });
-        setText(""); setPhoto(null); toast.success("Message gardé · envoyé au retour du réseau");
+        setText(""); setAtts([]); toast.success("Message gardé · envoyé au retour du réseau");
       } else toast.error(e.response?.data?.detail || "Message non envoyé · réessayez");
     }
     finally { setSending(false); }
@@ -125,16 +125,15 @@ function Conversation({ id }) {
           return (
             <div key={m.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[82%] rounded-xl px-3 py-2 text-sm ${mine ? "bg-[color:var(--rider-primary)] text-white" : "bg-[#f5f5f5] dark:bg-[#242424]"}`}>
-                <MessagePhotos m={m} onOpen={setZoom}/><RichText text={m.text}/>
+                <MessagePhotos m={m} onOpen={setZoom} light={mine}/><RichText text={m.text}/>
                 <div className={`text-[9px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{!mine && m.from_name ? `${m.from_name} · ` : ""}{dateTimeFmt(m.at)}</div>
               </div>
             </div>
           );
         })}
       </div>
-      {photo && <div className="relative inline-block mb-2 self-start"><img src={photo} alt="Aperçu" className="h-16 rounded-lg"/><button onClick={() => setPhoto(null)} className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full px-1.5 text-xs">×</button></div>}
       {conv?.closed ? <div className="text-xs text-[#999] text-center pt-2">Conversation fermée après la livraison</div>
-        : <RichComposer value={text} onChange={setText} onSend={send} onPhoto={setPhoto} sending={sending} canSend={!!(text.trim() || photo)} testid="rider-msg"/>}
+        : <RichComposer value={text} onChange={setText} onSend={send} attachments={atts} onAttachments={setAtts} sending={sending} canSend={!!(text.trim() || atts.length)} testid="rider-msg"/>}
     </div>
   );
 }

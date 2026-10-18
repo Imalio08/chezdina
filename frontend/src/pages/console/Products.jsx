@@ -3,6 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
+import { useKeptState } from "@/lib/keptState";
 import { fcfa, fcfaCompact } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Download, Pencil, Eye, Trash2, Copy, Archive, Tag, Package, AlertTriangle, Clock, BarChart3, DollarSign, Percent, CheckCircle, XCircle, ChevronDown, Search } from "lucide-react";
@@ -29,8 +30,8 @@ export default function Products() {
   const [brands, setBrands] = useState([]);
   const [cats, setCats] = useState([]);
   const [view, setView] = useStoredView("products", "grid");
-  const [q, setQ] = useState("");
-  const [filters, setFilters] = useState({});
+  const [q, setQ] = useKeptState("products-q", "");
+  const [filters, setFilters] = useKeptState("products-filters", {});
   const [selected, setSelected] = useState([]);
   const [detailId, setDetailId] = useState(null);
   const [editId, setEditId] = useState(null); // null = no form, "new" = new, "<id>" = edit

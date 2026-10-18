@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
+import { useDetailParam } from "@/lib/keptState";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, X, Users, Filter, ChevronLeft, Hand, Zap, Sparkles, Megaphone, Loader2 } from "lucide-react";
@@ -14,7 +15,7 @@ export default function Segments() {
   const [customers, setCustomers] = useState([]);
   const [edit, setEdit] = useState(null);
   const [open, setOpen] = useState(false);
-  const [detail, setDetail] = useState(null);
+  const [detail, setDetail] = useDetailParam();
   const [aiOpen, setAiOpen] = useState(false);
 
   const load = async () => {

@@ -297,7 +297,7 @@ function LegacyPrepRunner({ order, onBack }) {
           <input ref={inputRef} value={scanBuffer} onChange={e => setScanBuffer(e.target.value)} onKeyDown={onKey} placeholder="Scannez un article (douchette ou saisie) puis Entrée" className="flex-1 bg-transparent outline-none text-sm font-mono" data-testid="prep-scan-input"/>
           <button onClick={() => handleScan(scanBuffer)} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="prep-scan-submit"><Check size={13}/>Valider</button>
         </div>
-        <div className="text-[10px] text-[#999] mt-1.5">Format attendu : SKU · ou SKU|taille|couleur. Pour les cas particuliers, utilisez l'override manuel.</div>
+        <div className="text-[10px] text-[#999] mt-1.5">Saisissez le code imprimé sous le QR de l'étiquette.</div>
       </div>
 
       <div className="space-y-2">

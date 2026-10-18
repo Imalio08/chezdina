@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
+import { useKeptState } from "@/lib/keptState";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, MessageSquare, X, Search, Copy, Phone, Ban, Check, Users, Trophy } from "lucide-react";
@@ -20,8 +21,8 @@ export default function Customers() {
   const ro = useAuth().user?.role === "community_manager";
   const confirm = useConfirm();
   const [list, setList] = useState([]);
-  const [q, setQ] = useState("");
-  const [tab, setTab] = useState("all");
+  const [q, setQ] = useKeptState("customers-q", "");
+  const [tab, setTab] = useKeptState("customers-tab", "all");
   const [view, setView] = useStoredView("customers", "table");
   const [edit, setEdit] = useState(null);
   const [open, setOpen] = useState(false);

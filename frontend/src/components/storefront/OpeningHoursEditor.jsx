@@ -61,7 +61,7 @@ export default function OpeningHoursEditor({ value = {}, onChange }) {
           );
         })}
       </div>
-      <div className="text-[11px] text-[#999] italic">Le bandeau "Boutique fermée" s'affiche automatiquement sur le site vitrine en dehors de ces créneaux.</div>
+      <div className="text-[11px] text-[#999] italic">En dehors de ces horaires, le site affiche « Boutique fermée ».</div>
     </div>
   );
 }

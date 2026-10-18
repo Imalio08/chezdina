@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
+import { RichComposer } from "@/components/shared/RichComposer";
 import { toast } from "sonner";
 import { fcfa, fcfaCompact } from "@/lib/format";
 import { ShoppingBag, DollarSign, MessageSquare, CheckCircle, X, Send, Target, Upload, Trash2 } from "lucide-react";
@@ -288,7 +289,7 @@ function RelaunchForm({ targets, carts, onClose }) {
           {/* Message */}
           <div>
             <label className="text-[10px] uppercase text-[#666] font-semibold">Message · variables {`{prénom} {produits} {code} {date_fin} {lien_panier}`}</label>
-            <textarea rows={5} className="dina-input" value={f.message} onChange={e => setF({...f, message: e.target.value})} data-testid="rf-message"/>
+            <RichComposer value={f.message} onChange={v => setF({...f, message: v})} rows={5} testid="rf-message"/>
           </div>
         </div>
 

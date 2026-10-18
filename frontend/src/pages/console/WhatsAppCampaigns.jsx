@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
+import { RichComposer } from "@/components/shared/RichComposer";
 import { toast } from "sonner";
 import { Send, Check, Trash2, MessageCircle, Users, Megaphone, Clock, Zap } from "lucide-react";
 import { dateTimeFmt } from "@/lib/format";
@@ -138,7 +139,7 @@ function BroadcastModal({ segCounts, onClose, onDone }) {
         </div>
 
         <label className="text-xs uppercase font-semibold text-[#666]">Message (variables : {"{prenom}"}, {"{code}"})</label>
-        <textarea className="dina-input my-2" rows={6} value={message} onChange={e => setMessage(e.target.value)} placeholder="Bonjour {prenom}, nous avons de nouveaux arrivages…" data-testid="wa-message" />
+        <div className="my-2"><RichComposer value={message} onChange={setMessage} rows={6} placeholder="Bonjour {prenom}, nous avons de nouveaux arrivages…" testid="wa-message" /></div>
 
         <div className="flex gap-2 mt-3">
           <button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button>

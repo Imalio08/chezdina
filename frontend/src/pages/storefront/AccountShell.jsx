@@ -7,7 +7,7 @@ import { reveal } from "@/lib/reveal";
 import { toast } from "sonner";
 import { useCustomer } from "@/context/CustomerContext";
 import { MessagePhotos, PhotoLightbox } from "@/components/shared/OrderThread";
-import { RichComposer, RichText } from "@/components/shared/RichComposer";
+import { RichComposer, RichText, plainPreview } from "@/components/shared/RichComposer";
 import { AddressModal, addressLine } from "@/components/storefront/AddressForm";
 import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
 import { playChime } from "@/lib/notifySound";
@@ -674,7 +674,7 @@ function MessagesPage() {
   };
   const [active, setActive] = useState(null);
   const [text, setText] = useState("");
-  const [photo, setPhoto] = useState(null);
+  const [atts, setAtts] = useState([]);
   const [zoom, setZoom] = useState(null);
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
@@ -698,9 +698,9 @@ function MessagesPage() {
   useEffect(() => { loadActive(); const t = setInterval(loadActive, 5000); return () => clearInterval(t); }, [id]);
 
   const send = async () => {
-    if ((!text.trim() && !photo) || !id || sending) return;
+    if ((!text.trim() && !atts.length) || !id || sending) return;
     setSending(true);
-    try { await api.post("/public/account/messages/send", { conversation_id: id, text, attachments: photo ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [] }); setText(""); setPhoto(null); await loadActive(); }
+    try { await api.post("/public/account/messages/send", { conversation_id: id, text, attachments: atts }); setText(""); setAtts([]); await loadActive(); }
     catch (e) { toast.error(e.response?.data?.detail || "Message non envoyé · réessayez"); } finally { setSending(false); }
   };
 
@@ -735,7 +735,7 @@ function MessagesPage() {
                     <div className="font-medium text-sm truncate">{other.name || "—"}</div>
                     {unread > 0 && <span className="bg-[#b02a2a] text-white text-[9px] rounded-full px-1.5 py-0.5">{unread}</span>}
                   </div>
-                  <div className="text-xs text-[#666] truncate">{last?.text || "Nouvelle conversation"}</div>
+                  <div className="text-xs text-[#666] truncate">{last?.text ? plainPreview(last.text) : last?.attachments?.length ? "Pièce jointe" : "Nouvelle conversation"}</div>
                 </div>
               </div>
             </button>
@@ -751,14 +751,13 @@ function MessagesPage() {
             <div ref={listRef} className="flex-1 overflow-y-auto space-y-2 py-2 max-h-[55vh] md:max-h-[60vh]" data-testid="msg-list">
               {(active.messages || []).map((m, i) => {
                 const mine = m.from_id === customer.id;
-                return <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`${mine ? "bg-[#b02a2a] text-white" : "bg-[#f5f5f5]"} rounded-xl px-3 py-2 max-w-[80%]`}><MessagePhotos m={m} onOpen={setZoom}/>{m.text && <RichText text={m.text} className="text-sm"/>}<div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{m.from_name && !mine ? `${m.from_name} · ` : ""}{dateFmt(m.at)}</div></div></div>;
+                return <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`${mine ? "bg-[#b02a2a] text-white" : "bg-[#f5f5f5]"} rounded-xl px-3 py-2 max-w-[80%]`}><MessagePhotos m={m} onOpen={setZoom} light={mine}/>{m.text && <RichText text={m.text} className="text-sm"/>}<div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{m.from_name && !mine ? `${m.from_name} · ` : ""}{dateFmt(m.at)}</div></div></div>;
               })}
             </div>
             <PhotoLightbox src={zoom} onClose={() => setZoom(null)}/>
-            {photo && <div className="relative inline-block mb-2 self-start" data-testid="msg-photo-preview"><img src={photo} alt="Aperçu" className="h-20 rounded-lg"/><button onClick={() => setPhoto(null)} className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full px-1.5 text-xs">×</button></div>}
             {active.closed ? <div className="text-xs text-[#999] text-center border-t border-[#ececec] pt-2">Conversation fermée après la livraison</div> : (
               <div className="border-t border-[#ececec] pt-2">
-                <RichComposer value={text} onChange={setText} onSend={send} onPhoto={setPhoto} canSend={!sending && !!(text.trim() || photo)} testid="msg"/>
+                <RichComposer value={text} onChange={setText} onSend={send} attachments={atts} onAttachments={setAtts} canSend={!sending && !!(text.trim() || atts.length)} testid="msg"/>
                 {sending && <div className="text-[11px] text-[#666] mt-1" data-testid="msg-sending">Envoi…</div>}
               </div>
             )}

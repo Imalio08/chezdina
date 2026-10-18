@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
+import { useKeptState } from "@/lib/keptState";
 import { toast } from "sonner";
 import { Star, Check, X, Trash2, MessageSquareReply, Reply } from "lucide-react";
 import { dateFmt } from "@/lib/format";
 import useFocusParam from "@/lib/useFocusParam";
 
 export default function Reviews() {
-  const [tab, setTab] = useState("pending");
+  const [tab, setTab] = useKeptState("reviews-tab", "pending");
   const [rows, setRows] = useState([]);
   useFocusParam();
   const [counts, setCounts] = useState({ pending: 0, approved: 0, rejected: 0 });

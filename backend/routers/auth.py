@@ -164,6 +164,22 @@ def _customer_session(c: dict, response: Response) -> dict:
     return {"customer": clean(c), "token": token}
 
 
+@router.post("/public/account/link-login")
+async def cust_link_login(body: dict, response: Response):
+    """Exchange the sign-in token carried by links sent to the customer for a session."""
+    import jwt
+    try:
+        p = jwt.decode(str(body.get("t") or ""), JWT_SECRET, algorithms=[JWT_ALG])
+    except Exception:
+        raise HTTPException(401, "Lien expiré")
+    if p.get("kind") != "customer_link":
+        raise HTTPException(401, "Lien invalide")
+    c = await db.customers.find_one({"id": p.get("sub"), "status": {"$ne": "blacklist"}})
+    if not c:
+        raise HTTPException(404, "Compte introuvable")
+    return _customer_session(c, response)
+
+
 async def _unique_ref_code() -> str:
     for n in (4, 4, 4, 5, 5, 6):
         code = f"DINA-{random.randint(10 ** (n - 1), 10 ** n - 1)}"

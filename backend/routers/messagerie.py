@@ -308,12 +308,19 @@ async def send_message(body: Dict[str, Any], user: dict = Depends(get_user)):
     return await send_message_core(body, user)
 
 
+_ATT_TYPES = {"image": ("data:image/",), "video": ("data:video/",), "audio": ("data:audio/",), "file": ("data:application/", "data:text/")}
+
+
 def _image_attachments(raw) -> List[Dict[str, Any]]:
+    """Images, videos, audio and files (data URLs ≤ ~7 Mo or https links), max 5."""
     out: List[Dict[str, Any]] = []
-    for a in (raw or [])[:3]:
-        u = str((a or {}).get("url") or "")
-        if (a or {}).get("type") == "image" and len(u) <= 3_000_000 and (u.startswith("data:image/") or u.startswith("https://")):
-            out.append({"type": "image", "url": u, "name": str(a.get("name") or "photo.jpg")[:120], "mime": str(a.get("mime") or "image/jpeg")[:40]})
+    for a in (raw or [])[:5]:
+        a = a if isinstance(a, dict) else {}
+        t = a.get("type")
+        u = str(a.get("url") or "")
+        if t in _ATT_TYPES and len(u) <= 9_500_000 and (u.startswith(_ATT_TYPES[t]) or u.startswith("https://")):
+            out.append({"type": t, "url": u, "name": str(a.get("name") or ("photo.jpg" if t == "image" else "fichier"))[:120],
+                        "mime": str(a.get("mime") or ("image/jpeg" if t == "image" else ""))[:80], "size": int(a.get("size") or 0)})
     return out
 
 
@@ -574,6 +581,6 @@ async def broadcast(body: Dict[str, Any], user: dict = Depends(require_role("adm
         ids = (seg or {}).get("customer_ids") or []
     count = 0
     for cid in ids:
-        await send_message_core({"customer_id": cid, "text": text, "image": image, "kind": "boutique_cliente"}, user)
+        await send_message_core({"customer_id": cid, "text": text, "image": image, "attachments": body.get("attachments") or [], "kind": "boutique_cliente"}, user)
         count += 1
     return {"ok": True, "count": count, "valid_until": valid_until}

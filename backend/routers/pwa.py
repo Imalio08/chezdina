@@ -112,14 +112,16 @@ async def _load_settings() -> dict:
     }
 
 
+LAUNCH = {"launch_handler": {"client_mode": ["navigate-existing", "auto"]}, "handle_links": "preferred", "capture_links": "existing-client-navigate"}
+
+
 @router.get("/public/manifest.webmanifest")
 async def dynamic_manifest():
     cfg = await _load_settings()
     name = cfg["name"]
-    short = (name.split(" ")[0] if " " in name else name)[:12] or "Dina"
     manifest = {
         "name": name,
-        "short_name": short,
+        "short_name": name[:20],
         "description": f"{name} — chaussures & sacs femme à Abidjan",
         "start_url": "/",
         "id": "/boutique",
@@ -133,6 +135,34 @@ async def dynamic_manifest():
             {"src": "/api/public/pwa-icon/512",          "sizes": "512x512", "type": "image/png"},
             {"src": "/api/public/pwa-icon/512-maskable", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ],
+        **LAUNCH,
+    }
+    return JSONResponse(
+        manifest,
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=60"},
+    )
+
+
+@router.get("/public/manifest-console.webmanifest")
+async def dynamic_console_manifest():
+    cfg = await _load_settings()
+    manifest = {
+        "name": "Console",
+        "short_name": "Console",
+        "description": f"Console de gestion {cfg['name']}",
+        "start_url": "/console",
+        "id": "/console",
+        "scope": "/console",
+        "display": "standalone",
+        "theme_color": cfg["theme_color"],
+        "background_color": cfg["bg_color"],
+        "icons": [
+            {"src": "/api/public/pwa-icon/192",          "sizes": "192x192", "type": "image/png"},
+            {"src": "/api/public/pwa-icon/512",          "sizes": "512x512", "type": "image/png"},
+            {"src": "/api/public/pwa-icon/512-maskable", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+        ],
+        **LAUNCH,
     }
     return JSONResponse(
         manifest,
@@ -145,12 +175,9 @@ async def dynamic_manifest():
 async def dynamic_rider_manifest():
     """Separate PWA for livreurs: launches /rider on install, uses rider_cms logo."""
     cfg = await _load_settings()
-    name = cfg["name"]
-    short_full = f"{name} Livreur"
-    short = (short_full[:12]) or "Livreur"
     manifest = {
-        "name": f"{name} — Livreur",
-        "short_name": short,
+        "name": "Livreur",
+        "short_name": "Livreur",
         "description": "Application des livreurs — courses, carte, pointage",
         "start_url": "/riders",
         "id": "/rider",
@@ -164,6 +191,7 @@ async def dynamic_rider_manifest():
             {"src": "/api/public/pwa-icon-rider/512",          "sizes": "512x512", "type": "image/png"},
             {"src": "/api/public/pwa-icon-rider/512-maskable", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
         ],
+        **LAUNCH,
     }
     return JSONResponse(
         manifest,

@@ -5,12 +5,10 @@ import { Camera, X } from "lucide-react";
 import { dateTimeFmt } from "@/lib/format";
 import { compressImage } from "@/lib/imageCompress";
 import { editImage } from "@/components/shared/ImageEditor";
-import { RichComposer, RichText } from "@/components/shared/RichComposer";
+import { RichComposer, RichText, AttachmentsView } from "@/components/shared/RichComposer";
 
-export function MessagePhotos({ m, onOpen }) {
-  const imgs = (m.attachments || []).filter(a => a.type === "image");
-  if (!imgs.length) return null;
-  return <div className="flex flex-wrap gap-1.5 mb-1">{imgs.map((a, i) => <img key={i} src={a.url} alt="Photo" onClick={() => onOpen(a.url)} className="w-36 h-28 object-cover rounded-lg cursor-zoom-in hover:opacity-90 transition-opacity" data-testid="thread-photo"/>)}</div>;
+export function MessagePhotos({ m, onOpen, light }) {
+  return <AttachmentsView items={m.attachments || []} onOpen={onOpen} light={light}/>;
 }
 
 export function PhotoLightbox({ src, onClose }) {
@@ -43,7 +41,7 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
   const [conv, setConv] = useState(null);
   const [error, setError] = useState(null);
   const [text, setText] = useState("");
-  const [photo, setPhoto] = useState(null);
+  const [atts, setAtts] = useState([]);
   const [zoom, setZoom] = useState(null);
   const [sending, setSending] = useState(false);
   const listRef = useRef(null);
@@ -57,24 +55,23 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
       setError(e.response?.data?.detail || "Messagerie indisponible");
     }
   };
-  useEffect(() => { setConv(null); setPhoto(null); load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [orderId, party]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setConv(null); setAtts([]); load(); const t = setInterval(load, 10000); return () => clearInterval(t); }, [orderId, party]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [count]);
 
   const send = async (value) => {
     const txt = (value ?? text).trim();
-    if ((!txt && !photo) || sending) return;
+    const attachments = value === undefined ? atts : [];
+    if ((!txt && !attachments.length) || sending) return;
     setSending(true);
     try {
-      const attachments = photo && value === undefined ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [];
       const r = await api.post(`/orders/${orderId}/thread/${party}/send`, { text: txt, attachments });
-      setText(""); if (attachments.length) setPhoto(null);
+      setText(""); if (attachments.length) setAtts([]);
       setConv(c => ({ ...c, messages: [...(c?.messages || []), r.data.message] })); onSent?.(txt);
     } catch (e) {
       if (me === "rider" && !e.response) {
-        const attachments = photo && value === undefined ? [{ type: "image", url: photo, name: "photo.jpg", mime: "image/jpeg" }] : [];
         const { enqueue } = await import("@/lib/riderOffline");
         await enqueue("thread", { order_id: orderId, party, payload: { text: txt, attachments } });
-        setText(""); if (attachments.length) setPhoto(null);
+        setText(""); if (attachments.length) setAtts([]);
         const local = { id: `local_${Date.now()}`, from_kind: "rider", text: `${txt} · ⏳ envoi au retour du réseau`, at: new Date().toISOString(), attachments };
         setConv(c => { const next = { ...c, messages: [...(c?.messages || []), local] }; import("@/lib/riderOffline").then(m => m.kvSet(`thread:${orderId}:${party}`, next)).catch(() => {}); return next; });
         toast.success("Message gardé · envoyé au retour du réseau");
@@ -96,7 +93,7 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
         : conv.messages.map(m => (
           <div key={m.id} className={`flex ${mine(m) ? "justify-end" : "justify-start"}`} data-testid={`thread-msg-${m.id}`}>
             <div className={`max-w-[80%] rounded-xl px-3 py-2 text-xs ${mine(m) ? "bg-[#b02a2a] text-white" : "bg-white dark:bg-[#1f1f1f] border border-[#ececec] dark:border-[#2a2a2a]"}`}>
-              <MessagePhotos m={m} onOpen={setZoom}/>
+              <MessagePhotos m={m} onOpen={setZoom} light={mine(m)}/>
               {m.text && <RichText text={m.text}/>}
               <div className={`text-[9px] mt-1 ${mine(m) ? "text-white/70" : "text-[#999]"}`}>{who(m)}{m.from_name} · {dateTimeFmt(m.at)}</div>
             </div>
@@ -109,14 +106,8 @@ export default function OrderThread({ orderId, party, me = "store", quickReplies
           {quickReplies.map((q, i) => <button key={i} onClick={() => send(q)} disabled={sending} className="shrink-0 text-[11px] px-2.5 py-1 rounded-full border border-[#ececec] dark:border-[#2a2a2a] hover:border-[#b02a2a] hover:text-[#b02a2a] transition-colors" data-testid={`quick-reply-${party}-${i}`}>{q}</button>)}
         </div>
       )}
-      {photo && (
-        <div className="relative inline-block mb-2" data-testid="thread-photo-preview">
-          <img src={photo} alt="Aperçu" className="h-20 rounded-lg"/>
-          <button onClick={() => setPhoto(null)} className="absolute -top-2 -right-2 bg-[#1c1c1c] text-white rounded-full p-0.5" data-testid="thread-photo-remove"><X size={12}/></button>
-        </div>
-      )}
-      <RichComposer value={text} onChange={setText} onSend={() => send()} onPhoto={setPhoto} sending={sending} canSend={!!(text.trim() || photo)}
-        placeholder={photo ? "Légende (facultative)…" : "Votre message…"} testid={`thread-composer-${party}`}/>
+      <RichComposer value={text} onChange={setText} onSend={() => send()} attachments={atts} onAttachments={setAtts} sending={sending} canSend={!!(text.trim() || atts.length)}
+        placeholder={atts.length ? "Légende (facultative)…" : "Votre message…"} testid={`thread-composer-${party}`}/>
       </>}
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
+import { RichComposer } from "@/components/shared/RichComposer";
 import { toast } from "sonner";
 import { Users, Package, BellRing, Trash2, ShoppingBag, Search as SearchIcon, Hash, Globe, Store, X, Send, Upload } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
@@ -225,7 +226,7 @@ function NotifyModal({ item, onClose }) {
           </div>
           <div>
             <label className="text-[10px] uppercase text-[#666] font-semibold">Message à envoyer</label>
-            <textarea rows={5} className="dina-input" value={f.message} onChange={e => setF({...f, message: e.target.value})} data-testid="wl-notify-message"/>
+            <RichComposer value={f.message} onChange={v => setF({...f, message: v})} rows={5} testid="wl-notify-message"/>
           </div>
         </div>
         <div className="flex gap-2 mt-5">

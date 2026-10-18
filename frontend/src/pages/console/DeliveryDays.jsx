@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
+import { useKeptState } from "@/lib/keptState";
 import { fcfa, statusLabel, statusColor, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Calendar, Package, DollarSign, AlertTriangle, CheckCircle2, Users, X, Printer, Map, Sparkles, UserPlus, FileText } from "lucide-react";
@@ -143,7 +144,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
   const [brand, setBrand] = useState({ logo: "", name: "Chez Dina" });
   useEffect(() => { api.get("/public/site").then(r => setBrand({ logo: r.data?.logo || "", name: r.data?.name || "Chez Dina" })).catch(() => {}); }, []);
   const nav = useNavigate();
-  const [tab, setTab] = useState("affectation");
+  const [tab, setTab] = useKeptState("delivery-days-tab", "affectation");
   const [selected, setSelected] = useState([]);
   const [assignTo, setAssignTo] = useState(null);
   const [suggestions, setSuggestions] = useState(null);

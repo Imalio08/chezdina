@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import api from "@/lib/api";
+import { goBack } from "@/lib/keptState";
 import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { ChevronLeft, Download, Printer, MessageCircle, FileText, User, Truck, MapPin, Clock, Send, Eye } from "lucide-react";
@@ -74,7 +75,7 @@ export default function OrderDetail() {
   return (
     <div className="space-y-5 font-sora" data-testid="order-detail">
       {preview && <InvoicePreviewModal data={preview} onClose={() => setPreview(null)}/>}
-      <button onClick={() => nav("/console/commandes")} className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13}/>Retour aux commandes</button>
+      <button onClick={() => goBack(nav, "/console/commandes")} data-testid="detail-back" className="text-sm text-[#666] inline-flex items-center gap-1 hover:text-[#b02a2a]"><ChevronLeft size={13}/>Retour</button>
       <div className="dina-card-white p-5">
         <div className="flex items-start justify-between gap-3 flex-wrap">
           <div>

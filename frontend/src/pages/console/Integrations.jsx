@@ -35,7 +35,7 @@ export default function Integrations() {
           <label className="flex items-center gap-2 text-sm mb-3"><input type="checkbox" checked={f.whatsapp_auto !== false} onChange={e => setF({ ...f, whatsapp_auto: e.target.checked })} className="accent-[#b02a2a]" data-testid="integ-wa-auto" />Messages automatiques sur changement de statut</label>
           <Field label="Token Meta (Cloud API)"><input type="password" className="dina-input" placeholder="EAAG…" value={f.whatsapp_meta_token || ""} onChange={e => setF({ ...f, whatsapp_meta_token: e.target.value })} data-testid="integ-wa-token" /></Field>
           <Field label="Phone number ID"><input className="dina-input" value={f.whatsapp_meta_phone_id || ""} onChange={e => setF({ ...f, whatsapp_meta_phone_id: e.target.value })} data-testid="integ-wa-phone" /></Field>
-          <div className="text-xs text-[#666]">Sans token : les messages sont enfilés dans Campagnes WhatsApp pour envoi manuel 1-clic. Avec token : envoi auto via Meta Cloud API.</div>
+          <div className="text-xs text-[#666]">Sans connexion WhatsApp Business, les messages attendent dans Campagnes WhatsApp et partent en un clic. Une fois connecté, ils partent tout seuls.</div>
         </S>
         <S icon={ImageIcon} title="Pixels Marketing">
           <Field label="Meta Pixel ID"><input className="dina-input" placeholder="123456789" value={f.meta_pixel_id || ""} onChange={e => setF({ ...f, meta_pixel_id: e.target.value })} data-testid="integ-meta-pixel" /></Field>

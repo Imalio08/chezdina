@@ -33,7 +33,7 @@ export default function SiteAppearance() {
   return (
     <div className="space-y-5">
       <div className="flex justify-between items-center flex-wrap gap-2">
-        <div><h1 className="font-serif text-3xl">Apparence du site</h1><p className="text-sm text-[#666]">Édite les blocs vitrine sans toucher au JSON</p></div>
+        <div><h1 className="font-serif text-3xl">Apparence du site</h1><p className="text-sm text-[#666]">Modifiez les blocs de la page d'accueil</p></div>
         <a href="/" target="_blank" rel="noreferrer" className="dina-btn-secondary !min-h-[40px]" data-testid="view-site"><ExternalLink size={14}/>Voir le site</a>
       </div>
 
@@ -92,7 +92,7 @@ function PopupTab({ site, onSave, saving }) {
         <div className="font-serif text-xl">Popup de bienvenue</div>
         <label className="flex items-center gap-2 text-sm cursor-pointer"><input type="checkbox" checked={!!p.enabled} onChange={e=>setP({...p,enabled:e.target.checked})} className="accent-[#b02a2a]" data-testid="popup-enabled"/>Activé</label>
       </div>
-      <p className="text-xs text-[#666]">S'affiche 1 fois par session après un délai configurable.</p>
+      <p className="text-xs text-[#666]">Apparaît une seule fois par visite, après le délai choisi.</p>
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="space-y-2">
           <Input label="Titre" value={p.title} onChange={v=>setP({...p,title:v})} testid="popup-title"/>

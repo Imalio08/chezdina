@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Outlet, NavLink, useNavigate, useLocation, Link } from "react-router-dom";
+import AppInstallButton from "@/components/shared/AppInstallButton";
 import { useAuth } from "@/context/AuthContext";
 import { useApp } from "@/context/AppContext";
 import api from "@/lib/api";
@@ -395,6 +396,7 @@ export default function ConsoleLayout() {
               <Clock size={12}/><span className="hidden lg:inline">{punchStatus?.departure ? "Terminé" : punchStatus?.checked_in ? "Pointé" : "Pointer"}</span>
             </button>
           )}
+          <AppInstallButton appName="Console"/>
           <button onClick={()=>setTheme(theme==="light"?"dark":"light")} className="dina-chip hidden md:inline-flex" data-testid="theme-toggle" title={theme==="light"?"Mode sombre":"Mode clair"}>{theme==="light"?<Moon size={12}/>:<Sun size={12}/>}</button>
           <button onClick={toggleSound} className="dina-chip hidden md:inline-flex" data-testid="sound-toggle" title={soundOn ? "Couper les sons" : "Activer les sons"}>{soundOn ? <Volume2 size={12}/> : <VolumeX size={12}/>}</button>
           <div className="relative">

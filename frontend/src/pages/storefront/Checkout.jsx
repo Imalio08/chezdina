@@ -5,7 +5,7 @@ import api from "@/lib/api";
 import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
 import { reveal } from "@/lib/reveal";
-import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalLink } from "lucide-react";
+import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalLink, X } from "lucide-react";
 import { track } from "@/lib/analytics";
 import { useCustomer } from "@/context/CustomerContext";
 import WavePayBox from "@/components/storefront/WavePayBox";
@@ -246,7 +246,8 @@ export default function Checkout() {
 
       {confirmedOrder && (
         <div className="fixed inset-0 bg-black/60 z-50 grid place-items-center p-4" data-testid="deposit-modal">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[92vh] overflow-y-auto">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[92vh] overflow-y-auto relative">
+            <button onClick={() => nav(`/suivi/${confirmedOrder.code}`)} className="absolute top-3 right-3 p-1 text-[#666] hover:text-[#1c1c1c]" aria-label="Fermer" data-testid="deposit-modal-close"><X size={18}/></button>
             <div className="text-center mb-4">
               <div className="font-serif text-xl">Commande {confirmedOrder.code} créée</div>
               <div className="text-xs text-[#666]">{confirmedOrder.status === "en_attente_acompte" ? "Elle sera confirmée dès que la boutique aura vérifié votre acompte Wave." : "Elle sera marquée payée dès que la boutique aura vérifié votre paiement Wave."}</div>

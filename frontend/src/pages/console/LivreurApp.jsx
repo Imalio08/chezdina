@@ -188,7 +188,7 @@ function IdentiteTab({ ctx }) {
     <div className="space-y-4" data-testid="la-identite">
       <div className="dina-card-white p-5 space-y-3">
         <div className="font-serif text-xl">Logo livreur</div>
-        <p className="text-xs text-[#666]">Affiché dans l'app livreur, le manifest PWA et l'icône d'installation sur l'écran d'accueil du téléphone. Vide = reprend le logo principal de la boutique.</p>
+        <p className="text-xs text-[#666]">Ce logo apparaît dans l'app livreur et sur l'icône du téléphone. Sans logo ici, celui de la boutique est utilisé.</p>
         <div className="flex items-center gap-4 flex-wrap">
           {cms.logo ? (
             <img src={cms.logo} alt="Logo livreur" className="h-20 w-20 object-cover border rounded-xl bg-white" data-testid="rider-logo-preview"/>

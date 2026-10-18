@@ -277,7 +277,7 @@ function ZonesTab({ period }) {
     <div className="space-y-4">
       <div className="flex justify-end"><ExportBar rows={rows} name="zones" /></div>
       <div className="dina-card-white overflow-x-auto"><table className="dina-table"><thead><tr><th>Zone</th><th>Clientes</th><th>Commandes</th><th className="text-right">CA</th><th className="text-right">Livrées</th><th className="text-right">Annulées</th></tr></thead><tbody>{rows.length === 0 ? <tr><td colSpan={6} className="text-sm text-[#666] text-center py-6">Aucune donnée pour cette période</td></tr> : rows.map((z,i)=>(<tr key={i}><td className="font-medium">{z.name}</td><td>{z.clients}</td><td>{z.orders}</td><td className="text-right tabular">{fcfa(z.revenue)}</td><td className="text-right text-[#1f8a4c]">{z.delivered}</td><td className="text-right text-[#c62828]">{z.cancelled}</td></tr>))}</tbody></table></div>
-      <div className="text-xs text-[#666]">Carte Leaflet des zones disponible via /console/zones</div>
+      <div className="text-xs text-[#666]">La carte des zones se trouve dans Zones géographiques.</div>
     </div>
   );
 }
