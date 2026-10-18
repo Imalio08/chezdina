@@ -19,7 +19,7 @@ READ = ("GET", "HEAD")
 
 COMMON = ("/api/auth/", "/api/attendance/", "/api/attendance/me", "/api/attendance/check-in", "/api/attendance/today-kiosk", "/api/me/",
           "/api/notifications", "/api/manual", "/api/users/me", "/api/push/", "/api/public/", "/api/dashboard/role",
-          "/api/orders-messages")
+          "/api/orders-messages", "/api/onboarding/me", "/api/onboarding/files/", "/api/onboarding/employees/")
 COMMON_READ = ("/api/business", "/api/brands", "/api/categories", "/api/products", "/api/stock", "/api/zones")
 
 ROLE_API = {

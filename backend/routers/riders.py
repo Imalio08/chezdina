@@ -257,6 +257,13 @@ async def rider_today(user: dict = Depends(get_user)):
         orders.append(o)
     for o in orders:
         o["amount_due"] = amount_due(o)
+    day_sessions = await db.delivery_sessions.find({"rider_id": user["id"], "date": today}, {"closed": 1}).to_list(20)
+    open_left = any(o.get("status") in ("confirmee", "prete", "assignee", "en_livraison") and not o.get("readonly") for o in orders)
+    day_closed = bool(day_sessions) and all(s.get("closed") for s in day_sessions) and not open_left
+    for o in orders:
+        o["customer"] = _mask_customer(o.get("customer")) if day_closed or o.get("readonly") else _rider_customer(o.get("customer"))
+        for k in ("contact_log", "customer_phone", "customer_id"):
+            o.pop(k, None)
     to_collect = sum(o["amount_due"] for o in orders if not o.get("readonly") and o.get("status") not in ("livree", "annulee", "echouee", "retournee", "refusee", "reportee"))
     collected = 0
     for o in orders:
@@ -285,7 +292,7 @@ async def rider_today(user: dict = Depends(get_user)):
         for oid, r in (s.get("reconciliations") or {}).items():
             if isinstance(r, dict) and r.get("collected") and any(o["id"] == oid and o.get("status") == "livree" for o in orders):
                 handed += float(r.get("amount") or 0)
-    return {"orders": clean(orders), "counts": counts, "to_collect": to_collect, "collected": collected, "balance_to_hand_over": max(0, collected - handed)}
+    return {"orders": clean(orders), "counts": counts, "to_collect": to_collect, "collected": collected, "balance_to_hand_over": max(0, collected - handed), "day_closed": day_closed}
 
 
 @router.get("/riders/me/history")
@@ -324,13 +331,41 @@ async def rider_history(user: dict = Depends(get_user), days: int = 30):
 
 
 def _mask_customer(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """History / closed day: no number, name reduced to its initial."""
     c = dict(c or {})
-    digits = "".join(ch for ch in (c.get("phone") or "") if ch.isdigit())
-    if digits.startswith("225") and len(digits) > 10:
-        digits = digits[3:]
-    c["phone_masked"] = f"{digits[:2]} •• •• •• {digits[-2:]}" if len(digits) >= 4 else None
-    c["phone"] = None
-    return {k: c.get(k) for k in ("name", "phone_masked", "address", "quartier", "zone", "landmark")}
+    n = (c.get("name") or "").strip()
+    return {"name": f"{n[0]}•••" if n else None, "phone_masked": "•• •• •• •• ••", "quartier": c.get("quartier"), "zone": c.get("zone")}
+
+
+def _rider_customer(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Open course: first name, quartier, landmark, GPS pin. Never the phone number."""
+    c = dict(c or {})
+    first = (c.get("name") or "").strip().split(" ")[0] or None
+    return {"name": first, "quartier": c.get("quartier"), "zone": c.get("zone"), "landmark": c.get("landmark") or c.get("address"),
+            "address": c.get("landmark") or c.get("address"), "lat": c.get("lat"), "lng": c.get("lng"), "can_call": bool(c.get("phone"))}
+
+
+@router.post("/riders/me/orders/{oid}/call")
+async def rider_call(oid: str, user: dict = Depends(get_user)):
+    """Returns the number to dial only for his own course while it is on the way / arrived; every call is logged."""
+    o = await db.orders.find_one({"id": oid, "rider_id": user["id"]}, {"customer": 1, "status": 1, "code": 1})
+    if not o:
+        raise HTTPException(404, "Course introuvable")
+    if o.get("status") != "en_livraison":
+        raise HTTPException(400, "Appel possible uniquement quand la course est En route ou Arrivé")
+    digits = "".join(ch for ch in ((o.get("customer") or {}).get("phone") or "") if ch.isdigit())
+    if not digits:
+        raise HTTPException(400, "Aucun numéro pour cette cliente")
+    await db.orders.update_one({"id": oid}, {"$push": {"contact_log": {"kind": "call", "at": now_iso(), "by": user.get("name"), "by_id": user["id"], "via": "app_livreur"}}})
+    return {"tel": f"+{digits}" if len(digits) > 10 else digits}
+
+
+@router.post("/riders/me/orders/{oid}/arrived")
+async def rider_arrived(oid: str, user: dict = Depends(get_user)):
+    r = await db.orders.update_one({"id": oid, "rider_id": user["id"], "status": "en_livraison"}, {"$set": {"arrived_at": now_iso()}})
+    if not r.matched_count:
+        raise HTTPException(400, "Course non en route")
+    return {"ok": True}
 
 
 @router.get("/riders/me/orders/{oid}")
@@ -342,7 +377,7 @@ async def rider_order_detail(oid: str, user: dict = Depends(get_user)):
     keep = ("id", "code", "status", "created_at", "assigned_at", "delivered_at", "delivery_date", "delivery_slot", "delivery_zone",
             "delivery_address", "items", "subtotal", "delivery_fee", "discount", "total", "payment_method", "payment_status", "note")
     out = {k: o.get(k) for k in keep}
-    out["customer"] = _mask_customer(o.get("customer"))
+    out["customer"] = _rider_customer(o.get("customer")) if o.get("rider_id") == user["id"] and o.get("status") in ("confirmee", "prete", "assignee", "en_livraison") else _mask_customer(o.get("customer"))
     out["proof"] = {k: proof.get(k) for k in ("method", "at", "amount_collected", "photo")} if proof else None
     out["timeline"] = [{k: t.get(k) for k in ("status", "at", "by", "reason")} for t in (o.get("timeline") or [])]
     return clean(out)

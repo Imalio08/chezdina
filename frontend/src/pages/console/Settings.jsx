@@ -13,6 +13,7 @@ import { ExceptionsEditor } from "@/components/storefront/OpeningHoursEditor";
 import StoreLocation from "@/components/settings/StoreLocation";
 import { HoursFields, EmployeeHours, useHoursConfig } from "@/components/settings/AttendanceHours";
 import Audit from "@/pages/console/Audit";
+import DocTemplates from "@/components/settings/DocTemplates";
 
 const SAVED_MSG = "Modifications enregistrées";
 const ERROR_MSG = "Erreur · modifications non enregistrées";
@@ -24,6 +25,7 @@ const TABS = [
   { id: "livraison", label: "Livraison", icon: Truck },
   { id: "paiements", label: "Paiements", icon: CreditCard },
   { id: "documents", label: "Documents", icon: FileText },
+  { id: "documents-rh", label: "Documents RH", icon: FileText },
   { id: "notifications", label: "Notifications", icon: Bell },
   { id: "integrations", label: "Intégrations", icon: Plug },
   { id: "equipe", label: "Équipe & horaires", icon: Users },
@@ -78,6 +80,7 @@ export default function Settings() {
           {tab === "livraison" && <LivraisonTab />}
           {tab === "paiements" && <PaiementsTab />}
           {tab === "documents" && <DocumentsTab />}
+          {tab === "documents-rh" && <DocTemplates />}
           {tab === "notifications" && <NotificationsTab />}
           {tab === "integrations" && <IntegrationsTab />}
           {tab === "equipe" && <EquipeTab />}

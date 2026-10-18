@@ -112,6 +112,7 @@ import { ImageEditorHost } from "@/components/shared/ImageEditor";
 import { PdfPreviewHost } from "@/components/shared/PdfPreview";
 import RiderLogin from "@/pages/rider/RiderLogin";
 import PunchGate from "@/components/shared/PunchGate";
+import OnboardingGate from "@/components/shared/OnboardingGate";
 import PopupGuard from "@/components/shared/PopupGuard";
 
 function Protected({ children }) {
@@ -120,6 +121,7 @@ function Protected({ children }) {
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
   if (!user) return <Navigate to="/console/connexion" replace state={{ from: location.pathname + location.search }} />;
   if (user.role === "rider") return <Navigate to="/riders" replace />;
+  if (user.onboarding_required) return <OnboardingGate />;
   if (user.punch_required) return <PunchGate />;
   return children;
 }
@@ -129,6 +131,7 @@ function ProtectedRider({ children }) {
   if (loading) return <div className="min-h-screen grid place-items-center text-sm text-[#666]">Chargement…</div>;
   if (!user) return <Navigate to="/riders/connexion" replace state={{ from: location.pathname + location.search }} />;
   if (user.role !== "rider") return <Navigate to="/console" replace />;
+  if (user.onboarding_required) return <OnboardingGate />;
   return children;
 }
 // Old URLs (/boutique/…, /rider/…) keep working: strip / swap the prefix, keep query + hash.

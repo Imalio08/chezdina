@@ -10,6 +10,7 @@ import { useNavigate as useNav, useSearchParams } from "react-router-dom";
 import { notifsChanged } from "@/pages/rider/Notifications";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
 import { fetchDay, enqueue, patchCachedOrder, isNetErr, kvGet } from "@/lib/riderOffline";
+import { callCustomer } from "@/lib/riderCall";
 
 const FAIL_REASONS = ["Cliente absente", "Cliente injoignable", "Refus de la commande", "Adresse introuvable", "Autre"];
 
@@ -191,27 +192,14 @@ function OrderCard({ order, onOpen }) {
 }
 
 function OrderDetail({ order, onClose, onStatus, onDeliver }) {
-  const [templates, setTemplates] = useState([]);
-  const [showWa, setShowWa] = useState(false);
+  const [arrived, setArrived] = useState(!!order.arrived_at);
   const [postpone, setPostpone] = useState(false);
   const [chat, setChat] = useState(false);
   const [clientChat, setClientChat] = useState(false);
   const [fail, setFail] = useState(false);
   const navTo = useNav();
-  useEffect(() => { api.get("/delivery-templates").then(r => setTemplates(r.data.wa_templates || [])).catch(() => { }); }, []);
-  const phone = order.customer?.phone?.replace(/\D/g, "") || "";
-  const callPhone = () => { api.post(`/orders/${order.id}/contact-log`, { kind: "call" }).catch(() => { }); window.location.href = `tel:${phone}`; };
-  const openWa = (tpl) => {
-    const prefill = (tpl.text || "")
-      .replace("{prenom_client}", (order.customer?.name || "").split(" ")[0])
-      .replace("{prenom_livreur}", "")
-      .replace("{numero_commande}", order.code)
-      .replace("{montant}", fcfa(order.payment_method === "cod" ? dueOf(order) : order.total))
-      .replace("{lien_suivi}", `${window.location.origin}/suivi/${order.code}`);
-    api.post(`/orders/${order.id}/contact-log`, { kind: "whatsapp", template_key: tpl.key }).catch(() => { });
-    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(prefill)}`, "_blank");
-    setShowWa(false);
-  };
+  const canCall = order.status === "en_livraison" && !order.readonly;
+  const markArrived = () => api.post(`/riders/me/orders/${order.id}/arrived`).then(() => { setArrived(true); toast.success("Arrivée signalée"); }).catch(e => toast.error(e?.response?.data?.detail || "Erreur"));
   const itinerary = () => navTo(`/riders/carte?route=${order.id}`);
 
   return (
@@ -223,15 +211,16 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
         </div>
         <div className="p-4 space-y-3">
           <div className="grid grid-cols-4 gap-2">
-            <button onClick={callPhone} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-call"><Phone size={14} /><span>Appeler</span></button>
-            <button onClick={() => setShowWa(true)} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-whatsapp"><MessageCircle size={14} /><span>WhatsApp</span></button>
+            <button onClick={() => callCustomer(order)} disabled={!canCall} title={canCall ? "" : "Disponible quand la course est En route"} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5 disabled:opacity-40" data-testid="order-call"><Phone size={14} /><span>Appeler</span></button>
+            <button onClick={markArrived} disabled={!canCall || arrived} className={`dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5 disabled:opacity-40 ${arrived ? "!text-[#1f8a4c]" : ""}`} data-testid="order-arrived"><MapPin size={14} /><span>{arrived ? "Arrivé" : "Je suis arrivé"}</span></button>
             <button onClick={() => setClientChat(c => !c)} className={`dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5 ${clientChat ? "!border-[#b02a2a] !text-[#b02a2a]" : ""}`} data-testid="order-message-client"><Send size={14} /><span>Message</span></button>
             <button onClick={itinerary} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-route"><Navigation size={14} /><span>Itinéraire</span></button>
           </div>
           {clientChat && <div className="dina-card-white p-3" data-testid="rider-client-chat"><div className="text-xs font-semibold mb-2">Messagerie avec {order.customer?.name || "la cliente"}</div><OrderThread orderId={order.id} party="rider_customer" me="rider" height="max-h-60" quickReplies={["Je suis en route", "J'arrive dans 10 minutes", "Je suis devant chez vous", "Pouvez-vous me rappeler ?"]}/></div>}
           <div className="p-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg text-sm">
-            <div className="font-semibold">{order.customer?.name}</div>
-            <div className="text-xs text-[#666] flex items-center gap-1"><MapPin size={10} />{order.customer?.address || order.delivery_zone}</div>
+            <div className="font-semibold" data-testid="order-customer-first-name">{order.customer?.name}</div>
+            <div className="text-xs text-[#666] flex items-center gap-1"><MapPin size={10} />{[order.customer?.quartier || order.delivery_zone, order.customer?.landmark].filter(Boolean).join(" · ")}</div>
+            {order.customer?.lat && order.customer?.lng && <a href={`https://www.google.com/maps?q=${order.customer.lat},${order.customer.lng}`} target="_blank" rel="noreferrer" className="text-xs text-[#5867fd] underline" data-testid="order-gps-pin">Voir le point GPS</a>}
             {order.note && <div className="text-xs italic mt-1">« {order.note} »</div>}
           </div>
           <div className="dina-card-white p-3">
@@ -255,14 +244,6 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
           <button onClick={() => setChat(c => !c)} className="dina-btn-secondary w-full !min-h-[44px] text-xs" data-testid="rider-msg-store"><MessageCircle size={14}/>{chat ? "Masquer les messages" : "Message boutique"}</button>
           {chat && <div className="dina-card-white p-3" data-testid="rider-order-chat"><OrderThread orderId={order.id} party="rider" me="rider" height="max-h-60" quickReplies={["Je suis en route", "Cliente injoignable", "Livraison effectuée", "Adresse introuvable"]}/></div>}
         </div>
-        {showWa && (
-          <div className="fixed inset-0 bg-black/70 grid place-items-end z-[80]" onClick={() => setShowWa(false)}>
-            <div className="bg-white dark:bg-[#1a1a1a] rounded-t-2xl w-full p-4" onClick={e => e.stopPropagation()}>
-              <div className="font-semibold mb-2">Choisir un message</div>
-              {templates.map(t => <button key={t.key} onClick={() => openWa(t)} className="w-full text-left p-3 border border-[#ececec] dark:border-[#2a2a2a] rounded-lg mb-2 text-sm hover:bg-[#fff5f5] dark:hover:bg-[#2a1818]" data-testid={`wa-tpl-${t.key}`}><div className="font-semibold text-xs text-[#b02a2a]">{t.label}</div><div className="text-xs text-[#666] line-clamp-2 mt-0.5">{t.text}</div></button>)}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

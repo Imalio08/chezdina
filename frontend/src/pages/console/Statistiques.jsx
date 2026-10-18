@@ -7,6 +7,7 @@ import { Download, FileSpreadsheet, Package, TrendingUp, ShoppingBag, AlertTrian
 import { AreaChart, Area, LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, CartesianGrid } from "recharts";
 import PeriodSelector from "@/components/shared/PeriodSelector";
 import * as XLSX from "xlsx";
+import { useAuth } from "@/context/AuthContext";
 
 const COLORS = ["#b02a2a","#f4b12c","#0021cc","#1f8a4c","#5867fd","#d94848","#e4991e","#1c1c1c"];
 const toBackendPeriod = (p) => ({ today:"today", yesterday:"yesterday", this_week:"7d", last_week:"7d", last7:"7d", last30:"30d", this_month:"30d", last_month:"last_month", this_quarter:"90d", last_quarter:"90d", this_year:"year", last_year:"year", all:"year" }[p] || "30d");
@@ -97,6 +98,8 @@ export default function Statistiques() {
 }
 
 function ExportBar({ rows, name }) {
+  const { user } = useAuth();
+  if (user?.role !== "admin") return null;
   return (
     <div className="flex gap-2 justify-end">
       <button onClick={() => exportCsv(rows, name)} className="dina-btn-secondary !min-h-[32px] text-xs" data-testid={`exp-csv-${name}`}><Download size={11} />CSV</button>

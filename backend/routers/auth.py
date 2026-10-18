@@ -32,28 +32,44 @@ class CustomerSignupIn(BaseModel):
 
 
 # ---------- Staff auth ----------
+async def _staff_guard(u: dict, request: Request) -> None:
+    if u.get("active") is False:
+        raise HTTPException(401, "Accès désactivé par le propriétaire")
+    from routers.privacy import enforce_access
+    await enforce_access(u, request)
+
+
+async def _session_flags(u: dict) -> None:
+    from routers.onboarding import onboarding_blocked
+    u["onboarding_required"] = await onboarding_blocked(u)
+
+
 @router.post("/auth/login")
-async def login(body: LoginIn, response: Response):
+async def login(body: LoginIn, request: Request, response: Response):
     u = await db.users.find_one({"email": body.email.lower().strip()})
     if not u or not verify_pw(body.password, u.get("password_hash", "")):
         raise HTTPException(401, "Identifiants incorrects")
-    token = make_token(u["id"], u["role"])
+    await _staff_guard(u, request)
+    token = make_token(u["id"], u["role"], sv=u.get("session_version") or 0)
     response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60 * 60 * 24 * 7, path="/")
     for k in ("_id", "password_hash", "pin_hash"):
         u.pop(k, None)
     u["punch_required"] = await punch_required(u)
+    await _session_flags(u)
     return {"user": u, "token": token}
 
 
 @router.post("/auth/login-pin")
-async def login_pin(body: PinIn, response: Response):
-    async for u in db.users.find({}):
+async def login_pin(body: PinIn, request: Request, response: Response):
+    async for u in db.users.find({"active": {"$ne": False}}):
         if verify_pw(body.pin.strip(), u.get("pin_hash", "")):
-            token = make_token(u["id"], u["role"])
+            await _staff_guard(u, request)
+            token = make_token(u["id"], u["role"], sv=u.get("session_version") or 0)
             response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60 * 60 * 24 * 7, path="/")
             for k in ("_id", "password_hash", "pin_hash"):
                 u.pop(k, None)
             u["punch_required"] = await punch_required(u)
+            await _session_flags(u)
             return {"user": u, "token": token}
     raise HTTPException(401, "PIN invalide")
 
@@ -71,11 +87,12 @@ async def rider_login_pin(body: PinIn, request: Request, response: Response):
         async for u in db.users.find({"role": "rider", "active": {"$ne": False}}):
             if verify_pw(pin, u.get("pin_hash", "")):
                 await db.login_attempts.delete_many({"identifier": key})
-                token = make_token(u["id"], u["role"])
+                token = make_token(u["id"], u["role"], sv=u.get("session_version") or 0)
                 response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60 * 60 * 24 * 7, path="/")
                 for k in ("_id", "password_hash", "pin_hash"):
                     u.pop(k, None)
                 u["punch_required"] = False
+                await _session_flags(u)
                 return {"user": u, "token": token}
     await db.login_attempts.insert_one({"identifier": key, "at": now_iso()})
     raise HTTPException(401, "Code PIN incorrect")
@@ -83,6 +100,7 @@ async def rider_login_pin(body: PinIn, request: Request, response: Response):
 
 @router.get("/auth/me")
 async def me(user: dict = Depends(get_user)):
+    await _session_flags(user)
     return {**user, "punch_required": await punch_required(user)}
 
 

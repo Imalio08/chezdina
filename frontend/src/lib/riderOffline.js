@@ -24,6 +24,12 @@ export const kvSet = (k, v) => tx("kv", "readwrite", s => s.put({ k, v }));
 export const allOps = async () => ((await tx("ops", "readonly", s => s.getAll())) || []).sort((a, b) => a.seq - b.seq);
 export const pendingCount = async () => (await allOps()).length;
 
+// Day reconciled & closed: wipe every cached customer data (courses, conversations) from the phone.
+export async function purgeCustomerData() {
+  await tx("kv", "readwrite", s => s.clear());
+  try { Object.keys(localStorage).filter(k => /^dina_(rider_course|conv|order)/.test(k)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
+}
+
 const quickPos = () => new Promise(res => {
   if (!navigator.geolocation) return res({});
   navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res({}), { timeout: 4000, maximumAge: 120000 });
@@ -76,6 +82,7 @@ let lastWarm = 0;
 export async function fetchDay() {
   try {
     const { data } = await api.get("/riders/me/today");
+    if (data.day_closed && !(await pendingCount())) await purgeCustomerData();
     await kvSet("today", data); await kvSet("today_at", new Date().toISOString());
     if (Date.now() - lastWarm > 10 * 60000) { lastWarm = Date.now(); warmTiles(data.orders || []); }
     return { data, offline: false };

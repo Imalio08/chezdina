@@ -27,7 +27,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const f = () => setUser(u => (u && u.role !== "admin" && u.role !== "rider") ? { ...u, punch_required: true } : u);
     window.addEventListener("punch-required", f);
-    return () => window.removeEventListener("punch-required", f);
+    const o = () => setUser(u => (u && u.role !== "admin") ? { ...u, onboarding_required: true } : u);
+    const sc = (e) => { setUser(false); import("sonner").then(m => m.toast.error(e.detail || "Session fermée")); };
+    window.addEventListener("onboarding-required", o);
+    window.addEventListener("session-closed", sc);
+    return () => { window.removeEventListener("punch-required", f); window.removeEventListener("onboarding-required", o); window.removeEventListener("session-closed", sc); };
   }, []);
 
   const login = async (email, password) => {

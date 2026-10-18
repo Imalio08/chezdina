@@ -446,11 +446,12 @@ async def _after_order_msg(conv: Dict[str, Any], party: str, user: dict, preview
 # ---------- Rider inbox (all conversations involving the rider) ----------
 @router.get("/rider/conversations")
 async def rider_conversations(q: str = "", user: dict = Depends(get_user)):
-    rows = [r for r in await db.conversations.find({"participants.id": user["id"]}).sort("updated_at", -1).to_list(200) if _conv_match(r, q)]
+    rows = [r for r in await db.conversations.find({"participants.id": user["id"]}).sort("updated_at", -1).to_list(200)
+            if not q or q.strip().lower() in str(r.get("order_code") or "").lower()]
     out = []
     for r in rows:
         msgs = r.get("messages") or []
-        other = next((p for p in r.get("participants") or [] if p.get("id") != user["id"]), {})
+        other = _first_name_only(next((p for p in r.get("participants") or [] if p.get("id") != user["id"]), {}))
         out.append({"id": r["id"], "kind": r.get("kind"), "order_code": r.get("order_code"), "closed": r.get("closed", False),
                     "with": other, "last_message": msgs[-1] if msgs else None, "updated_at": r.get("updated_at"),
                     "archived": user["id"] in (r.get("archived_for") or []),
@@ -470,7 +471,15 @@ async def rider_conversation(cid: str, user: dict = Depends(get_user)):
                 m.setdefault("read_by", []).append(user["id"])
         await _mark_read(cid, user["id"])
     await mark_ref_read("rider" if user.get("role") == "rider" else "staff", user["id"], cid)
+    if user.get("role") == "rider":
+        conv["participants"] = [_first_name_only(p) for p in conv.get("participants") or []]
     return clean(conv)
+
+
+def _first_name_only(p: dict) -> dict:
+    if p.get("kind") != "customer":
+        return p
+    return {"kind": "customer", "id": p.get("id"), "name": (p.get("name") or "Cliente").split(" ")[0]}
 
 
 @router.post("/rider/conversations/store")

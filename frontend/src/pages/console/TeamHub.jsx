@@ -4,8 +4,9 @@ import { useAuth } from "@/context/AuthContext";
 import Team from "@/pages/console/Team";
 import Pointage from "@/pages/console/Pointage";
 import RolesPermissions from "@/pages/console/RolesPermissions";
+import SecurityTab from "@/components/team/SecurityTab";
 
-const TABS = [["employes", "Employés"], ["presences", "Présences"], ["roles", "Rôles & permissions", true]];
+const TABS = [["employes", "Employés"], ["presences", "Présences"], ["roles", "Rôles & permissions", true], ["securite", "Sécurité & accès", true]];
 
 // Équipe: Employés, Présences, Rôles & permissions in one place
 export default function TeamHub() {
@@ -21,6 +22,7 @@ export default function TeamHub() {
       {tab === "employes" && <Team/>}
       {tab === "presences" && <Pointage/>}
       {tab === "roles" && <RolesPermissions/>}
+      {tab === "securite" && <SecurityTab/>}
     </div>
   );
 }

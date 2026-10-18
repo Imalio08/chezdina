@@ -72,8 +72,10 @@ export default function Customers() {
     } catch { toast.error("Erreur"); }
   };
 
-  const openWa = (c, text) => {
-    const digits = (c.phone || "").replace(/\D/g, "");
+  const openWa = async (c, text) => {
+    let phone = c.phone || "";
+    if (phone.includes("•")) { try { phone = (await api.get(`/customers/${c.id}`)).data.customer.phone || ""; } catch { return toast.error("Fiche indisponible"); } }
+    const digits = phone.replace(/\D/g, "");
     window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text || `Bonjour ${c.name?.split(" ")[0] || ""}, Chez Dina 💕`)}`, "_blank");
   };
 

@@ -38,7 +38,13 @@ async def orders(user: dict = Depends(get_user), status: Optional[str] = None, c
             {"customer.name": {"$regex": q, "$options": "i"}},
             {"customer.phone": {"$regex": q, "$options": "i"}},
         ]
-    return clean(await db.orders.find(f).sort("created_at", -1).to_list(5000))
+    rows = clean(await db.orders.find(f).sort("created_at", -1).to_list(5000))
+    if user.get("role") != "admin":
+        from routers.privacy import mask_phone
+        for r in rows:
+            if isinstance(r.get("customer"), dict) and r["customer"].get("phone"):
+                r["customer"]["phone"] = mask_phone(r["customer"]["phone"])
+    return rows
 
 
 @router.post("/orders")

@@ -34,9 +34,9 @@ def verify_pw(p, h):
     except Exception:
         return False
 
-def make_token(uid, role, m=60 * 24 * 7):
+def make_token(uid, role, m=60 * 24 * 7, sv=0):
     return jwt.encode(
-        {"sub": uid, "role": role, "exp": datetime.now(timezone.utc) + timedelta(minutes=m)},
+        {"sub": uid, "role": role, "sv": sv, "exp": datetime.now(timezone.utc) + timedelta(minutes=m)},
         JWT_SECRET, algorithm=JWT_ALG,
     )
 
@@ -100,6 +100,10 @@ async def get_user(request: Request):
     user = await db.users.find_one({"id": payload["sub"]})
     if not user:
         raise HTTPException(401, "Introuvable")
+    if user.get("active") is False:
+        raise HTTPException(401, "Accès désactivé par le propriétaire")
+    if int(payload.get("sv") or 0) != int(user.get("session_version") or 0):
+        raise HTTPException(401, "Session fermée · reconnectez-vous")
     for k in ("_id", "password_hash", "pin_hash"):
         user.pop(k, None)
     path = request.url.path
@@ -108,8 +112,13 @@ async def get_user(request: Request):
         from routers.roles_meta import inactive_roles
         if user.get("role") in await inactive_roles():
             raise HTTPException(403, "Votre rôle est désactivé · contactez le propriétaire")
-    if user.get("role") == "rider" and not path.startswith(RIDER_PREFIXES):
+    if user.get("role") == "rider" and (not path.startswith(RIDER_PREFIXES) or RIDER_DENY.match(path)):
         raise HTTPException(403, "Accès réservé à l'équipe de la boutique")
+    from routers.privacy import enforce_access
+    await enforce_access(user, request)
+    from routers.onboarding import onboarding_blocked
+    if not path.startswith(ONBOARDING_FREE) and await onboarding_blocked(user):
+        raise HTTPException(423, "Documents à signer avant d'accéder à vos outils")
     from role_access import api_allowed
     if not api_allowed(user.get("role"), request.method, path):
         raise HTTPException(403, "Accès non autorisé pour votre rôle")
@@ -120,7 +129,11 @@ async def get_user(request: Request):
 
 RIDER_PREFIXES = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in", "/api/business", "/api/deliveries",
                   "/api/delivery-templates", "/api/me/", "/api/notifications", "/api/orders-messages", "/api/orders/",
-                  "/api/rider", "/api/users/me", "/api/push/", "/api/public/")
+                  "/api/rider", "/api/users/me", "/api/push/", "/api/public/", "/api/onboarding/me", "/api/onboarding/files/")
+# Riders never read raw orders / delivery lists (customer phone, history): only their sanitised course endpoints.
+import re as _re
+RIDER_DENY = _re.compile(r"^/api/(deliveries(/suggest-split)?$|orders/[^/]+(/invoice)?$|customers)")
+ONBOARDING_FREE = ("/api/auth/", "/api/onboarding/me", "/api/onboarding/files/", "/api/me/notifications", "/api/notifications", "/api/public/")
 PUNCH_FREE = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in")
 _punch_cfg = {"at": 0.0, "roles": set()}
 

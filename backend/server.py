@@ -223,7 +223,11 @@ async def update_user(uid: str, body: Dict[str, Any], user: dict = Depends(requi
         if (body.get("role") or target.get("role")) == "rider" and await _rider_pin_taken(str(body["pin"]), uid):
             raise HTTPException(400, "Ce code PIN est déjà utilisé par un autre livreur")
         body["pin_hash"] = hash_pw(body.pop("pin"))
-    await db.users.update_one({"id": uid}, {"$set": body})
+    body.pop("session_version", None)
+    ops = {"$set": body}
+    if body.get("active") is False:
+        ops["$inc"] = {"session_version": 1}
+    await db.users.update_one({"id": uid}, ops)
     return {"ok": True}
 
 @api.delete("/users/{uid}")
@@ -234,6 +238,7 @@ async def delete_user(uid: str, user: dict = Depends(require_role("admin"))):
 # ---------- Products: endpoints moved to routers/catalog.py — P5 Refactor Feb 2026 ----------
 
 # ---------- Customers ----------
+from routers.privacy import mask_phone, log_customer_open  # noqa: E402
 async def customer_metrics(cid: str):
     rows = await db.orders.find({"customer.id": cid}).to_list(500)
     return {"total_orders": len(rows), "total_spent": sum(r.get("total",0) for r in rows),
@@ -253,6 +258,9 @@ async def customers(user: dict = Depends(get_user), q: Optional[str] = None, sta
             r["derived_status"] = "inactive"
         else:
             r["derived_status"] = r.get("status", "active")
+        if user.get("role") != "admin":
+            r["phone"] = mask_phone(r.get("phone"))
+            r.pop("access_code", None)
     return clean(rows)
 
 @api.post("/customers")
@@ -270,6 +278,7 @@ async def create_customer(body: CustomerIn, user: dict = Depends(get_user)):
 @api.patch("/customers/{cid}")
 async def update_customer(cid: str, body: Dict[str, Any], user: dict = Depends(get_user)):
     body.pop("id", None); body.pop("_id", None)
+    if "•" in str(body.get("phone") or ""): body.pop("phone")
     if "password" in body: body["password_hash"] = hash_pw(body.pop("password"))
     await db.customers.update_one({"id": cid}, {"$set": body})
     return {"ok": True}
@@ -289,16 +298,17 @@ async def customers_top(user: dict = Depends(get_user), limit: int = 20):
     top = []
     for i, r in enumerate(rows[:limit]):
         top.append({
-            "rank": i + 1, "id": r.get("id"), "name": r.get("name"), "phone": r.get("phone"),
+            "rank": i + 1, "id": r.get("id"), "name": r.get("name"), "phone": r.get("phone") if user.get("role") == "admin" else mask_phone(r.get("phone")),
             "tier": r.get("tier"), "loyalty_points": r.get("loyalty_points", 0),
             "total_spent": r.get("total_spent", 0), "orders_count": r.get("orders_count", 0),
         })
     return top
 
 @api.get("/customers/{cid}")
-async def get_customer_detail(cid: str, user: dict = Depends(get_user)):
+async def get_customer_detail(cid: str, request: Request, user: dict = Depends(get_user)):
     c = await db.customers.find_one({"id": cid}, {"password_hash":0})
     if not c: raise HTTPException(404)
+    await log_customer_open(user, cid, c.get("name"), request)
     orders = await db.orders.find({"customer.id": cid}).sort("created_at", -1).to_list(100)
     tops: Dict[str, Dict[str,Any]] = {}
     for o in orders:
@@ -5938,6 +5948,10 @@ from routers.stock_status import router as stock_status_router  # noqa: E402
 app.include_router(stock_status_router)
 from routers.roles_meta import router as roles_meta_router  # noqa: E402
 app.include_router(roles_meta_router)
+from routers.privacy import router as privacy_router  # noqa: E402
+app.include_router(privacy_router)
+from routers.onboarding import router as onboarding_router  # noqa: E402
+app.include_router(onboarding_router)
 app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:
