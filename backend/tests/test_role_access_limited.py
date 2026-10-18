@@ -296,8 +296,7 @@ def test_cm_writes_promotion_segment_campaign():
     assert sg.status_code == 200, sg.text
     sid = sg.json()["id"]
     c = s.post(f"{BASE_URL}/api/campaigns", json={"name": "TEST_camp", "text": "TEST", "target_type": "ids", "customer_ids": []})
-    assert c.status_code == 200, c.text
-    assert s.delete(f"{BASE_URL}/api/campaigns/{c.json()['id']}").status_code == 200
+    assert c.status_code == 403, c.text  # campaigns are owner-only
     assert s.delete(f"{BASE_URL}/api/segments/{sid}").status_code == 200
     MDB.promotions.delete_many({"code": "TEST_CMPROMO"})
     MDB.customer_segments_v2.delete_many({"name": "TEST_seg"})

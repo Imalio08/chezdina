@@ -67,14 +67,13 @@ export default function Team() {
         <div className="flex gap-2 items-center">
           <input className="dina-input max-w-xs text-center text-2xl tracking-widest font-serif" inputMode="numeric" maxLength={4} placeholder="Code" value={code} onChange={e=>setCode(e.target.value.replace(/\D/g,""))} data-testid="attendance-code"/>
           <button onClick={punch} className="dina-btn-primary !min-h-[48px]" data-testid="attendance-punch">Pointer</button>
-          <div className="text-xs text-[#666] ml-2">Codes démo: 1234 (admin), 2222 (manager), 3333, 4444, 5555…</div>
         </div>
       </div>
 
       <div className="grid lg:grid-cols-2 gap-4">
         <div className="dina-card-white p-5">
           <div className="font-semibold mb-3">Membres ({t.length})</div>
-          <table className="dina-table">
+          <div className="overflow-x-auto"><table className="dina-table">
             <thead><tr><th>Nom</th><th>Rôle</th><th>Téléphone</th><th>Présent</th>{owner && <th>Documents</th>}<th></th></tr></thead>
             <tbody>{t.map(u=>(
               <tr key={u.id} data-testid={`team-row-${u.email}`} className={u.active === false ? "opacity-50" : ""}>
@@ -86,7 +85,7 @@ export default function Team() {
                 <td className="text-right whitespace-nowrap">{owner && u.role !== "admin" && <><button onClick={()=>setFileOf(u)} className="text-[#5867fd] mr-2" title="Dossier · Onboarding" data-testid={`team-file-${u.email}`}><FolderOpen size={14}/></button><button onClick={()=>toggleAccess(u)} className={`mr-2 ${u.active === false ? "text-[#1f8a4c]" : "text-[#b26a00]"}`} title={u.active === false ? "Réactiver l'accès" : "Désactiver l'accès (1 clic)"} data-testid={`team-access-${u.email}`}><Power size={14}/></button></>}<button onClick={()=>setEditing(u)} className="text-[#0021cc] mr-2"><Pencil size={14}/></button><button onClick={()=>del(u.id)} className="text-[#c62828]"><Trash2 size={14}/></button></td>
               </tr>
             ))}</tbody>
-          </table>
+          </table></div>
         </div>
 
         <div className="dina-card-white p-5">

@@ -136,7 +136,7 @@ export default function Courses() {
         ))}
       </div>
 
-      <OrderFilters orders={d.orders} value={of} onChange={setOf} fields={["q", "slot", "zone"]} testid="rider-order-filters"/>
+      <OrderFilters orders={d.orders} value={of} onChange={setOf} fields={["q", "slot", "zone"]} testid="rider-order-filters" placeholder="Rechercher un code de commande…"/>
 
       <div className="space-y-2">
         {filtered.length === 0 && <div className="text-center text-sm text-[#666] py-10">Aucune course</div>}

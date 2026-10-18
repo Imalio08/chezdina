@@ -132,9 +132,9 @@ RIDER_PREFIXES = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in"
                   "/api/rider", "/api/users/me", "/api/push/", "/api/public/", "/api/onboarding/me", "/api/onboarding/files/")
 # Riders never read raw orders / delivery lists (customer phone, history): only their sanitised course endpoints.
 import re as _re
-RIDER_DENY = _re.compile(r"^/api/(deliveries(/suggest-split)?$|orders/[^/]+(/invoice)?$|customers)")
+RIDER_DENY = _re.compile(r"^/api/(deliveries(/suggest-split)?$|orders/[^/]+(/invoice)?$|customers|notifications)")
 ONBOARDING_FREE = ("/api/auth/", "/api/onboarding/me", "/api/onboarding/files/", "/api/me/notifications", "/api/notifications", "/api/public/")
-PUNCH_FREE = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in")
+PUNCH_FREE = ("/api/auth/", "/api/attendance/me", "/api/attendance/check-in", "/api/onboarding/me", "/api/onboarding/files/")
 _punch_cfg = {"at": 0.0, "roles": set()}
 
 

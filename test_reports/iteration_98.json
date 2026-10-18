@@ -1,0 +1,55 @@
+{
+  "summary": "Tested customer-data protection (rider masking/call/arrived, rider deny-list, history masking, masked phones for manager, record-open log + threshold alert, owner-only campaigns/broadcasts, device & hours enforcement, one-click deactivation/session revocation) and HR onboarding (seeded templates, versioning, assign→423 gate, e-sign w/ PIN + PDF, file ACL, request-resign, scan upload, departure PV) via new pytest suite (17/17 pass) + UI (rider app course detail, rider/console OnboardingGate, Équipe Employés/EmployeeFile/Sécurité, Paramètres Documents RH, manager Clients/Statistiques/nav). Found and FIXED one critical bug: punch-required roles (manager/sales/stock/CM) with pending docs were dead-locked (onboarding endpoints were not PUNCH_FREE → 428, gate falsely showed 'Tout est signé'). Remaining: several manager-accessible endpoints still leak full customer phones; rider can read /api/notifications with customer names+phones; staff login has no brute-force lockout.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/onboarding/me, POST /api/onboarding/me/sign/{id}", "issue": "FIXED by testing agent: returned 428 'Pointage d'arrivée requis' for punch-required roles (sales/manager/stock/CM) → employee could never sign; frontend gate rendered first so user was stuck. Added '/api/onboarding/me', '/api/onboarding/files/' to PUNCH_FREE in deps.py.", "priority": "CRITICAL"},
+      {"endpoint": "GET /api/deliveries, /api/delivery-sessions, /api/whatsapp-outbox, /api/invoices, /api/reviews, /api/abandoned-carts, /api/waitlist (as manager)", "issue": "Return FULL customer phone numbers to the Gérante (e.g. '+225 07 85 55 58 88'), bypassing the masking applied to /api/customers & /api/orders and the per-record access log. Requirement: phones masked everywhere for non-owner; full number only when opening a customer record (logged).", "priority": "HIGH"},
+      {"endpoint": "GET /api/notifications (as rider)", "issue": "Rider passes RIDER_PREFIXES ('/api/notifications') and receives the global console notification feed incl. customer full names + phone numbers (new orders, abandoned carts). Should be denied for riders (add to RIDER_DENY) or riders should only use /api/me/notifications.", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/auth/login, POST /api/auth/login-pin", "issue": "No brute-force lockout for staff login (only rider-pin and customer code have it). Console 4-digit PIN login iterates all users with no rate limit; also the attendance kiosk UI prints 'Codes démo: 1234 (admin), 2222 (manager)...'."},
+      {"endpoint": "POST /api/customers/{cid}/regen-access-code", "issue": "Manager can regenerate a customer's login code (and gets it + WhatsApp link) → can log in as the customer and see full data; consider owner-only or log it as a record opening."},
+      {"endpoint": "tests/test_role_access_limited.py::test_cm_writes_promotion_segment_campaign", "issue": "Now fails (403 'Réservé au propriétaire') because campaigns are owner-only per new spec. Update the old test (or confirm CM role should lose campaigns)."},
+      {"endpoint": "onboarding validity", "issue": "Expiry computed as 30*months days (12 months = 360 days, not 1 year)."},
+      {"endpoint": "GET /api/orders/{id}", "issue": "No such route (405) - fine; rider deny verified on /api/orders, /orders/{id}/invoice, /deliveries, /customers, /customers/top."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "OnboardingGate", "issue": "load() .catch(() => setDocs([])) masks API errors and shows 'Tout est signé · merci !' while the user is still blocked (this is how the 428 deadlock appeared). Show an error/retry state instead.", "selector": "[data-testid='onboarding-gate']", "priority": "MEDIUM"},
+      {"component": "ConsoleLayout nav (manager)", "issue": "'Segments & campagnes' still visible in Gérante nav (/console/segments); spec says campaigns owner-only. /console/campagnes correctly redirects.", "selector": "aside a[href='/console/segments']", "priority": "MEDIUM"},
+      {"component": "SecurityTab roles", "issue": "'Vendeuse' role checkbox appears twice in 'Rôles concernés'.", "selector": "[data-testid^='sec-role-']", "priority": "LOW"},
+      {"component": "Rider Courses search", "issue": "Placeholder 'Rechercher code, cliente, téléphone…' still mentions phone search although riders must have no customer search/phones.", "selector": "rider courses search input", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Équipe > Employés", "issues": ["Members table inside half-width card overflows horizontally at 1920px; after interacting, names are cut on the left ('Ouattara', 'onaté')."]},
+      {"screen": "EmployeeFile > Départ / SecurityTab hours", "issues": ["Native browser date/time pickers used (departure-date, sec-start/sec-end) instead of shadcn components."]},
+      {"screen": "EmployeeFile > Onboarding", "issues": ["Expiry shown without year ('expire le 13 oct.') right after 'Signé le 18 oct.' → looks already expired; show the year."]},
+      {"screen": "OnboardingGate", "issues": ["Sign button enabled before checkbox/signature/PIN; validation only via toast (works, but disabling would be clearer)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_privacy_onboarding.py", "/app/backend/tests/probe_manager_phone_leak.py", "/app/backend/tests/probe_rider_phone_leak.py", "/app/backend/tests/ui_seed_onboarding.py", "/app/test_reports/pytest/pytest_privacy.xml"],
+  "action_items": [
+    "Mask customer phones (or strip them) for non-admin in /api/deliveries, /api/delivery-sessions, /api/whatsapp-outbox, /api/invoices (+ /orders/{id}/invoice), /api/reviews, /api/abandoned-carts, /api/waitlist",
+    "Deny riders on GET /api/notifications (global staff feed with customer names/phones) – add to RIDER_DENY",
+    "OnboardingGate: handle /onboarding/me errors (don't show 'Tout est signé' on failure)",
+    "Hide 'Segments & campagnes' from Gérante nav (or split segments vs campaigns)",
+    "Update test_role_access_limited.py CM campaign test to expect 403 (owner-only)",
+    "Add brute-force lockout to /api/auth/login and /api/auth/login-pin; remove demo PIN hint from kiosk",
+    "Remove duplicate 'Vendeuse' in SecurityTab roles; show year on expiry dates; fix Team table overflow"
+  ],
+  "critical_code_review_comments": [
+    "deps.PUNCH_FREE lacked onboarding paths while frontend renders OnboardingGate before PunchGate → deadlock (fixed).",
+    "Phone masking is applied per-endpoint (customers, customers/top, orders) – a central response-level sanitiser for non-admin (or masking in shared serializers) would avoid the many remaining leaks.",
+    "privacy_cfg and onboarding _gate are in-process caches (30s) – fine for single worker, inconsistent with multiple workers.",
+    "server.py is >5000 lines; customers endpoints should move to a router."
+  ],
+  "updated_files": ["/app/backend/deps.py (PUNCH_FREE += /api/onboarding/me, /api/onboarding/files/)", "/app/backend/tests/test_privacy_onboarding.py", "/app/backend/tests/probe_manager_phone_leak.py", "/app/backend/tests/probe_rider_phone_leak.py", "/app/backend/tests/ui_seed_onboarding.py"],
+  "success_rate": {"backend": "100% of requested privacy/onboarding tests (17/17) after fix; 3 extra data-leak findings", "frontend": "~90% (all requested flows work; nav/gate-error/design issues)"},
+  "seed_data_creation": "TEST_ users (test_*@dinastore.ci, test_ui_*), TEST_Doc templates, staff_devices TEST_dev_*, access logs/alerts all deleted. Privacy settings restored to defaults (verified in DB). Order DN-260920-1032 contact_log reset to [] and arrived_at unset.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run: cd /app/backend && python -m pytest tests/test_privacy_onboarding.py -n0 (must run serially – it toggles global privacy settings). Probes: python tests/probe_manager_phone_leak.py / probe_rider_phone_leak.py list endpoints leaking full phones. UI seed: python tests/ui_seed_onboarding.py (creates TEST_UI sales PIN 8383 / rider PIN 8181 with pending 'charte'), 'cleanup' arg removes them. Console login inputs have no type attr: use page.locator('input:visible').nth(0/1). Rider en_livraison order: cabc0bb8 (DN-260920-1032), assignee: e477584c (DN-260810-1037).",
+  "rca of the issue": "Onboarding deadlock: get_user() checks onboarding (423) before punch (428) but /api/onboarding/me* were in ONBOARDING_FREE only, not PUNCH_FREE; for punch-enabled roles the gate's own calls hit 428, OnboardingGate catch() set docs=[] and displayed 'Tout est signé'. Repro: create sales user, assign doc, login → gate shows nothing to sign. Mitigation applied: added paths to PUNCH_FREE; verified sales user signs then reaches PunchGate."
+}

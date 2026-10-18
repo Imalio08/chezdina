@@ -88,6 +88,24 @@ def api_allowed(role: str, method: str, path: str) -> bool:
     return any(method in m and rx.match(path) for m, rx in rules["rules"])
 
 
+# Customer phones are masked for every non-owner on customer-facing lists; the full number only comes from GET /api/customers/{id} (logged).
+PHONE_MASKED = ("/api/customers", "/api/orders", "/api/deliveries", "/api/delivery-sessions", "/api/whatsapp-outbox", "/api/invoices",
+                "/api/reviews", "/api/abandoned-carts", "/api/waitlist", "/api/segments", "/api/loyalty", "/api/referrals", "/api/wallet",
+                "/api/notifications", "/api/messages", "/api/conversations", "/api/opportunit", "/api/search", "/api/dashboard", "/api/campaigns")
+CUSTOMER_RECORD = re.compile(r"^/api/customers/[^/]+$")
+PHONE_KEYS = {"phone", "customer_phone", "to", "to_phone", "whatsapp"}
+PHONE_RE = re.compile(r"^\+?[\d\s().-]{8,}$")
+
+
+def _mask_phones(obj: Any) -> Any:
+    from routers.privacy import mask_phone
+    if isinstance(obj, dict):
+        return {k: (mask_phone(v) if k in PHONE_KEYS and isinstance(v, str) and PHONE_RE.match(v) else _mask_phones(v)) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_mask_phones(v) for v in obj]
+    return obj
+
+
 def _strip(obj: Any, extra: set) -> Any:
     if isinstance(obj, dict):
         return {k: _strip(v, extra) for k, v in obj.items() if k not in extra and not SENSITIVE_RE.search(k)}
@@ -102,7 +120,10 @@ class LimitedRoleFieldFilter(BaseHTTPMiddleware):
         path = request.url.path
         role = getattr(request.state, "role", None)
         public = path.startswith("/api/public/")
-        if (role not in LIMITED_ROLES and not public) or "application/json" not in resp.headers.get("content-type", ""):
+        if "application/json" not in resp.headers.get("content-type", ""):
+            return resp
+        mask = role not in (None, "admin") and request.method == "GET" and path.startswith(PHONE_MASKED) and not CUSTOMER_RECORD.match(path)
+        if (role not in LIMITED_ROLES and not public) and not mask:
             return resp
         if path.startswith(("/api/auth/", "/api/dashboard/role")):
             return resp
@@ -112,7 +133,11 @@ class LimitedRoleFieldFilter(BaseHTTPMiddleware):
                 extra |= keys
         body = b"".join([chunk async for chunk in resp.body_iterator])
         try:
-            data = _strip(json.loads(body), extra)
+            data = json.loads(body)
+            if role in LIMITED_ROLES or public:
+                data = _strip(data, extra)
+            if mask:
+                data = _mask_phones(data)
         except ValueError:
             return Response(body, status_code=resp.status_code, headers=dict(resp.headers))
         headers = {k: v for k, v in resp.headers.items() if k.lower() != "content-length"}

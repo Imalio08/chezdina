@@ -334,10 +334,11 @@ async def bulk_customers(body: List[CustomerIn], user: dict = Depends(require_ro
 
 # ---------- Pack 6: Customer access-code regeneration + first-login change ----------
 @api.post("/customers/{cid}/regen-access-code")
-async def regen_access_code(cid: str, user: dict = Depends(require_role("admin","manager"))):
+async def regen_access_code(cid: str, request: Request, user: dict = Depends(require_role("admin","manager"))):
     code = gen_access_code()
     await db.customers.update_one({"id": cid}, {"$set": {"access_code": code, "access_code_must_change": True, "access_code_generated_at": now_iso()}})
     c = await db.customers.find_one({"id": cid}, {"password_hash": 0})
+    await log_customer_open(user, cid, (c or {}).get("name"), request)
     return {"ok": True, "access_code": code, "phone": c.get("phone"), "name": c.get("name")}
 
 @api.post("/public/account/change-code")

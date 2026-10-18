@@ -57,7 +57,7 @@ function OnboardingTab({ emp, file, reload }) {
         {docs.map(d => <div key={d.id} className="flex items-center gap-2 p-2.5 border border-[#ececec] rounded-lg text-sm" data-testid={`onb-doc-${d.kind}`}>
           <FileText size={14} className="text-[#666]" />
           <div className="flex-1 min-w-0"><div className="font-medium truncate">{d.title} <span className="text-xs text-[#999]">v{d.version}</span></div>
-            <div className="text-[11px] text-[#666]">{d.signed_at ? `Signé le ${dateTimeFmt(d.signed_at)} · ${d.method === "papier" ? "version papier" : `IP ${d.ip || "—"}`}` : `Demandé le ${dateTimeFmt(d.assigned_at)}`}{d.expires_at ? ` · expire le ${dateTimeFmt(d.expires_at)}` : ""}</div></div>
+            <div className="text-[11px] text-[#666]">{d.signed_at ? `Signé le ${dateTimeFmt(d.signed_at)} · ${d.method === "papier" ? "version papier" : `IP ${d.ip || "—"}`}` : `Demandé le ${dateTimeFmt(d.assigned_at)}`}{d.expires_at ? ` · expire le ${new Date(d.expires_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}` : ""}</div></div>
           <span className="dina-chip" style={{ color: ST[d.status]?.[1] }} data-testid={`onb-status-${d.kind}`}>{ST[d.status]?.[0]}</span>
           {d.pdf_file_id && <button onClick={() => openFile(d.pdf_file_id)} className="text-[#5867fd]" title="PDF signé" data-testid={`onb-pdf-${d.kind}`}><Download size={14} /></button>}
           {d.status === "pending" && <ScanButton emp={emp} docId={d.id} title={d.title} onDone={reload} testid={`onb-scan-${d.kind}`} />}

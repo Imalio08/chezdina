@@ -32,6 +32,16 @@ def _strip(t: str) -> str:
     return html.unescape(re.sub(r"<[^>]+>", "\n", t or "")).strip()
 
 
+def _add_months(months: int) -> Optional[str]:
+    if not months:
+        return None
+    import calendar
+    n = datetime.now(timezone.utc)
+    y, m = divmod(n.month - 1 + months, 12)
+    y, m = n.year + y, m + 1
+    return n.replace(year=y, month=m, day=min(n.day, calendar.monthrange(y, m)[1])).isoformat()
+
+
 async def _ensure_seed() -> None:
     if await db.doc_templates.count_documents({}):
         return
@@ -221,7 +231,7 @@ async def upload_scan(uid: str, body: Dict[str, Any], user: dict = Depends(requi
         d = await db.employee_docs.find_one({"id": body["doc_id"], "user_id": uid})
         if d and d.get("status") == "pending":
             months = d.get("validity_months") or 0
-            exp = (datetime.now(timezone.utc) + timedelta(days=30 * months)).isoformat() if months else None
+            exp = _add_months(months)
             await db.employee_docs.update_one({"id": d["id"]}, {"$set": {"status": "signed", "signed_at": now_iso(), "expires_at": exp,
                                                                          "method": "papier", "scan_file_id": fid, "pdf_file_id": fid}})
             _reset(uid)
@@ -291,7 +301,7 @@ async def sign(doc_id: str, body: Dict[str, Any], request: Request, user: dict =
     ip, ua = client_ip(request), (request.headers.get("user-agent") or "")[:200]
     dev = (body.get("device") or "")[:120] or ua
     months = d.get("validity_months") or 0
-    exp = (datetime.now(timezone.utc) + timedelta(days=30 * months)).isoformat() if months else None
+    exp = _add_months(months)
     digest = hashlib.sha256((d.get("body") or "").encode()).hexdigest()
     pdf = _pdf(f"{d['title']} · version {d['version']}", [
         ("Employé(e)", user.get("name")), ("Rôle", user.get("role")), ("Lu et accepté", "Oui · case « J'ai lu et j'accepte » cochée"),

@@ -22,7 +22,7 @@ export function applyOrderFilters(orders, f) {
 const uniq = (arr) => [...new Set(arr.filter(Boolean))].sort();
 
 // Reusable filter bar · fields: q, status, date, slot, zone, rider
-export function OrderFilters({ orders, value, onChange, fields = ["q", "date", "slot", "zone", "rider"], statuses = [], testid = "order-filters" }) {
+export function OrderFilters({ orders, value, onChange, fields = ["q", "date", "slot", "zone", "rider"], statuses = [], testid = "order-filters", placeholder = "Rechercher code, cliente, téléphone, adresse…" }) {
   const opts = useMemo(() => ({
     slot: uniq(orders.map(slotOf)),
     zone: uniq(orders.map(o => o.delivery_zone)),
@@ -36,7 +36,7 @@ export function OrderFilters({ orders, value, onChange, fields = ["q", "date", "
       {fields.includes("q") && (
         <div className="relative col-span-2 sm:col-span-3 lg:flex-1 lg:min-w-[220px]">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#999]"/>
-          <input className="dina-input !min-h-[38px] pl-8 text-sm w-full" placeholder="Rechercher code, cliente, téléphone, adresse…" value={value.q} onChange={set("q")} data-testid={`${testid}-q`}/>
+          <input className="dina-input !min-h-[38px] pl-8 text-sm w-full" placeholder={placeholder} value={value.q} onChange={set("q")} data-testid={`${testid}-q`}/>
         </div>
       )}
       {fields.includes("status") && (

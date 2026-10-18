@@ -9,10 +9,11 @@ import SignaturePad from "@/components/shared/SignaturePad";
 export default function OnboardingGate() {
   const { user, setUser, logout } = useAuth();
   const [docs, setDocs] = useState(null);
-  const load = () => api.get("/onboarding/me").then(r => {
+  const [err, setErr] = useState("");
+  const load = () => { setErr(""); return api.get("/onboarding/me").then(r => {
     setDocs(r.data.to_sign);
     if (!r.data.to_sign.length) setUser(u => ({ ...u, onboarding_required: false }));
-  }).catch(() => setDocs([]));
+  }).catch(e => setErr(e?.response?.data?.detail || "Connexion impossible")); };
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const doc = docs?.[0];
   return (
@@ -24,7 +25,8 @@ export default function OnboardingGate() {
             <p className="text-sm text-[#666]">Bonjour {user?.name?.split(" ")[0]}, lisez et signez {docs?.length > 1 ? `ces ${docs.length} documents` : "ce document"} pour accéder à vos outils.</p></div>
           <button onClick={logout} className="text-xs text-[#666] flex items-center gap-1" data-testid="onboarding-logout"><LogOut size={12} />Quitter</button>
         </div>
-        {docs === null && <div className="text-sm text-[#666]">Chargement…</div>}
+        {err && <div className="dina-card-white p-4 text-sm text-[#c62828] flex justify-between items-center" data-testid="onboarding-error">{err}<button onClick={load} className="dina-btn-secondary !min-h-[34px] text-xs" data-testid="onboarding-retry">Réessayer</button></div>}
+        {docs === null && !err && <div className="text-sm text-[#666]">Chargement…</div>}
         {doc && <SignDoc key={doc.id} doc={doc} index={1} total={docs.length} onSigned={load} />}
         {docs && !docs.length && <div className="dina-card-white p-6 text-center"><CheckCircle2 className="mx-auto text-[#1f8a4c]" /><div className="mt-2 font-semibold">Tout est signé · merci !</div></div>}
       </div>

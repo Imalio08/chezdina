@@ -47,7 +47,7 @@ export const PATH_ROLES = {
   "/console/stock": [M, S, K],
   "/console/clients": [M, S, C],
   "/console/messagerie": [M, S, C],
-  "/console/segments": [M, C],
+  "/console/segments": [],
   "/console/promotions": [M, C],
   "/console/campagnes": [],
   "/console/campagnes-whatsapp": [],

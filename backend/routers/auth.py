@@ -46,9 +46,13 @@ async def _session_flags(u: dict) -> None:
 
 @router.post("/auth/login")
 async def login(body: LoginIn, request: Request, response: Response):
+    key = f"staff:{body.email.lower().strip()}"
+    await _throttle(key, request)
     u = await db.users.find_one({"email": body.email.lower().strip()})
     if not u or not verify_pw(body.password, u.get("password_hash", "")):
+        await db.login_attempts.insert_one({"identifier": key, "at": now_iso()})
         raise HTTPException(401, "Identifiants incorrects")
+    await db.login_attempts.delete_many({"identifier": key})
     await _staff_guard(u, request)
     token = make_token(u["id"], u["role"], sv=u.get("session_version") or 0)
     response.set_cookie("access_token", token, httponly=True, secure=True, samesite="none", max_age=60 * 60 * 24 * 7, path="/")
@@ -61,6 +65,9 @@ async def login(body: LoginIn, request: Request, response: Response):
 
 @router.post("/auth/login-pin")
 async def login_pin(body: PinIn, request: Request, response: Response):
+    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
+    key = f"staff-pin:{ip}"
+    await _throttle(key, request)
     async for u in db.users.find({"active": {"$ne": False}}):
         if verify_pw(body.pin.strip(), u.get("pin_hash", "")):
             await _staff_guard(u, request)
@@ -71,7 +78,14 @@ async def login_pin(body: PinIn, request: Request, response: Response):
             u["punch_required"] = await punch_required(u)
             await _session_flags(u)
             return {"user": u, "token": token}
+    await db.login_attempts.insert_one({"identifier": key, "at": now_iso()})
     raise HTTPException(401, "PIN invalide")
+
+
+async def _throttle(key: str, request: Request) -> None:
+    since = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+    if await db.login_attempts.count_documents({"identifier": key, "at": {"$gt": since}}) >= 8:
+        raise HTTPException(429, "Trop d'essais · réessayez dans 15 minutes")
 
 
 @router.post("/auth/rider-login-pin")
