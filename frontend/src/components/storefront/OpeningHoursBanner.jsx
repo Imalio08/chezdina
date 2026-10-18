@@ -19,7 +19,15 @@ export default function OpeningHoursBanner() {
   if (!Object.keys(hours).length) return null;
   const now = new Date();
   const todayKey = DAY_KEYS[now.getDay()];
-  const today = hours[todayKey] || {};
+  const iso = now.toISOString().slice(0, 10);
+  const ex = (hours.exceptions || []).find(e => e.date === iso);
+  const today = ex ? (ex.closed ? { closed: true } : { open: ex.open, close: ex.close }) : (hours[todayKey] || {});
+  if (ex?.show_message && ex.message) return (
+    <div className="bg-[#fff5f5] dark:bg-[#2a1818] border-b border-[#fde8e8] text-[#b02a2a] px-4 py-2 flex items-center justify-between text-xs" data-testid="hours-exception-banner">
+      <Clock size={13} className="shrink-0 mr-2"/><Marquee className="flex-1" testid="hours-exception-text"><b>{ex.message}</b></Marquee>
+      <button onClick={() => { sessionStorage.setItem("dina_hours_dismissed", "1"); setDismissed(true); }} aria-label="Fermer" className="ml-2"><X size={13}/></button>
+    </div>
+  );
   const nowMin = now.getHours() * 60 + now.getMinutes();
   const toMin = (hhmm) => { if (!hhmm) return null; const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
   const openMin = toMin(today.open);

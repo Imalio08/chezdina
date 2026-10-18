@@ -3,6 +3,8 @@ import api from "@/lib/api";
 import { toast } from "sonner";
 import { Save, Shield, Plus, Trash2 } from "lucide-react";
 import SaveButton from "@/components/shared/SaveButton";
+import { SECTIONS as NAV } from "@/components/layout/ConsoleLayout";
+import { useRoles } from "@/lib/useRoles";
 
 /* 4 niveaux par cellule : none / read / write / full
    Compat descendante : true → "full", false/absent → "none". */
@@ -14,47 +16,23 @@ const LEVELS = [
   { k: "full",  label: "Complet",     color: "#1f8a4c", bg: "#e8f5ee" },
 ];
 
-const SECTIONS = [
-  {
-    label: "Ventes & commandes",
-    modules: [
-      { key: "pos", label: "Caisse POS", sensitive: false },
-      { key: "orders", label: "Commandes", sensitive: false },
-      { key: "deliveries", label: "Livraisons", sensitive: false },
-    ],
-  },
-  {
-    label: "Catalogue & stock",
-    modules: [
-      { key: "products", label: "Produits", sensitive: false },
-      { key: "stock", label: "Stock & inventaire", sensitive: true },
-      { key: "purchases", label: "Approvisionnements", sensitive: false },
-    ],
-  },
-  {
-    label: "Clients & marketing",
-    modules: [
-      { key: "customers", label: "Clientes", sensitive: false },
-      { key: "campaigns", label: "Campagnes", sensitive: false },
-    ],
-  },
-  {
-    label: "Finances",
-    modules: [
-      { key: "expenses", label: "Dépenses", sensitive: true },
-      { key: "cash", label: "Sessions de caisse", sensitive: true },
-      { key: "stats", label: "Statistiques & finances", sensitive: true },
-    ],
-  },
-  {
-    label: "Administration",
-    modules: [
-      { key: "team", label: "Équipe & paies", sensitive: true },
-      { key: "settings", label: "Paramètres", sensitive: true },
-      { key: "audit", label: "Journal d'audit", sensitive: true },
-    ],
-  },
-];
+const PATH_KEY = { "/console/pos": "pos", "/console/commandes": "orders", "/console/livraisons": "deliveries", "/console/produits": "products", "/console/stock": "stock",
+  "/console/achats": "purchases", "/console/clients": "customers", "/console/segments": "campaigns", "/console/sessions-caisse": "cash", "/console/statistiques": "stats",
+  "/console/finances": "stats_finances", "/console/equipe": "team", "/console/parametres": "settings" };
+const SENSITIVE = new Set(["stock", "cash", "stats", "stats_finances", "team", "settings", "audit", "expenses"]);
+// Every tab and sub-tab of the console menu becomes a row of the matrix
+const SECTIONS = (() => {
+  const seen = new Set();
+  const secs = NAV.map(s => ({ label: s.label || "Général", modules: s.items.map(it => {
+    const key = PATH_KEY[it.to] || `page:${it.to}`;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    return { key, label: it.label, sensitive: SENSITIVE.has(key) };
+  }).filter(Boolean) })).filter(s => s.modules.length);
+  const extra = [["expenses", "Dépenses"], ["audit", "Journal d'audit"], ["page:/console/approbations", "À approuver"], ["page:/console/equipe?onglet=presences", "Équipe › Présences"], ["page:/console/equipe?onglet=roles", "Équipe › Rôles & permissions"], ["page:/console/stock?tab=invendables", "Stock › Non vendables"], ["page:/console/stock?tab=inventories", "Stock › Inventaires"]]
+    .filter(([k]) => !seen.has(k)).map(([key, label]) => ({ key, label, sensitive: SENSITIVE.has(key) }));
+  return extra.length ? [...secs, { label: "Autres onglets", modules: extra }] : secs;
+})();
 const ALL_KEYS = SECTIONS.flatMap(s => s.modules.map(m => m.key));
 
 const normalize = (v) => {
@@ -73,13 +51,11 @@ const asMap = (r) => {
 
 export default function RolesPermissions() {
   const [matrix, setMatrix] = useState({});
-  const [roles, setRoles] = useState([
-    { key: "admin", label: "Admin", builtin: true },
-    { key: "manager", label: "Gérante", builtin: true },
-    { key: "sales", label: "Vendeuse", builtin: true },
-    { key: "stock_keeper", label: "Stock", builtin: true },
-    { key: "rider", label: "Livreur", builtin: true },
-  ]);
+  const [allRoles, reloadRoles] = useRoles();
+  const [roles, setRoles] = useState([]);
+  useEffect(() => { if (allRoles.length) setRoles(rs => [...allRoles, ...rs.filter(r => !allRoles.find(a => a.key === r.key))]); }, [allRoles]);
+  const rename = async (r) => { const l = window.prompt("Nouveau nom du rôle", r.label); if (!l?.trim()) return; try { await api.patch(`/roles/meta/${r.key}`, { label: l.trim() }); toast.success("Rôle renommé"); reloadRoles(); } catch (e) { toast.error(e.response?.data?.detail || "Erreur"); } };
+  const toggle = async (r) => { if (!window.confirm(r.active === false ? `Réactiver le rôle « ${r.label} » ?` : `Désactiver le rôle « ${r.label} » ? Ses employés ne pourront plus se connecter.`)) return; try { await api.patch(`/roles/meta/${r.key}`, { active: r.active === false }); toast.success(r.active === false ? "Rôle réactivé" : "Rôle désactivé"); reloadRoles(); } catch (e) { toast.error(e.response?.data?.detail || "Erreur"); } };
   const [saving, setSaving] = useState(false);
   const [showNewRole, setShowNewRole] = useState(false);
   const [newRoleName, setNewRoleName] = useState("");
@@ -91,9 +67,6 @@ export default function RolesPermissions() {
       const normalized = {};
       Object.entries(raw).forEach(([role, perms]) => { normalized[role] = asMap(perms); });
       setMatrix(normalized);
-      // Pull custom roles that may be defined server-side
-      const custom = Object.keys(raw).filter(k => !roles.find(r => r.key === k));
-      if (custom.length) setRoles(rs => [...rs, ...custom.map(k => ({ key: k, label: k, builtin: false }))]);
     } catch { toast.error("Erreur de chargement"); }
   };
   useEffect(() => { load(); }, []); // eslint-disable-line
@@ -115,7 +88,7 @@ export default function RolesPermissions() {
     try {
       await api.patch("/roles-permissions", { matrix });
       toast.success("Matrice enregistrée");
-    } catch { toast.error("Droits admin requis"); }
+    } catch (e) { toast.error(e?.response?.status === 403 ? "Droits admin requis" : (typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Enregistrement impossible · réessayez")); }
     finally { setSaving(false); }
   };
 
@@ -186,8 +159,9 @@ export default function RolesPermissions() {
             <tr>
               <th className="text-left pb-3 pr-4 min-w-[220px]"><Shield size={14} className="inline mr-1"/>Module</th>
               {roles.map(r => (
-                <th key={r.key} className="pb-3 px-2 min-w-[140px]">
-                  <div className="text-center font-semibold text-xs uppercase text-[#666]">{r.label}</div>
+                <th key={r.key} className={`pb-3 px-2 min-w-[140px] ${r.active === false ? "opacity-50" : ""}`}>
+                  <div className="text-center font-semibold text-xs uppercase text-[#666]" data-testid={`role-label-${r.key}`}>{r.label}{r.active === false && <div className="normal-case text-[10px] text-[#c62828]">désactivé</div>}</div>
+                  {r.key !== "admin" && <div className="flex justify-center gap-2 mt-1 text-[10px]"><button onClick={() => rename(r)} className="text-[#5867fd]" data-testid={`role-rename-${r.key}`}>Renommer</button><button onClick={() => toggle(r)} className={r.active === false ? "text-[#1f8a4c]" : "text-[#c62828]"} data-testid={`role-toggle-${r.key}`}>{r.active === false ? "Réactiver" : "Désactiver"}</button></div>}
                   {!r.builtin && <button onClick={() => removeRole(r.key)} className="text-[10px] text-[#c62828] mt-1" title="Supprimer rôle"><Trash2 size={10} className="inline"/></button>}
                 </th>
               ))}

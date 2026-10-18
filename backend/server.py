@@ -131,7 +131,7 @@ class ReferralApplyIn(BaseModel):
     code: str          # parrain's referral_code
     customer_id: str   # filleul (new customer)
 class RolesPermissionsIn(BaseModel):
-    matrix: Dict[str, Dict[str, bool]]  # {role: {permission_key: true/false}}
+    matrix: Dict[str, Dict[str, Any]]  # {role: {permission_key: level|bool}}
 class AttendancePunchIn(BaseModel):
     code: str
     kind: str = "in"  # in | out
@@ -5383,6 +5383,12 @@ async def declare_handover(sid: str, body: Dict[str,Any], user: dict = Depends(g
         "handover_amount": int(body.get("amount",0)), "handover_at": now_iso(), "handover_by": user.get("name"),
         "handover_note": body.get("note",""), "status": "pending_validation"
     }})
+    from routers.cash_analysis import analyze
+    an = await analyze({**s, "handover_amount": int(body.get("amount", 0))})
+    await db.cash_sessions.update_one({"id": sid}, {"$set": {"analysis": {k: v for k, v in an.items() if k != "movements"}, "expected": an["expected"]}})
+    from routers.notify import notify
+    for owner in await db.users.find({"role": "admin", "active": {"$ne": False}}, {"id": 1}).to_list(10):
+        await notify("staff", owner["id"], f"Clôture de caisse · {an['verdict']}", f"{user.get('name')} · compté {int(body.get('amount',0))} FCFA · {len(an['attention'])} point(s) d'attention", f"/console/sessions-caisse?focus={sid}", "handover")
     await db.notifications.insert_one({"id":new_id(),"type":"handover","title":"Versement en attente","msg":f"{user.get('name')} a déposé {int(body.get('amount',0))} FCFA","color":"#5867fd","at":now_iso(),"link":f"/console/sessions-caisse?focus={sid}"})
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.declare_handover","entity_id":sid,"after":{"amount":body.get("amount")},"at":now_iso()})
     return {"ok": True}
@@ -5393,8 +5399,9 @@ async def validate_handover(sid: str, body: Dict[str,Any], user: dict = Depends(
     s = await db.cash_sessions.find_one({"id": sid})
     if not s: raise HTTPException(404)
     if s.get("status") != "pending_validation": raise HTTPException(400, "Aucun versement en attente de contrôle")
-    expected = int(body.get("expected", s.get("handover_amount",0)))
-    actual = int(body.get("actual", s.get("handover_amount",0)))
+    from routers.cash_analysis import analyze
+    expected = int((await analyze(s))["expected"])
+    actual = int(s.get("handover_amount", 0))
     gap = actual - expected
     status = "validated" if gap == 0 else "gap"
     await db.cash_sessions.update_one({"id": sid}, {"$push": {"handover_history": {"decision": "valide", "declared": s.get("handover_amount"), "expected": expected, "actual": actual, "gap": gap, "by": user.get("name"), "at": now_iso()}}, "$set": {
@@ -5404,6 +5411,9 @@ async def validate_handover(sid: str, body: Dict[str,Any], user: dict = Depends(
     # If gap, record it on the Gérante balance
     if gap != 0 and s.get("manager_id"):
         await db.manager_balance.insert_one({"id":new_id(),"manager_id":s.get("manager_id"),"session_id":sid,"amount":-gap,"reason":"Écart versement","at":now_iso()})
+    if s.get("manager_id") or s.get("opened_by_id"):
+        from routers.notify import notify
+        await notify("staff", s.get("manager_id") or s.get("opened_by_id"), "Clôture de caisse validée", f"Par {user.get('name')} · {'conforme' if gap == 0 else f'écart {gap} FCFA'}", f"/console/sessions-caisse?focus={sid}", "handover")
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":"cash.validate_handover","entity_id":sid,"after":{"gap":gap,"status":status},"at":now_iso()})
     return {"ok": True, "gap": gap, "status": status}
 
@@ -5922,6 +5932,12 @@ from routers.coupons import router as coupons_router  # noqa: E402
 app.include_router(coupons_router)
 from routers.ai_visuals import router as ai_visuals_router  # noqa: E402
 app.include_router(ai_visuals_router)
+from routers.cash_analysis import router as cash_analysis_router  # noqa: E402
+app.include_router(cash_analysis_router)
+from routers.stock_status import router as stock_status_router  # noqa: E402
+app.include_router(stock_status_router)
+from routers.roles_meta import router as roles_meta_router  # noqa: E402
+app.include_router(roles_meta_router)
 app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:

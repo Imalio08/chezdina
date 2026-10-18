@@ -104,6 +104,10 @@ async def get_user(request: Request):
         user.pop(k, None)
     path = request.url.path
     request.state.role = user.get("role")
+    if user.get("role") != "admin" and not path.startswith("/api/auth/"):
+        from routers.roles_meta import inactive_roles
+        if user.get("role") in await inactive_roles():
+            raise HTTPException(403, "Votre rôle est désactivé · contactez le propriétaire")
     if user.get("role") == "rider" and not path.startswith(RIDER_PREFIXES):
         raise HTTPException(403, "Accès réservé à l'équipe de la boutique")
     from role_access import api_allowed

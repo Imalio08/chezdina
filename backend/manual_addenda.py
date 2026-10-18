@@ -139,6 +139,15 @@ def P(shot: str, caption: str):
 
 ADDENDA += [
     ("prise en main", [
+        {"id": "add-v3-stock-rule", "heading": "Règle du stock, articles non vendables et clôture de caisse", "blocks": [
+            T("Tout article qui sort de la boutique sans être enregistré dans le système est considéré comme toujours en stock. Les inventaires réguliers vérifient que le stock réel correspond au stock du système."),
+            S(["Stock › Non vendables : déclarez un article Défectueux, Invendable, Retour fournisseur, En réparation ou Perdu (ou ajoutez un motif), avec la raison, un commentaire et une photo",
+               "Le propriétaire valide : l'article sort alors du stock vendable. Plus tard, changez son état : réparé et remis en stock, renvoyé au fournisseur, vendu avec remise ou détruit. Chaque changement est noté",
+               "Clôture de caisse : la Gérante compte ses espèces sans voir le montant attendu. Le système calcule l'attendu (fond + ventes espèces + argent des livreurs − sorties) et envoie au propriétaire le verdict « Conforme » ou « Écart », avec les points d'attention",
+               "Le propriétaire valide ou rejette avec un motif ; la Gérante reçoit la décision",
+               "Équipe regroupe Employés, Présences et Rôles & permissions ; chaque rôle peut être renommé, désactivé ou réactivé"]),
+        ]},
+
         {"id": "add-v2-all-platforms", "heading": "Nouveautés communes : console, app livreur, site", "blocks": [
             T("Ces règles s'appliquent partout, sur ordinateur, tablette et téléphone (y compris l'application installée sur l'écran d'accueil)."),
             S(["Plus de zoom automatique : en touchant un champ, l'écran ne grossit plus ; tous les champs sont lisibles en 16 px",

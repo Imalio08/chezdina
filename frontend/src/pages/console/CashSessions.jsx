@@ -295,25 +295,20 @@ function HandoverModal({ session, onClose, onDone }) {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const expected = (session.opening_cash || 0) + (session.cash_sales || 0);
   const submit = async () => {
     const n = parseInt(amount || "0", 10);
     if (Number.isNaN(n) || n < 0) return toast.error("Montant invalide");
     setSubmitting(true);
-    try { await api.post(`/cash-sessions/${session.id}/declare-handover`, { amount: n, note }); toast.success("Versement déclaré · en attente du propriétaire"); onDone(); }
+    try { await api.post(`/cash-sessions/${session.id}/declare-handover`, { amount: n, note }); toast.success("Comptage envoyé · le propriétaire reçoit l'analyse"); onDone(); }
     catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
     finally { setSubmitting(false); }
   };
   return (
     <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="handover-modal">
-        <div className="font-serif text-xl mb-3">Déclarer un versement au propriétaire</div>
-        <div className="p-3 rounded-lg bg-[#f5f5f5] dark:bg-[#141414] text-xs mb-3">
-          <div className="flex justify-between"><span className="text-[#666]">Fond initial</span><span className="tabular font-semibold">{fcfa(session.opening_cash || 0)}</span></div>
-          <div className="flex justify-between"><span className="text-[#666]">Ventes espèces (indicatif)</span><span className="tabular font-semibold">{fcfa(session.cash_sales || 0)}</span></div>
-          <div className="flex justify-between mt-1 pt-1 border-t border-[#ececec] dark:border-[#2a2a2a]"><span className="text-[#666]">Attendu</span><span className="tabular font-semibold text-[#b02a2a]">{fcfa(expected)}</span></div>
-        </div>
-        <label className="text-xs uppercase text-[#666] font-semibold">Montant versé réellement (FCFA)</label>
+        <div className="font-serif text-xl mb-2">Clôture : comptez votre caisse</div>
+        <div className="p-3 rounded-lg bg-[#f5f5f5] dark:bg-[#141414] text-xs mb-3" data-testid="handover-blind-info">Comptez les espèces présentes dans la caisse et saisissez le total. Le montant attendu n'est pas affiché : le système compare et envoie l'analyse au propriétaire.</div>
+        <label className="text-xs uppercase text-[#666] font-semibold">Espèces comptées (FCFA)</label>
         <input type="number" min="0" inputMode="numeric" className="dina-input mt-1 mb-3 tabular text-right text-lg" value={amount} onChange={e => setAmount(e.target.value)} data-testid="handover-amount" autoFocus/>
         <label className="text-xs uppercase text-[#666] font-semibold">Note (facultatif)</label>
         <textarea className="dina-input mt-1 mb-4" rows={2} placeholder="Ex. une partie du fond gardée pour le change" value={note} onChange={e => setNote(e.target.value)} data-testid="handover-note"/>
@@ -324,37 +319,38 @@ function HandoverModal({ session, onClose, onDone }) {
 }
 
 function ValidateHandoverModal({ session, onClose, onDone }) {
-  const expected = session.handover_amount || 0;
-  const [actual, setActual] = useState(expected);
-  const [note, setNote] = useState("");
+  const [an, setAn] = useState(null);
+  useEffect(() => { api.get(`/cash-sessions/${session.id}/analysis`).then(r => setAn(r.data)).catch(() => {}); }, [session.id]);
+  const expected = an?.expected ?? session.expected ?? 0;
+  const actual = session.handover_amount || 0;
+  const note = "";
   const [submitting, setSubmitting] = useState(false);
-  const gap = (+actual || 0) - expected;
+  const gap = actual - expected;
   const submit = async () => {
     setSubmitting(true);
     try {
-      const r = await api.post(`/cash-sessions/${session.id}/validate-handover`, { expected, actual: +actual || 0, note });
-      toast.success(r.data.gap === 0 ? "Versement validé sans écart" : `Validé · écart ${fcfa(r.data.gap)} appliqué au solde Gérante`);
+      const r = await api.post(`/cash-sessions/${session.id}/validate-handover`, { note });
+      toast.success(r.data.gap === 0 ? "Clôture validée · conforme" : `Validée · écart ${fcfa(r.data.gap)} appliqué au solde Gérante`);
       onDone();
     } catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); }
     finally { setSubmitting(false); }
   };
+  const L = ({ k, v, b }) => <div className={`flex justify-between ${b ? "font-semibold border-t border-[#ececec] pt-1 mt-1" : ""}`}><span className="text-[#666]">{k}</span><span className="tabular">{v}</span></div>;
   return (
     <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="validate-handover-modal">
-        <div className="font-serif text-xl mb-3">Valider le versement</div>
-        <div className="p-3 rounded-lg bg-[#fff5f5] dark:bg-[#2a1818] text-xs mb-3">
-          <div className="flex justify-between"><span className="text-[#666]">Déclaré par {session.handover_by}</span><span className="tabular font-semibold text-[#5867fd]">{fcfa(expected)}</span></div>
-          <div className="flex justify-between text-[#666]"><span>Le</span><span>{dateTimeFmt(session.handover_at)}</span></div>
-          {session.handover_note && <div className="mt-2 italic">"{session.handover_note}"</div>}
-        </div>
-        <label className="text-xs uppercase text-[#666] font-semibold">Montant effectivement reçu (FCFA)</label>
-        <input type="number" min="0" inputMode="numeric" className="dina-input mt-1 mb-2 tabular text-right text-lg" value={actual} onChange={e => setActual(e.target.value)} data-testid="validate-actual" autoFocus/>
-        <div className={`text-xs mb-3 font-semibold ${gap === 0 ? "text-[#1f8a4c]" : gap > 0 ? "text-[#1f8a4c]" : "text-[#c62828]"}`}>
-          Écart : {gap > 0 ? "+" : ""}{fcfa(gap)} {gap !== 0 && "— ajouté au solde Gérante"}
-        </div>
-        <label className="text-xs uppercase text-[#666] font-semibold">Note (facultatif)</label>
-        <textarea className="dina-input mt-1 mb-4" rows={2} placeholder="Ex. écart lié au change" value={note} onChange={e => setNote(e.target.value)} data-testid="validate-note"/>
-        <div className="flex gap-2"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={submit} disabled={submitting} className="dina-btn-primary flex-1" data-testid="validate-confirm"><CheckCircle size={13}/>Valider</button></div>
+      <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()} data-testid="validate-handover-modal">
+        <div className="font-serif text-xl mb-3">Analyse de la clôture</div>
+        <div className={`text-center rounded-xl py-3 mb-3 text-white font-bold text-lg ${gap === 0 ? "bg-[#1f8a4c]" : "bg-[#c62828]"}`} data-testid="cash-verdict">{gap === 0 ? "Conforme" : `Écart de ${gap > 0 ? "+" : ""}${fcfa(gap)}`}</div>
+        {an && <div className="text-xs space-y-0.5 mb-3" data-testid="cash-analysis">
+          <L k="Fond de caisse" v={fcfa(an.opening_cash)}/><L k="Ventes en espèces" v={fcfa(an.cash_sales)}/><L k="Espèces remises par les livreurs" v={fcfa(an.rider_cash)}/><L k="Autres entrées" v={fcfa(an.other_in)}/><L k="Sorties (dont remboursements)" v={`−${fcfa(an.outs)}`}/>
+          <L k="Attendu par le système" v={fcfa(an.expected)} b/><L k="Compté par la Gérante" v={fcfa(actual)}/>
+          {an.attention.length > 0 && <div className="mt-2 p-2 rounded-lg bg-[#fdf2e0] text-[#8a5a00]" data-testid="cash-attention"><b>Points d'attention</b><ul className="list-disc pl-4">{an.attention.map((a, i) => <li key={i}>{a}</li>)}</ul></div>}
+          <div className="mt-2"><b>Par moyen de paiement</b>{Object.entries(an.by_method).map(([m, v]) => <L key={m} k={m} v={fcfa(v)}/>)}</div>
+          {an.movements.length > 0 && <details className="mt-2"><summary className="cursor-pointer">Mouvements ({an.movements.length})</summary>{an.movements.map(m => <L key={m.id} k={m.reason || m.label || m.kind || ""} v={`${m.type === "in" ? "+" : "−"}${fcfa(m.amount)}`}/>)}</details>}
+        </div>}
+        <div className="text-xs text-[#666] mb-4">Comptage envoyé par {session.handover_by} · {dateTimeFmt(session.handover_at)}{session.handover_note ? ` · « ${session.handover_note} »` : ""}</div>
+        <div className="flex gap-2"><button onClick={onClose} className="dina-btn-secondary flex-1">Annuler</button><button onClick={submit} disabled={submitting} className="dina-btn-primary flex-1" data-testid="validate-confirm"><CheckCircle size={13}/>Valider la clôture</button></div>
+        <div className="text-[11px] text-[#666] mt-2">Pour refuser, fermez et utilisez « Rejeter » sur la session (motif obligatoire).</div>
       </div>
     </div>
   );

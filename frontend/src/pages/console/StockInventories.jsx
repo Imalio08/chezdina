@@ -3,6 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { useKeptState } from "@/lib/keptState";
 import ApprovalReview, { stockRow } from "@/components/shared/ApprovalReview";
+import UnsellableTab from "@/components/stock/UnsellableTab";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Minus, X, Edit, Package, AlertTriangle, Clock, DollarSign, History, ClipboardList, CheckSquare } from "lucide-react";
@@ -11,6 +12,7 @@ const TABS = [
   { k: "stock", label: "Stock par variante" },
   { k: "movements", label: "Mouvements" },
   { k: "requests", label: "Demandes d'ajustement" },
+  { k: "invendables", label: "Non vendables" },
   { k: "inventories", label: "Inventaires" },
 ];
 
@@ -134,6 +136,8 @@ export default function StockInventories() {
           {review && <ApprovalReview row={review} onClose={() => setReview(null)} onDone={() => { setReview(null); load(); }}/>}
         </div>
       )}
+
+      {tab === "invendables" && <UnsellableTab/>}
 
       {tab === "inventories" && (
         <div className="space-y-3">

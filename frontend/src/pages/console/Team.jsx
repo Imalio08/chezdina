@@ -4,14 +4,12 @@ import { dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Trash2, Pencil } from "lucide-react";
 
-const ROLES = [
-  { v:"admin", label:"Propriétaire" },
-  { v:"manager", label:"Gérante" },
-  { v:"rider", label:"Livreur" },
-];
+import { useRoles } from "@/lib/useRoles";
 
 export default function Team() {
   const [t, setT] = useState([]);
+  const [ROLES_ALL] = useRoles();
+  const ROLES = ROLES_ALL.map(r => ({ v: r.key, label: r.label }));
   const [att, setAtt] = useState([]);
   const [code, setCode] = useState("");
   const [editing, setEditing] = useState(null);
@@ -86,6 +84,8 @@ export default function Team() {
 
 function UserForm({ initial, onSave, onClose }) {
   const [f, setF] = useState(initial || { name:"", email:"", phone:"+225 ", role:"sales", password:"", pin:"" });
+  const [all] = useRoles();
+  const ROLES = all.filter(r => r.active || r.key === f.role).map(r => ({ v: r.key, label: r.label }));
   return (
     <div className="fixed inset-0 bg-black/50 grid place-items-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-2xl p-6 w-full max-w-md" onClick={e=>e.stopPropagation()}>

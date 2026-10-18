@@ -21,7 +21,7 @@ import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
 import { toast } from "sonner";
 import { Volume2, VolumeX } from "lucide-react";
 
-const SECTIONS = [
+export const SECTIONS = [
   { label: "", items: [
     { to: "/console", icon: LayoutDashboard, label: "Tableau de bord", end: true },
   ]},
@@ -58,10 +58,8 @@ const SECTIONS = [
     { to: "/console/avis", icon: Star, label: "Avis clients" },
   ]},
   { label: "Équipe", items: [
-    { to: "/console/equipe", icon: UserCog, label: "Employés" },
-    { to: "/console/roles", icon: Shield, label: "Rôles & permissions", adminOnly: true },
+    { to: "/console/equipe", icon: UserCog, label: "Équipe" },
     { to: "/console/approbations", icon: CheckCircle2, label: "À approuver", adminOnly: true },
-    { to: "/console/presences", icon: UserCheck, label: "Présences", presence: true },
   ]},
   { label: "Site vitrine", items: [
     { to: "/console/site?tab=apparence", icon: Palette, label: "Apparence" },

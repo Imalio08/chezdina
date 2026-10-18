@@ -50,6 +50,7 @@ import RiderMessages from "@/pages/rider/Messages";
 import RiderNotifications from "@/pages/rider/Notifications";
 import BonsPlans from "@/pages/storefront/BonsPlans";
 import WhatsAppCampaigns from "@/pages/console/WhatsAppCampaigns";
+import TeamHub from "@/pages/console/TeamHub";
 import Referrals from "@/pages/console/Referrals";
 import RolesPermissions from "@/pages/console/RolesPermissions";
 import Approvals from "@/pages/console/Approvals";
@@ -259,7 +260,7 @@ export default function App() {
               <Route path="facturation" element={<ErrorBoundary><Invoicing /></ErrorBoundary>} />
               <Route path="depenses" element={<ErrorBoundary><Expenses /></ErrorBoundary>} />
               <Route path="statistiques" element={<ErrorBoundary><Statistiques /></ErrorBoundary>} />
-              <Route path="equipe" element={<ErrorBoundary><Team /></ErrorBoundary>} />
+              <Route path="equipe" element={<ErrorBoundary><TeamHub /></ErrorBoundary>} />
               <Route path="site" element={<ErrorBoundary><SiteVitrine /></ErrorBoundary>} />
               <Route path="livreur-app" element={<ErrorBoundary><LivreurApp /></ErrorBoundary>} />
               <Route path="integrations" element={<ErrorBoundary><Integrations /></ErrorBoundary>} />
@@ -284,12 +285,12 @@ export default function App() {
               <Route path="encaissements" element={<ErrorBoundary><Encaissements/></ErrorBoundary>} />
               <Route path="resultat" element={<ErrorBoundary><ProfitLoss/></ErrorBoundary>} />
               <Route path="employes" element={<ErrorBoundary><Team/></ErrorBoundary>} />
-              <Route path="roles" element={<ErrorBoundary><RolesPermissions/></ErrorBoundary>} />
+              <Route path="roles" element={<Navigate to="/console/equipe?onglet=roles" replace/>} />
               <Route path="approbations" element={<ErrorBoundary><Approvals/></ErrorBoundary>} />
               <Route path="audit" element={<Navigate to="/console/parametres?tab=securite" replace/>} />
               <Route path="pointage" element={<ErrorBoundary><Kiosk/></ErrorBoundary>} />
-              <Route path="presences" element={<ErrorBoundary><Pointage/></ErrorBoundary>} />
-              <Route path="presence" element={<Navigate to="/console/presences" replace/>} />
+              <Route path="presences" element={<Navigate to="/console/equipe?onglet=presences" replace/>} />
+              <Route path="presence" element={<Navigate to="/console/equipe?onglet=presences" replace/>} />
               <Route path="apparence" element={<Navigate to="/console/site?tab=apparence" replace/>} />
               <Route path="accueil" element={<Navigate to="/console/site?tab=accueil" replace/>} />
               <Route path="apercu" element={<Navigate to="/" replace/>} />
