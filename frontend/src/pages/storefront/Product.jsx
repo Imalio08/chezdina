@@ -93,6 +93,7 @@ export default function ProductPage() {
         <div>
           <div className="relative aspect-[4/5] bg-[#fff5f5] rounded-2xl overflow-hidden group">
             <SmartImage src={current} alt={p.name} fallbackText={p.name} className="w-full h-full object-cover" data-testid="product-main-image"/>
+            {(p.ai_images || []).includes(current) && <span className="absolute bottom-10 right-3 bg-[#7c3aed] text-white text-[10px] font-bold px-2 py-0.5 rounded" data-testid="product-ai-marker">Visuel créé par IA</span>}
             {p.compare_at > p.price && <span className="absolute top-3 left-3 bg-[#c62828] text-white text-sm font-bold px-2.5 py-1 rounded-lg shadow" data-testid="product-promo-sticker">-{Math.round((1 - p.price / p.compare_at) * 100)} %</span>}
             {gallery.length > 1 && (
               <>
@@ -104,8 +105,9 @@ export default function ProductPage() {
           </div>
           {gallery.length > 1 && (
             <div className="grid grid-cols-5 gap-2 mt-3">{gallery.map((src,i)=>(
-              <button key={i} onClick={()=>setImgIdx(i)} className={`aspect-square rounded-lg overflow-hidden border-2 transition ${imgIdx===i?"border-[#b02a2a]":"border-transparent"}`} data-testid={`product-thumb-${i}`}>
+              <button key={i} onClick={()=>setImgIdx(i)} className={`relative aspect-square rounded-lg overflow-hidden border-2 transition ${imgIdx===i?"border-[#b02a2a]":"border-transparent"}`} data-testid={`product-thumb-${i}`}>
                 <SmartImage src={src} alt={`${p.name} ${i+1}`} fallbackText={p.name} className="w-full h-full object-cover"/>
+                {(p.ai_images || []).includes(src) && <span className="absolute bottom-0 inset-x-0 bg-[#7c3aed] text-white text-[9px] font-bold text-center">IA</span>}
               </button>
             ))}</div>
           )}

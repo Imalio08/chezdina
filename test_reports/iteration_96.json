@@ -1,0 +1,48 @@
+{
+  "summary": "Iteration 96 – tested referral share OG (bots/browsers + 1200x630 JPEG), coupons (public/POS check+available, server-side order coupon, uses +1), approvals decide with mandatory reject reason (stock/approval/expense) + requester notifications, AI analyze (real Gemini) + ONE generate via UI. UI: Checkout CouponPicker, POS coupon (needed a TEST cash session), OrderDetail status badge, fiches colis hidden iframe (Orders bulk/single slip, OrderDetail), Approvals review modal (validate→confirm, reject→required reason), Stock 'Demandes' tab req-open, AI wand flow in ProductFormV3 + storefront gallery. Almost all of it works. Fixed one bug: coupon regex injection. Found 2 data gaps in seeded promos and a few minor issues.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/public/coupons/check (data)", "issue": "The FLASH20 and LIVRAISON promo documents in the DB have NO min_order, starts_at, ends_at, usage_limit or channel fields. The seed in server.py (~line 5749) sets min_order 15000/25000, but the live data is older and was never updated. So FLASH20 is accepted at 10 000 FCFA and LIVRAISON (free delivery) at any subtotal. The code logic is right; the data needs a migration or backfill."},
+      {"endpoint": "routers/coupons.py _calc", "issue": "Promo type 'bogo' (TEST2POUR1, buy_qty/get_qty, scope=products) is treated as a flat amount. It is listed as usable '-100 FCFA' in /coupons/available (seen in the Checkout and POS chips) and applies -100 FCFA to any cart. Exclude unsupported types (bogo, product-scoped) or implement them."},
+      {"endpoint": "routers/coupons.py resolve", "issue": "The promo 'channel' field (boutique/all/pos) and 'scope'/'products'/'category' are ignored, so a POS-only or category-only promo is accepted everywhere."},
+      {"endpoint": "routers/coupons.py redeem", "issue": "There is a race between the check and the redeem: a voucher can be used by two orders placed at the same time, and usage_limit can be exceeded. Use an atomic find_one_and_update with status != used, or uses < limit, at order time."},
+      {"endpoint": "GET /api/public/share/invitation/{code} and /image.jpg", "issue": "HEAD requests return 405. Some link-preview crawlers (Facebook debugger, LinkedIn, Slack, iMessage) send HEAD first. Use @router.api_route(..., methods=['GET','HEAD']). Unknown codes return 200 with a generic card, which is fine."},
+      {"endpoint": "POST /api/stock/adjustment-requests/{id}/decide", "issue": "The decision value is not validated: any value other than 'approve' (e.g. 'foo') counts as a reject, and _need_reason only checks for 'reject'. So decision='foo' with no note rejects with no reason. Validate decision in ('approve','reject')."},
+      {"endpoint": "POST /api/approval-requests/{id}/decide", "issue": "_decision_done falls back to requested_by (a name) when requested_by_id is missing, so the notification target_id may be a name instead of a user id (legacy rows)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Storefront Product gallery", "issue": "ai_images are added after the real photos (correct), but the storefront shows no 'IA' marker on them, so customers cannot tell AI visuals from real photos. The requirement says AI visuals must be clearly marked IA.", "selector": "[data-testid=product-thumb-1]", "priority": "MEDIUM"},
+      {"component": "Approvals KPIs", "issue": "The 'Approuvées' and 'Refusées' counters only count approval_requests + expense_requests. After validating or rejecting a stock adjustment they stay at 0.", "selector": "[data-testid=kpi-approved], [data-testid=kpi-rejected]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "ApprovalReview review-stock", "issues": ["The product thumbnail area was blank in the screenshot for a product whose image is a relative /catalog path. Check that the image loads."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter96_coupons_share_approvals.py", "/app/backend/tests/ui_seed_iter96.py", "/app/test_reports/pytest/iter96.xml"],
+  "action_items": [
+    "Backfill the live promotions FLASH20 (min_order 15000, channel, dates, usage_limit 100) and LIVRAISON (min_order 25000), or add an idempotent migration.",
+    "Exclude or implement 'bogo' and product/category-scoped promos in coupons._calc/available; enforce promo.channel (storefront vs POS).",
+    "Make coupon and voucher redemption atomic.",
+    "Allow HEAD on the share invitation page and image routes.",
+    "Validate the decision value in stock_adj_decide.",
+    "Show an 'IA' badge on storefront gallery thumbnails and main image for ai_images.",
+    "Include stock adjustment requests in the Approvals approved/rejected KPIs.",
+    "Optional: ai_images are stored as about 115 KB base64 data URIs inside the product document. This bloats /products list responses; consider storing them as files/URLs like the real photos."
+  ],
+  "critical_code_review_comments": [
+    "FIXED: routers/coupons.py resolve() built the regex f'^{code}$' from unescaped user input, so code '.*' resolved to BIENVENUE10 (any promo could be guessed with a regex). Now uses re.escape(code).",
+    "Pre-existing: public_create_order and POS create_order trust the item price and delivery_fee sent by the client. The coupon is now server-side, but price tampering is still possible on /api/public/orders. Re-price items from db.products.",
+    "ai_analyze swallows every exception and returns DEFAULT_IDEAS silently. Log the exception so Gemini failures are visible.",
+    "scanOnce.makeScanGate is correct for html5-qrcode (the success callback only fires on decode, so the code must be undecoded for 1.5s before it re-triggers). PosScanner cleanup calls stop().then(...) without .catch, which can leave an unhandled rejection."
+  ],
+  "updated_files": ["/app/backend/routers/coupons.py", "/app/backend/tests/test_iter96_coupons_share_approvals.py", "/app/backend/tests/ui_seed_iter96.py"],
+  "success_rate": {"backend": "91% (20/22; the 2 failures are data-only: FLASH20/LIVRAISON min_order missing in DB; the regex bug is fixed and its test now passes)", "frontend": "95% (all requested flows work; storefront IA marker missing)"},
+  "seed_data_creation": "Created and then deleted: TEST_Approval Shoe product, 3 stock requests, its stock movement, notifications, a TEST cash session (TEST_session_iter96), and TEST_ orders from pytest. Promo uses counters were restored (BIENVENUE10 45, FLASH20 12, LIVRAISON 78). Exactly 1 Gemini generate call was made (UI). Analyze was called twice (pytest + UI).",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "POS needs an open cash session: insert a doc into cash_sessions {closed: False} and delete it afterwards. POS add product: pos-add-<id> → sheet-size-<s> → sheet-add. Staff login inputs have no type: use page.locator('input').nth(0/1). Product edit: /console/produits → 'Tableau' button → search → edit-product-<SKU>. Run 'python tests/ui_seed_iter96.py' to seed and 'python tests/ui_seed_iter96.py clean' to clean up. Fiche iframe structure verified with a querySelectorAll('iframe') .pg/.f check (6 orders → [4,2], @page margin 0)."
+}

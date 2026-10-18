@@ -68,8 +68,8 @@ export default function Approvals() {
 
   const counts = {
     pending: approvals.filter(a => a.status === "pending").length + expenseReqs.filter(e => e.status === "pending").length + stockReqs.filter(s => s.status === "pending").length,
-    approved: approvals.filter(a => a.status === "approved").length + expenseReqs.filter(e => e.status === "approved").length,
-    rejected: approvals.filter(a => a.status === "rejected").length + expenseReqs.filter(e => e.status === "rejected").length,
+    approved: approvals.filter(a => a.status === "approved").length + expenseReqs.filter(e => e.status === "approved").length + stockReqs.filter(s => s.status === "approved").length,
+    rejected: approvals.filter(a => a.status === "rejected").length + expenseReqs.filter(e => e.status === "rejected").length + stockReqs.filter(s => s.status === "rejected").length,
   };
 
   const decide = async (row, decision) => {

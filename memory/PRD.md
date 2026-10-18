@@ -1265,3 +1265,14 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Espace cliente : échouées dans Annulées, attente d'acompte/prêtes dans En cours, acompte payé + reste à payer.
 - Tests : iteration_94/95 + pytest e2e 47/47 ; données TEST nettoyées.
 
+
+## 2026-10-18 — Parrainage, codes promo, fiches colis, scan, baguette IA, approbations
+- Aperçu du lien de parrainage : og:url = lien partagé, image 1200×630 générée (photo produit + nom boutique + offre + code) /api/public/share/invitation/{code}/image.jpg, pas de redirection pour les robots, GET+HEAD.
+- Codes promo / bons d'achat (routers/coupons.py) : vérification, liste des codes utilisables, application côté serveur (la remise envoyée par le navigateur est ignorée sur le site), utilisation atomique ; CouponPicker au paiement du site et en caisse, ligne « Réduction · CODE » ; porte-monnaie en caisse (wallet_use).
+- Fiche commande : badge de statut large sur fond coloré.
+- Fiches colis : lib/printFiches.js, 4 par A4, iframe dédiée, @page margin 0 (sans menu, titre, URL ni date) ; utilisé par Commandes, fiche commande, Préparation, Fiches colis (A4).
+- Scan QR : lib/scanOnce.js (un code lu une fois tant qu'il reste devant la caméra), bip + vibration, message unique.
+- Baguette magique IA (Gemini Nano Banana gemini-3.1-flash-image-preview, clé Emergent) : /api/products/ai/analyze et /generate ; visuels IA dans product.ai_images (badge IA console + boutique), photo principale inchangée.
+- Approbations : ApprovalReview (détail, avant/après stock, valider avec résumé, refus avec motif obligatoire), motif obligatoire côté serveur, notification au demandeur ; aussi dans Stock › Demandes.
+- Tests iteration_96 : backend 20/22 (2 échecs = données FLASH20/LIVRAISON sans montant minimum), frontend ~95 % ; corrections ensuite (marqueur IA boutique, compteurs, canaux/types non gérés, HEAD, décision validée).
+

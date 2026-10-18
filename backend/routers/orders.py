@@ -46,12 +46,13 @@ async def create_order(body: OrderIn, user: dict = Depends(get_user)):
     sub = sum(it.qty * it.price for it in body.items)
     from routers.coupons import resolve as _coupon, redeem as _redeem
     cid = (body.customer or {}).get("id")
-    coupon = await _coupon(body.coupon_code, sub, body.delivery_fee, cid) if body.coupon_code else None
+    coupon = await _coupon(body.coupon_code, sub, body.delivery_fee, cid, "pos") if body.coupon_code else None
     if coupon:
         body.discount += int(coupon["discount"])
     wallet_used = 0
     code = gen_code()
     oid = new_id()
+    await _redeem(coupon, code)
     if cid and body.wallet_use > 0:
         from routers.wallet import debit_for_order
         wallet_used = await debit_for_order(cid, int(body.wallet_use), max(0, sub - body.discount), oid, code)
@@ -86,7 +87,6 @@ async def create_order(body: OrderIn, user: dict = Depends(get_user)):
         )
         doc["points_awarded"] = True
     await db.orders.insert_one(doc)
-    await _redeem(coupon, doc["code"])
     return clean(doc)
 
 

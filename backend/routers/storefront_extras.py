@@ -131,7 +131,7 @@ def _render_og(d: Dict[str, Any], code: str, raw: bytes) -> bytes:
     return buf.getvalue()
 
 
-@router.get("/public/share/invitation/{code}/image.jpg")
+@router.api_route("/public/share/invitation/{code}/image.jpg", methods=["GET", "HEAD"])
 async def share_invitation_image(code: str, request: Request):
     from fastapi.responses import Response as R
     d = await _invite_data(code, request)
@@ -154,7 +154,7 @@ async def share_invitation_image(code: str, request: Request):
     return R(content=hit, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
 
 
-@router.get("/public/share/invitation/{code}", response_class=HTMLResponse)
+@router.api_route("/public/share/invitation/{code}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 async def share_invitation(code: str, request: Request):
     d = await _invite_data(code, request)
     name, origin = d["name"], d["origin"]

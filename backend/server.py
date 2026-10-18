@@ -1623,6 +1623,7 @@ async def stock_adj_decide(aid: str, body: Dict[str,Any], user: dict = Depends(r
     if not doc: raise HTTPException(404)
     if doc.get("status") != "pending": raise HTTPException(400, "Déjà traité")
     decision = body.get("decision")  # "approve" | "reject"
+    if decision not in ("approve", "reject"): raise HTTPException(400, "Décision invalide")
     note = body.get("note", "")
     _need_reason(decision, note)
     if decision == "approve":
@@ -3937,7 +3938,7 @@ async def public_create_order(body: OrderIn, request: Request):
     sub = sum(it.qty * it.price for it in body.items)
     # Discount comes only from a valid coupon (never trusted from the browser)
     from routers.coupons import resolve as _coupon, redeem as _redeem
-    coupon = await _coupon(body.coupon_code, sub, body.delivery_fee, (logged or {}).get("id")) if body.coupon_code else None
+    coupon = await _coupon(body.coupon_code, sub, body.delivery_fee, (logged or {}).get("id"), "boutique") if body.coupon_code else None
     body.discount = int(coupon["discount"]) if coupon else 0
     total = sub + body.delivery_fee - body.discount
     code = gen_code()
@@ -3945,6 +3946,7 @@ async def public_create_order(body: OrderIn, request: Request):
         dup = await db.orders.find_one({"checkout_key": body.checkout_key})
         if dup:
             return {"code": dup["code"], "id": dup["id"], "status": dup["status"], "deposit_required": dup.get("deposit_required", 0), "wallet_used": dup.get("wallet_used", 0), "total": dup.get("total")}
+    await _redeem(coupon, code)
     oid = new_id()
     wallet_used = 0
     if logged and body.wallet_use > 0:
@@ -3994,7 +3996,6 @@ async def public_create_order(body: OrderIn, request: Request):
         await _record_stock_mov(it.product_id, it.size, -it.qty, "Commande en ligne", body.customer.get("name") if body.customer else None, code)
     if body.customer and body.customer.get("id"):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}})
-    await _redeem(coupon, code)
     from routers.notify import notify_staff
     await notify_staff("Nouvelle commande en ligne", f"{code} · {(body.customer or {}).get('name') or ''} · {int(total)} FCFA", f"/console/commandes/{code}")
     return {"code": code, "id": doc["id"], "status": initial_status, "deposit_required": deposit_amount, "wallet_used": wallet_used, "total": total}
@@ -5321,7 +5322,7 @@ async def decide_approval(aid: str, body: Dict[str,Any], user: dict = Depends(re
     if prev.get("status") != "pending": raise HTTPException(400, "Déjà traitée")
     await db.approval_requests.update_one({"id": aid}, {"$set": {"status": decision, "decision_at": now_iso(), "decision_by": user.get("name"), "decision_note": body.get("note","")}})
     r = await db.approval_requests.find_one({"id": aid})
-    await _decision_done(r.get("requested_by_id") or r.get("requested_by"), r.get("kind") or "", decision, body.get("note", ""), user)
+    await _decision_done(r.get("requested_by_id"), r.get("kind") or "", decision, body.get("note", ""), user)
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":f"approval.{decision}","entity_id":aid,"after":{"kind":r.get("kind")},"at":now_iso()})
     return clean(r)
 
