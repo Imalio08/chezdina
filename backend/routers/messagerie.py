@@ -55,27 +55,7 @@ async def send_message_core(body: Dict[str, Any], user: dict) -> Dict[str, Any]:
     parts.append(f"s:{user['id']}")
     key = _conv_key(parts)
     conv = existing or await db.conversations.find_one({"key": key})
-    allowed_types = {"image", "video", "audio", "file"}
-    safe_attachments: List[Dict[str, Any]] = []
-    for a in (body.get("attachments") or [])[:10]:
-        if not isinstance(a, dict):
-            continue
-        t = a.get("type")
-        u = str(a.get("url") or "")
-        if t not in allowed_types:
-            continue
-        if not (
-            u.startswith("http://") or u.startswith("https://")
-            or u.startswith("data:image/") or u.startswith("data:video/")
-            or u.startswith("data:audio/") or u.startswith("data:application/pdf")
-        ):
-            continue
-        safe_attachments.append({
-            "type": t, "url": u,
-            "name": str(a.get("name") or "fichier")[:200],
-            "size": int(a.get("size") or 0),
-            "mime": str(a.get("mime") or "")[:80],
-        })
+    safe_attachments = _image_attachments(body.get("attachments"))
     msg = {
         "id": new_id(), "at": now_iso(),
         "from_id": user["id"], "from_name": user.get("name"), "from_kind": "store",
@@ -320,8 +300,15 @@ def _image_attachments(raw) -> List[Dict[str, Any]]:
         u = str(a.get("url") or "")
         if t in _ATT_TYPES and len(u) <= 9_500_000 and (u.startswith(_ATT_TYPES[t]) or u.startswith("https://")):
             out.append({"type": t, "url": u, "name": str(a.get("name") or ("photo.jpg" if t == "image" else "fichier"))[:120],
-                        "mime": str(a.get("mime") or ("image/jpeg" if t == "image" else ""))[:80], "size": int(a.get("size") or 0)})
+                        "mime": str(a.get("mime") or ("image/jpeg" if t == "image" else ""))[:80], "size": _safe_int(a.get("size"))})
     return out
+
+
+def _safe_int(v) -> int:
+    try:
+        return max(0, int(v or 0))
+    except (TypeError, ValueError):
+        return 0
 
 
 # ---------- Customer-side send ----------

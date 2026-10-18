@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "@/lib/api";
-import { RichComposer, RichText, plainPreview } from "@/components/shared/RichComposer";
+import { RichComposer, RichText, plainPreview, AttachmentsView } from "@/components/shared/RichComposer";
 import { dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import {
@@ -19,18 +19,7 @@ function MessageBubble({ m, isMe, onReact }) {
           <div className={`text-[10px] mb-1 ${isMe ? "opacity-80" : "text-[#666]"}`}>{m.from_name} · {dateTimeFmt(m.at)}</div>
           {m.text && <RichText text={m.text} className="text-sm leading-snug"/>}
           {m.image && <img src={m.image} alt="" className="mt-1 rounded max-h-48 object-contain" />}
-          {(m.attachments || []).map((a, i) => (
-            <div key={i} className="mt-1.5">
-              {a.type === "image" && <img src={a.url} alt={a.name} className="rounded max-h-48 object-contain"/>}
-              {a.type === "video" && <video src={a.url} controls className="rounded max-h-48 w-full"/>}
-              {a.type === "audio" && <audio src={a.url} controls className="w-full"/>}
-              {a.type === "file" && (
-                <a href={a.url} target="_blank" rel="noreferrer" download={a.name} className={`inline-flex items-center gap-2 text-xs underline ${isMe ? "text-white" : "text-[#5867fd]"}`}>
-                  <FileIcon size={12}/>{a.name || "fichier"} ({a.size ? `${Math.round(a.size / 1024)} ko` : "—"})<Download size={11}/>
-                </a>
-              )}
-            </div>
-          ))}
+          <div className="mt-1.5"><AttachmentsView items={m.attachments || []} onOpen={(u) => window.open(u, "_blank")} light={isMe}/></div>
           {Object.keys(reactions).length > 0 && (
             <div className="flex flex-wrap gap-1 mt-1.5">
               {Object.entries(reactions).map(([e, uids]) => (

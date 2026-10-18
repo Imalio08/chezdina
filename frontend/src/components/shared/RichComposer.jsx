@@ -31,11 +31,11 @@ const inline = (s) => s
   .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
   .replace(/\*(.+?)\*/g, "<em>$1</em>")
   .replace(/~~(.+?)~~/g, "<s>$1</s>")
-  .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" class="underline">$1</a>')
-  .replace(/(^|\s)(https?:\/\/[^\s<]+)/g, '$1<a href="$2" target="_blank" rel="noreferrer" class="underline">$2</a>');
+  .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)"'<>]+)\)/g, '<a href="$2" target="_blank" rel="noreferrer" class="underline">$1</a>')
+  .replace(/(^|\s)(https?:\/\/[^\s<"'>&]+)/g, '$1<a href="$2" target="_blank" rel="noreferrer" class="underline">$2</a>');
 
 export function renderMarkdown(text = "") {
-  const esc = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const out = []; let list = null;
   const close = () => { if (list) { out.push(`</${list}>`); list = null; } };
   esc.split("\n").forEach(line => {

@@ -1241,3 +1241,14 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 
 
 
+
+## 2026-10-18 — Textes, retour, popups, éditeur unique, PWA console
+- Textes techniques remplacés (Promotions, Paramètres, Intégrations, Apparence, Vitrine, App livreur, Préparation, Statistiques, Horaires).
+- Retour : goBack() sur fiches commande/produit/cliente/livreur ; filtres gardés (useKeptState, sessionStorage) sur Commandes, Produits, Clientes, Stock, Jours de livraison, Avis ; détails internes en ?voir= (Fournisseurs, Bons de commande, Segments, Campagnes, Marques) ; scroll restauré au retour (ScrollToTop).
+- Popups : PopupGuard global (Échap + clic extérieur via le bouton Fermer/X/Annuler) ; croix sur la popup d'acompte du paiement.
+- RichComposer unique (gras, italique, barré, listes, liens, emojis, pièces jointes images/vidéos/fichiers ≤5 Mo) : messagerie console + diffusion, fil commande, app livreur, espace cliente, campagnes, relances paniers, liste d'attente. Rendu RichText avec échappement des guillemets (anti-XSS). WhatsApp : conversion **gras**→*gras* dans _url_quote.
+- PWA : manifest-console « Console » (scope /console), « Livreur », « Chez Dina » ; launch_handler/handle_links ; bouton Installer dans l'en-tête console (+ guide iPhone/iPad/Mac Safari).
+- Liens clientes signés (?cl=, 30 j) : suivi, avis, panier partagé, partage commande → POST /api/public/account/link-login connecte la cliente.
+- Tests iteration_93 : backend 12/12 après corrections (XSS, fichiers docx/txt console, taille non numérique).
+- Reste : page WhatsAppCampaigns non routée (fusionnée dans Campagnes) ; pièces jointes non envoyables par WhatsApp (wa.me).
+

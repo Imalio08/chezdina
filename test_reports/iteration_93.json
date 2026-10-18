@@ -1,0 +1,62 @@
+{
+  "summary": "Iteration 93: tested PWA manifests, customer sign-in links (?cl=), attachments on all send endpoints, the shared RichComposer (console Messagerie, customer space, rider app, order thread, campaigns, broadcast), PopupGuard (Escape and backdrop), detail-back with kept filters/scroll, ?voir= inline details, document titles, and the Promotions subtitle. Backend: 10/12 pytest pass, 2 real bugs. Frontend: most features work. Found 1 CRITICAL XSS in renderMarkdown and 1 back-button trap on CustomerDetail (fixed by me). Scroll restore after going back is flaky. The WhatsApp campaign composer cannot be reached.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/messages/send (send_message_core, messagerie.py ~L58-78)", "issue": "Console file filter only accepts data:application/pdf. The composer accepts .doc/.docx/.xls/.xlsx/.txt, but these are silently dropped (test_console_docx_txt: kept=[]). The rider and customer endpoints (_image_attachments) do accept data:application/* and data:text/*. There are 2 copies of the validation logic (DRY): send_message_core should reuse _image_attachments."},
+      {"endpoint": "POST /api/messages/send, /public/account/messages/send, /rider/conversations/{id}/send, /orders/{oid}/thread/{party}/send", "issue": "int(a.get('size') or 0) returns 500 when size is not numeric (e.g. 'big'). Use a safe int conversion."},
+      {"endpoint": "POST /api/messages/send", "issue": "body.image is stored without validation. There is also no URL-length cap, unlike _image_attachments (9.5 MB)."},
+      {"endpoint": "manifest.webmanifest", "issue": "Storefront scope '/' contains /console and /riders. On Android, staff links can be captured by the 'Chez Dina' app when Console/Livreur is not installed. Rider manifest id '/rider' vs start_url/scope '/riders' (cosmetic)."},
+      {"endpoint": "CORS", "issue": "access-control-allow-origin: * on /api/auth/login (no explicit origins + credentials). This predates this iteration."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RichComposer.renderMarkdown / RichText (components/shared/RichComposer.jsx)", "issue": "CRITICAL stored XSS. Text is escaped only for & < >, and the link regexes ([t](https?://[^\\s)]+) and auto-link https?://[^\\s<]+) let a double quote through into href=\"...\". A customer message such as `https://x.test/\"data-xss=\"1` or `[lien](https://y.test/\"onmouseover=\"alert`1`)` injects attributes into <a>. Verified: a[data-xss] is rendered in BOTH the customer space and the console Messagerie, so a customer can run JS in a staff session. Fix: also escape \" and ' (to &quot; and &#39;) in esc(), and/or exclude quotes from the URL regex: [^\\s)\"'<>]+.", "selector": "[data-testid=msg-thread] a", "priority": "CRITICAL"},
+      {"component": "CustomerDetail back (FIXED by testing agent)", "issue": "useEffect(() => setParams({tab}), [tab]) pushed a new history entry on mount (/clients/ID to /clients/ID?tab=overview). detail-back (nav(-1)) and the browser back button therefore landed on /clients/ID, which pushed ?tab again, so the user was stuck on the detail page. Changed to setParams({tab}, {replace:true}). After the fix, back returns to /console/clients with the 'Actives' tab kept.", "selector": "[data-testid=detail-back]", "priority": "HIGH"},
+      {"component": "ScrollToTop (App.js) scroll restoration", "issue": "Flaky. Products: back via detail-back restored scrollY 900 once, then returned to 0 on a second round (1800 to 0) and in another run (629 to 0, q='escarpin' kept). Customers: 1500 to 0 via detail-back, 1500 to 1341 via browser back. Likely RCA: the scroll listener writes scrollMemo[keyRef.current], but keyRef is only updated in a passive useEffect. When the list unmounts, the shorter detail page triggers a clamp scroll event (scrollY 0) before the effect runs, which overwrites the list's saved position. Also the restore loop gives up after 2 s if the list loads slowly. Fix: in the listener use scrollMemo[window.history.state?.key] (React Router updates it synchronously), or save scroll in useLayoutEffect cleanup, and keep retrying until the content height is enough.", "selector": "window.scrollY after [data-testid=detail-back]", "priority": "MEDIUM"},
+      {"component": "AccountShell messages", "issue": "data-testid collision: the thread container is data-testid='msg-list' and the composer's bullet-list button is also 'msg-list' (testid='msg' + '-list'). Rename the container (e.g. 'msg-thread-list').", "selector": "[data-testid=msg-list]", "priority": "LOW"},
+      {"component": "WhatsAppCampaigns.jsx", "issue": "Imported in App.js but never routed. /console/campagnes-whatsapp renders Campagnes, so the 'wa-message' RichComposer cannot be reached. The campagnes routes are also declared twice in App.js (lines ~281-282 and ~298-299).", "selector": "[data-testid^=wa-message-]", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Console Messagerie bubble", "issues": ["The console MessageBubble renders attachments with its own code (no thread-photo testid, no lightbox) instead of the shared AttachmentsView. The same attachment looks different in the console, customer space and rider app."]}
+    ]
+  },
+  "passed_checks": [
+    "Manifests: console name/short_name 'Console' scope '/console'; rider 'Livreur' start '/riders'; storefront short_name 'Chez Dina'; all include launch_handler + handle_links",
+    "link-login: bad token 401, staff JWT 401, shared-cart link contains ?cl=, exchanging it returns {customer, token} + customer_token cookie, no password_hash; share/order link '/suivi/CODE?cl=' exchanges for the order's customer; shared cart without customer gives no cl",
+    "Attachments image/video/pdf kept on console, customer and rider send endpoints; invalid types and javascript: URLs dropped; attachment-only send OK; invalid-only send gives 400 (customer)",
+    "Storefront /?cl= and /suivi/CODE?cl= log the customer in (localStorage dina_customer) and remove cl from the URL",
+    "RichComposer toolbar testids exist for msg (console + customer), rider-msg, thread-composer-customer, camp-text, broadcast-text; bold wraps the selection, olist/italic insert; emoji picker inserts; image attach shows a chip and sends; bold and list render as <strong>/<li> in bubbles",
+    "Desktop Enter sends; with matchMedia pointer:coarse emulated, Enter inserts a newline",
+    "Escape and backdrop close: console broadcast modal, campaign modal, POS 'Ouvrir une session' modal, storefront quick-add popup. Checkout deposit-modal-close exists in code (aria-label Fermer, navigates to /suivi/CODE); not run end-to-end to avoid creating a real order",
+    "detail-back: Customers tab kept (after fix), Products search q kept via sessionStorage, Orders filters persisted in kept:orders-filters",
+    "Suppliers ?voir=id: browser back returns to the list; in-page Retour without history replaces the URL",
+    "document.title 'Console' on /console, 'Livreur' on /riders; correct manifest link swapped; install button absent in headless with no crash",
+    "/promotions subtitle no longer contains 'prix barré et badge de réduction' (now 'Tous les produits en promotion')",
+    "Admin bcrypt hash starts with $2b$; httpOnly access_token cookie set on login"
+  ],
+  "test_report_links": ["/app/backend/tests/test_iter93_pwa_links_attachments.py", "/app/backend/tests/ui_seed_iter93.py", "/app/test_reports/pytest/iter93.xml"],
+  "action_items": [
+    "CRITICAL: fix the XSS in renderMarkdown (escape quotes and restrict URL chars) in components/shared/RichComposer.jsx",
+    "Console send_message_core: reuse _image_attachments so .docx/.xlsx/.txt files are kept",
+    "Safe int() for attachment size on all send endpoints (currently 500)",
+    "Make ScrollToTop restoration reliable (key from history.state, longer/height-aware retry)",
+    "Rename the AccountShell 'msg-list' container testid; route or remove WhatsAppCampaigns; remove the duplicate campagnes routes",
+    "Optional: use the shared AttachmentsView in the console MessageBubble"
+  ],
+  "critical_code_review_comments": [
+    "renderMarkdown injects into dangerouslySetInnerHTML with partial escaping, which is stored XSS from customer to staff",
+    "Two attachment validators exist with different rules (send_message_core vs _image_attachments)",
+    "CustomerContext cl handling uses window.history.replaceState, so React Router's location/searchParams still contain cl until the next navigation. Harmless now, but any useSearchParams reader on the landing page will still see cl",
+    "customer_link tokens are valid 30 days, cannot be revoked, and give full account access to anyone the WhatsApp link is forwarded to. Consider a shorter TTL or single-use tokens"
+  ],
+  "updated_files": ["/app/frontend/src/pages/console/CustomerDetail.jsx (setParams replace:true)", "/app/backend/tests/test_iter93_pwa_links_attachments.py", "/app/backend/tests/ui_seed_iter93.py"],
+  "success_rate": {"backend": "83% (10/12)", "frontend": "~85%"},
+  "seed_data_creation": "Created TEST_Iter93 / TEST_Iter93UI customers, their conversations, 3 shared carts and rider TEST_ messages. All deleted or pulled afterwards (0 TEST_Iter93 customers left).",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Console login UI: page.locator('input').nth(0/1) + button 'Se connecter'. POS is /console/pos (needs an open cash session for the toolbar). Rider login: button 'Se connecter avec e-mail et mot de passe' then rider-login-email. ui_seed_iter93.py creates a TEST customer + cl token + XSS probe message (run 'cleanup <cid>' afterwards). Retest: XSS (a[data-xss] must be 0), console docx/txt attachments, size='big' must not return 500, scroll restoration after detail-back.",
+  "rca of the issue": "Back trap: CustomerDetail pushed ?tab on mount (no replace), so back returned to an entry that re-pushed it. XSS: esc() leaves \" unescaped and the URL regex char classes allow \", so href breaks out. Scroll: memo key updated in a passive effect, after the clamp scroll event."
+}

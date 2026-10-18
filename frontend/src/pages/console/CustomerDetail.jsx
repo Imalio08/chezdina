@@ -54,7 +54,7 @@ export default function CustomerDetail() {
 
   const load = () => api.get(`/customers/${id}`).then(r => setData(r.data));
   useEffect(() => { load(); }, [id]);
-  useEffect(() => { setParams({ tab }); }, [tab]);
+  useEffect(() => { setParams({ tab }, { replace: true }); }, [tab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!data) return <div className="text-center py-12 text-sm text-[#666]">Chargement…</div>;
   const { customer: c, orders, metrics } = data;

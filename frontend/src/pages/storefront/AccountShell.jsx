@@ -748,7 +748,7 @@ function MessagesPage() {
         {id && <button onClick={() => nav("/compte/messages")} className="md:hidden text-xs text-[#666] flex items-center gap-1 mb-2" data-testid="msg-back"><ArrowLeft size={12}/>Conversations</button>}
         {!active ? <div className="m-auto text-sm text-[#666]">Sélectionnez une conversation</div> : (
           <>
-            <div ref={listRef} className="flex-1 overflow-y-auto space-y-2 py-2 max-h-[55vh] md:max-h-[60vh]" data-testid="msg-list">
+            <div ref={listRef} className="flex-1 overflow-y-auto space-y-2 py-2 max-h-[55vh] md:max-h-[60vh]" data-testid="msg-thread-list">
               {(active.messages || []).map((m, i) => {
                 const mine = m.from_id === customer.id;
                 return <div key={i} className={`flex ${mine ? "justify-end" : "justify-start"}`}><div className={`${mine ? "bg-[#b02a2a] text-white" : "bg-[#f5f5f5]"} rounded-xl px-3 py-2 max-w-[80%]`}><MessagePhotos m={m} onOpen={setZoom} light={mine}/>{m.text && <RichText text={m.text} className="text-sm"/>}<div className={`text-[10px] mt-1 ${mine ? "text-white/70" : "text-[#999]"}`}>{m.from_name && !mine ? `${m.from_name} · ` : ""}{dateFmt(m.at)}</div></div></div>;

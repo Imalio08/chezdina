@@ -153,7 +153,8 @@ function ScrollToTop() {
   const type = useNavigationType();
   const keyRef = React.useRef(key);
   useEffect(() => {
-    const f = () => { scrollMemo[keyRef.current] = window.scrollY; };
+    if ("scrollRestoration" in window.history) window.history.scrollRestoration = "manual";
+    const f = () => { const k = window.history.state?.key; if (k) scrollMemo[k] = window.scrollY; };
     window.addEventListener("scroll", f, { passive: true });
     return () => window.removeEventListener("scroll", f);
   }, []);
@@ -162,7 +163,7 @@ function ScrollToTop() {
     if (type === "POP" && scrollMemo[key] != null) {
       const y = scrollMemo[key];
       let n = 0;
-      const t = setInterval(() => { window.scrollTo(0, y); if (Math.abs(window.scrollY - y) < 2 || ++n > 20) clearInterval(t); }, 100);
+      const t = setInterval(() => { if (document.documentElement.scrollHeight >= y + window.innerHeight - 2) window.scrollTo(0, y); if (Math.abs(window.scrollY - y) < 2 || ++n > 60) clearInterval(t); }, 100);
       return () => clearInterval(t);
     }
     window.scrollTo(0, 0);
