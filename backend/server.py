@@ -4221,7 +4221,7 @@ async def _ai_tool_stock_alerts() -> str:
     if len(low) > 10: lines.append(f"… et {len(low)-10} autres")
     return "\n".join(lines)
 
-async def _ai_tool_inactive_customers(days: int = 30) -> str:
+async def _ai_tool_inactive_customers(days: int = 30, owner: bool = False) -> str:
     from datetime import datetime, timedelta, timezone
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     recent_orders = await db.orders.find({"created_at": {"$gte": cutoff}}).to_list(5000)
@@ -4230,7 +4230,7 @@ async def _ai_tool_inactive_customers(days: int = 30) -> str:
     inactive = [c for c in all_customers if c["id"] not in active_ids and c.get("total_spent",0) > 0]
     if not inactive: return "Aucune cliente inactive avec historique."
     inactive.sort(key=lambda c:-c.get("total_spent",0))
-    lines = [f"**{len(inactive)} clientes inactives** (>{days}j sans commande) :"] + [f"• {c['name']} · {c.get('phone','')} · {c.get('total_spent',0):,.0f} FCFA cumulés".replace(",", " ") for c in inactive[:8]]
+    lines = [f"**{len(inactive)} clientes inactives** (>{days}j sans commande) :"] + [f"• {c['name']} · {c.get('phone','') if owner else mask_phone(c.get('phone'))} · {c.get('total_spent',0):,.0f} FCFA cumulés".replace(",", " ") for c in inactive[:8]]
     return "\n".join(lines)
 
 async def _ai_tool_rider_perf(period_days: int = 30) -> str:
@@ -4343,7 +4343,7 @@ async def ask_dina(body: AskIn, user: dict = Depends(get_user)):
             return {"answer": await _ai_tool_sales(days), "source": "tool:sales"}
         if tool == "top": return {"answer": await _ai_tool_top_products(), "source": "tool:top_products"}
         if tool == "stock": return {"answer": await _ai_tool_stock_alerts(), "source": "tool:stock_alerts"}
-        if tool == "inactive": return {"answer": await _ai_tool_inactive_customers(), "source": "tool:inactive_customers"}
+        if tool == "inactive": return {"answer": await _ai_tool_inactive_customers(owner=user.get("role") == "admin"), "source": "tool:inactive_customers"}
         if tool == "rider": return {"answer": await _ai_tool_rider_perf(), "source": "tool:rider_perf"}
         if tool == "summary": return {"answer": await _ai_tool_daily_summary(user), "source": "tool:summary"}
     except Exception:

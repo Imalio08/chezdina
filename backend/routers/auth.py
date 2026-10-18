@@ -65,9 +65,12 @@ async def login(body: LoginIn, request: Request, response: Response):
 
 @router.post("/auth/login-pin")
 async def login_pin(body: PinIn, request: Request, response: Response):
-    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[0].strip()
+    ip = (request.headers.get("x-forwarded-for") or (request.client.host if request.client else "")).split(",")[-1].strip()
     key = f"staff-pin:{ip}"
     await _throttle(key, request)
+    since = (datetime.now(timezone.utc) - timedelta(minutes=15)).isoformat()
+    if await db.login_attempts.count_documents({"identifier": {"$regex": "^staff-pin:"}, "at": {"$gt": since}}) >= 40:
+        raise HTTPException(429, "Trop d'essais · réessayez dans 15 minutes")
     async for u in db.users.find({"active": {"$ne": False}}):
         if verify_pw(body.pin.strip(), u.get("pin_hash", "")):
             await _staff_guard(u, request)

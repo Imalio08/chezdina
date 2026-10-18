@@ -1,0 +1,42 @@
+{
+  "summary": "Retest of iteration-98 fixes (customer-data protection + onboarding). Backend: new tests/test_privacy_fixes_iter99.py (29 tests) + regression test_privacy_onboarding.py + test_role_access_limited.py => 104/108 pass. All requested fixes verified: on every requested list the phone/customer_phone/to keys are masked for the manager and stay full for the admin; GET /api/customers/{id} shows the full number and is logged; staff phones (/api/users, /api/team) stay full; PATCH order/customer with a masked phone keeps the original; rider /api/notifications 403 and /api/me/notifications 200; staff email lockout gives 429 on the 9th try (8 x 401 first); a 12-month template gives expires_at exactly +1 year; manager regen-access-code is logged. 4 remaining leaks/bypasses were found (see below). Frontend: all 5 UI fixes verified, and both regression flows (TEST_UI sales sign flow, rider1 Appeler/Je suis arrivé) pass end to end.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/whatsapp-outbox (manager)", "issue": "`phone` is masked but `phone_digits` (e.g. 2250700000011) and the wa.me/<full number> links in the same rows are not. The full customer number is still readable. PHONE_KEYS in role_access.py does not include phone_digits, and wa links are inside URL strings.", "priority": "HIGH"},
+      {"endpoint": "GET /api/out-of-catalog (manager)", "issue": "Returns customer_phone in full (+2250700000002). The /api/out-of-catalog prefix is missing from PHONE_MASKED.", "priority": "HIGH"},
+      {"endpoint": "GET /api/notifications (manager)", "issue": "The free-text `msg` of the 'Alerte retour en stock' (waitlist) alert contains the full phone, e.g. 'Mules Raphia Naturel · taille 39 · +225 05 48 11 22 02'. The key-based masking does not cover message text.", "priority": "MEDIUM"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/auth/login-pin", "issue": "Lockout is keyed on the first X-Forwarded-For value, which the client controls. After 8 bad PINs from XFF=10.250.x.x the next try gets 429, but the same request with a different XFF header gets 401 again. Brute-forcing a 4-digit PIN is therefore unlimited. Fix: use the right-most (proxy-added) XFF entry, or add a global staff-pin cap like rider-login-pin has (40 per 15 min)."},
+      {"endpoint": "POST /api/auth/login", "issue": "Lockout is per email only, so anyone can lock the owner/admin out for 15 minutes with 8 bad tries. This is an accepted trade-off; consider adding an IP component or a CAPTCHA."},
+      {"endpoint": "server.py _ai_tool_inactive_customers", "issue": "Builds AI chat text with full customer phones (c.get('phone')). This bypasses the masking if a manager can use the AI assistant. Use mask_phone for non-admin users."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "/console/equipe Membres table", "issues": ["The table (display:block, overflow-x:auto) scrolls horizontally as intended. When scrolled, the action icons column draws past the end of the striped row background (row width 790 px vs content 832 px). Cosmetic only."]},
+      {"screen": "Login for an onboarding-pending punch-required user", "issues": ["Shows the toast 'pointez votre arrivée pour continuer' while the user is actually on the 'Documents à signer' gate. Message order is confusing; minor."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_privacy_fixes_iter99.py", "/app/backend/tests/probe_iter99_leaks.py", "/app/test_reports/pytest/pytest_iter99.xml"],
+  "action_items": [
+    "Mask or strip `phone_digits` and the wa.me links in /api/whatsapp-outbox for non-admin users (e.g. serve the link via a server-side redirect endpoint, or add phone_digits to PHONE_KEYS and rewrite wa links)",
+    "Add /api/out-of-catalog to PHONE_MASKED",
+    "Mask phones inside notification msg text (waitlist 'retour en stock' alert), or leave the phone out of that text",
+    "staff login-pin throttle: do not trust a client-supplied X-Forwarded-For first hop; add a global cap",
+    "Mask phones in the AI tool output (_ai_tool_inactive_customers) for non-admin users"
+  ],
+  "critical_code_review_comments": [
+    "role_access._mask_phones only masks values whose key is in PHONE_KEYS and that match PHONE_RE. Phones embedded in free text or URLs (msg, wa_link, message bodies) slip through. Consider a text-level regex pass for non-admin users on PHONE_MASKED paths.",
+    "PHONE_MASKED is an allow-list of prefixes, so any new customer-facing endpoint leaks by default. Consider deny-by-default (mask on every GET for non-admin users, except staff endpoints /api/users, /api/team, /api/customers/{id}).",
+    "OnboardingGate: the fix is correct. When the retry also fails, the error is shown again; that works."
+  ],
+  "updated_files": ["/app/backend/tests/test_privacy_fixes_iter99.py", "/app/backend/tests/probe_iter99_leaks.py"],
+  "success_rate": {"backend": "93% (104/108 incl. regression; all 4 failures are newly found leaks or bypasses, not regressions)", "frontend": "100% of requested checks"},
+  "seed_data_creation": "Everything was created with the TEST_ prefix and then deleted: customers, a test order, templates, rider/sales users, the ui_seed_onboarding users, login_attempts staff:test_* and staff-pin:*. Privacy settings were restored to defaults. Order cabc0bb8 (DN-260920-1032) was restored: contact_log=[], arrived_at unset, status en_livraison.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run serially: cd /app/backend && python -m pytest tests/test_privacy_fixes_iter99.py tests/test_privacy_onboarding.py -n0. Expected failures until fixed: test_manager_lists_masked[/api/out-of-catalog], test_pin_lockout_xff_spoof, test_outbox_no_full_digits_or_wa_links_for_manager, test_notifications_free_text_no_full_phone. Raw-text leak probe: python tests/probe_iter99_leaks.py. UI seed: python tests/ui_seed_onboarding.py (TEST_UI sales test_ui_sales@dinastore.ci / Test123! / PIN 8383); cleanup arg removes. Team table: the scroller is the <table> itself (display:block), not its parent div. The rider 'Je suis arrivé' click modifies order cabc0bb8; restore arrived_at/contact_log afterwards."
+}

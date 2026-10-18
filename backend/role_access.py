@@ -91,10 +91,13 @@ def api_allowed(role: str, method: str, path: str) -> bool:
 # Customer phones are masked for every non-owner on customer-facing lists; the full number only comes from GET /api/customers/{id} (logged).
 PHONE_MASKED = ("/api/customers", "/api/orders", "/api/deliveries", "/api/delivery-sessions", "/api/whatsapp-outbox", "/api/invoices",
                 "/api/reviews", "/api/abandoned-carts", "/api/waitlist", "/api/segments", "/api/loyalty", "/api/referrals", "/api/wallet",
-                "/api/notifications", "/api/messages", "/api/conversations", "/api/opportunit", "/api/search", "/api/dashboard", "/api/campaigns")
+                "/api/notifications", "/api/messages", "/api/conversations", "/api/opportunit", "/api/search", "/api/dashboard", "/api/campaigns",
+                "/api/out-of-catalog", "/api/me/notifications", "/api/ask", "/api/ai")
 CUSTOMER_RECORD = re.compile(r"^/api/customers/[^/]+$")
-PHONE_KEYS = {"phone", "customer_phone", "to", "to_phone", "whatsapp"}
+PHONE_KEYS = {"phone", "customer_phone", "to", "to_phone", "whatsapp", "phone_digits", "digits"}
 PHONE_RE = re.compile(r"^\+?[\d\s().-]{8,}$")
+# Phone numbers embedded in free text / wa.me links (8+ digits, optional +225 and spaces).
+PHONE_IN_TEXT = re.compile(r"(?<![\w/-])(?:\+?225[\s.]?)?0\d(?:[\s.]?\d{2}){4}(?!\d)|(?<=wa\.me/)\d{8,15}")
 
 
 def _mask_phones(obj: Any) -> Any:
@@ -103,6 +106,8 @@ def _mask_phones(obj: Any) -> Any:
         return {k: (mask_phone(v) if k in PHONE_KEYS and isinstance(v, str) and PHONE_RE.match(v) else _mask_phones(v)) for k, v in obj.items()}
     if isinstance(obj, list):
         return [_mask_phones(v) for v in obj]
+    if isinstance(obj, str) and sum(ch.isdigit() for ch in obj) >= 8:
+        return PHONE_IN_TEXT.sub(lambda m: mask_phone(m.group(0)) or "••", obj)
     return obj
 
 

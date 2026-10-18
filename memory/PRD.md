@@ -1276,3 +1276,23 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Approbations : ApprovalReview (détail, avant/après stock, valider avec résumé, refus avec motif obligatoire), motif obligatoire côté serveur, notification au demandeur ; aussi dans Stock › Demandes.
 - Tests iteration_96 : backend 20/22 (2 échecs = données FLASH20/LIVRAISON sans montant minimum), frontend ~95 % ; corrections ensuite (marqueur IA boutique, compteurs, canaux/types non gérés, HEAD, décision validée).
 
+
+## 2026-10-18 — Stock non vendable, caisse, rôles, Équipe, GPS, fermetures exceptionnelles
+- Matrice des droits enregistrable (bug « droits admin requis » corrigé) mais PAS encore appliquée (droits réels = role_access.py).
+- Rôles dynamiques (renommer/désactiver/réactiver), TeamHub Équipe, Stock › Non vendables, analyse de clôture de caisse à l'aveugle, GPS précis, fermetures exceptionnelles.
+- NON FAIT : planification/rappels d'inventaires, inventaire partiel, photo/commentaire par ligne, validation propriétaire des inventaires.
+
+## 2026-10-18 — Protection des données clientes + dossier d'onboarding
+- Livreur : WhatsApp supprimé ; « Appeler » via POST /api/riders/me/orders/{id}/call (course à lui, statut en_livraison, journalisé dans contact_log), « Je suis arrivé » (arrived_at) ; ne reçoit que prénom/quartier/repère/GPS ; refus 403 sur /api/orders/{id}, /api/deliveries, /api/customers, /api/notifications ; historique masqué (initiale) ; cache hors ligne effacé quand la journée est clôturée (day_closed).
+- Console : numéros masqués pour tout non-propriétaire (middleware role_access PHONE_MASKED, y compris texte libre et liens wa.me) ; numéro complet seulement sur GET /api/customers/{id}, journalisé (customer_access_log) + alerte propriétaire au-delà d'un seuil (privacy_alerts) ; exports Statistiques réservés au propriétaire ; Campagnes/Segments/diffusions réservés au propriétaire.
+- Accès (routers/privacy.py, Équipe › Sécurité & accès) : appareils autorisés (en-tête X-Device-Id, demandes en attente), horaires, rôles concernés — DÉSACTIVÉS par défaut, à activer par le propriétaire ; désactivation en un clic (session_version → toutes les sessions fermées).
+- Connexion du personnel limitée à 8 essais / 15 min (par email ; PIN par IP + plafond global de 40).
+- Onboarding (routers/onboarding.py) : modèles versionnés (Paramètres › Documents RH, 5 modèles de départ avec [à compléter par le propriétaire]), choix des documents à la création d'un employé, écran bloquant (code 423 + OnboardingGate) avec texte complet, case à cocher, signature dessinée + PIN, PDF signé (reportlab) avec date, appareil, IP et empreinte du texte ; scans papier ; nouvelle signature demandée après une nouvelle version ; statuts signé/en attente/expiré ; relances manuelles ; PV de départ signé + désactivation.
+- Tests : iteration_98 (17/17 + correction du blocage pointage/onboarding), iteration_99 (104/108 ; fuites restantes corrigées ensuite, vérifiées par curl).
+
+## Roadmap
+- P0 : appliquer la matrice des droits aux accès réels.
+- P1 : inventaires réguliers (planification, surprise, partiel, photos, validation propriétaire).
+- P1 : relances automatiques programmées des documents à signer et des documents expirés.
+- P2 : bouton « Effacer les données de ce téléphone » côté livreur.
+
