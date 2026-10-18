@@ -66,13 +66,26 @@ export default function Courses() {
   const show = (data) => { setD(data); setOpen(prev => prev ? ((data.orders || []).find(x => x.id === prev.id) || prev) : prev); };
   const load = () => fetchDay().then(r => show(r.data)).catch(() => toast.error("Courses indisponibles · connectez-vous une première fois à internet"));
   const fromCache = () => kvGet("today").then(x => x && show(x));
-  useEffect(() => { load(); const t = setInterval(load, 30000); window.addEventListener("rider-notifs-changed", load); window.addEventListener("rider-day-changed", fromCache); return () => { clearInterval(t); window.removeEventListener("rider-notifs-changed", load); window.removeEventListener("rider-day-changed", fromCache); }; }, []); // eslint-disable-line
+  useEffect(() => {
+    load(); const t = setInterval(load, 20000);
+    const onVis = () => { if (document.visibilityState === "visible") load(); };
+    window.addEventListener("rider-notifs-changed", load); window.addEventListener("rider-day-refresh", load); window.addEventListener("online", load);
+    document.addEventListener("visibilitychange", onVis); window.addEventListener("rider-day-changed", fromCache);
+    return () => { clearInterval(t); window.removeEventListener("rider-notifs-changed", load); window.removeEventListener("rider-day-refresh", load); window.removeEventListener("online", load); document.removeEventListener("visibilitychange", onVis); window.removeEventListener("rider-day-changed", fromCache); };
+  }, []); // eslint-disable-line
   const openCourse = (o) => { setOpen(o); api.post("/me/notifications/read", { ref: o.code }).then(r => { if (r.data?.updated) notifsChanged(); }).catch(() => {}); };
   useEffect(() => {
     if (!want || !d) return;
-    const o = (d.orders || []).find(x => x.code === want);
-    if (o) openCourse(o); else toast.error(`La course ${want} n'est plus dans votre liste`);
     sp.delete("course"); setSp(sp, { replace: true });
+    const o = (d.orders || []).find(x => x.code === want);
+    if (o) { openCourse(o); return; }
+    // Not in the current list (closed earlier, or list not refreshed yet): fetch it directly
+    fetchDay().then(r => {
+      show(r.data);
+      const f = (r.data.orders || []).find(x => x.code === want);
+      if (f) return openCourse(f);
+      return api.get(`/riders/me/orders/${want}`).then(x => openCourse({ ...x.data, readonly: true }));
+    }).catch(() => toast.error(`La course ${want} n'est plus attribuée à votre compte`));
   }, [want, d]); // eslint-disable-line
 
   const match = (o) => {
@@ -230,12 +243,12 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
             {order.delivery_fee > 0 && <div className="flex justify-between"><span className="text-[#666]">Livraison</span><span className="tabular">{fcfa(order.delivery_fee)}</span></div>}
             <div className="flex justify-between font-semibold text-base pt-1 border-t border-[#ececec]"><span>À encaisser</span><span className="tabular text-[#b02a2a]">{order.payment_method === "cod" ? fcfa(order.total) : payInfo(order).paid ? "0 (prépayée)" : payInfo(order).label}</span></div>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          {order.readonly ? <div className="text-xs text-center text-[#666] py-2" data-testid="order-readonly">Course {order.status === "reportee" ? "reportée et rendue à la boutique" : "clôturée"} · consultation seule</div> : <div className="grid grid-cols-2 gap-2">
             {["confirmee", "prete", "assignee"].includes(order.status) && <button onClick={() => onStatus(order.id, "en_livraison")} className="dina-btn-primary !min-h-[44px]" data-testid="status-en-route">Je démarre</button>}
             {order.status === "en_livraison" && <button onClick={() => onDeliver(order)} className="dina-btn-primary !min-h-[44px]" data-testid="rider-delivered">Livrée</button>}
             {order.status !== "livree" && <button onClick={() => setFail(true)} className="dina-btn-secondary !min-h-[44px] text-xs" style={{ color: "#c62828" }} data-testid="status-fail">Échec</button>}
             {order.status !== "livree" && <button onClick={() => setPostpone(true)} className="dina-btn-secondary !min-h-[44px] text-xs" data-testid="status-reschedule">Reporter</button>}
-          </div>
+          </div>}
           {postpone && <PostponeForm onCancel={() => setPostpone(false)} onConfirm={(date, reason) => onStatus(order.id, "reportee", reason || "Reportée", date)}/>}
           {fail && <FailForm order={order} onCancel={() => setFail(false)} onStatus={onStatus}/>}
           <button onClick={() => setChat(c => !c)} className="dina-btn-secondary w-full !min-h-[44px] text-xs" data-testid="rider-msg-store"><MessageCircle size={14}/>{chat ? "Masquer les messages" : "Message boutique"}</button>

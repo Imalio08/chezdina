@@ -51,6 +51,7 @@ export default function RiderShell() {
         if (seenNotifs.current) {
           const fresh = items.filter(x => !x.read && !seenNotifs.current.has(x.id));
           if (fresh.length) playChime(fresh.some(x => x.type !== "message") ? "order" : "message");
+          if (fresh.some(x => x.type !== "message")) window.dispatchEvent(new Event("rider-day-refresh"));
           fresh.slice(0, 3).forEach(x => toast(x.title, { id: x.id, description: x.msg, action: x.link ? { label: "Ouvrir", onClick: () => openNotif(x) } : undefined }));
           if (fresh.length > 3) toast(`${fresh.length - 3} autre(s) notification(s)`, { action: { label: "Voir", onClick: () => nav("/riders/notifications") } });
         }

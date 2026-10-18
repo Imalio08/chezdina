@@ -713,6 +713,11 @@ def _url_quote(s: str) -> str:
 def order_transition_guard(o: Dict[str, Any], new_status: str, user: dict) -> None:
     """Shared rules: only gérante/owner confirm; deposit must be received; limited roles only prepare."""
     role = user.get("role")
+    if role == "rider":
+        if o.get("rider_id") != user.get("id"):
+            raise HTTPException(403, "Cette course n'est pas attribuée à votre compte")
+        if new_status not in ("en_livraison", "livree", "reportee", "echouee", "annulee", "retournee", "refusee"):
+            raise HTTPException(403, "Statut non autorisé pour un livreur")
     if role in ("stock_keeper", "sales", "community_manager") and new_status not in ("en_preparation", "prete"):
         raise HTTPException(403, "Votre rôle peut seulement passer une commande en préparation ou prête")
     if new_status == "confirmee" and o.get("status") in ("nouvelle", "en_attente_acompte"):
@@ -756,7 +761,8 @@ async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get
         if o.get("session_id"):
             await db.delivery_sessions.update_one({"id": o["session_id"]}, {"$set": {f"postponed.{oid}": {
                 "to": body.next_date, "at": now_iso(), "by": user.get("name"), "reason": body.reason or ""}}})
-        upd.update({"status": "confirmee", "rider_id": None, "rider_name": None, "session_id": None})
+        upd.update({"status": "confirmee", "rider_id": None, "rider_name": None, "session_id": None,
+                    "postponed_rider_id": o.get("rider_id"), "postponed_at": now_iso()})
     # When status becomes "en_livraison" (En route), generate delivery_code and enqueue WA
     if body.status == "en_livraison" and prev != "en_livraison" and not o.get("delivery_code"):
         phone = (o.get("customer") or {}).get("phone") or ""
@@ -793,6 +799,8 @@ async def deliver_order(oid: str, body: ProofIn, user: dict = Depends(get_user))
     if not o: raise HTTPException(404)
     if o.get("status") == "livree":
         raise HTTPException(400, "Déjà livrée")
+    if user.get("role") == "rider" and o.get("rider_id") != user.get("id"):
+        raise HTTPException(403, "Cette course n'est pas attribuée à votre compte")
     settings = await db.site_settings.find_one({"id":"main"}) or {}
     tpl = settings.get("delivery_templates") or {}
     threshold = int(tpl.get("proof_threshold", 50000))

@@ -238,12 +238,23 @@ async def rider_kpis(rid: str, user: dict = Depends(get_user)):
 # ---------- Rider self-service ----------
 @router.get("/riders/me/today")
 async def rider_today(user: dict = Depends(get_user)):
-    """Rider dashboard summary for today."""
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    orders = await db.orders.find({
-        "rider_id": user["id"],
-        "$or": [{"assigned_at": {"$gte": start}}, {"created_at": {"$gte": start}}],
-    }).to_list(500)
+    """Rider dashboard: every open course assigned to him (whatever the assignment day) + courses closed today (Africa/Abidjan)."""
+    from zoneinfo import ZoneInfo
+    now_local = datetime.now(ZoneInfo("Africa/Abidjan"))
+    today = now_local.date().isoformat()
+    start = now_local.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).isoformat()
+    sess_ids = [oid for s in await db.delivery_sessions.find({"rider_id": user["id"], "date": today}, {"orders": 1}).to_list(20) for oid in (s.get("orders") or [])]
+    orders = await db.orders.find({"$or": [
+        {"rider_id": user["id"], "status": {"$in": ["confirmee", "prete", "assignee", "en_livraison"]}},
+        {"rider_id": user["id"], "status": "reportee", "$or": [{"delivery_date": {"$lte": today}}, {"delivery_date": None}]},
+        {"rider_id": user["id"], "$or": [{"assigned_at": {"$gte": start}}, {"delivered_at": {"$gte": start}}, {"updated_at": {"$gte": start}}, {"timeline.at": {"$gte": start}}]},
+        {"id": {"$in": sess_ids}, "rider_id": user["id"]},
+    ]}).sort("assigned_at", 1).to_list(500)
+    # Courses he postponed today left his list (back to the store): keep them visible, read-only, as "Reportée"
+    for o in await db.orders.find({"postponed_rider_id": user["id"], "postponed_at": {"$gte": start}, "rider_id": {"$ne": user["id"]}}).to_list(100):
+        o["status"] = "reportee"
+        o["readonly"] = True
+        orders.append(o)
     to_collect = sum(o.get("total", 0) for o in orders if o.get("payment_method") == "cod" and o.get("status") not in ("livree", "annulee"))
     collected = 0
     for o in orders:
@@ -317,7 +328,7 @@ def _mask_customer(c: Optional[Dict[str, Any]]) -> Dict[str, Any]:
 
 @router.get("/riders/me/orders/{oid}")
 async def rider_order_detail(oid: str, user: dict = Depends(get_user)):
-    o = await db.orders.find_one({"id": oid, "rider_id": user["id"]})
+    o = await db.orders.find_one({"$or": [{"id": oid}, {"code": oid}], "$and": [{"$or": [{"rider_id": user["id"]}, {"postponed_rider_id": user["id"]}]}]})
     if not o:
         raise HTTPException(404, "Commande introuvable")
     proof = o.get("proof") or {}
@@ -412,7 +423,7 @@ async def assign_delivery(oid: str, body: AssignIn, user: dict = Depends(require
         raise HTTPException(404)
     tl = o.get("timeline", [])
     tl.append({"status": "assignee", "at": now_iso(), "by": user.get("name"), "note": f"→ {body.rider_name}"})
-    await db.orders.update_one({"id": oid}, {"$set": {"rider_id": body.rider_id, "rider_name": body.rider_name, "status": "assignee", "timeline": tl}})
+    await db.orders.update_one({"id": oid}, {"$set": {"rider_id": body.rider_id, "rider_name": body.rider_name, "status": "assignee", "assigned_at": now_iso(), "timeline": tl}})
     res = await _apply_slot(oid, body.rider_id, body.slot_id) if body.slot_id else {}
     from routers.notify import rider_assigned
     await rider_assigned(o, body.rider_id, o.get("rider_id"))
@@ -517,7 +528,7 @@ async def session_add_order(sid: str, body: Dict[str, Any], user: dict = Depends
     if oid not in orders:
         orders.append(oid)
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"orders": orders}})
-    await db.orders.update_one({"id": oid}, {"$set": {"rider_id": s["rider_id"], "rider_name": s["rider_name"], "status": "assignee", "session_id": sid, "delivery_date": s.get("date")},
+    await db.orders.update_one({"id": oid}, {"$set": {"rider_id": s["rider_id"], "rider_name": s["rider_name"], "status": "assignee", "assigned_at": now_iso(), "session_id": sid, "delivery_date": s.get("date")},
                                             "$push": {"timeline": {"status": "assignee", "at": now_iso(), "by": user.get("name"), "reason": f"Journée {s.get('date')} · {s['rider_name']}"}}})
     res = await _apply_slot(oid, s["rider_id"], body.get("slot_id")) if "slot_id" in body else {}
     o = await db.orders.find_one({"id": oid})
