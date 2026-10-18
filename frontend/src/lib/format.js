@@ -5,6 +5,8 @@ export const fcfa = (n) => {
   const v = Math.round(Number(n || 0));
   return v.toLocaleString("fr-FR").replace(/[\u202f\u00a0]/g, " ") + " FCFA";
 };
+// Cash the rider must collect: COD total minus the deposit already paid
+export const dueOf = (o) => o?.amount_due ?? (o?.payment_method === "cod" ? Math.max(0, (o.total || 0) - (o.deposit_paid || 0)) : 0);
 // Compact FCFA — "77,4 M FCFA" · "2,1 Md FCFA" · "12,5 k FCFA". Use full fcfa() for tooltip.
 export const fcfaCompact = (n) => {
   const raw = Number(n || 0);

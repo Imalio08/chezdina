@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "@/lib/api";
 import { useKeptState } from "@/lib/keptState";
-import { fcfa, statusLabel, statusColor, dateTimeFmt } from "@/lib/format";
+import { fcfa, statusLabel, statusColor, dateTimeFmt, dueOf } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Calendar, Package, DollarSign, AlertTriangle, CheckCircle2, Users, X, Printer, Map, Sparkles, UserPlus, FileText } from "lucide-react";
 import KPICard from "@/components/shared/KPICard";
@@ -321,8 +321,8 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
                   <td><OrderDayStatus order={o}/></td>
                   <td className="text-right tabular">{fcfa(o.subtotal||0)}</td>
                   <td className="text-right tabular">{fcfa(o.delivery_fee||0)}</td>
-                  <td className="text-right tabular text-[#1f8a4c]">{o.payment_status==="paye"?fcfa(o.total||0):"—"}</td>
-                  <td className={`text-right tabular ${o.postponed_to ? "line-through text-[#999]" : ""}`}>{fcfa(o.payment_method==="cod"?(o.total||0):0)}</td>
+                  <td className="text-right tabular text-[#1f8a4c]">{o.payment_method==="cod"?(o.deposit_paid>0?fcfa(o.deposit_paid):"—"):(o.payment_status==="paye"?fcfa(o.total||0):"—")}</td>
+                  <td className={`text-right tabular ${o.postponed_to ? "line-through text-[#999]" : ""}`}>{fcfa(dueOf(o))}</td>
                   <td>{o.postponed_to || o.status === "livree" || o.payment_method !== "cod" ? <VersementCell session={session} order={o} onVerse={setReconcileOrder} onReload={onReload}/> : <span className="text-[10px] text-[#999]">Pas encore livrée</span>}</td>
                 </tr>
               ))}

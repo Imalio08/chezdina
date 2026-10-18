@@ -1252,3 +1252,16 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Tests iteration_93 : backend 12/12 après corrections (XSS, fichiers docx/txt console, taille non numérique).
 - Reste : page WhatsAppCampaigns non routée (fusionnée dans Campagnes) ; pièces jointes non envoyables par WhatsApp (wa.me).
 
+
+## 2026-10-18 — App livreur vide + parcours complets console/site/livreur
+- Cause racine : /riders/me/today ne gardait que les commandes affectées/créées le jour même (UTC) et les affectations n'écrivaient jamais assigned_at → toutes les courses ouvertes disparaissaient. Désormais : toutes les courses ouvertes du livreur + reportées dues + clôturées/modifiées aujourd'hui (Africa/Abidjan) + journée du jour + courses qu'il a reportées (lecture seule).
+- assigned_at posé ; /deliveries/assign rattache à la journée du livreur (retire de l'ancienne) ; livreur limité à ses propres courses (403).
+- Notification → /riders?course=CODE ouvre la course (repli GET /riders/me/orders/{id|code}, lecture seule) ; liste rafraîchie à chaque nouvelle notification, au retour en premier plan et au retour du réseau.
+- Montant à encaisser = total − acompte (deps.amount_due / format.dueOf) partout : app livreur, preuve, journées, réconciliation, versements, WhatsApp « Préparez X FCFA ».
+- Livraison : delivered_at, payment_status payé, notification cliente « livrée » (aussi hors ligne).
+- Report : statut reste « reportee » (nouvelle date visible console + espace cliente), réaffectable dans Journées.
+- Réconciliation validée → mouvement de caisse « Encaissement livreur » (session de caisse de la Gérante) ; « À remettre » baisse après validation.
+- Notifications : commandes en attente d'acompte dans la cloche staff ; cliente notifiée pour confirmée, en préparation, prête, confiée au livreur.
+- Espace cliente : échouées dans Annulées, attente d'acompte/prêtes dans En cours, acompte payé + reste à payer.
+- Tests : iteration_94/95 + pytest e2e 47/47 ; données TEST nettoyées.
+

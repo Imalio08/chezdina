@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Check, Shield, XCircle, X } from "lucide-react";
-import { statusLabel, statusColor, fcfa } from "@/lib/format";
+import { statusLabel, statusColor, fcfa, dueOf } from "@/lib/format";
 
 const CATS = [["montant", "Montant incorrect"], ["justificatif", "Justificatif manquant"], ["ecart", "Écart de caisse"], ["autre", "Autre anomalie"]];
 
@@ -11,7 +11,7 @@ function RejectVersementModal({ session, order, onClose, onDone }) {
   const [reason, setReason] = useState("");
   const [declared, setDeclared] = useState("");
   const [busy, setBusy] = useState(false);
-  const ecart = declared === "" ? null : (+declared) - (order.total || 0);
+  const ecart = declared === "" ? null : (+declared) - dueOf(order);
   const submit = async () => {
     if (!cat) return toast.error("Choisissez le type d'anomalie");
     if (reason.trim().length < 3) return toast.error("Le motif est obligatoire");
@@ -24,7 +24,7 @@ function RejectVersementModal({ session, order, onClose, onDone }) {
     <div className="fixed inset-0 bg-black/60 grid place-items-center z-50 p-4" onClick={onClose}>
       <div className="bg-white dark:bg-[#1a1a1a] rounded-2xl p-6 w-full max-w-md" onClick={e => e.stopPropagation()} data-testid="reject-versement-modal">
         <div className="flex justify-between items-start mb-3"><div className="font-serif text-xl text-[#c62828]">Rejeter le versement {order.code}</div><button onClick={onClose}><X size={18}/></button></div>
-        <div className="text-xs text-[#666] mb-3">Attendu : <b className="tabular">{fcfa(order.total || 0)}</b></div>
+        <div className="text-xs text-[#666] mb-3">Attendu : <b className="tabular">{fcfa(dueOf(order))}</b></div>
         <label className="text-xs uppercase font-semibold text-[#666]">Montant remis par le livreur</label>
         <input type="number" className="dina-input mb-1 tabular" value={declared} onChange={e => setDeclared(e.target.value)} data-testid="reject-versement-declared"/>
         {ecart !== null && <div className={`text-xs mb-3 tabular ${ecart < 0 ? "text-[#c62828]" : "text-[#1f8a4c]"}`}>Écart : {ecart > 0 ? "+" : ""}{fcfa(ecart)}</div>}

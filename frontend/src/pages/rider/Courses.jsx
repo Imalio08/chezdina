@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "@/lib/api";
-import { fcfa, statusLabel, statusColor, payInfo } from "@/lib/format";
+import { fcfa, statusLabel, statusColor, payInfo, dueOf } from "@/lib/format";
 import { toast } from "sonner";
 import { Phone, MessageCircle, Navigation, ChevronRight, X, MapPin, Send } from "lucide-react";
 import DeliveryProofModal from "@/components/rider/DeliveryProofModal";
@@ -179,7 +179,7 @@ function OrderCard({ order, onOpen }) {
       <div className="flex-1 min-w-0">
         <div className="font-semibold text-sm">{(order.customer?.name || "").split(" ")[0]} · {order.delivery_zone}</div>
         <div className="text-[11px] text-[#666] dark:text-[#999] truncate">{order.customer?.quartier || order.note || ""}</div>
-        <div className="text-[11px] mt-0.5">{isCod ? <span className="text-[#c62828] font-semibold">COD {fcfa(order.total)}</span> : <span style={{ color: payInfo(order).color }}>{payInfo(order).paid ? "Déjà payé" : payInfo(order).label}</span>}</div>
+        <div className="text-[11px] mt-0.5">{isCod ? <span className="text-[#c62828] font-semibold">COD {fcfa(dueOf(order))}</span> : <span style={{ color: payInfo(order).color }}>{payInfo(order).paid ? "Déjà payé" : payInfo(order).label}</span>}</div>
         <SlotBadge order={order}/>
       </div>
       <div className="flex flex-col items-end gap-1">
@@ -206,7 +206,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
       .replace("{prenom_client}", (order.customer?.name || "").split(" ")[0])
       .replace("{prenom_livreur}", "")
       .replace("{numero_commande}", order.code)
-      .replace("{montant}", fcfa(order.total))
+      .replace("{montant}", fcfa(order.payment_method === "cod" ? dueOf(order) : order.total))
       .replace("{lien_suivi}", `${window.location.origin}/suivi/${order.code}`);
     api.post(`/orders/${order.id}/contact-log`, { kind: "whatsapp", template_key: tpl.key }).catch(() => { });
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(prefill)}`, "_blank");

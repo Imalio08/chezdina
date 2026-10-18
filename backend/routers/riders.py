@@ -280,7 +280,12 @@ async def rider_today(user: dict = Depends(get_user)):
             counts["echecs"] += 1
         if s in ("annulee", "retournee", "refusee"):
             counts["annulees_retournees"] += 1
-    return {"orders": clean(orders), "counts": counts, "to_collect": to_collect, "collected": collected, "balance_to_hand_over": collected}
+    handed = 0
+    for s in await db.delivery_sessions.find({"rider_id": user["id"], "date": today}, {"reconciliations": 1}).to_list(20):
+        for oid, r in (s.get("reconciliations") or {}).items():
+            if isinstance(r, dict) and r.get("collected") and any(o["id"] == oid and o.get("status") == "livree" for o in orders):
+                handed += float(r.get("amount") or 0)
+    return {"orders": clean(orders), "counts": counts, "to_collect": to_collect, "collected": collected, "balance_to_hand_over": max(0, collected - handed)}
 
 
 @router.get("/riders/me/history")
@@ -568,6 +573,8 @@ async def reconcile(sid: str, body: ReconcileIn, user: dict = Depends(require_ro
         approver = await db.users.find_one({"attendance_code": body.pin.strip(), "role": {"$in": ["admin", "manager"]}, "active": True})
         if not approver:
             raise HTTPException(403, "PIN invalide ou droits insuffisants")
+        if body.order_id not in (s.get("orders") or []):
+            raise HTTPException(404, "Commande absente de cette journée")
         o = await db.orders.find_one({"id": body.order_id})
         due = amount_due(o or {})
         amount = float(body.amount) if body.amount is not None else float(due)

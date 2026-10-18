@@ -484,7 +484,7 @@ function OrderDetail() {
             <div className="font-serif text-xl">Commande {o.code}</div>
             <div className="text-xs text-[#666]">{dateFmt(o.created_at)}</div>
           </div>
-          <span className="dina-chip" style={{color: statusColor[o.status]}}>{statusLabel[o.status]}</span>
+          <span className="dina-chip" style={{color: statusColor[o.status]}}>{statusLabel[o.status]}{o.status === "reportee" && (o.rescheduled_for || o.delivery_date) ? ` au ${new Date((o.rescheduled_for || o.delivery_date) + "T12:00:00").toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" })}` : ""}</span>
         </div>
         <Timeline tl={o.timeline || []}/>
       </div>
@@ -520,6 +520,10 @@ function OrderDetail() {
           <div className="border-t border-[#ececec] mt-2 pt-2 flex justify-between font-semibold">
             <span>Total</span><span className="tabular text-[#b02a2a]">{fcfa(o.total)}</span>
           </div>
+          {o.deposit_paid > 0 && !paid && <>
+            <KV label="Acompte payé" value={`-${fcfa(o.deposit_paid)}`}/>
+            <div className="flex justify-between font-semibold text-sm" data-testid="account-balance-due"><span>Reste à payer</span><span className="tabular">{fcfa(Math.max(0, o.total - o.deposit_paid))}</span></div>
+          </>}
           <div className="mt-2 text-xs">{paid ? <span className="text-[#1f8a4c]">✓ Payé</span> : o.payment_status === "preuve_envoyee" ? <span className="text-[#e4991e]">Preuve Wave envoyée · en attente de vérification</span> : <span className="text-[#e4991e]">En attente de paiement</span>}</div>
           {(needsWave(o) || o.wave_proof) && !paid && <div className="mt-4 pt-4 border-t border-[#ececec]" data-testid="account-wave"><WavePayBox order={o} phone={o.customer?.phone} onChange={load}/></div>}
         </div>

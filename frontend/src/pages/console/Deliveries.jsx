@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
-import { fcfa, statusLabel, statusColor, payInfo } from "@/lib/format";
+import { fcfa, statusLabel, statusColor, payInfo, dueOf } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Check, X, Pencil, Trash2, Printer, Map, Shield, GripVertical, Clock } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -119,7 +119,7 @@ export default function Deliveries() {
                       <div className="flex justify-between items-start"><div className="font-medium text-xs">{o.code}</div><div className="tabular font-semibold text-xs">{fcfa(o.total)}</div></div>
                       <div className="text-[11px] text-[#666] truncate">{o.customer?.name}</div>
                       <div className="text-[11px] text-[#666] truncate">{o.delivery_zone || "—"}</div>
-                      <div className="text-[10px] text-[#999] mt-0.5">{o.items?.length || 0} art · {o.payment_method === "cod" ? <span className="text-[#c62828] font-semibold">COD {fcfa(o.total)}</span> : <span style={{ color: payInfo(o).color }}>{payInfo(o).label}</span>}</div>
+                      <div className="text-[10px] text-[#999] mt-0.5">{o.items?.length || 0} art · {o.payment_method === "cod" ? <span className="text-[#c62828] font-semibold">COD {fcfa(dueOf(o))}</span> : <span style={{ color: payInfo(o).color }}>{payInfo(o).label}</span>}</div>
                     </div>
                   </div>
                 </div>
@@ -157,7 +157,7 @@ export default function Deliveries() {
                             <div className="text-[11px] text-[#666] truncate">{o.customer?.name}</div>
                             <div className="text-[11px] text-[#666] truncate">{o.delivery_zone}</div>
                             <SlotBadge order={o}/>
-                            <div className="text-[10px] tabular mt-0.5">{o.payment_method === "cod" ? <span className={o.postponed_to ? "line-through text-[#999]" : "text-[#c62828] font-semibold"}>COD {fcfa(o.total)}</span> : <span style={{ color: payInfo(o).color }}>{payInfo(o).label}</span>}</div>
+                            <div className="text-[10px] tabular mt-0.5">{o.payment_method === "cod" ? <span className={o.postponed_to ? "line-through text-[#999]" : "text-[#c62828] font-semibold"}>COD {fcfa(dueOf(o))}</span> : <span style={{ color: payInfo(o).color }}>{payInfo(o).label}</span>}</div>
                           </div>
                         ))}
                       </div>
@@ -205,7 +205,7 @@ export default function Deliveries() {
                         <td>{o.customer?.name}</td>
                         <td>{o.delivery_zone}</td>
                         <td><OrderDayStatus order={o}/></td>
-                        <td className={`text-right tabular font-semibold ${o.postponed_to ? "line-through text-[#999]" : ""}`}>{isCod ? fcfa(o.total) : "—"}</td>
+                        <td className={`text-right tabular font-semibold ${o.postponed_to ? "line-through text-[#999]" : ""}`}>{isCod ? fcfa(dueOf(o)) : "—"}</td>
                         <td className="tabular">{confirmed && amount != null ? fcfa(amount) : "—"}</td>
                         <td className={`tabular ${ecart > 0 ? "text-[#1f8a4c]" : ecart < 0 ? "text-[#c62828]" : "text-[#666]"}`}>{ecart != null ? (ecart > 0 ? "+" : "") + fcfa(ecart) : "—"}</td>
                         <td><VersementCell session={s} order={o} onVerse={(ord) => setReconcileFor({ session: s, order: ord })} onReload={load}/></td>
@@ -255,11 +255,11 @@ export default function Deliveries() {
 }
 
 export function ReconcileLineModal({ session, order, onClose, onDone }) {
-  const [amount, setAmount] = useState(order.total || 0);
+  const [amount, setAmount] = useState(dueOf(order));
   const [pin, setPin] = useState("");
   const [note, setNote] = useState("");
   const [loading, setLoading] = useState(false);
-  const ecart = (+amount || 0) - (order.total || 0);
+  const ecart = (+amount || 0) - dueOf(order);
   const submit = async () => {
     if (!pin || pin.length < 4) return toast.error("Entrez le PIN gérante (4 chiffres)");
     setLoading(true);
@@ -284,7 +284,7 @@ export function ReconcileLineModal({ session, order, onClose, onDone }) {
 
         <div className="p-3 bg-[#fff5f5] dark:bg-[#2a1818] rounded-lg mb-3 text-center">
           <div className="text-[10px] uppercase text-[#666]">À encaisser</div>
-          <div className="font-serif text-2xl tabular font-semibold text-[#b02a2a]">{fcfa(order.total)}</div>
+          <div className="font-serif text-2xl tabular font-semibold text-[#b02a2a]">{fcfa(dueOf(order))}</div>
         </div>
 
         <label className="text-xs uppercase font-semibold text-[#666]">Montant reçu (FCFA)</label>

@@ -662,7 +662,7 @@ def _wa_message_for_status(order: dict, status: str) -> Optional[str]:
         extra = f" avec notre livreur {rider}" if rider else ""
         return f"{base}\nVotre commande {code} est en route{extra}. Il vous appellera à l'approche. {'Préparez ' + str(int(amount_due(order))) + ' FCFA en espèces.' if is_cod and amount_due(order) > 0 else ('Déjà payée, aucun paiement à prévoir.' if is_cod or order.get('payment_status') == 'paye' else 'Votre paiement Wave est en cours de vérification.')} 🛵\nSuivre ma commande : {track}"
     if status == "en_livraison":
-        return f"{base}\nVotre colis {code} est en livraison. {'À encaisser : ' + str(total) + ' FCFA.' if is_cod else ''} 📍"
+        return f"{base}\nVotre colis {code} est en livraison. {'Préparez ' + str(int(amount_due(order))) + ' FCFA en espèces.' if is_cod and amount_due(order) > 0 else ''} 📍"
     if status == "livree":
         return f"{base}\nMerci pour votre commande {code} ! 💐\nNous serions ravies d'avoir votre avis en 10s : https://chezdina.net{customer_link(f'/noter/{code}', cid)}"
     if status == "echouee":

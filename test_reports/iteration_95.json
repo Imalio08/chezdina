@@ -1,0 +1,50 @@
+{
+  "summary": "Iteration 95: retest of the iteration_94 fixes. New serial pytest test_e2e_rider_flow_iter95.py: 20 of 21 pass. It covers 4 TEST_ storefront orders, 2 riders, deposit, prep, both assign endpoints, reassign, postpone + reassign, fail, deliver, offline sync, reconcile -> cash_movements, and close of a TEST cash session. UI checked at 390x844 (rider app and customer space) and at 1920x1080 (console). Results per scenario: S1 OK (staff bell shows 'Nouvelle commande · acompte attendu'; en_attente_acompte orders appear in the customer's in_progress list). S2 OK (mark-deposit-paid sends the customer 'confirmée'; status-v3 sends 'en préparation' and 'prête'; both assign endpoints send 'confiée à un livreur'; /deliveries/assign attaches the order to the rider's day, and on reassign removes it from the previous rider's day and sets the new session_id; per-order amount_due = total - deposit_paid; to_collect and session total_to_collect use it; rider 403/404 security and the notification link work). S3 OK in API and UI (deliver sets delivered_at and payment_status=paye and sends the customer 'livrée'; rider UI shows 'À encaisser 25 200 FCFA' + 'Acompte déjà payé − 10 800 FCFA'; the proof amount is prefilled with 25200; the rider KPIs drop by exactly the amount due) BUT the en_livraison WhatsApp still says the full total. S4 OK (status stays reportee; rider_id is cleared; delivery_date and rescheduled_for are the new date; the rider sees it read-only; console shows Reportée with the new date; the order is in the Journées ready list only for the new date and can be reassigned there; the customer sees Reportée; the échouée order is in the customer's Annulées tab) - minor: the customer detail does not show the new date. S5 not retested (code not touched). S6 KO in UI: the backend reconcile with PIN is correct (due = amount_due, rider_cod cash_movement in, removed when un-validated, counted in cash session close ins/expected), BUT the console Réconciliation table and the 'Valider' modal still use o.total, so the Gérante validates 36 000 instead of 25 200 and the cash drawer is overstated by the deposit. S7 OK (offline sync: delivered_at = offline time, payment_status paye, customer 'livrée', idempotent). All test data was cleaned up, including 5 orders and 1 customer left over from earlier iter94 runs.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "server.py _wa_message_for_status('en_livraison') (line ~665)", "issue": "The customer WhatsApp says 'À encaisser : {total} FCFA' (32000) instead of amount_due (22400 after the deposit). The 'Préparez X FCFA' amount_due text exists only in the 'assignee' template, and that template is never queued because the assign endpoints, mark-deposit-paid and status-v3 do not call _enqueue_wa. So no message ever contains 'Préparez X FCFA'."},
+      {"endpoint": "GET /api/riders/me/today balance_to_hand_over", "issue": "balance_to_hand_over always equals collected and ignores versements the Gérante has already validated, so the rider's 'À remettre' never decreases after reconciliation."},
+      {"endpoint": "POST /api/auth/login", "issue": "CORS returns access-control-allow-origin '*' (not an explicit origin) on login. 6 wrong attempts on an unknown email give 401 every time and never 429 (lockout seems to apply only to known users; not checked in depth)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "DeliveryDays.jsx Réconciliation table (lines 324-325)", "issue": "'Déjà payé' shows o.total when payment_status=='paye', which is now always true after delivery (36 000 shown as already paid). 'À encaisser' shows o.total (36 000) instead of o.amount_due (25 200). Use o.deposit_paid and o.amount_due.", "selector": "[data-testid=day-detail] table", "priority": "HIGH"},
+      {"component": "Deliveries.jsx ReconcileLineModal (line ~258-262)", "issue": "The amount is prefilled with order.total, and 'À encaisser' and the écart are computed from total. If the Gérante validates as prefilled, a 36 000 rider_cod cash_movement is created when the rider collected 25 200, which overstates the cash session expected amount. Use order.amount_due.", "selector": "[data-testid=reconcile-amount]", "priority": "HIGH"},
+      {"component": "VersementCell.jsx reject modal (lines 14, 27)", "issue": "'Attendu' and the écart use order.total instead of amount_due.", "selector": "[data-testid^=reconcile-]", "priority": "MEDIUM"}
+    ],
+    "integration_issues": [
+      {"flow": "Rider app course list / WhatsApp template", "issue": "Courses.jsx:182 shows 'COD {total}' on the list card, and line 209 fills the {montant} placeholder of the rider WhatsApp templates with order.total, not amount_due. The proof modal header also shows the total.", "affected_selectors": ["[data-testid^=course-]", "[data-testid^=wa-tpl-]"]},
+      {"flow": "Legacy console rider page /console/livreur (pages/console/Rider.jsx:52-53, 101, 168)", "issue": "toCollect, collected and 'À encaisser' still use o.total.", "affected_selectors": []}
+    ],
+    "design_issues": [
+      {"screen": "Customer order detail /compte/commandes/{code}", "issues": ["A postponed order shows the Reportée chip but not the new delivery date", "The payment block shows 'Total 30 000 · En attente de paiement' with no line for the deposit already paid or the remaining balance"]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_e2e_rider_flow_iter95.py", "/app/backend/tests/cleanup_iter95.py", "/app/backend/tests/seed_ui_iter95.py", "/app/test_reports/pytest/iter95_e2e.xml"],
+  "action_items": [
+    "DeliveryDays.jsx reconciliation table: Déjà payé = o.deposit_paid (or total when prepaid non-COD); À encaisser = o.amount_due",
+    "Deliveries.jsx ReconcileLineModal: default amount, displayed 'À encaisser' and écart = order.amount_due",
+    "VersementCell.jsx: 'Attendu' and écart = order.amount_due",
+    "server.py _wa_message_for_status en_livraison: use amount_due(order); queue the 'assignee' WA message (or move 'Préparez X FCFA' into en_livraison)",
+    "Courses.jsx: list card COD amount and {montant} in the WA templates = amount_due; optionally show 'À encaisser' in the DeliveryProofModal header",
+    "pages/console/Rider.jsx: use amount_due",
+    "rider_today: balance_to_hand_over = collected - validated reconciliations",
+    "Customer order detail: show 'Reportée au JJ/MM' and the deposit paid / remaining balance"
+  ],
+  "critical_code_review_comments": [
+    "amount_due was fixed in the backend, but several frontend places still compute cash from o.total (DeliveryDays reconcile table, ReconcileLineModal, VersementCell, Courses list/WA template, console Rider.jsx). Use one helper (o.amount_due ?? max(0,total-deposit_paid)) everywhere.",
+    "list_cash_movements filters by UTC day while rider days use Africa/Abidjan (same offset today, but keep it consistent).",
+    "reconcile() does not check that body.order_id belongs to session sid before writing a cash movement.",
+    "server.py has more than 5800 lines; split the order/rider status logic into routers."
+  ],
+  "updated_files": ["/app/backend/tests/test_e2e_rider_flow_iter95.py", "/app/backend/tests/cleanup_iter95.py", "/app/backend/tests/seed_ui_iter95.py"],
+  "success_rate": {"backend": "95% (20/21)", "frontend": "80% (8/10 UI checks)"},
+  "test_credentials": "From /app/memory/test_credentials.md: admin aouattaraesca@gmail.com/Admin123! (PIN 1234), manager manager.cocody@dinastore.ci/Manager123! (PIN 2222), rider1/rider2 @dinastore.ci Rider123!",
+  "seed_data_creation": "TEST_E2E Cliente95 + 5 orders, 1 TEST cash session (note TEST_iter95), 1 rider2 delivery day for tomorrow. All removed by cleanup_iter95.py, which also removed 5 orders and 1 customer left over from iter94.",
+  "retest_needed": true,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run: export REACT_APP_BACKEND_URL=...; cd /app/backend; pytest tests/test_e2e_rider_flow_iter95.py -n0 -p no:randomly -s; then python tests/cleanup_iter95.py. The only expected failure is test_start_whatsapp_prepare_amount_due (WA en_livraison text). The test opens and closes a TEST cash session only if none is open. For the UI: run seed_ui_iter95.py <phone> to get a reportee order. Console login inputs have no type=email; use input:visible nth(0)/nth(1). The rider detail sheet closes after 'Je démarre'; reopen it with /riders?course=CODE after the /riders redirect has finished. The DeliveryDays reconcile modal is opened with [data-testid=reconcile-{code}] and has an amount field [data-testid=reconcile-amount].",
+  "rca of the issue": "The S6 UI over-collection comes from frontend components still using o.total after the backend switched to deps.amount_due. The backend cash_movement uses body.amount when it is given, and the console modal always sends its prefilled total, so the overstated amount flows into the cash session. Reproduce: an order with a deposit, delivered -> Journées de livraison -> day -> Réconciliation -> Valider: the modal shows 36 000 instead of 25 200. Fix: prefill with and compare against order.amount_due."
+}

@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import api from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { fcfa, statusLabel, statusColor, payInfo } from "@/lib/format";
+import { fcfa, statusLabel, statusColor, payInfo, dueOf } from "@/lib/format";
 import { toast } from "sonner";
 import { Phone, MapPin, Package, LogOut, History, Wallet, User, MessageCircle, Navigation, QrCode, AlertCircle, Clock, CheckCircle2, Truck } from "lucide-react";
 
@@ -49,8 +49,8 @@ export default function Rider() {
   const active = orders.filter(o => ["assignee","en_livraison","prete","recuperee"].includes(o.status));
   const history = orders.filter(o => ["livree","echouee","retournee","annulee"].includes(o.status));
   const delivered = history.filter(o => o.status === "livree");
-  const toCollect = active.filter(o => o.payment_method === "cod").reduce((s,o)=>s+(o.total||0),0);
-  const collected = delivered.filter(o => o.payment_method === "cod").reduce((s,o)=>s+(o.total||0),0);
+  const toCollect = active.reduce((s,o)=>s+dueOf(o),0);
+  const collected = delivered.reduce((s,o)=>s+dueOf(o),0);
   const remaining = toCollect; // not yet collected on active COD
 
   const update = async (status, extra = {}) => {
@@ -98,7 +98,7 @@ export default function Rider() {
             <div className="text-sm font-medium">{o.customer?.name}</div>
             <div className="text-xs text-[#666] flex items-center gap-1 mt-1"><MapPin size={11}/>{o.delivery_zone}{o.delivery_address?` · ${o.delivery_address.slice(0,40)}`:""}</div>
             <div className="flex justify-between items-end mt-3">
-              <div className="text-xs text-[#666]">{(o.items || []).length} article(s) · {o.payment_method==="cod"?<strong className="text-[#c62828]">À encaisser {fcfa(o.total)}</strong>:<strong style={{ color: payInfo(o).color }}>{payInfo(o).paid ? "Déjà payé" : payInfo(o).label}</strong>}</div>
+              <div className="text-xs text-[#666]">{(o.items || []).length} article(s) · {o.payment_method==="cod"?<strong className="text-[#c62828]">À encaisser {fcfa(dueOf(o))}</strong>:<strong style={{ color: payInfo(o).color }}>{payInfo(o).paid ? "Déjà payé" : payInfo(o).label}</strong>}</div>
               <div className="tabular font-semibold text-sm">{fcfa(o.total)}</div>
             </div>
           </div>
