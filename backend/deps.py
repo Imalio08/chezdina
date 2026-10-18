@@ -46,6 +46,13 @@ def make_customer_token(cid: str, m: int = 60 * 24 * 30):
         JWT_SECRET, algorithm=JWT_ALG,
     )
 
+def amount_due(o: dict) -> float:
+    """Cash the rider must collect: COD total minus the deposit already paid."""
+    if (o or {}).get("payment_method") != "cod":
+        return 0
+    return max(0, float(o.get("total") or 0) - float(o.get("deposit_paid") or 0))
+
+
 def customer_link(path: str, cid: "str | None") -> str:
     """Append a 30-day sign-in token so the customer lands logged in (Safari on iPhone)."""
     if not cid:

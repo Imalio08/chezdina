@@ -241,7 +241,8 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
           <div className="dina-card-white p-3 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(order.subtotal || order.total)}</span></div>
             {order.delivery_fee > 0 && <div className="flex justify-between"><span className="text-[#666]">Livraison</span><span className="tabular">{fcfa(order.delivery_fee)}</span></div>}
-            <div className="flex justify-between font-semibold text-base pt-1 border-t border-[#ececec]"><span>À encaisser</span><span className="tabular text-[#b02a2a]">{order.payment_method === "cod" ? fcfa(order.total) : payInfo(order).paid ? "0 (prépayée)" : payInfo(order).label}</span></div>
+            <div className="flex justify-between font-semibold text-base pt-1 border-t border-[#ececec]"><span>À encaisser</span><span className="tabular text-[#b02a2a]">{order.payment_method === "cod" ? fcfa(order.amount_due ?? Math.max(0, order.total - (order.deposit_paid || 0))) : payInfo(order).paid ? "0 (prépayée)" : payInfo(order).label}</span></div>
+            {order.payment_method === "cod" && order.deposit_paid > 0 && <div className="flex justify-between text-xs text-[#1f8a4c]" data-testid="order-deposit-paid"><span>Acompte déjà payé</span><span className="tabular">− {fcfa(order.deposit_paid)}</span></div>}
           </div>
           {order.readonly ? <div className="text-xs text-center text-[#666] py-2" data-testid="order-readonly">Course {order.status === "reportee" ? "reportée et rendue à la boutique" : "clôturée"} · consultation seule</div> : <div className="grid grid-cols-2 gap-2">
             {["confirmee", "prete", "assignee"].includes(order.status) && <button onClick={() => onStatus(order.id, "en_livraison")} className="dina-btn-primary !min-h-[44px]" data-testid="status-en-route">Je démarre</button>}

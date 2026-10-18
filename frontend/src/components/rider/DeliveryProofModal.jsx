@@ -16,7 +16,7 @@ export default function DeliveryProofModal({ order, onClose, onDone }) {
   const [name, setName] = useState("");
   const [relation, setRelation] = useState("");
   const [pin, setPin] = useState("");
-  const [amount, setAmount] = useState(order.total || 0);
+  const [amount, setAmount] = useState(order.amount_due ?? (order.payment_method === "cod" ? Math.max(0, (order.total || 0) - (order.deposit_paid || 0)) : 0));
   const [paymentMethod] = useState(order.payment_method || "cod");
   const [loading, setLoading] = useState(false);
   const [templates, setTemplates] = useState(null);

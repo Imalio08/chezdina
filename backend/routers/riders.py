@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from deps import db, get_user, require_role, clean, new_id, now_iso
+from deps import db, get_user, require_role, clean, new_id, now_iso, amount_due
 from models import AssignIn, SessionIn, ReconcileIn, RiderLocationIn
 
 router = APIRouter(prefix="/api", tags=["riders"])
@@ -255,12 +255,14 @@ async def rider_today(user: dict = Depends(get_user)):
         o["status"] = "reportee"
         o["readonly"] = True
         orders.append(o)
-    to_collect = sum(o.get("total", 0) for o in orders if o.get("payment_method") == "cod" and o.get("status") not in ("livree", "annulee"))
+    for o in orders:
+        o["amount_due"] = amount_due(o)
+    to_collect = sum(o["amount_due"] for o in orders if not o.get("readonly") and o.get("status") not in ("livree", "annulee", "echouee", "retournee", "refusee", "reportee"))
     collected = 0
     for o in orders:
         p = o.get("proof") or {}
         if o.get("status") == "livree" and o.get("payment_method") == "cod":
-            collected += p.get("amount_collected") or o.get("total", 0)
+            collected += p.get("amount_collected") if p.get("amount_collected") is not None else o["amount_due"]
     counts = {"a_livrer": 0, "en_route": 0, "livrees": 0, "annulees": 0, "reportees": 0, "echecs": 0, "annulees_retournees": 0}
     for o in orders:
         s = o.get("status")
@@ -309,7 +311,7 @@ async def rider_history(user: dict = Depends(get_user), days: int = 30):
             o["customer"] = _mask_customer(o.get("customer"))
         dl = [o for o in d["orders_detail"] if o.get("status") == "livree"]
         d["delivered_count"] = len(dl)
-        d["collected_total"] = sum((o.get("proof") or {}).get("amount_collected") or o.get("total", 0) for o in dl if o.get("payment_method") == "cod")
+        d["collected_total"] = sum((o.get("proof") or {}).get("amount_collected") or amount_due(o) for o in dl if o.get("payment_method") == "cod")
         for o in d["orders_detail"]:
             o.pop("proof", None)
         out.append(d)
@@ -423,10 +425,22 @@ async def assign_delivery(oid: str, body: AssignIn, user: dict = Depends(require
         raise HTTPException(404)
     tl = o.get("timeline", [])
     tl.append({"status": "assignee", "at": now_iso(), "by": user.get("name"), "note": f"→ {body.rider_name}"})
-    await db.orders.update_one({"id": oid}, {"$set": {"rider_id": body.rider_id, "rider_name": body.rider_name, "status": "assignee", "assigned_at": now_iso(), "timeline": tl}})
+    # Attach to the rider's delivery day (same date) so the evening reconciliation includes it
+    from zoneinfo import ZoneInfo
+    day = o.get("delivery_date") or datetime.now(ZoneInfo("Africa/Abidjan")).date().isoformat()
+    if o.get("session_id"):
+        await db.delivery_sessions.update_one({"id": o["session_id"], "rider_id": {"$ne": body.rider_id}}, {"$pull": {"orders": oid}})
+    sess = await db.delivery_sessions.find_one({"rider_id": body.rider_id, "date": day, "closed": {"$ne": True}})
+    if not sess:
+        sess = {"id": new_id(), "rider_id": body.rider_id, "rider_name": body.rider_name, "date": day, "orders": [], "closed": False, "reconciliations": {}, "created_at": now_iso()}
+        await db.delivery_sessions.insert_one(dict(sess))
+    await db.delivery_sessions.update_one({"id": sess["id"]}, {"$addToSet": {"orders": oid}})
+    await db.orders.update_one({"id": oid}, {"$set": {"rider_id": body.rider_id, "rider_name": body.rider_name, "status": "assignee", "assigned_at": now_iso(), "timeline": tl, "session_id": sess["id"], "delivery_date": day}})
     res = await _apply_slot(oid, body.rider_id, body.slot_id) if body.slot_id else {}
-    from routers.notify import rider_assigned
+    from routers.notify import rider_assigned, order_status_event
     await rider_assigned(o, body.rider_id, o.get("rider_id"))
+    if o.get("status") != "assignee":
+        await order_status_event({**o, "status": "assignee", "rider_id": body.rider_id}, "assignee", False, body.rider_id)
     return {"ok": True, **res}
 
 
@@ -435,7 +449,7 @@ async def suggest_split(body: Dict[str, Any], user: dict = Depends(require_role(
     """Propose a zone-based + load-balanced split of unassigned orders among active riders."""
     requested_oids = body.get("order_ids") or []
     requested_rids = body.get("rider_ids") or []
-    order_filter = {"id": {"$in": requested_oids}} if requested_oids else {"mode": "delivery", "status": {"$in": ["prete", "confirmee"]}, "rider_id": {"$in": [None, ""]}}
+    order_filter = {"id": {"$in": requested_oids}} if requested_oids else {"mode": "delivery", "status": {"$in": ["prete", "confirmee", "reportee"]}, "rider_id": {"$in": [None, ""]}}
     orders = await db.orders.find(order_filter).to_list(500)
     rider_filter = {"id": {"$in": requested_rids}} if requested_rids else {"role": "rider", "active": {"$ne": False}}
     riders = await db.users.find(rider_filter).to_list(200)
@@ -503,11 +517,13 @@ async def list_sessions(user: dict = Depends(get_user), rider_id: Optional[str] 
         rec = s.get("reconciliations", {})
         s["orders_detail"] = orders
         s["postponed_count"] = len(orders) - len(active)
-        s["total_to_collect"] = sum(o.get("total", 0) for o in active if o.get("payment_method") == "cod")
+        for o in orders:
+            o["amount_due"] = amount_due(o)
+        s["total_to_collect"] = sum(o["amount_due"] for o in active)
         s["prepaid_count"] = sum(1 for o in active if o.get("payment_method") != "cod")
         s["delivered_count"] = sum(1 for o in active if o.get("status") == "livree")
         s["cancelled_count"] = sum(1 for o in active if o.get("status") in ("annulee", "echouee"))
-        s["collected_total"] = sum(o.get("total", 0) for o in active if o.get("payment_method") == "cod" and _verse(rec.get(o["id"])))
+        s["collected_total"] = sum((rec.get(o["id"]) or {}).get("amount", o["amount_due"]) if isinstance(rec.get(o["id"]), dict) else o["amount_due"] for o in active if _verse(rec.get(o["id"])))
         out.append(s)
     return clean(out)
 
@@ -533,8 +549,10 @@ async def session_add_order(sid: str, body: Dict[str, Any], user: dict = Depends
     res = await _apply_slot(oid, s["rider_id"], body.get("slot_id")) if "slot_id" in body else {}
     o = await db.orders.find_one({"id": oid})
     if o and prev_rider != s["rider_id"]:
-        from routers.notify import rider_assigned
+        from routers.notify import rider_assigned, order_status_event
         await rider_assigned(o, s["rider_id"], prev_rider)
+        if cur.get("status") != "assignee":
+            await order_status_event(o, "assignee", False, s["rider_id"])
     return {"ok": True, **res}
 
 
@@ -551,7 +569,7 @@ async def reconcile(sid: str, body: ReconcileIn, user: dict = Depends(require_ro
         if not approver:
             raise HTTPException(403, "PIN invalide ou droits insuffisants")
         o = await db.orders.find_one({"id": body.order_id})
-        due = (o or {}).get("total", 0) if (o or {}).get("payment_method") == "cod" else 0
+        due = amount_due(o or {})
         amount = float(body.amount) if body.amount is not None else float(due)
         rec[body.order_id] = {
             "collected": True, "amount": amount, "due": due, "ecart": amount - due,
@@ -562,6 +580,15 @@ async def reconcile(sid: str, body: ReconcileIn, user: dict = Depends(require_ro
     else:
         rec[body.order_id] = {"collected": False, "at": now_iso()}
     await db.delivery_sessions.update_one({"id": sid}, {"$set": {"reconciliations": rec}})
+    # Validated rider cash goes into the Gérante's cash drawer (cash session)
+    ref = f"rider:{sid}:{body.order_id}"
+    await db.cash_movements.delete_many({"ref": ref})
+    if body.collected and rec[body.order_id].get("amount"):
+        oc = await db.orders.find_one({"id": body.order_id}, {"code": 1}) or {}
+        await db.cash_movements.insert_one({"id": new_id(), "type": "in", "amount": float(rec[body.order_id]["amount"]), "ref": ref, "kind": "rider_cod",
+                                            "reason": f"Encaissement livreur {s.get('rider_name') or ''} · {oc.get('code') or ''}".strip(),
+                                            "label": f"Encaissement livreur {s.get('rider_name') or ''} · {oc.get('code') or ''}".strip(),
+                                            "by": rec[body.order_id].get("approved_by"), "user_name": rec[body.order_id].get("approved_by"), "created_at": now_iso()})
     return {"ok": True, "reconciliation": rec[body.order_id]}
 
 
@@ -583,7 +610,7 @@ async def reject_versement(sid: str, body: Dict[str, Any], user: dict = Depends(
     if not cat or len(reason) < 3:
         raise HTTPException(400, "Type d'anomalie et motif obligatoires")
     o = await db.orders.find_one({"id": oid}) or {}
-    due = o.get("total", 0) if o.get("payment_method") == "cod" else 0
+    due = amount_due(o)
     declared = body.get("declared")
     declared = float(declared) if declared not in (None, "") else None
     rec = s.get("reconciliations", {})

@@ -153,7 +153,7 @@ function DayDetail({ session, orders, riders, onBack, onReload }) {
   const [pickSlot, setPickSlot] = useState(false);
   const sid = session.id;
   const dayDate = session.date || new Date().toISOString().slice(0, 10);
-  const ready = orders.filter(o => o.mode === "delivery" && (o.status === "prete" || o.status === "confirmee") && !o.rider_id && (!o.rescheduled_for || o.rescheduled_for <= dayDate));
+  const ready = orders.filter(o => o.mode === "delivery" && ["prete", "confirmee", "reportee"].includes(o.status) && !o.rider_id && (!o.rescheduled_for || o.rescheduled_for <= dayDate));
   const assigned = session.orders_detail || orders.filter(o => (session.orders||[]).includes(o.id));
 
   useEffect(() => {

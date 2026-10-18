@@ -74,7 +74,7 @@ class TestAssign:
         assign(ctx, o, "r1")
         n1 = by_ref(ctx["r1"], o["code"])
         assert len(n1) == 1 and n1[0]["title"] == "Nouvelle course attribuée"
-        assert n1[0]["link"] == f"/rider?course={o['code']}" and n1[0]["type"] == "delivery" and n1[0]["read"] is False
+        assert n1[0]["link"] == f"/riders?course={o['code']}" and n1[0]["type"] == "delivery" and n1[0]["read"] is False
         assign(ctx, o, "r1")  # same rider → no dup
         assert len(by_ref(ctx["r1"], o["code"])) == 1
         assign(ctx, o, "r2")
@@ -170,7 +170,7 @@ class TestMessages:
         r = requests.post(f"{API}/public/account/messages/send", json={"conversation_id": cid, "text": "TEST_bonjour 😀"}, headers=ch)
         assert r.status_code == 200, r.text
         n = by_ref(ctx["r1"], cid)
-        assert len(n) == 1 and n[0]["link"] == f"/rider/messages/{cid}" and n[0]["type"] == "message" and not n[0]["read"]
+        assert len(n) == 1 and n[0]["link"] == f"/riders/messages/{cid}" and n[0]["type"] == "message" and not n[0]["read"]
         # rider2 can't open
         assert requests.get(f"{API}/rider/conversations/{cid}", headers=ctx["r2"]).status_code in (403, 404)
         r = requests.get(f"{API}/rider/conversations/{cid}", headers=ctx["r1"])

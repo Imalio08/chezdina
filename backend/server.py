@@ -19,7 +19,7 @@ logger = logging.getLogger("dina")
 from deps import (
     client, db, JWT_SECRET, JWT_ALG,
     hash_pw, verify_pw, make_token, make_customer_token, customer_link,
-    new_id, now_iso, gen_access_code, clean,
+    new_id, now_iso, gen_access_code, clean, amount_due,
     get_user, require_role, get_customer, norm_phone, gen_code, inc_variant,
 )
 # Shared Pydantic models (moved to models.py — P5 Refactor Feb 2026)
@@ -394,8 +394,8 @@ async def account_addresses_delete(aid: str, c: dict = Depends(get_customer)):
     await db.customers.update_one({"id": c["id"]}, {"$set": {"addresses": addrs}})
     return {"ok": True, "addresses": addrs}
 
-_IN_PROGRESS_STATUSES = ("nouvelle","confirmee","assignee","en_preparation","en_livraison","reportee")
-_CANCELLED_STATUSES = ("annulee","retournee","refusee")
+_IN_PROGRESS_STATUSES = ("en_attente_acompte","nouvelle","confirmee","assignee","en_preparation","prete","en_livraison","recuperee","reportee")
+_CANCELLED_STATUSES = ("annulee","retournee","refusee","echouee")
 
 @api.get("/public/account/orders-split")
 async def account_orders_split(c: dict = Depends(get_customer)):
@@ -660,7 +660,7 @@ def _wa_message_for_status(order: dict, status: str) -> Optional[str]:
         return f"{base}\nVotre commande {code} est prête ! Elle part en livraison très bientôt vers {zone}. 📦"
     if status == "assignee":
         extra = f" avec notre livreur {rider}" if rider else ""
-        return f"{base}\nVotre commande {code} est en route{extra}. Il vous appellera à l'approche. {'Préparez ' + str(total) + ' FCFA en espèces.' if is_cod else ('Déjà payée, aucun paiement à prévoir.' if order.get('payment_status') == 'paye' else 'Votre paiement Wave est en cours de vérification.')} 🛵\nSuivre ma commande : {track}"
+        return f"{base}\nVotre commande {code} est en route{extra}. Il vous appellera à l'approche. {'Préparez ' + str(int(amount_due(order))) + ' FCFA en espèces.' if is_cod and amount_due(order) > 0 else ('Déjà payée, aucun paiement à prévoir.' if is_cod or order.get('payment_status') == 'paye' else 'Votre paiement Wave est en cours de vérification.')} 🛵\nSuivre ma commande : {track}"
     if status == "en_livraison":
         return f"{base}\nVotre colis {code} est en livraison. {'À encaisser : ' + str(total) + ' FCFA.' if is_cod else ''} 📍"
     if status == "livree":
@@ -761,7 +761,7 @@ async def update_order_status(oid: str, body: StatusIn, user: dict = Depends(get
         if o.get("session_id"):
             await db.delivery_sessions.update_one({"id": o["session_id"]}, {"$set": {f"postponed.{oid}": {
                 "to": body.next_date, "at": now_iso(), "by": user.get("name"), "reason": body.reason or ""}}})
-        upd.update({"status": "confirmee", "rider_id": None, "rider_name": None, "session_id": None,
+        upd.update({"status": "reportee", "rider_id": None, "rider_name": None, "session_id": None,
                     "postponed_rider_id": o.get("rider_id"), "postponed_at": now_iso()})
     # When status becomes "en_livraison" (En route), generate delivery_code and enqueue WA
     if body.status == "en_livraison" and prev != "en_livraison" and not o.get("delivery_code"):
@@ -840,8 +840,12 @@ async def deliver_order(oid: str, body: ProofIn, user: dict = Depends(get_user))
     else:
         raise HTTPException(400, "Méthode inconnue")
     tl = o.get("timeline", []); tl.append({"status":"livree","at":now_iso(),"by":user.get("name"),"proof_method":body.method})
-    await db.orders.update_one({"id": oid}, {"$set": {"status":"livree","timeline":tl,"proof": proof}})
+    dset = {"status":"livree","timeline":tl,"proof": proof,"delivered_at": now_iso(),"updated_at": now_iso()}
+    if o.get("payment_method") != "wave" or o.get("payment_status") == "paye": dset["payment_status"] = "paye"
+    await db.orders.update_one({"id": oid}, {"$set": dset})
     await _enqueue_wa({**o, "status":"livree"}, "livree", user.get("name"))
+    from routers.notify import order_status_event
+    await order_status_event({**o, **dset}, "livree", user.get("role") == "rider", o.get("rider_id"))
     from routers.wallet import on_order_status
     await on_order_status(o, "livree")
     return {"ok": True, "proof": proof}
@@ -2904,12 +2908,12 @@ async def attendance_punch_kiosk(body: AttendancePunchIn):
 async def notifications(user: dict = Depends(get_user)):
     """Real-time notifications from DB: new orders, low stock, pending reviews, stock alerts, abandoned carts."""
     items = []
-    new_orders = await db.orders.find({"status": "nouvelle"}).sort("created_at", -1).to_list(10)
+    new_orders = await db.orders.find({"status": {"$in": ["nouvelle", "en_attente_acompte"]}}).sort("created_at", -1).to_list(10)
     for o in new_orders:
         items.append({
             "id": f"order-{o['id']}",
             "type": "order",
-            "title": "Nouvelle commande",
+            "title": "Nouvelle commande" if o.get("status") == "nouvelle" else "Nouvelle commande · acompte attendu",
             "msg": f"{o.get('code','?')} · {o.get('customer',{}).get('name','?')} · {int(o.get('total',0))} FCFA",
             "at": o.get("created_at"),
             "link": f"/console/commandes/{o.get('code')}",
@@ -3983,6 +3987,8 @@ async def mark_deposit_paid(oid: str, body: Dict[str, Any], user: dict = Depends
         "deposit_paid": amount, "deposit_tx_ref": tx_ref, "deposit_paid_at": now_iso(),
         "status": "confirmee", "payment_status": "acompte_recu",
     }, "$push": {"timeline": {"status": "confirmee", "at": now_iso(), "by": user.get("name"), "note": f"Acompte reçu · ref {tx_ref}"}}})
+    from routers.notify import order_status_event
+    await order_status_event({**o, "status": "confirmee"}, "confirmee", False)
     return {"ok": True, "status": "confirmee", "tx_ref": tx_ref, "amount": amount}
 
 
@@ -5613,6 +5619,9 @@ async def update_order_status_v3(oid: str, body: Dict[str,Any], user: dict = Dep
         }}, upsert=True)
     from routers.wallet import on_order_status
     await on_order_status(o, new_status)
+    if new_status != o.get("status"):
+        from routers.notify import order_status_event
+        await order_status_event({**o, **patch}, new_status, role == "rider", o.get("rider_id"))
     return {"ok": True}
 
 @api.get("/orders/{oid}/invoice")
