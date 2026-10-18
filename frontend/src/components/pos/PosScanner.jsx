@@ -1,14 +1,18 @@
 import React, { useEffect, useRef } from "react";
 import { X, ScanLine } from "lucide-react";
 import { toast } from "sonner";
+import { makeScanGate, scanBeep } from "@/lib/scanOnce";
 
-/** POS Scanner — html5-qrcode continuous mode with camera. */
+/** POS Scanner — each code is read once (beep), then waits for the next code. */
 export default function PosScanner({ onScan, onClose }) {
   const containerRef = useRef(null);
   const scannerRef = useRef(null);
+  const cb = useRef(onScan);
+  cb.current = onScan;
 
   useEffect(() => {
     let mounted = true;
+    const gate = makeScanGate();
     (async () => {
       try {
         const { Html5Qrcode } = await import("html5-qrcode");
@@ -20,8 +24,9 @@ export default function PosScanner({ onScan, onClose }) {
           { facingMode: "environment" },
           { fps: 10, qrbox: { width: 260, height: 180 } },
           (text) => {
-            try { new Audio("data:audio/wav;base64,UklGRnoAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVYAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==").play().catch(()=>{}); } catch {}
-            onScan(text);
+            if (!gate(text)) return;
+            scanBeep(true);
+            cb.current(text);
           },
           () => {}
         );
@@ -34,7 +39,7 @@ export default function PosScanner({ onScan, onClose }) {
       mounted = false;
       if (scannerRef.current) { try { scannerRef.current.stop().then(()=>scannerRef.current.clear()); } catch {} }
     };
-  }, [onScan]);
+  }, []);
 
   return (
     <div className="fixed inset-0 bg-black/80 grid place-items-center z-[60] p-4" data-testid="pos-scanner-modal">
@@ -44,7 +49,7 @@ export default function PosScanner({ onScan, onClose }) {
           <button onClick={onClose}><X size={18}/></button>
         </div>
         <div id="pos-scanner-area" ref={containerRef} className="w-full aspect-video bg-black rounded-lg overflow-hidden"></div>
-        <div className="text-xs text-[#666] mt-3 text-center">Un bip retentit à chaque code reconnu · article ajouté au panier</div>
+        <div className="text-xs text-[#666] mt-3 text-center">Un bip à chaque code lu · présentez ensuite l'article suivant</div>
       </div>
     </div>
   );

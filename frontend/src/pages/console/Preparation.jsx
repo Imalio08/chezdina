@@ -5,13 +5,13 @@ import { toast } from "sonner";
 import { Check, Package, ScanLine, AlertTriangle, ArrowLeft, Keyboard, LayoutGrid, List, Columns3, Printer, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS, slotOf } from "@/components/shared/OrderFilters";
-import { downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { printFichesFor } from "@/lib/printFiches";
 import PrepRunner from "@/components/orders/PrepRunner";
 export { PrepRunner };
 
 const PREP_STATUSES = ["nouvelle", "confirmee", "en_preparation", "prete"];
 const KANBAN_COLS = [["nouvelle", "Nouvelles", "#0021cc"], ["confirmee", "Confirmées", "#5867fd"], ["en_preparation", "En préparation", "#e4991e"], ["prete", "Prêtes", "#1f8a4c"]];
-const slip = async (o) => downloadPackingSlipPDF(o, await fetchBusinessForPdf(api));
+const slip = async (o) => printFichesFor([o]);
 
 export default function Preparation() {
   const [orders, setOrders] = useState([]);

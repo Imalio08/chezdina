@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import ApprovalReview, { stockRow } from "@/components/shared/ApprovalReview";
 import api from "@/lib/api";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
@@ -26,6 +27,7 @@ export default function Approvals() {
   const [filter, setFilter] = useState("pending");
   const [kindFilter, setKindFilter] = useState("");
   const [note, setNote] = useState("");
+  const [review, setReview] = useState(null);
 
   const load = async () => {
     try {
@@ -59,13 +61,7 @@ export default function Approvals() {
       createdAt: e.created_at, decisionBy: e.decision_by,
       amount: e.amount,
     }));
-    stockReqs.forEach(s => rows.push({
-      id: s.id, kind: "stock_adjustment", source: "stock",
-      title: `Stock · ${s.product_name}${s.size ? ` · ${s.size}` : ""}`,
-      requestedBy: s.requested_by, reason: s.reason,
-      payload: { qty_delta: s.qty_delta }, status: s.status === "approved" ? "approved" : s.status === "rejected" ? "rejected" : "pending",
-      createdAt: s.created_at,
-    }));
+    stockReqs.forEach(s => rows.push(stockRow(s)));
     rows.sort((a,b) => (b.createdAt || "").localeCompare(a.createdAt || ""));
     return kindFilter ? rows.filter(r => r.kind === kindFilter) : rows;
   }, [approvals, expenseReqs, stockReqs, kindFilter]);
@@ -108,7 +104,7 @@ export default function Approvals() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="font-serif text-3xl">À approuver</h1>
-          <p className="text-sm text-[#666]">Boîte unique · remises, remboursements, dépenses, ajustements stock, versements caisse</p>
+          <p className="text-sm text-[#666]">Toutes les demandes à valider : remises, remboursements, dépenses, ajustements de stock, versements de caisse</p>
         </div>
       </div>
 
@@ -133,7 +129,7 @@ export default function Approvals() {
           const Icon = KIND_ICON[r.kind] || Clock;
           const color = KIND_COLOR[r.kind] || "#666";
           return (
-            <div key={`${r.source}-${r.id}`} className="dina-card-white p-4" data-testid={`approval-row-${r.id}`} data-focus-id={r.id}>
+            <div key={`${r.source}-${r.id}`} onClick={() => setReview(r)} className="dina-card-white p-4 cursor-pointer hover:border-[#b02a2a] transition-colors" data-testid={`approval-row-${r.id}`} data-focus-id={r.id}>
               <div className="flex items-start gap-3 flex-wrap">
                 <div className="w-10 h-10 rounded-lg grid place-items-center shrink-0" style={{background: `${color}1a`, color}}><Icon size={16}/></div>
                 <div className="flex-1 min-w-0">
@@ -156,10 +152,8 @@ export default function Approvals() {
                   )}
                 </div>
                 {r.status === "pending" && (
-                  <div className="flex items-center gap-2 shrink-0">
-                    <input className="dina-input !py-1 text-xs max-w-[160px]" placeholder="Commentaire (optionnel)" value={note} onChange={e => setNote(e.target.value)} data-testid={`approval-note-${r.id}`}/>
-                    <button onClick={() => decide(r, "approved")} className="dina-btn-primary !min-h-[36px] !bg-[#1f8a4c]" data-testid={`approval-approve-${r.id}`}><CheckCircle size={13}/>Approuver</button>
-                    <button onClick={() => decide(r, "rejected")} className="dina-btn-secondary !min-h-[36px] !text-[#c62828]" data-testid={`approval-reject-${r.id}`}><XCircle size={13}/>Refuser</button>
+                  <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
+                    <button onClick={() => setReview(r)} className="dina-btn-secondary !min-h-[36px]" data-testid={`approval-open-${r.id}`}>Voir et décider</button>
                   </div>
                 )}
               </div>
@@ -167,6 +161,7 @@ export default function Approvals() {
           );
         })}
       </div>
+      {review && <ApprovalReview row={review} onClose={() => setReview(null)} onDone={() => { setReview(null); load(); }}/>}
     </div>
   );
 }

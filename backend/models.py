@@ -67,6 +67,7 @@ class ProductIn(BaseModel):
     description: str = ""
     image: str = ""
     images: List[str] = []
+    ai_images: List[str] = []
     sizes: List[str] = []
     colors: List[str] = []
     stock_by_size: Dict[str, int] = {}
@@ -140,6 +141,7 @@ class OrderIn(BaseModel):
     mode: str = "store"
     store_id: Optional[str] = None
     wallet_use: int = 0
+    coupon_code: Optional[str] = None
     checkout_key: Optional[str] = None
 
 

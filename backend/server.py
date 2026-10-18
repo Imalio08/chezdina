@@ -1562,7 +1562,32 @@ async def stock_movements_list(product_id: str = None, user: dict = Depends(get_
 @api.get("/stock/adjustment-requests")
 async def stock_adj_requests(user: dict = Depends(get_user)):
     rows = await db.stock_adjustment_requests.find({}).sort("created_at", -1).to_list(100)
+    pids = list({r.get("product_id") for r in rows if r.get("product_id")})
+    prods = {p["id"]: p for p in await db.products.find({"id": {"$in": pids}}, {"id": 1, "stock": 1, "stock_by_size": 1, "sku": 1, "image": 1, "cost": 1, "price": 1}).to_list(500)}
+    for r in rows:
+        p = prods.get(r.get("product_id")) or {}
+        cur = int(((p.get("stock_by_size") or {}).get(r["size"]) if r.get("size") else p.get("stock")) or 0)
+        r["stock_now"] = cur
+        if r.get("status") == "pending":
+            r["stock_before"], r["stock_after"] = cur, cur + int(r.get("qty_delta") or 0)
+        r["sku"], r["image"] = p.get("sku"), p.get("image")
+        r["value_impact"] = int(r.get("qty_delta") or 0) * float(p.get("cost") or p.get("price") or 0)
     return clean(rows)
+
+
+async def _decision_done(requester_id, title: str, decision: str, note: str, user: dict):
+    """Requester learns the outcome (and the rejection reason)."""
+    if not requester_id:
+        return
+    from routers.notify import notify
+    ok = decision in ("approve", "approved")
+    await notify("staff", requester_id, f"Demande {'validée' if ok else 'refusée'} · {title}",
+                 f"Par {user.get('name')}{'' if ok else ' · Motif : ' + note}", "/console/approbations", "approval")
+
+
+def _need_reason(decision: str, note: str):
+    if decision in ("reject", "rejected") and not (note or "").strip():
+        raise HTTPException(400, "Indiquez le motif du refus")
 
 @api.post("/stock/adjustment-requests")
 async def stock_adj_request(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
@@ -1599,11 +1624,13 @@ async def stock_adj_decide(aid: str, body: Dict[str,Any], user: dict = Depends(r
     if doc.get("status") != "pending": raise HTTPException(400, "Déjà traité")
     decision = body.get("decision")  # "approve" | "reject"
     note = body.get("note", "")
+    _need_reason(decision, note)
     if decision == "approve":
         await _apply_stock_adj(doc, user.get("name"))
         await db.stock_adjustment_requests.update_one({"id": aid}, {"$set": {"status":"approved", "approved_by": user.get("name"), "approved_at": now_iso(), "decision_note": note}})
     else:
         await db.stock_adjustment_requests.update_one({"id": aid}, {"$set": {"status":"rejected", "rejected_by": user.get("name"), "rejected_at": now_iso(), "decision_note": note}})
+    await _decision_done(doc.get("requested_by_id"), f"Stock {doc.get('product_name') or ''}", decision, note, user)
     return {"ok": True}
 
 @api.get("/stock/inventories")
@@ -3908,6 +3935,10 @@ async def public_create_order(body: OrderIn, request: Request):
     if logged:
         body.customer = {**(body.customer or {}), "id": logged["id"]}
     sub = sum(it.qty * it.price for it in body.items)
+    # Discount comes only from a valid coupon (never trusted from the browser)
+    from routers.coupons import resolve as _coupon, redeem as _redeem
+    coupon = await _coupon(body.coupon_code, sub, body.delivery_fee, (logged or {}).get("id")) if body.coupon_code else None
+    body.discount = int(coupon["discount"]) if coupon else 0
     total = sub + body.delivery_fee - body.discount
     code = gen_code()
     if body.checkout_key:
@@ -3940,6 +3971,7 @@ async def public_create_order(body: OrderIn, request: Request):
     doc = {"id": oid, "code": code, "items": [it.model_dump() for it in body.items], "checkout_key": body.checkout_key, "wallet_used": wallet_used,
            "customer": body.customer, "channel": body.channel or "boutique", "payment_method": body.payment_method,
            "delivery_zone": body.delivery_zone, "delivery_fee": body.delivery_fee, "discount": body.discount,
+           "coupon": coupon,
            "note": body.note, "mode": body.mode or "delivery", "store_id":"store-cocody",
            "subtotal": sub, "total": total, "status": initial_status, "payment_status": initial_payment,
            "deposit_required": deposit_amount, "deposit_paid": 0, "deposit_tx_ref": None, "deposit_paid_at": None,
@@ -3962,6 +3994,7 @@ async def public_create_order(body: OrderIn, request: Request):
         await _record_stock_mov(it.product_id, it.size, -it.qty, "Commande en ligne", body.customer.get("name") if body.customer else None, code)
     if body.customer and body.customer.get("id"):
         await db.customers.update_one({"id": body.customer["id"]}, {"$set":{"last_order_at": now_iso()}})
+    await _redeem(coupon, code)
     from routers.notify import notify_staff
     await notify_staff("Nouvelle commande en ligne", f"{code} · {(body.customer or {}).get('name') or ''} · {int(total)} FCFA", f"/console/commandes/{code}")
     return {"code": code, "id": doc["id"], "status": initial_status, "deposit_required": deposit_amount, "wallet_used": wallet_used, "total": total}
@@ -5282,8 +5315,13 @@ async def list_approvals(user: dict = Depends(require_role("admin")), status: Op
 async def decide_approval(aid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
     decision = body.get("decision")  # "approved" | "rejected"
     if decision not in ("approved","rejected"): raise HTTPException(400)
+    _need_reason(decision, body.get("note", ""))
+    prev = await db.approval_requests.find_one({"id": aid})
+    if not prev: raise HTTPException(404)
+    if prev.get("status") != "pending": raise HTTPException(400, "Déjà traitée")
     await db.approval_requests.update_one({"id": aid}, {"$set": {"status": decision, "decision_at": now_iso(), "decision_by": user.get("name"), "decision_note": body.get("note","")}})
     r = await db.approval_requests.find_one({"id": aid})
+    await _decision_done(r.get("requested_by_id") or r.get("requested_by"), r.get("kind") or "", decision, body.get("note", ""), user)
     await db.audit_log.insert_one({"id":new_id(),"user_id":user.get("id"),"user_name":user.get("name"),"action":f"approval.{decision}","entity_id":aid,"after":{"kind":r.get("kind")},"at":now_iso()})
     return clean(r)
 
@@ -5308,8 +5346,12 @@ async def list_expense_requests(user: dict = Depends(require_role("admin")), sta
 @api.post("/expense-requests/{eid}/decide")
 async def decide_expense_request(eid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
     decision = body.get("decision")
+    if decision not in ("approved", "rejected"): raise HTTPException(400)
+    _need_reason(decision, body.get("note", ""))
     r = await db.expense_requests.find_one({"id": eid})
     if not r: raise HTTPException(404)
+    if r.get("status") != "pending": raise HTTPException(400, "Déjà traitée")
+    await _decision_done(r.get("requested_by_id"), r.get("label") or "Dépense", decision, body.get("note", ""), user)
     await db.expense_requests.update_one({"id": eid}, {"$set": {"status": decision, "decision_at": now_iso(), "decision_by": user.get("name"), "decision_note": body.get("note","")}})
     if decision == "approved":
         exp = {"id": new_id(), "label": r.get("label"), "amount": r.get("amount"), "category": r.get("category"),
@@ -5875,6 +5917,10 @@ from routers.storefront_extras import router as storefront_extras_router  # noqa
 app.include_router(storefront_extras_router)
 from routers.prep_verify import router as prep_verify_router  # noqa: E402
 app.include_router(prep_verify_router)
+from routers.coupons import router as coupons_router  # noqa: E402
+app.include_router(coupons_router)
+from routers.ai_visuals import router as ai_visuals_router  # noqa: E402
+app.include_router(ai_visuals_router)
 app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:

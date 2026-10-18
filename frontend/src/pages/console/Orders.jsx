@@ -6,7 +6,8 @@ import { fcfa, dateTimeFmt, statusLabel, statusColor } from "@/lib/format";
 import { toast } from "sonner";
 import { X, Pencil, Printer, FileText, MessageCircle, Download, Receipt, Eye, CheckCircle2, ScanLine, Truck, Wallet } from "lucide-react";
 import { InvoicePreviewModal, buildInvoicePreview, shareInvoiceOnWhatsApp } from "@/components/shared/InvoicePreviewModal";
-import { downloadInvoicePDF, downloadPackingSlipPDF, downloadPackingSlipsPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { downloadInvoicePDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { printFichesFor } from "@/lib/printFiches";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
 import { PrepRunner } from "@/pages/console/Preparation";
 import AssignDayModal from "@/components/orders/AssignDayModal";
@@ -104,7 +105,7 @@ export default function Orders() {
   };
   const printSlips = async (list) => {
     if (!list.length) return;
-    try { downloadPackingSlipsPDF(list, await fetchBusinessForPdf(api)); } catch { toast.error("Impression impossible · réessayez"); }
+    try { await printFichesFor(list); } catch { toast.error("Impression impossible · réessayez"); }
   };
   const assignSel = () => {
     const ready = selOrders.filter(o => o.status === "prete");
@@ -129,7 +130,7 @@ export default function Orders() {
         // Generate the REAL A4 PDF with logo + lines + totals and trigger download.
         downloadInvoicePDF(o, inv, business);
       } else if (action === "slip") {
-        downloadPackingSlipPDF(o, business);
+        await printFichesFor([o]);
       }
     } catch (e) { console.error(e); toast.error("Erreur facture"); }
   };

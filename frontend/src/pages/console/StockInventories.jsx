@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/api";
 import { useKeptState } from "@/lib/keptState";
+import ApprovalReview, { stockRow } from "@/components/shared/ApprovalReview";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Minus, X, Edit, Package, AlertTriangle, Clock, DollarSign, History, ClipboardList, CheckSquare } from "lucide-react";
@@ -17,6 +18,7 @@ export default function StockInventories() {
   const { user } = useAuth();
   const isOwner = user?.role === "admin";
   const [tab, setTab] = useKeptState("stock-tab", "stock");
+  const [review, setReview] = useState(null);
   const [products, setProducts] = useState([]);
   const [kpis, setKpis] = useState(null);
   const [adjust, setAdjust] = useState(null);
@@ -117,21 +119,19 @@ export default function StockInventories() {
           <table className="dina-table"><thead><tr><th>Date</th><th>Produit</th><th>Taille</th><th className="text-right">Delta</th><th>Raison</th><th>Demandeur</th><th>Statut</th><th></th></tr></thead>
             <tbody>{requests.length === 0 ? <tr><td colSpan={8} className="text-center text-sm text-[#666] py-6">Aucune demande</td></tr> :
               requests.map(r => (
-                <tr key={r.id} data-testid={`req-${r.id}`}>
+                <tr key={r.id} data-testid={`req-${r.id}`} onClick={() => setReview(stockRow(r))} className="cursor-pointer hover:bg-[#fff5f5]">
                   <td className="text-xs text-[#666]">{dateFmt(r.created_at)}</td>
                   <td>{r.product_name}</td><td>{r.size || "—"}</td>
                   <td className={`text-right tabular font-semibold ${r.qty_delta < 0 ? "text-[#c62828]" : "text-[#1f8a4c]"}`}>{r.qty_delta > 0 ? "+" : ""}{r.qty_delta}</td>
                   <td className="text-xs">{r.reason}</td>
                   <td className="text-xs">{r.requested_by}</td>
-                  <td><span className={`dina-chip text-[10px] ${r.status === "approved" ? "!text-[#1f8a4c] !border-[#1f8a4c]" : r.status === "rejected" ? "!text-[#c62828] !border-[#c62828]" : ""}`}>{r.status}</span></td>
-                  <td className="text-right whitespace-nowrap">{r.status === "pending" && isOwner && <>
-                    <button onClick={async () => { await api.post(`/stock/adjustment-requests/${r.id}/decide`, { decision: "approve" }); load(); }} className="text-[#1f8a4c] mr-2" data-testid={`req-approve-${r.id}`}><CheckSquare size={13} /></button>
-                    <button onClick={async () => { await api.post(`/stock/adjustment-requests/${r.id}/decide`, { decision: "reject" }); load(); }} className="text-[#c62828]"><X size={13} /></button>
-                  </>}</td>
+                  <td><span className={`dina-chip text-[10px] ${r.status === "approved" ? "!text-[#1f8a4c] !border-[#1f8a4c]" : r.status === "rejected" ? "!text-[#c62828] !border-[#c62828]" : ""}`}>{r.status === "approved" ? "Validée" : r.status === "rejected" ? "Refusée" : "En attente"}</span>{r.status === "rejected" && r.decision_note && <div className="text-[10px] text-[#c62828] mt-0.5">Motif : {r.decision_note}</div>}</td>
+                  <td className="text-right whitespace-nowrap">{r.status === "pending" && isOwner && <button onClick={e => { e.stopPropagation(); setReview(stockRow(r)); }} className="dina-chip text-[11px]" data-testid={`req-open-${r.id}`}>Voir et décider</button>}</td>
                 </tr>
               ))}
             </tbody>
           </table>
+          {review && <ApprovalReview row={review} onClose={() => setReview(null)} onDone={() => { setReview(null); load(); }}/>}
         </div>
       )}
 

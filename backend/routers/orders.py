@@ -44,9 +44,20 @@ async def orders(user: dict = Depends(get_user), status: Optional[str] = None, c
 @router.post("/orders")
 async def create_order(body: OrderIn, user: dict = Depends(get_user)):
     sub = sum(it.qty * it.price for it in body.items)
-    total = sub + body.delivery_fee - body.discount
+    from routers.coupons import resolve as _coupon, redeem as _redeem
+    cid = (body.customer or {}).get("id")
+    coupon = await _coupon(body.coupon_code, sub, body.delivery_fee, cid) if body.coupon_code else None
+    if coupon:
+        body.discount += int(coupon["discount"])
+    wallet_used = 0
+    code = gen_code()
+    oid = new_id()
+    if cid and body.wallet_use > 0:
+        from routers.wallet import debit_for_order
+        wallet_used = await debit_for_order(cid, int(body.wallet_use), max(0, sub - body.discount), oid, code)
+    total = sub + body.delivery_fee - body.discount - wallet_used
     doc = {
-        "id": new_id(), "code": gen_code(),
+        "id": oid, "code": code, "coupon": coupon, "wallet_used": wallet_used,
         "items": [it.model_dump() for it in body.items],
         "customer": body.customer, "channel": body.channel, "payment_method": body.payment_method,
         "delivery_zone": body.delivery_zone, "delivery_fee": body.delivery_fee,
@@ -75,6 +86,7 @@ async def create_order(body: OrderIn, user: dict = Depends(get_user)):
         )
         doc["points_awarded"] = True
     await db.orders.insert_one(doc)
+    await _redeem(coupon, doc["code"])
     return clean(doc)
 
 

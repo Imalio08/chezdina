@@ -5,6 +5,7 @@ import { fcfa, payInfo } from "@/lib/format";
 import { toast } from "sonner";
 import { Printer, Phone, MapPin } from "lucide-react";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
+import { printFiches } from "@/lib/printFiches";
 
 const QR_URL = (txt, size=120) => `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(txt)}`;
 
@@ -37,7 +38,7 @@ export default function FichesColis() {
   const toggleAll = () => { const n = new Set(selected); shown.forEach(o => allShownSel ? n.delete(o.id) : n.add(o.id)); setSelected(n); };
   const list = orders.filter(o => selected.has(o.id));
 
-  const print = () => { if (!list.length) return toast.error("Sélectionnez des commandes"); window.print(); };
+  const print = () => { if (!list.length) return toast.error("Sélectionnez des commandes"); if (format === "a4") return printFiches(list, brand); window.print(); };
 
   return (
     <div className="space-y-5">
@@ -75,12 +76,18 @@ export default function FichesColis() {
       </div>
 
       {/* Printable labels */}
-      <div className={`labels-area labels-${format}`}>
+      {format !== "a4" && <div className={`labels-area labels-${format}`}>
         {list.map(o => <Label key={o.id} order={o} format={format} brand={brand}/>)}
-      </div>
+      </div>}
 
       <style>{`
-        @media print { .print\\:hidden { display:none !important; } body { background:white !important; } }
+        @media print {
+          @page { margin: 0; }
+          body * { visibility: hidden !important; }
+          .labels-area, .labels-area * { visibility: visible !important; }
+          .labels-area { position: absolute; left: 0; top: 0; width: 100%; }
+          body { background:white !important; }
+        }
         .labels-area.labels-a4 { display:grid; grid-template-columns:1fr 1fr; gap:4mm; page-break-inside:avoid; }
         .labels-area.labels-a4 .fiche { break-inside:avoid; }
         .labels-area.labels-a4 .fiche:nth-child(4n) { page-break-after:always; }

@@ -10,6 +10,7 @@ import PosNewCustomer from "@/components/pos/PosNewCustomer";
 import PosPasteWA from "@/components/pos/PosPasteWA";
 import PosPayment from "@/components/pos/PosPayment";
 import PosScanner from "@/components/pos/PosScanner";
+import CouponPicker from "@/components/shared/CouponPicker";
 import POSSessionGuard from "@/components/pos/POSSessionGuard";
 import { downloadReceiptPDF } from "@/lib/pdfReceipt";
 
@@ -38,6 +39,7 @@ function POSInner() {
   const [deliverySlot, setDeliverySlot] = useState("");
   const [riderInstructions, setRiderInstructions] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [coupon, setCoupon] = useState(null);
   const [receipt, setReceipt] = useState(null);
   const [shareUrl, setShareUrl] = useState(null);
   const [viewMobileCart, setViewMobileCart] = useState(false);
@@ -102,7 +104,7 @@ function POSInner() {
   const subtotal = cart.reduce((s,x)=>s+x.qty*x.price,0);
   const zoneFee = zones.find(z=>z.name===zone)?.fee || 0;
   const fee = mode === "delivery" ? zoneFee : 0;
-  const total = Math.max(0, subtotal + fee - Number(discount||0));
+  const total = Math.max(0, subtotal + fee - Number(discount||0) - (coupon?.discount || 0));
 
   const searchCust = async (v) => {
     setCustQ(v);
@@ -119,12 +121,13 @@ function POSInner() {
     try {
       const { data } = await api.post("/orders", {
         items: cart.map(x=>({product_id:x.product_id,name:x.name,size:x.size,color:x.color,qty:x.qty,price:x.price,image:x.image})),
-        customer, channel: "store", payment_method: method, mode, discount: Number(discount||0),
+        customer, channel: "store", payment_method: method, mode, discount: Number(discount||0), coupon_code: coupon?.code || null,
+        wallet_use: method === "wallet" ? total : Number(details?.mix?.wallet || 0),
         delivery_zone: mode==="delivery" ? zone : null, delivery_fee: fee,
         note: [address, riderInstructions && `Instructions: ${riderInstructions}`, deliveryDate && `Créneau: ${deliveryDate} ${deliverySlot}`].filter(Boolean).join(" · "),
       });
       setReceipt({ ...data, _details: details });
-      clearCart(); setDiscount(0); setShowPayment(false);
+      clearCart(); setDiscount(0); setCoupon(null); setShowPayment(false);
       if (mode==="store") setCustomer(null);
       toast.success(`Vente ${data.code} enregistrée`);
       refreshProducts();
@@ -336,6 +339,8 @@ function POSInner() {
                 setDiscount(e.target.value);
               }} data-testid="pos-discount"/>
             </div>
+            {coupon?.discount > 0 && <div className="flex justify-between text-[#1f8a4c]" data-testid="pos-coupon-line"><span>Réduction · {coupon.code}</span><span className="tabular">−{fcfa(coupon.discount)}</span></div>}
+            {cart.length > 0 && <div className="pt-1"><CouponPicker pos subtotal={subtotal} fee={fee} value={coupon} onChange={setCoupon} customerId={customer?.id} testid="pos-coupon"/></div>}
           </div>
           <button onClick={()=>setShowPayment(true)} disabled={!cart.length} className="dina-btn-primary w-full mt-2 !min-h-[40px] !text-sm" data-testid="pos-checkout"><CreditCard size={14}/>{mode==="delivery"?"Commander":"Encaisser"}</button>
         </div>
@@ -428,7 +433,7 @@ function POSInner() {
       {/* Modals */}
       {sheetProduct && <PosProductSheet product={sheetProduct} customer={customer} onAdd={addToCart} onClose={()=>setSheetProduct(null)}/>}
       {showScanner && <PosScanner onScan={(code)=>{
-        const match = products.find(p => p.sku === code || p.barcode === code || p.id === code);
+        const match = products.find(p => p.sku === code || p.barcode === code || p.id === code) || products.find(p => p.sku && code.startsWith(`${p.sku}-`));
         if (match) {
           addToCart(match, 1, match.sizes?.[0], match.colors?.[0]);
           toast.success(`✓ ${match.name} ajouté`);

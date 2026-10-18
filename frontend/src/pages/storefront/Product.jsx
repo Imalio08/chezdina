@@ -63,7 +63,7 @@ export default function ProductPage() {
   }, [id, deliveryZone]);
 
   if (!p) return <div className="p-10 text-sm text-[#666]">Chargement…</div>;
-  const gallery = (p.images && p.images.length ? p.images : [p.image]).filter(Boolean);
+  const gallery = [...(p.images && p.images.length ? p.images : [p.image]), ...(p.ai_images || [])].filter(Boolean);
   const videos = p.videos || [];
   const current = gallery[imgIdx] || p.image;
   const stockForSize = hasRealVariants(p)

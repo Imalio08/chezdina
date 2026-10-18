@@ -10,7 +10,8 @@ import { SlotBadge } from "@/components/delivery/SlotPicker";
 import OrderThread from "@/components/shared/OrderThread";
 import useFocusParam from "@/lib/useFocusParam";
 import SmartImage from "@/components/shared/SmartImage";
-import { downloadInvoicePDF, downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { downloadInvoicePDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { printFichesFor } from "@/lib/printFiches";
 import { OrderActions } from "@/pages/console/Orders";
 import { PrepRunner } from "@/pages/console/Preparation";
 import { useAuth } from "@/context/AuthContext";
@@ -63,7 +64,7 @@ export default function OrderDetail() {
       if (action === "wa") { await shareInvoiceOnWhatsApp(await buildInvoicePreview(api, order, inv)); return; }
       const business = await fetchBusinessForPdf(api);
       if (action === "pdf") { downloadInvoicePDF(order, inv, business); toast.success(`Facture ${inv.number} générée`); }
-      else if (action === "slip") { downloadPackingSlipPDF(order, business); toast.success(`Fiche colis ${order.code} générée`); }
+      else if (action === "slip") { await printFichesFor([order]); }
     } catch { toast.error("Erreur facture"); }
   };
 
@@ -84,7 +85,7 @@ export default function OrderDetail() {
             <div className="text-xs text-[#666] mt-1">{dateTimeFmt(order.created_at)} · {order.channel || "—"} · {order.mode || "—"}</div>
           </div>
           <div>
-            <span className="dina-chip" style={{ color: statusColor[order.status] }}><span className="status-dot" style={{ background: statusColor[order.status] }}/>{statusLabel[order.status]}</span>
+            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-base font-bold shadow-sm" style={{ background: statusColor[order.status] || "#666", color: "#fff" }} data-testid="order-status-badge"><span className="w-2.5 h-2.5 rounded-full bg-white/90"/>{statusLabel[order.status]}</span>
             <div className="font-serif tabular text-3xl text-[#b02a2a] text-right mt-2">{fcfa(order.total)}</div>
           </div>
         </div>

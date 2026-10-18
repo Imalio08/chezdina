@@ -9,6 +9,7 @@ import AiDescribeModal from "./AiDescribeModal";
 import SeoSection from "./SeoSection";
 import VariantsGrid from "./VariantsGrid";
 import VideoUpload from "./VideoUpload";
+import { AiVisualsSection } from "./AiVisuals";
 
 const SHOE_SIZES = ["36","37","38","39","40","41","42"];
 const CLOTH_SIZES = ["XS","S","M","L","XL","XXL"];
@@ -138,6 +139,7 @@ export default function ProductFormV3({ productId, brands:brandsProp, cats:catsP
           {/* 3. Photos */}
           <Section title="3. Photos" icon={ImageIcon}>
             <ImageUpload value={f.images||(f.image?[f.image]:[])} onChange={imgs=>setF({...f,images:imgs,image:imgs[0]||""})} max={8} maxKB={400} testid="pfv-images"/>
+            <AiVisualsSection photos={f.images?.length ? f.images : (f.image ? [f.image] : [])} value={f.ai_images || []} onChange={v => setF(p => ({ ...p, ai_images: v }))}/>
           </Section>
 
           {/* 3b. Vidéos */}

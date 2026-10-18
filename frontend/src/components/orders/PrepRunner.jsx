@@ -3,16 +3,19 @@ import api from "@/lib/api";
 import { fcfa, dateTimeFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Check, Package, ScanLine, AlertTriangle, ArrowLeft, Keyboard, Printer, Camera, XCircle } from "lucide-react";
-import { downloadPackingSlipPDF, fetchBusinessForPdf } from "@/lib/pdfInvoice";
+import { printFichesFor } from "@/lib/printFiches";
+import { makeScanGate, scanBeep } from "@/lib/scanOnce";
 
-const slip = async (o) => downloadPackingSlipPDF(o, await fetchBusinessForPdf(api));
+const slip = async (o) => printFichesFor([o]);
 
 function CameraScanner({ onCode }) {
   const ref = useRef(null);
-  const last = useRef({ code: "", at: 0 });
+  const cb = useRef(onCode);
+  cb.current = onCode;
   const [err, setErr] = useState("");
   useEffect(() => {
     let alive = true;
+    const gate = makeScanGate();
     (async () => {
       try {
         const { Html5Qrcode } = await import("html5-qrcode");
@@ -20,15 +23,13 @@ function CameraScanner({ onCode }) {
         const s = new Html5Qrcode("prep-camera", { verbose: false });
         ref.current = s;
         await s.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 240, height: 160 } }, (text) => {
-          const now = Date.now();
-          if (text === last.current.code && now - last.current.at < 2500) return;
-          last.current = { code: text, at: now };
-          onCode(text);
+          if (!gate(text)) return;
+          cb.current(text);
         }, () => {});
       } catch { if (alive) setErr("Caméra indisponible ou refusée · autorisez la caméra ou tapez le code de l'étiquette."); }
     })();
     return () => { alive = false; const s = ref.current; if (s) s.stop().then(() => s.clear()).catch(() => {}); };
-  }, [onCode]);
+  }, []);
   return (
     <div className="rounded-xl overflow-hidden bg-black relative" data-testid="prep-camera-wrap">
       <div id="prep-camera" className="w-full min-h-[220px]" />
@@ -98,7 +99,7 @@ export default function PrepRunner({ order, onBack }) {
     try {
       const { data } = await api.post(`/orders/${order.id}/prep/verify`, { code, method });
       setLines(data.lines); setLog(l => [...l, data.entry]);
-      if (data.ok) { setRefusal(""); toast.success(data.message); } else { setRefusal(data.message); toast.error(data.message); }
+      if (data.ok) { setRefusal(""); scanBeep(true); toast.success(data.message, { id: "prep-scan" }); } else { setRefusal(data.message); scanBeep(false); toast.error(data.message, { id: "prep-scan" }); }
     } catch (e) { toast.error(e?.response?.data?.detail || "Vérification impossible"); }
     finally { busyRef.current = false; }
   }, [order.id]);

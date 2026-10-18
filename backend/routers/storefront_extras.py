@@ -73,8 +73,11 @@ button{{background:#b02a2a;color:#fff;border:0;border-radius:10px;padding:12px 1
     return HTMLResponse(page)
 
 
-@router.get("/public/share/invitation/{code}", response_class=HTMLResponse)
-async def share_invitation(code: str, request: Request):
+_BOTS = ("facebookexternalhit", "facebot", "whatsapp", "twitterbot", "telegrambot", "linkedinbot", "slackbot", "discordbot", "skypeuripreview", "pinterest", "googlebot", "bingbot", "embedly", "vkshare", "snapchat", "viber")
+_OG_CACHE: Dict[str, Any] = {}
+
+
+async def _invite_data(code: str, request: Request):
     from routers.wallet import find_marraine, settings
     ref = await find_marraine(code)
     biz = await db.business.find_one({}) or {}
@@ -83,14 +86,92 @@ async def share_invitation(code: str, request: Request):
     first = ((ref or {}).get("name") or "").split(" ")[0] or "Une amie"
     prod = await db.products.find_one({"image": {"$nin": [None, ""]}, "visibility": {"$ne": "store"}, "stock": {"$gt": 0}}, sort=[("sold_count", -1)])
     origin = f"{request.headers.get('x-forwarded-proto', request.url.scheme)}://{request.headers.get('x-forwarded-host', request.headers.get('host'))}"
-    img = (prod or {}).get("image") or "/icons/icon-512.png"
-    image = img if img.startswith("http") else f"{origin}{img if img.startswith('/') else '/' + img}"
+    img = (prod or {}).get("image") or biz.get("logo") or "/icons/icon-512.png"
+    src = img if img.startswith("http") or img.startswith("data:") else f"{origin}{img if img.startswith('/') else '/' + img}"
+    return {"name": name, "bonus": bonus, "first": first, "origin": origin, "src": src}
+
+
+def _render_og(d: Dict[str, Any], code: str, raw: bytes) -> bytes:
+    """1200×630 card: product photo on the left, store name + referral offer on the right."""
+    import io, os
+    from PIL import Image, ImageDraw, ImageFont
+    W, H = 1200, 630
+    card = Image.new("RGB", (W, H), (176, 42, 42))
+    try:
+        ph = Image.open(io.BytesIO(raw)).convert("RGB")
+        r = max(560 / ph.width, H / ph.height)
+        ph = ph.resize((int(ph.width * r), int(ph.height * r)))
+        left, top = (ph.width - 560) // 2, (ph.height - H) // 2
+        card.paste(ph.crop((left, top, left + 560, top + H)), (0, 0))
+    except Exception:
+        pass
+    fd = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+    fb = lambda s: ImageFont.truetype(os.path.join(fd, "LiberationSans-Bold.ttf"), s)
+    fr = lambda s: ImageFont.truetype(os.path.join(fd, "LiberationSans-Regular.ttf"), s)
+    dr = ImageDraw.Draw(card)
+
+    def wrap(text, font, width):
+        out, line = [], ""
+        for w in text.split():
+            t = f"{line} {w}".strip()
+            if dr.textlength(t, font=font) <= width: line = t
+            else: out.append(line); line = w
+        return out + [line] if line else out
+    x, y = 610, 70
+    dr.text((x, y), d["name"].upper(), font=fb(46), fill=(255, 255, 255)); y += 90
+    for ln in wrap(f"{d['first']} vous offre", fr(40), 550):
+        dr.text((x, y), ln, font=fr(40), fill=(255, 235, 235)); y += 50
+    dr.text((x, y), d["bonus"], font=fb(84), fill=(255, 255, 255)); y += 110
+    for ln in wrap("sur votre première commande", fr(36), 550):
+        dr.text((x, y), ln, font=fr(36), fill=(255, 235, 235)); y += 46
+    y += 30
+    dr.rounded_rectangle((x, y, x + 520, y + 76), radius=38, fill=(255, 255, 255))
+    dr.text((x + 30, y + 18), f"Code {code.upper()}", font=fb(36), fill=(176, 42, 42))
+    buf = io.BytesIO(); card.save(buf, "JPEG", quality=85)
+    return buf.getvalue()
+
+
+@router.get("/public/share/invitation/{code}/image.jpg")
+async def share_invitation_image(code: str, request: Request):
+    from fastapi.responses import Response as R
+    d = await _invite_data(code, request)
+    key = f"{code}|{d['src']}|{d['bonus']}|{d['first']}|{d['name']}"
+    hit = _OG_CACHE.get(key)
+    if not hit:
+        raw = b""
+        try:
+            import httpx, base64
+            if d["src"].startswith("data:"):
+                raw = base64.b64decode(d["src"].split(",", 1)[1])
+            else:
+                async with httpx.AsyncClient(timeout=8, follow_redirects=True) as cl:
+                    raw = (await cl.get(d["src"])).content
+        except Exception:
+            pass
+        hit = _render_og(d, code, raw)
+        if len(_OG_CACHE) > 200: _OG_CACHE.clear()
+        _OG_CACHE[key] = hit
+    return R(content=hit, media_type="image/jpeg", headers={"Cache-Control": "public, max-age=86400"})
+
+
+@router.get("/public/share/invitation/{code}", response_class=HTMLResponse)
+async def share_invitation(code: str, request: Request):
+    d = await _invite_data(code, request)
+    name, origin = d["name"], d["origin"]
+    share_url = f"{origin}/api/public/share/invitation/{E(code)}"
+    image = f"{share_url}/image.jpg"
     target = f"{origin}/invitation/{E(code)}"
-    title = f"{first} vous invite chez {name}"
-    desc = f"Créez votre compte avec le code {code.upper()} et recevez {bonus} sur votre première commande."
-    page = f"""<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>{E(title)}</title>
+    title = f"{d['first']} vous invite chez {name}"
+    desc = f"Créez votre compte avec le code {code.upper()} et recevez {d['bonus']} sur votre première commande."
+    bot = any(b in (request.headers.get("user-agent") or "").lower() for b in _BOTS)
+    redirect = "" if bot else f'<meta http-equiv="refresh" content="0;url={target}">'
+    script = "" if bot else f'<script>location.replace("{target}")</script>'
+    page = f"""<!doctype html><html lang="fr" prefix="og: https://ogp.me/ns#"><head><meta charset="utf-8"><title>{E(title)}</title>
+<meta name="description" content="{E(desc)}">
 <meta property="og:type" content="website"><meta property="og:site_name" content="{E(name)}"><meta property="og:title" content="{E(title)}">
-<meta property="og:description" content="{E(desc)}"><meta property="og:image" content="{E(image)}"><meta property="og:url" content="{target}">
-<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{E(image)}">
-<meta http-equiv="refresh" content="0;url={target}"></head><body><script>location.replace("{target}")</script><a href="{target}">{E(title)}</a></body></html>"""
-    return HTMLResponse(page)
+<meta property="og:description" content="{E(desc)}"><meta property="og:url" content="{share_url}"><meta property="og:locale" content="fr_FR">
+<meta property="og:image" content="{image}"><meta property="og:image:secure_url" content="{image}"><meta property="og:image:type" content="image/jpeg">
+<meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="{E(title)}">
+<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="{E(title)}"><meta name="twitter:description" content="{E(desc)}"><meta name="twitter:image" content="{image}">
+{redirect}</head><body>{script}<a href="{target}">{E(title)}</a><p>{E(desc)}</p></body></html>"""
+    return HTMLResponse(page, headers={"Cache-Control": "public, max-age=300"})

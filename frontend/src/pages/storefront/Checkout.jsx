@@ -6,6 +6,7 @@ import { fcfa } from "@/lib/format";
 import { toast } from "sonner";
 import { reveal } from "@/lib/reveal";
 import { Trash2, MapPin, Navigation2, ChevronLeft, ChevronRight, Copy, ExternalLink, X } from "lucide-react";
+import CouponPicker from "@/components/shared/CouponPicker";
 import { track } from "@/lib/analytics";
 import { useCustomer } from "@/context/CustomerContext";
 import WavePayBox from "@/components/storefront/WavePayBox";
@@ -82,12 +83,13 @@ export default function Checkout() {
   const [walletBal, setWalletBal] = useState(0);
   const [useWallet, setUseWallet] = useState(false);
   const [walletAmt, setWalletAmt] = useState(0);
+  const [coupon, setCoupon] = useState(null);
   const [checkoutKey] = useState(() => `${Date.now()}-${Math.random().toString(36).slice(2)}`);
   useEffect(() => { if (customer) api.get("/public/account/wallet").then(r => { setWalletBal(r.data.balance); }).catch(() => {}); }, [customer?.id]); // eslint-disable-line
-  const walletMax = Math.min(walletBal, sub);
+  const walletMax = Math.min(walletBal, Math.max(0, sub - (coupon?.discount || 0)));
   const walletUsed = useWallet ? Math.max(0, Math.min(Number(walletAmt) || 0, walletMax)) : 0;
   useEffect(() => { if (useWallet && !walletAmt) setWalletAmt(walletMax); }, [useWallet]); // eslint-disable-line
-  const total = sub + fee - walletUsed;
+  const total = Math.max(0, sub + fee - (coupon?.discount || 0) - walletUsed);
 
   // Compute expected deposit for COD based on payment config
   const pol = paymentConfig.deposit_policy || { mode: "none" };
@@ -119,7 +121,7 @@ export default function Checkout() {
         items: cart.map(x=>({product_id:x.product_id,name:x.name,size:x.size,color:x.color,qty:x.qty,price:x.price,image:x.image})),
         customer: { ...(customer ? { id: customer.id } : {}), name, phone, address: addr, lat: coords?.lat, lng: coords?.lng },
         channel: "boutique", payment_method: method, delivery_zone: zone, delivery_fee: fee, mode: "delivery",
-        wallet_use: walletUsed, checkout_key: checkoutKey,
+        wallet_use: walletUsed, checkout_key: checkoutKey, coupon_code: coupon?.code || null,
       });
       if (walletUsed && data.wallet_used !== walletUsed) toast.warning(`Porte-monnaie appliqué : ${fcfa(data.wallet_used || 0)}`);
       toast.success("Commande créée !");
@@ -222,6 +224,8 @@ export default function Checkout() {
         <div className="text-sm space-y-1">
           <div className="flex justify-between"><span className="text-[#666]">Sous-total</span><span className="tabular">{fcfa(sub)}</span></div>
           <div className="flex justify-between"><span className="text-[#666]">Livraison · {zone}</span><span className="tabular">{fcfa(fee)}</span></div>
+          <div className="my-2"><CouponPicker subtotal={sub} fee={fee} value={coupon} onChange={setCoupon} testid="checkout-coupon"/></div>
+          {coupon?.discount > 0 && <div className="flex justify-between text-[#1f8a4c]" data-testid="checkout-coupon-line"><span>Réduction · {coupon.code}</span><span className="tabular">−{fcfa(coupon.discount)}</span></div>}
           {customer && walletBal > 0 && (
             <div className="my-2 p-3 rounded-lg border border-[#ececec] bg-white space-y-2" data-testid="checkout-wallet">
               <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={useWallet} onChange={e => setUseWallet(e.target.checked)} data-testid="checkout-wallet-toggle"/>Utiliser mon porte-monnaie</label>
