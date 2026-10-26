@@ -1302,6 +1302,13 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Limite : ne marche que pour les commandes ayant un point GPS cliente.
 - Vérifié par appels API (111 m → rien, 33 m → arrivée + notification, pas de doublon) ; données restaurées.
 
+## 2026-10-26 — Visite guidée, inventaires réguliers, permissions appliquées, manuel
+- Visite guidée (components/console/GuidedTour.jsx) : console (12 étapes filtrées par rôle, ouvre chaque écran et entoure l'élément) + app livreur (6 étapes) ; auto à la 1re connexion (après signature des documents) ; relance : Manuel › « Relancer la visite guidée », Profil livreur › « Revoir la visite guidée ».
+- Inventaires (routers/inventories.py + server.py + components/stock/InventoriesTab.jsx) : planifications (fréquence, 1re date, rappel J-x), cron quotidien 7h Abidjan (.emergent/crons.yml → POST /api/cron/inventories, WEBHOOK_CRON_SECRET) qui ouvre les inventaires échus + rappels + relance des retards ; inventaire surprise (propriétaire) ; périmètre tout/catégorie/marque/emplacement ; comptage aveugle avec commentaire + photo ; Soumettre → Valider et appliquer / Faire recompter (motif) ; historique avec écarts et valeur.
+- Permissions (backend/permissions.py) : matrice v2 par page console {rôle: {chemin: none|read|write|full}} appliquée dans deps.get_user (GET=lecture, POST/PATCH=modif, DELETE=complet), correspondance par segment, lectures partagées (catalogue ; recherche cliente ?q= pour Caisse/Commandes/Messagerie ; équipe pour Livraisons/Caisse) ; valeurs par défaut = accès d'avant ; rôles personnalisés persistés (role_meta) et autorisés seulement via la matrice ; menu/redirection/landing via perm_levels (/auth/me, /permissions/me) ; bandeau « Lecture seule » + boutons d'écriture grisés.
+- Manuel : sections add-v4-tour, add-v4-inventories, add-v4-permissions.
+- Tests : iteration_101 (inventaires, cron, visite, manuel OK ; trous de permissions), iteration_102 (15/16, 90 %) ; corrections ensuite (recherche cliente exige q non vide, page d'arrivée = 1re page autorisée, boutons Promotions, Créer masqué en lecture).
+
 ## Roadmap
 - P0 : appliquer la matrice des droits aux accès réels.
 - P1 : inventaires réguliers (planification, surprise, partiel, photos, validation propriétaire).

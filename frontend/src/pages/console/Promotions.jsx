@@ -74,7 +74,7 @@ export default function Promotions() {
               <td>{x.flash && <span className="dina-chip" style={{color:"#b02a2a"}}>⚡ Flash</span>}</td>
               <td className="text-right tabular">{x.uses||0}{x.usage_limit>0 && `/${x.usage_limit}`}</td>
               <td><button onClick={()=>toggle(x)} className="dina-chip" style={{color:expired?"#c62828":x.active?"#1f8a4c":"#666"}} data-testid={`promo-toggle-${x.code}`}>{expired?"Expirée":x.active?"Active":"Inactive"}</button></td>
-              <td className="text-right"><button onClick={()=>setEditing(x)} className="text-[#0021cc] mr-2"><Pencil size={14}/></button><button onClick={()=>del(x.id)} className="text-[#c62828]"><Trash2 size={14}/></button></td>
+              <td className="text-right"><button onClick={()=>setEditing(x)} className="text-[#0021cc] mr-2" data-testid={`promo-edit-${x.id}`}><Pencil size={14}/></button><button onClick={()=>del(x.id)} className="text-[#c62828]" data-testid={`promo-delete-${x.id}`}><Trash2 size={14}/></button></td>
             </tr>
           );
         })}</tbody>

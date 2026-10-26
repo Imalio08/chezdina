@@ -108,5 +108,7 @@ export function canAccess(role, pathname, extra = {}) {
 /** Returns the landing page for the given role (fallback = /console). */
 export function landingFor(role) {
   if (role === "rider") return "/riders";
+  const lv = typeof window !== "undefined" ? window.__dinaPerms : null;
+  if (lv && role !== "admin" && lv["/console"] === "none") return Object.keys(lv).find(k => lv[k] !== "none") || "/console/manuel";
   return "/console";
 }

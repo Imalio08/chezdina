@@ -1,0 +1,39 @@
+{
+  "summary": "Iteration 102 retested the permission-matrix fixes from iteration 101. Backend pytest: 15 of 16 passed (test_iter102_perm_fixes.py, run with -n 0). All fixes from iteration 101 now work. (1) On the default matrix the manager gets 200 on /api/team, /deliveries, /delivery-sessions, /rider-reports and /riders/locations, and the Livraisons, Journées de livraison and Livreurs pages load with no overlay or 403. (2) Segment-exact matching works: with Stock set to none for sales and for manager, /api/stock-movements, /api/stock/inventories and /api/stock-alerts return 403 while /api/products stays 200. (3) With Clients set to none, the plain /api/customers call returns 403 and /api/customers?q=xx returns 200 through the POS read. If POS, Commandes and Messagerie are also none, the search returns 403. (4) /api/permissions/me returns 200 for sales, stock_keeper, community_manager and manager. (5) A custom role created in the UI (roles-add, new-role-name, new-role-create, a cell change, roles-save) is still there after a reload, with its label and levels (role_meta is created). It appears in the employee role selector (user-role), and the server applies its levels: products read gives GET 200 and POST 403; customers, orders, dashboard and stock-movements give 403. (6) There is no rider column in the matrix. (7) Read-only mode: readonly-banner shows on Produits and Promotions, and products-new, card-edit-*, flash-launcher and promo-new are greyed out with pointer-events none. The server also blocks writes (POST and DELETE on promotions return 403). (8) Regression: each built-in role (manager, sales, stock_keeper, community_manager) opens all its default pages in the UI with no API 403 or 500, no overlay and no error boundary. GET /api/roles-permissions is now 403 for sales. The one failure: on /api/customers, any query string (for example ?status=all) returns the whole customer list (305 rows) even when Clients is none. Two new UI issues were found and are listed below.",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "GET /api/customers?status=all (or any query string, including empty ?q=)", "issue": "permissions._hit treats a trailing '?' as 'any query string is present' (bool(request.url.query)). So with Clients=none but POS, Commandes or Messagerie at read or higher, GET /api/customers?status=all returns the full list of 305 customers. The search read should require a non-empty q (or limit the results)."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "ConsoleLayout / rbac.landingFor", "issue": "landingFor() always returns /console. A role whose Tableau de bord is 'none' (for example a custom role with only Produits=read) lands on /console, the dashboard calls return 403, and the Emergent 'Unhandled rejection 403' overlay covers the screen. Direct links to forbidden pages also redirect to /console, which loops into the same overlay. landingFor should pick the first module the role can access.", "selector": "data-emergent-overlay-host", "priority": "MEDIUM"},
+      {"component": "Promotions table (read-only mode)", "issue": "The row edit (Pencil) and delete (Trash2) buttons have no data-testid, so the .dina-readonly CSS does not grey them out. They stay clickable in Lecture mode. The server blocks the request with a 403, so the user just sees an error.", "selector": "pages/console/Promotions.jsx line 77", "priority": "LOW"}
+    ],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Read-only module", "issues": ["The 'Vues' button (data-testid views-saved) is also greyed out because its testid contains 'save'. Saved views are read features.", "The top-bar 'Créer' quick actions stay visible for a role that only has read access (canAccess only checks for none)."]},
+      {"screen": "Rôles & permissions / Équipe role selector", "issues": ["A legacy custom role 'vendeuse' from db.roles shows as a second 'Vendeuse' column next to the built-in sales role 'Vendeuse', and twice in the employee role selector. This is confusing.", "Saving the matrix creates a role_meta entry for 'vendeuse' (labels include every non-builtin role)."]},
+      {"screen": "Livreurs", "issues": ["The avatar image for Kouamé Serge is broken (shows the broken-img icon)."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter102_perm_fixes.py", "/app/backend/tests/ui_seed_iter102.py", "/app/backend/tests/ui_seed_iter102_custom.py", "/app/backend/tests/ui_seed_iter102_custom_levels.py", "/app/test_reports/pytest/pytest_iter102.xml"],
+  "action_items": [
+    "In permissions._hit, the shared customer read ('/api/customers?') should require a non-empty 'q' parameter, not just any query string. Pass request.query_params.get('q') instead of bool(url.query).",
+    "In rbac.landingFor(role), use window.__dinaPerms to redirect to the first module that is not 'none' (fall back to a 'no access' page) instead of always /console. Also add .catch on the dashboard calls.",
+    "Add data-testid (for example promo-edit-{id} and promo-delete-{id}) to the Promotions row buttons so read-only mode disables them.",
+    "Optional: stop the readonly CSS matching 'views-saved', and hide 'Créer' quick actions whose target module is only read. Consider deduplicating the legacy 'vendeuse' custom role."
+  ],
+  "critical_code_review_comments": [
+    "permissions.check marks a request as a 'query' when any query string is present. The intent is search only.",
+    "PATCH /roles-permissions replaces v2 entirely. A save with matrix {} wipes the levels of all custom roles (role_meta stays). This is expected but easy to do by mistake from scripts.",
+    "When a role has no accessible module, the frontend landing and redirect target is hardcoded to /console."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter102_perm_fixes.py", "/app/backend/tests/ui_seed_iter102.py", "/app/backend/tests/ui_seed_iter102_custom.py", "/app/backend/tests/ui_seed_iter102_custom_levels.py"],
+  "success_rate": {"backend": "94% (15/16)", "frontend": "90%"},
+  "seed_data_creation": "Created TEST_ users (test_iter102_*, test_ui102_*), the custom roles test_role_iter102 and test_ui_caisse, and punch-ins. All were deleted afterwards. The matrix was restored to defaults ($unset v2, same as the original state). The role_meta entries created by the tests (test_*, vendeuse) were removed.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Run pytest with -n 0. Before the tests, roles_permissions had no v2 and role_meta was empty, and that state was restored. Use page.locator('input:visible').nth(0/1) for the staff login. Do not PATCH {matrix:{}} while a custom role is under test: it wipes the custom role's levels. Set test users' tour_done=true and punch in through /attendance/check-in with a selfie."
+}
