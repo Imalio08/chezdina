@@ -35,7 +35,7 @@ export default function InventoriesTab({ products, isOwner, onChanged }) {
       </div>
       <div className="flex justify-between items-center flex-wrap gap-2"><div className="font-semibold">Historique des inventaires ({rows.length})</div>
         <div className="flex gap-2">{isOwner && <button onClick={() => setCreate("surprise")} className="dina-btn-secondary !min-h-[36px] text-xs" data-testid="inv-surprise"><Zap size={13} />Inventaire surprise</button>}
-          <button onClick={() => setCreate("manuel")} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="inv-new"><Plus size={13} />Nouvel inventaire</button></div></div>
+          {isOwner && <button onClick={() => setCreate("manuel")} className="dina-btn-primary !min-h-[36px] text-xs" data-testid="inv-new"><Plus size={13} />Nouvel inventaire</button>}</div></div>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
         {rows.map(inv => <button key={inv.id} onClick={() => setOpen(inv)} className="dina-card-white p-4 text-left" data-testid={`inv-${inv.id}`}>
           <div className="flex justify-between gap-2"><div className="font-semibold">{inv.name}</div><span className="dina-chip text-[10px] whitespace-nowrap" style={{ color: ST[inv.status]?.[1] }} data-testid={`inv-status-${inv.id}`}>{ST[inv.status]?.[0] || inv.status}</span></div>

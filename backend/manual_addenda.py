@@ -139,8 +139,7 @@ def P(shot: str, caption: str):
 
 ADDENDA += [
     ("prise en main", [
-        {"id": "add-v3-stock-rule", "heading": "Règle du stock, articles non vendables et clôture de caisse", "blocks": [
-            T("Tout article qui sort de la boutique sans être enregistré dans le système est considéré comme toujours en stock. Les inventaires réguliers vérifient que le stock réel correspond au stock du système."),
+        {"id": "add-v3-stock-rule", "heading": "Articles non vendables et clôture de caisse", "blocks": [
             S(["Stock › Non vendables : déclarez un article Défectueux, Invendable, Retour fournisseur, En réparation ou Perdu (ou ajoutez un motif), avec la raison, un commentaire et une photo",
                "Le propriétaire valide : l'article sort alors du stock vendable. Plus tard, changez son état : réparé et remis en stock, renvoyé au fournisseur, vendu avec remise ou détruit. Chaque changement est noté",
                "Clôture de caisse : la Gérante compte ses espèces sans voir le montant attendu. Le système calcule l'attendu (fond + ventes espèces + argent des livreurs − sorties) et envoie au propriétaire le verdict « Conforme » ou « Écart », avec les points d'attention",
@@ -252,10 +251,10 @@ ADDENDA += [
                "App livreur : Profil › « Revoir la visite guidée »",
                "La visite ne montre que les pages autorisées pour votre rôle"])]},
         {"id": "add-v4-inventories", "heading": "Inventaires réguliers : planifiés, surprise, partiels", "blocks": [
-            T("Tout article qui sort de la boutique sans être enregistré dans le système est considéré comme toujours en stock. Les inventaires réguliers vérifient que le stock réel correspond au stock du système."),
+            T("Seul le propriétaire lance ou planifie un inventaire. Deux façons de faire : automatique (le système ouvre l'inventaire à la date prévue) ou manuel (le propriétaire le lance à tout moment et compte avec la gérante)."),
             S(["Stock › Inventaires › « Planifier » (propriétaire) : nom, fréquence (semaine, 2 semaines, mois, trimestre), première date, rappel X jours avant, périmètre",
                "Chaque matin à 7h, les inventaires arrivés à échéance s'ouvrent tout seuls ; la gérante et la magasinière reçoivent un rappel avant la date, le jour même, puis tant que l'inventaire n'est pas soumis",
-               "« Inventaire surprise » (propriétaire) : lancé immédiatement, l'équipe est prévenue",
+               "« Nouvel inventaire » ou « Inventaire surprise » (propriétaire uniquement) : lancé immédiatement ; pour la surprise, l'équipe est prévenue",
                "Périmètre : tout le stock, ou une partie par catégorie, marque ou emplacement (champ Emplacement de la fiche produit)",
                "Comptage à l'aveugle : pour chaque ligne, quantité comptée, commentaire et photo ; « Enregistrer » garde le travail en cours",
                "« Soumettre au propriétaire » : toutes les lignes doivent être comptées",

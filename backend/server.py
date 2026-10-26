@@ -1674,7 +1674,7 @@ async def _inventory_lines(scope: Dict[str, Any], pids: list) -> list:
     return lines
 
 @api.post("/stock/inventories")
-async def inventory_create(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
+async def inventory_create(body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
     kind = body.get("kind") or "manuel"
     if kind == "surprise" and user.get("role") != "admin":
         raise HTTPException(403, "Inventaire surprise réservé au propriétaire")

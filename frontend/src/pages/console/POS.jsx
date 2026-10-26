@@ -304,7 +304,6 @@ function POSInner() {
 
       {/* RIGHT: Cart (desktop) + mobile bottom sheet */}
       <div className={`dina-card-white p-3 flex flex-col min-h-0 ${viewMobileCart?"fixed inset-x-0 bottom-0 top-14 z-40 md:static":"flex"}`} data-testid="pos-cart-panel">
-        <div className="mb-2 p-2 rounded-lg bg-[#fdf2e0] text-[#8a5a00] text-[11px] leading-snug" data-testid="pos-stock-rule">Tout article qui sort de la boutique sans être enregistré dans le système est considéré comme toujours en stock. Les inventaires réguliers vérifient que le stock réel correspond au stock du système.</div>
         <div className="flex items-center justify-between mb-2">
           <div className="font-semibold text-sm">Panier · <span className="text-[#666] text-xs">{cart.length} article{cart.length>1?"s":""}</span></div>
           <div className="flex items-center gap-2">
