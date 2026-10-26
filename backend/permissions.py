@@ -11,14 +11,14 @@ BUILTIN = ("manager", "sales", "stock_keeper", "community_manager")
 # console page -> (API prefixes it owns, API prefixes it may only read), default roles (mirrors frontend rbac.PATH_ROLES)
 MODULES: Dict[str, Tuple[tuple, tuple, list]] = {
     "/console": (("/api/dashboard",), (), [M, S, K, C]),
-    "/console/pos": (("/api/pos", "/api/cash-movements"), ("/api/customers", "/api/promotions", "/api/wallet", "/api/cash-sessions", "/api/orders", "/api/users"), [M, S]),
-    "/console/commandes": (("/api/orders", "/api/invoices", "/api/out-of-catalog"), ("/api/customers", "/api/deliveries", "/api/riders", "/api/users"), [M, S, K]),
-    "/console/sessions-caisse": (("/api/cash-sessions", "/api/manager-balance"), ("/api/users",), [M]),
+    "/console/pos": (("/api/pos", "/api/cash-movements"), ("/api/customers?", "/api/promotions", "/api/wallet", "/api/cash-sessions", "/api/orders", "/api/users", "/api/team"), [M, S]),
+    "/console/commandes": (("/api/orders", "/api/invoices", "/api/out-of-catalog"), ("/api/customers?", "/api/deliveries", "/api/riders", "/api/users", "/api/team"), [M, S, K]),
+    "/console/sessions-caisse": (("/api/cash-sessions", "/api/manager-balance"), ("/api/users", "/api/team"), [M]),
     "/console/liste-attente": (("/api/waitlist",), (), [M, S]),
     "/console/paniers-abandonnes": (("/api/abandoned-carts",), (), [M, S]),
-    "/console/livraisons": (("/api/deliveries", "/api/delivery-templates"), ("/api/orders", "/api/riders", "/api/users"), [M]),
-    "/console/journees-livraison": (("/api/delivery-sessions",), ("/api/riders",), [M]),
-    "/console/livreurs": (("/api/riders", "/api/rider-reports", "/api/rider-cms"), (), [M]),
+    "/console/livraisons": (("/api/deliveries", "/api/delivery-templates"), ("/api/orders", "/api/riders", "/api/users", "/api/team"), [M]),
+    "/console/journees-livraison": (("/api/delivery-sessions",), ("/api/riders", "/api/team", "/api/users"), [M]),
+    "/console/livreurs": (("/api/riders", "/api/rider-reports", "/api/rider-cms"), ("/api/team", "/api/users"), [M]),
     "/console/zones": (("/api/zones",), (), [M]),
     "/console/produits": (("/api/products", "/api/ai"), (), [M, S, K, C]),
     "/console/marques": (("/api/brands",), (), [M, K]),
@@ -27,7 +27,7 @@ MODULES: Dict[str, Tuple[tuple, tuple, list]] = {
     "/console/achats": (("/api/purchase-orders",), ("/api/suppliers",), [M, K]),
     "/console/stock": (("/api/stock", "/api/stock-movements", "/api/stock-alerts"), (), [M, S, K]),
     "/console/clients": (("/api/customers", "/api/wallet", "/api/customer-segments"), (), [M, S, C]),
-    "/console/messagerie": (("/api/messages",), ("/api/customers",), [M, S, C]),
+    "/console/messagerie": (("/api/messages",), ("/api/customers?",), [M, S, C]),
     "/console/promotions": (("/api/promotions", "/api/promo-types"), (), [M, C]),
     "/console/fidelite": (("/api/loyalty",), (), [M, C]),
     "/console/parrainage": (("/api/referrals",), (), [M, C]),
@@ -70,19 +70,33 @@ async def role_levels(role: str) -> Dict[str, str]:
     return {p: saved.get(p) if saved.get(p) in LV else default_level(role, p) for p in MODULES}
 
 
-async def check(role: str, method: str, path: str) -> Optional[bool]:
+def _hit(path: str, query: bool, prefixes: tuple) -> bool:
+    """Segment-exact prefix match; a trailing '?' means: only as a search (query string present)."""
+    for p in prefixes:
+        if p.endswith("?"):
+            if query and (path == p[:-1] or path.startswith(p[:-1] + "/search")):
+                return True
+        elif path == p or path.startswith(p + "/"):
+            return True
+    return False
+
+
+SHARED_READ = ("/api/business", "/api/brands", "/api/categories", "/api/products", "/api/zones", "/api/collections")
+
+
+async def check(role: str, method: str, path: str, query: bool = False) -> Optional[bool]:
     """True/False when a module covers this API path; None when no module does (legacy rules apply)."""
-    from role_access import COMMON, COMMON_READ, READ
-    if path.startswith(COMMON) or (method in READ and path.startswith(COMMON_READ)):
+    from role_access import COMMON, READ
+    if path.startswith(COMMON) or (method in READ and _hit(path, False, SHARED_READ)):
         return None
     levels = await role_levels(role)
     need = 1 if method in READ else 3 if method == "DELETE" else 2
     best = -1
     for page, (own, reads, _) in MODULES.items():
         lv = LV[levels[page]]
-        if path.startswith(own):
+        if _hit(path, query, own):
             best = max(best, lv)
-        elif reads and method in READ and path.startswith(reads):
+        elif reads and method in READ and _hit(path, query, reads):
             best = max(best, min(lv, 1))
     if best < 0:
         return None

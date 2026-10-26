@@ -19,9 +19,9 @@ async def all_roles():
         if r.get("key") and r["key"] not in [x["key"] for x in out]:
             m = meta.get(r["key"]) or {}
             out.append({"key": r["key"], "label": m.get("label") or r.get("name") or r["key"], "active": m.get("active", r.get("active", True)), "builtin": False, "id": r.get("id")})
-    perms = (await db.roles_permissions.find_one({"id": "main"}) or {}).get("matrix") or {}
+    perms = (await db.roles_permissions.find_one({"id": "main"}) or {}).get("v2") or {}
     for k in perms:
-        if k not in [x["key"] for x in out]:
+        if k not in [x["key"] for x in out] and k not in ("admin", "rider"):
             m = meta.get(k) or {}
             out.append({"key": k, "label": m.get("label") or k.replace("_", " ").capitalize(), "active": m.get("active", True), "builtin": False})
     return out

@@ -1,0 +1,54 @@
+{
+  "summary": "Tested the permission matrix (API + UI), regular inventories (API + UI), cron, the guided tour (console + rider) and the manual addenda. Backend pytest: 11 of 15 passed. The 4 failures are real permission-enforcement gaps. Working: the inventory flow end to end (scope by category/brand/location; surprise inventories owner-only; blind count with comment and photo; submit only when all lines are counted; reject with a reason and notification; close applies the gaps to stock; history), plans (CRUD, idempotent run, next_due moves forward, reminder), cron (401, 200, duplicate ignored) and the manual sections. In the UI, the guided tour works in the console (9 steps for the manager, shown once, relaunchable from Manuel, Escape closes it) and in the rider app (6 steps, relaunch from profil-row-tour). Module 'none' hides the nav item and a direct URL redirects. Module 'read' shows readonly-banner. The inventories UI flow works end to end. Found a regression: a manager on the default matrix gets 403 on GET /api/team, so the Livraisons, Journées de livraison and Livreurs pages break. Also, a custom role created from the Rôles & permissions page is lost on reload.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/team (manager, DEFAULT matrix)", "issue": "Regression: returns 403 'Module non autorisé'. /api/team belongs to '/console/equipe' (default none for manager) and is not in the shared reads of livraisons, journees-livraison or livreurs. Deliveries.jsx, DeliveryDays.jsx, Riders.jsx and RiderDetail.jsx load it inside Promise.all, so these pages fail to load: empty data (e.g. 'Livreurs actifs 0'), an unhandled rejection, and the Emergent error overlay that blocked the guided tour on the Livraisons step. Fix: add '/api/team' to the read tuple of /console/livraisons, /console/journees-livraison and /console/livreurs (as was done for /api/users), and/or add .catch on these calls.", "priority": "CRITICAL"},
+      {"endpoint": "permissions.check: COMMON_READ prefix bypass", "issue": "COMMON_READ contains '/api/stock' and '/api/products'. With startswith, any GET on /api/stock-movements, /api/stock-alerts, /api/stock/inventories or /api/products returns None (legacy rules apply) even when the role's '/console/stock' or '/console/produits' is 'none'. Reproduced: sales and manager with stock=none still get 200 on GET /api/stock-movements, /api/stock/inventories and /api/stock-alerts. So 'Aucun' is not enforced server-side for read on the Stock and Produits modules. Fix: match exact segments (path == p or path.startswith(p + '/')) and decide which catalogue reads must stay shared (e.g. GET /api/products for POS).", "priority": "HIGH"},
+      {"endpoint": "Shared reads defeat 'none' on Clients", "issue": "With manager '/console/clients'=none, GET /api/customers still returns 200, because /console/pos, /console/commandes and /console/messagerie give read on /api/customers. It only returns 403 once all four modules are none. The review expected 403. Either document this as intended or limit the shared read to the narrow endpoints POS needs (e.g. customer search) instead of the full customer list.", "priority": "HIGH"},
+      {"endpoint": "GET /api/permissions/me (limited roles)", "issue": "Returns 403 'Accès non autorisé pour votre rôle' for sales (and any role in ROLE_API), because /api/permissions/ is not in COMMON. Fix: add '/api/permissions/me' to COMMON. /api/auth/me does return perm_levels.", "priority": "MEDIUM"}
+    ],
+    "minor": [
+      {"endpoint": "GET /api/roles-permissions", "issue": "Uses get_user, not require_role('admin'): any manager can read the whole matrix (returns 200 for manager)."},
+      {"endpoint": "POST /api/stock/inventories/{id}/count", "issue": "int(qty_counted) on a non-numeric value raises an unhandled 500. Validate the input."},
+      {"endpoint": "POST /api/cron/inventories", "issue": "Duplicate detection is find-then-insert (not atomic). Use a unique index on run_id or upsert."},
+      {"endpoint": "routers/roles_meta.all_roles", "issue": "Lists custom role keys from the legacy 'matrix' field only, not from 'v2'."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "RolesPermissions.jsx addRole", "issue": "'Nouveau rôle' only adds the role to local state. Saving writes it into v2, but no db.roles document is created, and GET /roles-permissions only lists db.roles keys plus built-ins. After a reload the role disappears from the matrix and cannot be assigned to users. Reproduced with role 'testuirole'. Fix: POST /api/roles when a role is added, or include v2 keys in GET.", "selector": "[data-testid=roles-add], [data-testid=new-role-create]", "priority": "HIGH"},
+      {"component": "Livraisons / Journées de livraison / Livreurs (manager)", "issue": "The pages break for the manager because of the GET /api/team 403 (see backend critical).", "selector": "/console/livraisons", "priority": "CRITICAL"}
+    ],
+    "integration_issues": [
+      {"flow": "Read-only module", "issue": "readonly-banner is shown, but create/edit/delete buttons are still visible and clickable ('Nouvelle promo', 'Vente flash', edit and delete icons on Promotions). The server returns 403, so the user only sees an error after acting. Hide or disable write actions when permLevel === 'read'.", "affected_selectors": ["[data-testid=readonly-banner]"]}
+    ],
+    "design_issues": [
+      {"screen": "Rôles & permissions", "issues": ["A Livreur (rider) column is shown, but the backend drops rider cells, so edits to it are silently ignored.", "Two columns are labelled 'VENDEUSE': built-in 'sales' and a custom db.roles key 'vendeuse'. This is confusing."]},
+      {"screen": "Inventaires › Planifier modal", "issues": ["Uses the native input type=date (inv-plan-date) instead of the shadcn calendar."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter101_perms_inventories.py", "/app/backend/tests/ui_seed_iter101.py", "/app/test_reports/pytest/pytest_iter101.xml"],
+  "action_items": [
+    "Add '/api/team' to the shared reads of /console/livraisons, /console/journees-livraison and /console/livreurs (manager regression), and add .catch on /team in Deliveries, DeliveryDays, Riders and RiderDetail",
+    "Fix the COMMON_READ prefix bypass in permissions.check / role_access: '/api/stock' matches '/api/stock-movements' and '/api/stock-alerts'. Use exact path-segment matching so 'none' on Stock and Produits blocks reads",
+    "Decide on the shared reads of /api/customers (POS, commandes, messagerie): 'Clients = Aucun' currently does not block GET /api/customers",
+    "Add /api/permissions/me to COMMON so limited roles can call it",
+    "Persist custom roles created on the Rôles & permissions page (POST /api/roles, or list v2 keys in GET /roles-permissions)",
+    "Hide or disable write actions in the UI when the module level is 'read'",
+    "Restrict GET /api/roles-permissions to admin. Validate qty_counted (avoid the 500)"
+  ],
+  "critical_code_review_comments": [
+    "permissions.check returns None for every COMMON_READ prefix before looking at the matrix, so the matrix never applies to GETs on /api/business, /api/brands, /api/categories, /api/products, /api/stock* or /api/zones. Combined with the startswith prefixes, this lets modules leak.",
+    "In require_role, 'inherits' gives every non-built-in or limited role manager-level endpoint access once get_user passes. This is safe only if the matrix covers every path; uncovered paths for custom roles are blocked by the BUILTIN check (good).",
+    "The PATCH /roles-permissions matrix replaces the whole v2 (no merge). The UI sends the full matrix, so saving once freezes the current defaults for every role; later changes to the code defaults will not apply.",
+    "GuidedTour marks tour_done as soon as the tour opens (before the user finishes it). Acceptable, but a user who closes the browser at step 1 never sees it again unless they relaunch it from the manual."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter101_perms_inventories.py", "/app/backend/tests/ui_seed_iter101.py"],
+  "success_rate": {"backend": "73% (11/15)", "frontend": "85% (tour console+rider, nav hide/redirect, readonly banner and inventories UI pass; Livraisons pages broken for the manager; custom role not persisted)"},
+  "test_credentials": "From /app/memory/test_credentials.md (admin aouattaraesca@gmail.com/Admin123!). TEST_ users were created through POST /api/users and deleted afterwards. Punch-in used POST /api/attendance/check-in with a fake selfie dataURL (more than 1000 chars).",
+  "seed_data_creation": "Temporary data only: TEST users (manager x2, rider PIN 7391, plus manager/sales/stock_keeper/community_manager/custom role in pytest), custom role test_custom_*, TEST_prod_* products, TEST inventories, plans and cron_runs. All deleted. roles_permissions v2 was unset (back to defaults, as before the tests). Note: the pytest teardown also removed 2 old 'TEST_FP5 Inv' inventories left over from earlier iterations.",
+  "retest_needed": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Run pytest with -n 0: the tests change the global matrix and must run serially, and xdist is on by default. The staff login inputs have no type attribute, so use page.locator('input:visible').nth(0/1). The Emergent error overlay (data-emergent-overlay-host) intercepts clicks on unhandled rejections; add an init_script that stops 'unhandledrejection'. Real users: admin and manager have tour_done=true, rider1 has no tour_done, so do not log in as rider1 for tour tests. Restore the matrix with PATCH {matrix:{}} plus $unset v2.",
+  "rca of the issue": "/api/team 403: permissions.MODULES maps '/api/team' as owned by '/console/equipe', where the manager default is none, and it is missing from the read tuples of the delivery modules. Before this change, role_access.api_allowed allowed everything for the manager (manager is not in ROLE_API). Repro: log in as a manager, punch in, GET /api/team returns 403. Stock bypass: COMMON_READ prefix '/api/stock' also matches '/api/stock-movements' through str.startswith, and check() returns None before the matrix is consulted."
+}

@@ -123,7 +123,7 @@ async def get_user(request: Request):
     role = user.get("role")
     if role not in ("admin", "rider"):
         from permissions import check, BUILTIN
-        ok = await check(role, request.method, path)
+        ok = await check(role, request.method, path, bool(request.url.query))
         if ok is False:
             raise HTTPException(403, "Module non autorisé pour votre rôle")
         if ok is None and role not in BUILTIN and not (path.startswith(COMMON) or (request.method in READ and path.startswith(COMMON_READ))):

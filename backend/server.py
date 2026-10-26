@@ -131,7 +131,8 @@ class ReferralApplyIn(BaseModel):
     code: str          # parrain's referral_code
     customer_id: str   # filleul (new customer)
 class RolesPermissionsIn(BaseModel):
-    matrix: Dict[str, Dict[str, Any]]  # {role: {permission_key: level|bool}}
+    matrix: Dict[str, Dict[str, Any]]  # {role: {console path: level}}
+    labels: Optional[Dict[str, str]] = None
 class AttendancePunchIn(BaseModel):
     code: str
     kind: str = "in"  # in | out
@@ -2944,9 +2945,10 @@ DEFAULT_PERMS = {
 @api.get("/roles-permissions")
 async def get_roles_permissions(user: dict = Depends(get_user)):
     from permissions import MODULES, role_levels
-    keys = {"admin", "manager", "sales", "stock_keeper", "community_manager"} | {r["key"] for r in await db.roles.find({}, {"key": 1}).to_list(100) if r.get("key")}
-    keys.discard("rider")
-    return {"id": "main", "matrix": {k: await role_levels(k) for k in sorted(keys)}, "modules": list(MODULES)}
+    from routers.roles_meta import all_roles
+    keys = {r["key"] for r in await all_roles()} | {"manager", "sales", "stock_keeper", "community_manager"}
+    keys -= {"rider", "admin"}
+    return {"id": "main", "matrix": {"admin": await role_levels("admin"), **{k: await role_levels(k) for k in sorted(keys)}}, "modules": list(MODULES)}
 
 @api.get("/permissions/me")
 async def my_permissions(user: dict = Depends(get_user)):
@@ -2958,6 +2960,9 @@ async def update_roles_permissions(body: RolesPermissionsIn, user: dict = Depend
     from permissions import MODULES, LV, invalidate
     v2 = {role: {p: lv for p, lv in perms.items() if p in MODULES and lv in LV} for role, perms in body.matrix.items() if role not in ("admin", "rider")}
     await db.roles_permissions.update_one({"id": "main"}, {"$set": {"id": "main", "v2": v2, "updated_at": now_iso(), "updated_by": user.get("name")}}, upsert=True)
+    for k, lbl in (body.labels or {}).items():
+        if k in v2 and k not in ("manager", "sales", "stock_keeper", "community_manager") and str(lbl).strip():
+            await db.role_meta.update_one({"key": k}, {"$setOnInsert": {"key": k, "label": str(lbl).strip()[:40], "active": True}}, upsert=True)
     invalidate()
     await db.audit_log.insert_one({"id": new_id(), "action": "roles.permissions", "by": user.get("name"), "at": now_iso()})
     return {"ok": True}

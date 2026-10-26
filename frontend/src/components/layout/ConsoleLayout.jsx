@@ -421,7 +421,7 @@ export default function ConsoleLayout() {
             )}
           </div>
         </header>
-        <div className="p-3 sm:p-4 lg:p-6 flex-1 min-w-0">{permLevel(pathname) === "read" && <div className="mb-3 text-xs px-3 py-2 rounded-lg bg-[#eceefe] text-[#3b47c4] font-medium" data-testid="readonly-banner">Lecture seule · votre rôle peut consulter cette page mais pas la modifier.</div>}<ErrorBoundary><Outlet /></ErrorBoundary></div>
+        <div className={`p-3 sm:p-4 lg:p-6 flex-1 min-w-0 ${permLevel(pathname) === "read" ? "dina-readonly" : ""}`}>{permLevel(pathname) === "read" && <div className="mb-3 text-xs px-3 py-2 rounded-lg bg-[#eceefe] text-[#3b47c4] font-medium" data-testid="readonly-banner"><style>{`.dina-readonly .dina-btn-primary,.dina-readonly [data-testid*="delete"],.dina-readonly [data-testid*="-new"],.dina-readonly [data-testid*="edit"],.dina-readonly [data-testid*="save"],.dina-readonly [data-testid*="create"],.dina-readonly [data-testid*="remove"]{opacity:.35;pointer-events:none}`}</style>Lecture seule · votre rôle peut consulter cette page mais pas la modifier.</div>}<ErrorBoundary><Outlet /></ErrorBoundary></div>
       </main>
       <GuidedTour/>
 

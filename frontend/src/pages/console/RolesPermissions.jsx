@@ -46,7 +46,7 @@ export default function RolesPermissions() {
   const SECTIONS = useMemo(() => buildSections(mods), [mods]);
   const [allRoles, reloadRoles] = useRoles();
   const [roles, setRoles] = useState([]);
-  useEffect(() => { if (allRoles.length) setRoles(rs => [...allRoles, ...rs.filter(r => !allRoles.find(a => a.key === r.key))]); }, [allRoles]);
+  useEffect(() => { if (allRoles.length) setRoles(rs => [...allRoles, ...rs.filter(r => !allRoles.find(a => a.key === r.key))].filter(r => r.key !== "rider")); }, [allRoles]);
   const rename = async (r) => { const l = window.prompt("Nouveau nom du rôle", r.label); if (!l?.trim()) return; try { await api.patch(`/roles/meta/${r.key}`, { label: l.trim() }); toast.success("Rôle renommé"); reloadRoles(); } catch (e) { toast.error(e.response?.data?.detail || "Erreur"); } };
   const toggle = async (r) => { if (!window.confirm(r.active === false ? `Réactiver le rôle « ${r.label} » ?` : `Désactiver le rôle « ${r.label} » ? Ses employés ne pourront plus se connecter.`)) return; try { await api.patch(`/roles/meta/${r.key}`, { active: r.active === false }); toast.success(r.active === false ? "Rôle réactivé" : "Rôle désactivé"); reloadRoles(); } catch (e) { toast.error(e.response?.data?.detail || "Erreur"); } };
   const [saving, setSaving] = useState(false);
@@ -81,8 +81,9 @@ export default function RolesPermissions() {
   const save = async () => {
     setSaving(true);
     try {
-      await api.patch("/roles-permissions", { matrix });
+      await api.patch("/roles-permissions", { matrix, labels: Object.fromEntries(roles.filter(r => !r.builtin).map(r => [r.key, r.label])) });
       toast.success("Matrice enregistrée · appliquée à la prochaine page ouverte par chaque employé");
+      reloadRoles();
     } catch (e) { toast.error(e?.response?.status === 403 ? "Droits admin requis" : (typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Enregistrement impossible · réessayez")); }
     finally { setSaving(false); }
   };
