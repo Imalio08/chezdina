@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { dateTimeFmt } from "@/lib/format";
 import { Camera, MapPin, Loader2, Send, X, CheckCircle2, Clock, AlertTriangle } from "lucide-react";
 import SubPage from "@/components/rider/SubPage";
+import { getPosition } from "@/lib/permissions";
 
 export const KINDS = [["panne_moto", "Panne moto"], ["accident", "Accident"], ["client_injoignable", "Client injoignable"], ["client_agressif", "Client agressif"], ["colis_endommage", "Colis endommagé"], ["autre", "Autre"]];
 export const URGENCY = [["faible", "Faible", "#1f8a4c"], ["moyenne", "Moyenne", "#e4991e"], ["haute", "Haute", "#c62828"], ["critique", "Critique", "#7a0f0f"]];
@@ -38,8 +39,7 @@ function ReportForm({ orders, onSent }) {
   const [geo, setGeo] = useState("pending");
   const [busy, setBusy] = useState(false);
   useEffect(() => {
-    if (!navigator.geolocation) { setGeo("off"); return; }
-    navigator.geolocation.getCurrentPosition(p => { setPos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: Math.round(p.coords.accuracy) }); setGeo("ok"); }, () => setGeo("off"), { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 });
+    getPosition().then(c => { if (c) { setPos({ lat: c.latitude, lng: c.longitude, acc: Math.round(c.accuracy) }); setGeo("ok"); } else setGeo("off"); });
   }, []);
   const set = (k, v) => setF(x => ({ ...x, [k]: v }));
   const pickPhoto = async (e) => { const file = e.target.files?.[0]; if (file) { try { set("photo", await compress(file)); } catch { toast.error("Photo illisible"); } } };

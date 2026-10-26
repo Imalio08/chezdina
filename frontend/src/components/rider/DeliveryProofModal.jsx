@@ -7,6 +7,7 @@ import { Shield, Camera, X, Check, AlertTriangle } from "lucide-react";
 import { compressImage } from "@/lib/imageCompress";
 import { editImage } from "@/components/shared/ImageEditor";
 import { enqueue, patchCachedOrder, isNetErr } from "@/lib/riderOffline";
+import { getPosition } from "@/lib/permissions";
 
 export default function DeliveryProofModal({ order, onClose, onDone }) {
   const [tab, setTab] = useState("code"); // code | photo | thirdparty
@@ -30,7 +31,7 @@ export default function DeliveryProofModal({ order, onClose, onDone }) {
     const c = await compressImage(f, 1600, 0.9); const ed = await editImage(c);
     if (ed) setPhoto(await compressImage(await (await fetch(ed)).blob()));
   };
-  const getPos = () => new Promise(res => { if (!navigator.geolocation) return res({}); navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res({}), { timeout: 5000 }); });
+  const getPos = () => getPosition({ timeout: 5000 }).then(c => c ? { lat: c.latitude, lng: c.longitude } : {});
 
   const submit = async () => {
     const pos = await getPos();

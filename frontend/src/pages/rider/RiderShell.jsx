@@ -17,6 +17,7 @@ import { NotifItem, useOpenNotif, markAllRead, FilterTabs } from "@/pages/rider/
 import { CheckCheck } from "lucide-react";
 import OfflineBar from "@/components/rider/OfflineBar";
 import { startRiderSync, fetchDay } from "@/lib/riderOffline";
+import { permState } from "@/lib/permissions";
 
 // Icons available for custom rider tabs
 const ICONS = {
@@ -168,8 +169,16 @@ export default function RiderShell() {
     return () => { clearInterval(t); window.removeEventListener("attendance-config-changed", onCfg); };
   }, []);
 
-  // Live GPS tracking
+  // Live GPS tracking: only once the rider already granted location (never prompts at app launch)
+  const [gpsOk, setGpsOk] = useState(false);
   useEffect(() => {
+    permState("geolocation").then(s => { if (s === "granted") setGpsOk(true); });
+    const f = () => setGpsOk(true);
+    window.addEventListener("dina-gps-granted", f);
+    return () => window.removeEventListener("dina-gps-granted", f);
+  }, []);
+  useEffect(() => {
+    if (!gpsOk) return;
     if (!navigator.geolocation) { setGpsState(s => ({ ...s, denied: true })); return; }
     const latest = { current: null, heading: null };
     const onOrient = (e) => {
@@ -229,7 +238,7 @@ export default function RiderShell() {
       window.removeEventListener("deviceorientationabsolute", onOrient, true);
       window.removeEventListener("deviceorientation", onOrient, true);
     };
-  }, []);
+  }, [gpsOk]);
 
   useEffect(() => {
     const stop = startRiderSync();

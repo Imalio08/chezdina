@@ -3,10 +3,10 @@
  */
 /* global clients */
 self.addEventListener("install", (e) => { self.skipWaiting(); });
-self.addEventListener("activate", (e) => { e.waitUntil(self.clients.claim()); });
+self.addEventListener("activate", (e) => { e.waitUntil(caches.keys().then((ks) => Promise.all(ks.filter((k) => ![SHELL, STATIC, TILES].includes(k)).map((k) => caches.delete(k)))).then(() => self.clients.claim())); });
 
 // Offline: app shell (network-first), static bundles + map tiles (cache-first). API calls are handled by the app (IndexedDB).
-const SHELL = "dina-shell-v1", STATIC = "dina-static-v1", TILES = "dina-tiles-v1";
+const SHELL = "dina-shell-v2", STATIC = "dina-static-v2", TILES = "dina-tiles-v1";
 self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;

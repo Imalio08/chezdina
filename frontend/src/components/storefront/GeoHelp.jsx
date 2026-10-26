@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { X, MapPin, Check } from "lucide-react";
+import { getPosition } from "@/lib/permissions";
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -74,14 +75,12 @@ export function useLocate(onOk, current) {
   const [busy, setBusy] = useState(false);
   const [help, setHelp] = useState(false);
   const [picker, setPicker] = useState(false);
-  const locate = () => {
+  const locate = async () => {
     if (!navigator.geolocation) { setHelp(true); return; }
     setBusy(true);
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setBusy(false); setHelp(false); onOk({ lat: p.coords.latitude, lng: p.coords.longitude }); },
-      () => { setBusy(false); setHelp(true); },
-      { enableHighAccuracy: true, timeout: 12000 }
-    );
+    const c = await getPosition({ timeout: 12000, maximumAge: 0 });
+    setBusy(false);
+    if (c) { setHelp(false); onOk({ lat: c.latitude, lng: c.longitude }); } else setHelp(true);
   };
   const ui = <>
     {help && <GeoHelpModal onClose={() => setHelp(false)} onRetry={locate} onManual={() => { setHelp(false); setPicker(true); }} />}

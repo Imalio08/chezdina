@@ -11,6 +11,8 @@ import { notifsChanged } from "@/pages/rider/Notifications";
 import { OrderFilters, applyOrderFilters, EMPTY_FILTERS } from "@/components/shared/OrderFilters";
 import { fetchDay, enqueue, patchCachedOrder, isNetErr, kvGet } from "@/lib/riderOffline";
 import { callCustomer } from "@/lib/riderCall";
+import { getPosition } from "@/lib/permissions";
+import { speak } from "@/lib/voiceNav";
 
 const FAIL_REASONS = ["Cliente absente", "Cliente injoignable", "Refus de la commande", "Adresse introuvable", "Autre"];
 
@@ -200,7 +202,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
   const navTo = useNav();
   const canCall = order.status === "en_livraison" && !order.readonly;
   const markArrived = () => api.post(`/riders/me/orders/${order.id}/arrived`).then(() => { setArrived(true); toast.success("Arrivée signalée"); }).catch(e => toast.error(e?.response?.data?.detail || "Erreur"));
-  const itinerary = () => navTo(`/riders/carte?route=${order.id}`);
+  const itinerary = () => navTo(`/riders/carte?route=${order.id}${order.status === "en_livraison" ? "&nav=1" : ""}`);
 
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-end" onClick={onClose}>
@@ -234,7 +236,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
             {order.payment_method === "cod" && order.deposit_paid > 0 && <div className="flex justify-between text-xs text-[#1f8a4c]" data-testid="order-deposit-paid"><span>Acompte déjà payé</span><span className="tabular">− {fcfa(order.deposit_paid)}</span></div>}
           </div>
           {order.readonly ? <div className="text-xs text-center text-[#666] py-2" data-testid="order-readonly">Course {order.status === "reportee" ? "reportée et rendue à la boutique" : "clôturée"} · consultation seule</div> : <div className="grid grid-cols-2 gap-2">
-            {["confirmee", "prete", "assignee"].includes(order.status) && <button onClick={() => onStatus(order.id, "en_livraison")} className="dina-btn-primary !min-h-[44px]" data-testid="status-en-route">Je démarre</button>}
+            {["confirmee", "prete", "assignee"].includes(order.status) && <button onClick={async () => { speak("Course démarrée. Calcul de l'itinéraire.", localStorage.getItem("dina_voice_nav") !== "off"); getPosition(); await onStatus(order.id, "en_livraison"); navTo(`/riders/carte?route=${order.id}&nav=1`); }} className="dina-btn-primary !min-h-[44px]" data-testid="status-en-route">Je démarre</button>}
             {order.status === "en_livraison" && <button onClick={() => onDeliver(order)} className="dina-btn-primary !min-h-[44px]" data-testid="rider-delivered">Livrée</button>}
             {order.status !== "livree" && <button onClick={() => setFail(true)} className="dina-btn-secondary !min-h-[44px] text-xs" style={{ color: "#c62828" }} data-testid="status-fail">Échec</button>}
             {order.status !== "livree" && <button onClick={() => setPostpone(true)} className="dina-btn-secondary !min-h-[44px] text-xs" data-testid="status-reschedule">Reporter</button>}

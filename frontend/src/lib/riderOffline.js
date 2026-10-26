@@ -1,5 +1,6 @@
 // Rider offline mode: day cache + action queue in IndexedDB (survives app close / phone restart).
 import api from "@/lib/api";
+import { getPosition } from "@/lib/permissions";
 
 const DBN = "dina_rider_offline";
 let dbp = null;
@@ -30,10 +31,7 @@ export async function purgeCustomerData() {
   try { Object.keys(localStorage).filter(k => /^dina_(rider_course|conv|order)/.test(k)).forEach(k => localStorage.removeItem(k)); } catch { /* ignore */ }
 }
 
-const quickPos = () => new Promise(res => {
-  if (!navigator.geolocation) return res({});
-  navigator.geolocation.getCurrentPosition(p => res({ lat: p.coords.latitude, lng: p.coords.longitude }), () => res({}), { timeout: 4000, maximumAge: 120000 });
-});
+const quickPos = () => getPosition({ ask: false, timeout: 4000, maximumAge: 120000, enableHighAccuracy: false }).then(c => c ? { lat: c.latitude, lng: c.longitude } : {});
 
 let seqN = 0;
 export async function enqueue(kind, fields) {

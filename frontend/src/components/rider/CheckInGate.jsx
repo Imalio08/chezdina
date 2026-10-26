@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import api from "@/lib/api";
 import { toast } from "sonner";
 import { Camera, MapPin, CheckCircle2, Loader2, AlertTriangle, X } from "lucide-react";
+import { getPosition, rememberCamera } from "@/lib/permissions";
 
 /** Live selfie + GPS attendance gate for riders. Blocks all tabs until check-in. */
 export default function CheckInGate({ user, onDone }) {
@@ -17,16 +18,13 @@ export default function CheckInGate({ user, onDone }) {
     (async () => {
       try {
         const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+        rememberCamera();
         setStream(s);
         if (videoRef.current) { videoRef.current.srcObject = s; videoRef.current.play().catch(()=>{}); }
       } catch { toast.error("Autorisez la caméra pour pointer"); }
     })();
     if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        p => setPos({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy }),
-        err => setGeoErr(err.message),
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-      );
+      getPosition({ timeout: 15000, maximumAge: 10000 }).then(c => c ? setPos({ lat: c.latitude, lng: c.longitude, acc: c.accuracy }) : setGeoErr("Autorisez la localisation dans les réglages du téléphone"));
     }
     return () => { stream?.getTracks().forEach(t => t.stop()); }; // eslint-disable-line
   }, []); // eslint-disable-line
