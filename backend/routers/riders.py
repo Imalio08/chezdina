@@ -60,7 +60,40 @@ async def push_rider_location(body: RiderLocationIn, user: dict = Depends(get_us
         {"$set": {**base, "at": at, "accuracy": body.accuracy or 0}},
         upsert=True,
     )
-    return {"ok": True}
+    arrived = []
+    async for o in db.orders.find({"rider_id": user["id"], "status": "en_livraison", "arrived_at": {"$in": [None, ""]},
+                                   "customer.lat": {"$nin": [None, ""]}}, {"id": 1, "code": 1, "customer": 1}):
+        c = o.get("customer") or {}
+        try:
+            d = _dist_m(body.lat, body.lng, float(c["lat"]), float(c["lng"]))
+        except (TypeError, ValueError, KeyError):
+            continue
+        if d <= 50 and (body.accuracy or 0) <= 100 and await _mark_arrived(o, user, auto=True):
+            arrived.append({"id": o["id"], "code": o.get("code"), "name": (c.get("name") or "").split(" ")[0]})
+    return {"ok": True, "arrived": arrived}
+
+
+def _dist_m(lat1, lng1, lat2, lng2) -> float:
+    import math
+    r = math.pi / 180
+    a = math.sin((lat2 - lat1) * r / 2) ** 2 + math.cos(lat1 * r) * math.cos(lat2 * r) * math.sin((lng2 - lng1) * r / 2) ** 2
+    return 2 * 6371000 * math.asin(math.sqrt(a))
+
+
+async def _mark_arrived(o: Dict[str, Any], user: dict, auto: bool) -> bool:
+    """Sets arrived_at once and tells the customer her rider is at the door."""
+    r = await db.orders.update_one({"id": o["id"], "status": "en_livraison", "arrived_at": {"$in": [None, ""]}},
+                                   {"$set": {"arrived_at": now_iso(), "arrived_auto": auto},
+                                    "$push": {"contact_log": {"kind": "arrived", "at": now_iso(), "by": user.get("name"), "by_id": user["id"], "via": "gps_50m" if auto else "bouton"}}})
+    if not r.modified_count:
+        return False
+    cid = (o.get("customer") or {}).get("id")
+    if cid:
+        from routers.notify import notify
+        first = (user.get("name") or "Votre livreur").split(" ")[0]
+        await notify("customer", cid, "Votre livreur est arrivé", f"{first} est devant chez vous avec votre commande {o.get('code')}.",
+                     f"/suivi/{o.get('code')}", "order", o.get("code"), f"arrived:{o['id']}")
+    return True
 
 
 @router.get("/riders/locations")
@@ -362,9 +395,11 @@ async def rider_call(oid: str, user: dict = Depends(get_user)):
 
 @router.post("/riders/me/orders/{oid}/arrived")
 async def rider_arrived(oid: str, user: dict = Depends(get_user)):
-    r = await db.orders.update_one({"id": oid, "rider_id": user["id"], "status": "en_livraison"}, {"$set": {"arrived_at": now_iso()}})
-    if not r.matched_count:
+    o = await db.orders.find_one({"id": oid, "rider_id": user["id"], "status": "en_livraison"}, {"id": 1, "code": 1, "customer": 1, "arrived_at": 1})
+    if not o:
         raise HTTPException(400, "Course non en route")
+    if not o.get("arrived_at"):
+        await _mark_arrived(o, user, auto=False)
     return {"ok": True}
 
 

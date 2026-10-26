@@ -18,6 +18,7 @@ import { CheckCheck } from "lucide-react";
 import OfflineBar from "@/components/rider/OfflineBar";
 import { startRiderSync, fetchDay } from "@/lib/riderOffline";
 import { permState, getPosition } from "@/lib/permissions";
+import { speak } from "@/lib/voiceNav";
 
 // Icons available for custom rider tabs
 const ICONS = {
@@ -207,13 +208,18 @@ export default function RiderShell() {
     }
     const push = async (coords) => {
       try {
-        await api.post("/riders/location", {
+        const { data } = await api.post("/riders/location", {
           lat: coords.latitude, lng: coords.longitude,
           accuracy: coords.accuracy,
           heading: latest.heading != null ? latest.heading : (coords.heading != null && !Number.isNaN(coords.heading) ? coords.heading : null),
           speed: coords.speed != null && !Number.isNaN(coords.speed) ? coords.speed : null,
           battery_level: battery ? Math.round(battery.level * 100) : null,
           battery_charging: battery ? battery.charging : null,
+        });
+        (data?.arrived || []).forEach(a => {
+          toast.success(`Arrivé · ${a.code} · ${a.name || "la cliente"} a été prévenue`);
+          speak(`Vous êtes arrivé. ${a.name || "La cliente"} a été prévenue.`, localStorage.getItem("dina_voice_nav") !== "off");
+          window.dispatchEvent(new CustomEvent("dina-arrived", { detail: a }));
         });
         setGpsState(s => ({ ...s, live: true, last_sent: new Date(), denied: false, accuracy: coords.accuracy, heading: latest.heading }));
       } catch { /* ignore */ }

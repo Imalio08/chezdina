@@ -24,6 +24,7 @@ export default function Tracking() {
           <div className="flex gap-1 mb-4">{steps.map((s,i)=><div key={s} className="flex-1 h-1.5 rounded-full" style={{background:i<=current?statusColor[s]:"#ececec"}}/>)}</div>
           <div className="dina-chip" style={{color:statusColor[o.status]}}><span className="status-dot" style={{background:statusColor[o.status]}}/>{statusLabel[o.status]}</div>
           {(needsWave(o) || o.wave_proof) && <div className="mt-4 p-4 rounded-xl border border-[#ececec]" data-testid="tracking-wave"><WavePayBox order={o} onChange={load}/></div>}
+          {o.status === "en_livraison" && o.arrived_at && <div className="text-sm mt-4 p-3 bg-[#e9f7ef] text-[#1f6b3d] rounded-lg font-semibold" data-testid="tracking-arrived">Votre livreur est arrivé · il vous attend devant chez vous.</div>}
           {o.rider_name && <div className="text-sm mt-4 p-3 bg-[#fff8e9] rounded-lg">Livreur: <strong>{o.rider_name}</strong></div>}
           <div className="mt-6 space-y-1">{o.items.map((it,i)=><div key={i} className="flex justify-between text-sm"><span>{it.qty}× {it.name}</span><span className="tabular">{fcfa(it.qty*it.price)}</span></div>)}</div>
           <div className="flex justify-between font-semibold mt-4 pt-4 border-t border-[#ececec]"><span>Total</span><span className="tabular">{fcfa(o.total)}</span></div>

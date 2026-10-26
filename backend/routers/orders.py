@@ -129,7 +129,7 @@ async def track(code: str):
     if not o:
         raise HTTPException(404)
     keep = ("code", "status", "items", "total", "subtotal", "delivery_fee", "discount", "created_at", "timeline", "rider_name",
-            "payment_method", "payment_status", "deposit_required", "deposit_paid", "delivery_zone", "mode")
+            "payment_method", "payment_status", "deposit_required", "deposit_paid", "delivery_zone", "mode", "arrived_at")
     out = {k: o.get(k) for k in keep}
     c = o.get("customer") or {}
     out["customer"] = {"name": (c.get("name") or "").split(" ")[0]}

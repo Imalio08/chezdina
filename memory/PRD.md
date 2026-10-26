@@ -1296,6 +1296,12 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Carte : « Je démarre » → /riders/carte?route=<id>&nav=1, seule la course visible, itinéraire OSRM depuis la position, consignes en français, guidage vocal (speechSynthesis fr-FR, annonce à ~150 m et au virage, recalcul si écart > 80 m), bouton voix on/off, Répéter, repli ligne droite si OSRM indisponible.
 - Tests iteration_100 : frontend 95 % ; corrections ensuite (page héritée, séparateurs, libellé Arrivé, indicateur GPS).
 
+## 2026-10-26 — Arrivée automatique à 50 m
+- POST /api/riders/location : si une course en_livraison du livreur a un point GPS cliente à ≤ 50 m (précision ≤ 100 m) et n'est pas encore « arrivée » → arrived_at + arrived_auto, ligne contact_log (via gps_50m), notification cliente « Votre livreur est arrivé » (une seule fois). Réponse arrived[] → toast + annonce vocale côté livreur, bouton Arrivé mis à jour.
+- Bouton manuel « Arrivé ? » prévient aussi la cliente. Page /suivi/{code} affiche « Votre livreur est arrivé ».
+- Limite : ne marche que pour les commandes ayant un point GPS cliente.
+- Vérifié par appels API (111 m → rien, 33 m → arrivée + notification, pas de doublon) ; données restaurées.
+
 ## Roadmap
 - P0 : appliquer la matrice des droits aux accès réels.
 - P1 : inventaires réguliers (planification, surprise, partiel, photos, validation propriétaire).

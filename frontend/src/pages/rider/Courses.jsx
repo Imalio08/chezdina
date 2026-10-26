@@ -195,6 +195,7 @@ function OrderCard({ order, onOpen }) {
 
 function OrderDetail({ order, onClose, onStatus, onDeliver }) {
   const [arrived, setArrived] = useState(!!order.arrived_at);
+  useEffect(() => { const f = (e) => { if (e.detail?.id === order.id) setArrived(true); }; window.addEventListener("dina-arrived", f); return () => window.removeEventListener("dina-arrived", f); }, [order.id]);
   const [postpone, setPostpone] = useState(false);
   const [chat, setChat] = useState(false);
   const [clientChat, setClientChat] = useState(false);
