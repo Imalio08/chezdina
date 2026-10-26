@@ -181,7 +181,7 @@ function NavPanel({ target, myPos, autoVoice, onClose, askPosition }) {
         <div className="flex-1 min-w-0">
           <div className="text-base font-semibold leading-tight" data-testid="nav-instruction">{!myPos ? "Activez votre position pour l'itinéraire" : step ? step.text : route ? (route.approx ? "Itinéraire approximatif · suivez la ligne" : "Suivez l'itinéraire") : "Calcul de l'itinéraire…"}</div>
           {toStep != null && <div className="text-xs text-[#5867fd] font-semibold" data-testid="nav-step-distance">dans {fmtDist(toStep)}</div>}
-          <div className="text-xs text-[#666] tabular" data-testid="map-route-stats">{target.code} · {target.customer?.name} · {target.customer?.landmark || target.customer?.quartier || ""}{route ? ` · ${route.km.toFixed(1)} km · ~${Math.max(1, Math.round(route.min))} min` : ""}{left != null && left < 60 ? " · vous êtes arrivé" : ""}</div>
+          <div className="text-xs text-[#666] tabular" data-testid="map-route-stats">{[target.code, target.customer?.name, target.customer?.landmark || target.customer?.quartier, route && `${route.km.toFixed(1)} km · ~${Math.max(1, Math.round(route.min))} min`, left != null && left < 60 && "vous êtes arrivé"].filter(Boolean).join(" · ")}</div>
         </div>
         <button onClick={toggleVoice} className={`p-2 rounded-lg ${voice ? "bg-[#eef0ff] text-[#5867fd]" : "bg-[#f2f2f2] text-[#999]"}`} title={voice ? "Couper la voix" : "Activer la voix"} data-testid="nav-voice-toggle">{voice ? <Volume2 size={18} /> : <VolumeX size={18} />}</button>
       </div>

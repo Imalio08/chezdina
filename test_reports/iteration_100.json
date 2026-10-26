@@ -1,0 +1,38 @@
+{
+  "summary": "Frontend-only test of the rider app fixes (permissions asked once, WhatsApp removed, focused navigation with voice guidance) plus storefront geolocation regression. 6 Playwright runs on a 390x844 viewport. Passed: (1) Launch WITHOUT permission: 0 getCurrentPosition/watchPosition calls (counted with a stubbed navigator.geolocation), indicator shows 'GPS…'. Launch WITH permission granted: 1 watchPosition, POST /api/riders/location sent, indicator shows 'GPS live'. (2) Order detail on assignee DN-260810-1037 and en_livraison DN-260920-1032: order-call, order-arrived, order-message-client and order-route are all present. Call and Arrived are disabled until the order is en_livraison. Message opens rider-client-chat. No 'whatsapp' or 'wa.me' anywhere in the DOM on Courses or Carte, including the map-selected panel (Appeler/Message/Itinéraire/Ouvrir). (3) 'Je démarre' on DN-260713-1109 set status to en_livraison (checked via API) and opened /riders/carte?route=<id>&nav=1. The map shows 2 markers (rider + target), the filter/optimize bar is hidden and the OSRM route comes back 200 as a solid #5867fd polyline. NavPanel shows instruction 'Tournez à droite', 'dans 110 m', stats '12.1 km · ~16 min', voice toggle, Répéter and Google Maps. speechSynthesis.speak was recorded with fr-FR: 'Course démarrée. Calcul de l'itinéraire.', 'Démarrez. Puis Tournez à droite', 'Dans 110 m, tournez à droite'. Voice toggle stores dina_voice_nav off/on and says 'Guidage vocal activé'. Répéter speaks the current step. 'Voir toutes les courses' returns to the full map (20 markers, filter back). Optimiser draws numbered markers. (4) With OSRM blocked: 'Itinéraire approximatif · suivez la ligne' with a dashed straight line ('8 8'), no Répéter button, no speech. (5) Itinéraire on an assignee order opens without nav=1. (6) Route page without permission: 'Activez votre position pour l'itinéraire' + nav-enable-gps. After granting and clicking it, route instructions appear and RiderShell live tracking starts through the dina-gps-granted event. (7) Carte without position shows map-locate. No geolocation calls on Carte load without permission. (8) Storefront /checkout: 0 geolocation calls on load. checkout-locate when denied opens the GeoHelp modal; when granted it sets coords ('Repositionner', 'Voir sur Maps', map shown). (9) Delivery proof modal: the intercepted POST /orders/{id}/deliver payload contains lat 5.35 and lng -4.01 (request was fulfilled with a 400 so nothing was really delivered). (10) Signalements page loads with the form. Punch modal opens with the camera. Test data: DN-260713-1109 was moved back to assignee by admin; rider counts are back to 14 à livrer / 4 en route.",
+  "backend_issues": {"critical": [], "minor": []},
+  "frontend_issues": {
+    "ui_bugs": [
+      {"component": "Carte NavPanel map-route-stats", "issue": "Double separator 'Laure · · 12.1 km' when customer has no landmark/quartier (empty string still joined with ' · ')", "selector": "[data-testid='map-route-stats']", "priority": "LOW"},
+      {"component": "RiderShell GPS indicator", "issue": "When permission not yet granted (state 'prompt'), indicator shows amber 'GPS…' forever, looks like loading. Better: 'GPS non activé' with tap-to-enable (which would also be the user gesture that requests permission)", "selector": "[data-testid='rider-gps-indicator']", "priority": "LOW"}
+    ],
+    "integration_issues": [
+      {"flow": "Legacy rider page /console/livreur (pages/console/Rider.jsx, still routed under ProtectedRider)", "issue": "Still has customer WhatsApp button (data-testid rider-whatsapp, wa.me link L156 + L73) and calls navigator.geolocation.watchPosition on mount (L35-46), which prompts at launch. This goes against both requirements if a rider lands there", "affected_selectors": ["[data-testid='rider-whatsapp']"]},
+      {"flow": "Check-in gate (selfie + GPS)", "issue": "components/rider/CheckInGate.jsx is not imported anywhere (dead code). The real rider punch is AttendancePunchModal (selfie + PIN, no GPS). The 'GPS check-in' regression is therefore N/A. Confirm this is intended or wire it in / delete it", "affected_selectors": ["[data-testid='checkin-gate']"]}
+    ],
+    "design_issues": [
+      {"screen": "Order detail action grid", "issues": ["'Je suis arrivé' wraps to 2 lines in the 4-column grid at 390px, so it is taller and misaligned compared with the other buttons"]}
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Remove the WhatsApp button and the mount-time watchPosition from the legacy pages/console/Rider.jsx (/console/livreur), or redirect /console/livreur to /riders",
+    "Delete the unused components/rider/CheckInGate.jsx, or wire it in if GPS check-in is required",
+    "Courses 'Je démarre': navTo(carte&nav=1) runs even when onStatus fails (changeStatus catches errors and resolves), so navigation and voice start on a status error. Make changeStatus return success/failure and navigate only on success",
+    "permissions.js: localStorage fallback stores 'denied' and getPosition then returns null forever on browsers where navigator.permissions.query throws (older iOS Safari). The retry buttons (GeoHelp Réessayer / nav-enable-gps) can then never prompt again. On an explicit user tap (ask=true), call getCurrentPosition even when the fallback says denied",
+    "Fix the double ' · ' in map-route-stats when landmark/quartier is empty",
+    "Optional: show 'GPS non activé' with tap-to-enable in the RiderShell indicator when permission is 'prompt'"
+  ],
+  "critical_code_review_comments": [
+    "On iOS Safari, geolocation permission often goes back to 'prompt' per session, so with the new rule live tracking only starts after the rider uses a GPS feature (Je démarre / Itinéraire / Ma position). This is intended, but the manager live map may show stale riders until then",
+    "Carte RouteLayer/NavPanel share state through a module-level routeBus. It works, but keep the cleanup on target change (it is there)",
+    "voiceNav speak(): 'Démarrez. Puis Tournez à droite' has a capitalised verb after 'Puis'; lowercase the first letter of the second step like the 'Dans X m' branch does",
+    "OSRM public demo server has no SLA and a rate limit; the fallback works, but consider an env-configured router URL for production"
+  ],
+  "updated_files": [],
+  "success_rate": {"backend": "N/A (skipped)", "frontend": "95%"},
+  "seed_data_creation": "None persisted. DN-260713-1109 was moved to en_livraison by the test and restored to assignee by admin PATCH /api/orders/{id}/status. The deliver call was intercepted (not sent). Cart item exists only in browser localStorage.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Rider login: /riders/connexion, PIN pad rider-pin-key-{d} + rider-pin-submit (5555). Rider1 has 18 orders today (14 assignee, 4 en_livraison, e.g. DN-260920-1032 en_livraison, DN-260810-1037 assignee). Use page.context.grant_permissions(['geolocation']) + set_geolocation(5.35,-4.01). Stub speechSynthesis.speak and wrap navigator.geolocation in add_init_script to count calls. To restore an order status, admin PATCH /api/orders/{id}/status {status:'assignee'} works."
+}

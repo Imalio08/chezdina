@@ -1290,6 +1290,12 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Onboarding (routers/onboarding.py) : modèles versionnés (Paramètres › Documents RH, 5 modèles de départ avec [à compléter par le propriétaire]), choix des documents à la création d'un employé, écran bloquant (code 423 + OnboardingGate) avec texte complet, case à cocher, signature dessinée + PIN, PDF signé (reportlab) avec date, appareil, IP et empreinte du texte ; scans papier ; nouvelle signature demandée après une nouvelle version ; statuts signé/en attente/expiré ; relances manuelles ; PV de départ signé + désactivation.
 - Tests : iteration_98 (17/17 + correction du blocage pointage/onboarding), iteration_99 (104/108 ; fuites restantes corrigées ensuite, vérifiées par curl).
 
+## 2026-10-26 — App livreur : permissions, WhatsApp, guidage vocal
+- lib/permissions.js : permState/getPosition/watchIfGranted — aucune demande GPS au lancement ; demande seulement à l'usage (Je démarre, Itinéraire, Ma position, preuve de livraison, signalement, checkout boutique) ; suivi live démarré seulement si déjà autorisé (événement dina-gps-granted) ; bouton « Activer le GPS » dans l'en-tête livreur.
+- Ancienne page /console/livreur (avec bouton WhatsApp cliente) redirigée vers /riders ; service worker : caches v2 + suppression des anciens caches (fin des vieilles versions sur téléphone).
+- Carte : « Je démarre » → /riders/carte?route=<id>&nav=1, seule la course visible, itinéraire OSRM depuis la position, consignes en français, guidage vocal (speechSynthesis fr-FR, annonce à ~150 m et au virage, recalcul si écart > 80 m), bouton voix on/off, Répéter, repli ligne droite si OSRM indisponible.
+- Tests iteration_100 : frontend 95 % ; corrections ensuite (page héritée, séparateurs, libellé Arrivé, indicateur GPS).
+
 ## Roadmap
 - P0 : appliquer la matrice des droits aux accès réels.
 - P1 : inventaires réguliers (planification, surprise, partiel, photos, validation propriétaire).

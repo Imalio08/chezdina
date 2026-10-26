@@ -214,7 +214,7 @@ function OrderDetail({ order, onClose, onStatus, onDeliver }) {
         <div className="p-4 space-y-3">
           <div className="grid grid-cols-4 gap-2">
             <button onClick={() => callCustomer(order)} disabled={!canCall} title={canCall ? "" : "Disponible quand la course est En route"} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5 disabled:opacity-40" data-testid="order-call"><Phone size={14} /><span>Appeler</span></button>
-            <button onClick={markArrived} disabled={!canCall || arrived} className={`dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5 disabled:opacity-40 ${arrived ? "!text-[#1f8a4c]" : ""}`} data-testid="order-arrived"><MapPin size={14} /><span>{arrived ? "Arrivé" : "Je suis arrivé"}</span></button>
+            <button onClick={markArrived} disabled={!canCall || arrived} className={`dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5 disabled:opacity-40 ${arrived ? "!text-[#1f8a4c]" : ""}`} data-testid="order-arrived"><MapPin size={14} /><span>{arrived ? "Arrivé" : "Arrivé ?"}</span></button>
             <button onClick={() => setClientChat(c => !c)} className={`dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5 ${clientChat ? "!border-[#b02a2a] !text-[#b02a2a]" : ""}`} data-testid="order-message-client"><Send size={14} /><span>Message</span></button>
             <button onClick={itinerary} className="dina-btn-secondary !min-h-[44px] text-xs flex-col gap-0.5" data-testid="order-route"><Navigation size={14} /><span>Itinéraire</span></button>
           </div>

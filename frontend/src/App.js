@@ -94,7 +94,6 @@ import LivraisonRetours from "@/pages/storefront/LivraisonRetours";
 import Suivi from "@/pages/storefront/Suivi";
 import Contact from "@/pages/storefront/Contact";
 import { ConfirmProvider } from "@/components/shared/ConfirmDialog";
-import Rider from "@/pages/console/Rider";
 import Home from "@/pages/storefront/Home";
 import OpeningHoursBanner from "@/components/storefront/OpeningHoursBanner";
 import Catalog from "@/pages/storefront/Catalog";
@@ -310,7 +309,7 @@ export default function App() {
               <Route path="fiches-colis" element={<ErrorBoundary><FichesColis/></ErrorBoundary>} />
             </Route>
             <Route path="/noter/:code" element={<ErrorBoundary><Rate/></ErrorBoundary>} />
-            <Route path="/console/livreur" element={<ProtectedRider><ErrorBoundary><Rider /></ErrorBoundary></ProtectedRider>} />
+            <Route path="/console/livreur" element={<Navigate to="/riders" replace />} />
             <Route path="/:slug" element={<SlugRedirect />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

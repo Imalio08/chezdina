@@ -17,7 +17,7 @@ import { NotifItem, useOpenNotif, markAllRead, FilterTabs } from "@/pages/rider/
 import { CheckCheck } from "lucide-react";
 import OfflineBar from "@/components/rider/OfflineBar";
 import { startRiderSync, fetchDay } from "@/lib/riderOffline";
-import { permState } from "@/lib/permissions";
+import { permState, getPosition } from "@/lib/permissions";
 
 // Icons available for custom rider tabs
 const ICONS = {
@@ -295,8 +295,10 @@ export default function RiderShell() {
                 <span className="text-[#c62828]" title="Autorisez la géolocalisation pour un suivi en direct">· ⚠ GPS refusé</span>
               ) : gpsState.live ? (
                 <span className="text-[#1f8a4c]" title={gpsState.last_sent ? `Dernière position ${gpsState.last_sent.toLocaleTimeString("fr-FR")}` : ""}>· GPS live{gpsState.battery_saver ? " ⚡" : ""}</span>
-              ) : (
+              ) : gpsOk ? (
                 <span className="text-[#e4991e]">· GPS…</span>
+              ) : (
+                <button onClick={() => getPosition()} className="text-[#e4991e] underline" data-testid="rider-gps-enable">· Activer le GPS</button>
               )}
             </div>
           </div>
