@@ -119,9 +119,17 @@ async def get_user(request: Request):
     from routers.onboarding import onboarding_blocked
     if not path.startswith(ONBOARDING_FREE) and await onboarding_blocked(user):
         raise HTTPException(423, "Documents à signer avant d'accéder à vos outils")
-    from role_access import api_allowed
-    if not api_allowed(user.get("role"), request.method, path):
-        raise HTTPException(403, "Accès non autorisé pour votre rôle")
+    from role_access import api_allowed, COMMON, COMMON_READ, READ
+    role = user.get("role")
+    if role not in ("admin", "rider"):
+        from permissions import check, BUILTIN
+        ok = await check(role, request.method, path)
+        if ok is False:
+            raise HTTPException(403, "Module non autorisé pour votre rôle")
+        if ok is None and role not in BUILTIN and not (path.startswith(COMMON) or (request.method in READ and path.startswith(COMMON_READ))):
+            raise HTTPException(403, "Accès non autorisé pour votre rôle")
+        if ok is None and not api_allowed(role, request.method, path):
+            raise HTTPException(403, "Accès non autorisé pour votre rôle")
     if not path.startswith(PUNCH_FREE) and await punch_required(user):
         raise HTTPException(428, "Pointage d'arrivée requis")
     return user
@@ -163,8 +171,8 @@ async def punch_required(user: dict) -> bool:
 def require_role(*roles):
     async def dep(user: dict = Depends(get_user)):
         role = user.get("role")
-        # Limited roles act as the gérante inside their own API allow-list (checked in get_user).
-        inherits = role in ("sales", "stock_keeper", "community_manager") and "manager" in roles
+        # Non-owner staff roles act as the gérante once get_user has authorised the path (matrix + allow-lists).
+        inherits = role not in ("admin", "manager", "rider") and "manager" in roles
         if role not in roles and role != "admin" and not inherits:
             raise HTTPException(403, "Accès refusé")
         return user

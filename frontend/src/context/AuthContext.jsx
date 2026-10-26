@@ -6,6 +6,7 @@ export const useAuth = () => useContext(Ctx);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  if (typeof window !== "undefined") window.__dinaPerms = user && user.role !== "admin" ? (user.perm_levels || null) : null;
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

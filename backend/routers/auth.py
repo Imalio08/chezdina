@@ -41,7 +41,10 @@ async def _staff_guard(u: dict, request: Request) -> None:
 
 async def _session_flags(u: dict) -> None:
     from routers.onboarding import onboarding_blocked
+    from permissions import role_levels
     u["onboarding_required"] = await onboarding_blocked(u)
+    if u.get("role") != "rider":
+        u["perm_levels"] = await role_levels(u.get("role"))
 
 
 @router.post("/auth/login")

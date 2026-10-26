@@ -40,12 +40,13 @@ export default function Manuel() {
         <div className="w-12 h-12 rounded-xl bg-[#fff5f5] text-[#b02a2a] grid place-items-center shrink-0">
           <GraduationCap size={24}/>
         </div>
-        <div>
+        <div className="flex-1">
           <h1 className="font-serif text-3xl">Manuel d'utilisation</h1>
           <p className="text-sm text-[#666] max-w-2xl mt-1">
             Apprenez à utiliser Chez Dina pas à pas. Chaque module couvre un domaine métier avec des objectifs clairs, des captures annotées et des guides numérotés. Les contenus sont modifiables par la propriétaire.
           </p>
         </div>
+        <button onClick={() => window.dispatchEvent(new Event("dina-replay-tour"))} className="dina-btn-secondary !min-h-[40px] text-sm shrink-0" data-testid="manual-replay-tour"><GraduationCap size={14}/>Relancer la visite guidée</button>
       </div>
 
       <div className="dina-card-white p-4 flex items-center gap-3 flex-wrap">

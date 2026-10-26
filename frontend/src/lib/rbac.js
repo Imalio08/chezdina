@@ -80,12 +80,22 @@ export const PATH_ROLES = {
 };
 
 /** Returns true if the role can access the given path. */
+export function permLevel(pathname) {
+  const lv = typeof window !== "undefined" ? window.__dinaPerms : null;
+  if (!lv || !pathname) return null;
+  const path = pathname.split("?")[0];
+  const key = Object.keys(lv).sort((a, b) => b.length - a.length).find(k => path === k || (k !== "/console" && path.startsWith(k + "/")));
+  return key ? lv[key] : null;
+}
+
 export function canAccess(role, pathname, extra = {}) {
   if (!role) return false;
   if (role === "admin") return true;
   if (!pathname) return false;
   const path = pathname.split("?")[0];
   if (extra.presence && /^\/console\/presences?(\/|$)/.test(path)) return true;
+  const lv = permLevel(path);
+  if (lv) return lv !== "none";
   const keys = Object.keys(PATH_ROLES).sort((a, b) => b.length - a.length);
   for (const key of keys) {
     if (path === key || path.startsWith(key + "/")) {

@@ -4,6 +4,7 @@ import api from "@/lib/api";
 import { useKeptState } from "@/lib/keptState";
 import ApprovalReview, { stockRow } from "@/components/shared/ApprovalReview";
 import UnsellableTab from "@/components/stock/UnsellableTab";
+import InventoriesTab from "@/components/stock/InventoriesTab";
 import { fcfa, dateFmt } from "@/lib/format";
 import { toast } from "sonner";
 import { Plus, Minus, X, Edit, Package, AlertTriangle, Clock, DollarSign, History, ClipboardList, CheckSquare } from "lucide-react";
@@ -27,20 +28,16 @@ export default function StockInventories() {
   const [adjust, setAdjust] = useState(null);
   const [requests, setRequests] = useState([]);
   const [movements, setMovements] = useState([]);
-  const [inventories, setInventories] = useState([]);
-  const [newInv, setNewInv] = useState(false);
-  const [countInv, setCountInv] = useState(null);
   const [q, setQ] = useKeptState("stock-q", "");
 
   const load = async () => {
-    const [p, k, r, m, i] = await Promise.all([
+    const [p, k, r, m] = await Promise.all([
       api.get("/products"),
       api.get("/stock/kpis").catch(() => ({ data: null })),
       api.get("/stock/adjustment-requests").catch(() => ({ data: [] })),
       api.get("/stock/movements").catch(() => ({ data: [] })),
-      api.get("/stock/inventories").catch(() => ({ data: [] })),
     ]);
-    setProducts(p.data); setKpis(k.data); setRequests(r.data || []); setMovements(m.data || []); setInventories(i.data || []);
+    setProducts(p.data); setKpis(k.data); setRequests(r.data || []); setMovements(m.data || []);
   };
   useEffect(() => { load(); }, []);
 
@@ -140,25 +137,9 @@ export default function StockInventories() {
 
       {tab === "invendables" && <UnsellableTab/>}
 
-      {tab === "inventories" && (
-        <div className="space-y-3">
-          <div className="flex justify-between"><div className="font-semibold">Inventaires ({inventories.length})</div>{isOwner && <button onClick={() => setNewInv(true)} className="dina-btn-primary !min-h-[36px]" data-testid="inv-new"><Plus size={13} />Nouvel inventaire</button>}</div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {inventories.length === 0 ? <div className="col-span-full text-center text-sm text-[#666] py-6">Aucun inventaire</div> :
-              inventories.map(inv => (
-                <div key={inv.id} className="dina-card-white p-4" data-testid={`inv-${inv.id}`}>
-                  <div className="flex items-start justify-between mb-2"><div><div className="font-semibold">{inv.name}</div><div className="text-[11px] text-[#666]">{dateFmt(inv.created_at)} · {inv.created_by}</div></div><span className={`dina-chip text-[10px] ${inv.status === "closed" ? "!text-[#999]" : "!text-[#1f8a4c] !border-[#1f8a4c]"}`}>{inv.status === "open" ? "Ouvert" : "Clôturé"}</span></div>
-                  <div className="text-xs text-[#666]">{inv.lines?.length || 0} lignes · {inv.gaps?.length || 0} écarts</div>
-                  <button onClick={() => setCountInv(inv)} className="dina-btn-secondary w-full !min-h-[32px] text-xs mt-2" data-testid={`inv-open-${inv.id}`}>{inv.status === "open" ? "Compter" : "Consulter"}</button>
-                </div>
-              ))}
-          </div>
-        </div>
-      )}
+      {tab === "inventories" && <InventoriesTab products={products} isOwner={isOwner} onChanged={load} />}
 
       {adjust && <AdjustModal product={adjust} isOwner={isOwner} onClose={() => setAdjust(null)} onSaved={() => { setAdjust(null); load(); }} />}
-      {newInv && <NewInventoryModal products={products} onClose={() => setNewInv(false)} onDone={() => { setNewInv(false); load(); }} />}
-      {countInv && <CountInventoryModal inv={countInv} isOwner={isOwner} onClose={() => setCountInv(null)} onDone={() => { setCountInv(null); load(); }} />}
     </div>
   );
 }

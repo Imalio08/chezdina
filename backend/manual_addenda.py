@@ -245,6 +245,30 @@ ADDENDA += [
                "Notifications : sur Android, bouton « Installer » et activation dans le navigateur ; sur iPhone, guide « Ajouter Chez Dina à l'écran d'accueil »",
                "Favoris, Vus récemment, Bons d'achat (codes promo actifs à copier) et Avis à donner fonctionnent sur téléphone",
                "Lien de parrainage : l'aperçu WhatsApp/Facebook montre une photo produit, le nom de la boutique et l'offre de bienvenue"])]},
+        {"id": "add-v4-tour", "heading": "Visite guidée de la console et de l'app livreur", "blocks": [
+            T("À la première connexion, une visite guidée présente pas à pas les écrans principaux : chaque étape ouvre l'écran concerné et entoure en rouge l'élément expliqué."),
+            S(["Suivant / Précédent pour avancer, la croix ou Échap pour quitter",
+               "Console : Manuel d'utilisation › bouton « Relancer la visite guidée »",
+               "App livreur : Profil › « Revoir la visite guidée »",
+               "La visite ne montre que les pages autorisées pour votre rôle"])]},
+        {"id": "add-v4-inventories", "heading": "Inventaires réguliers : planifiés, surprise, partiels", "blocks": [
+            T("Tout article qui sort de la boutique sans être enregistré dans le système est considéré comme toujours en stock. Les inventaires réguliers vérifient que le stock réel correspond au stock du système."),
+            S(["Stock › Inventaires › « Planifier » (propriétaire) : nom, fréquence (semaine, 2 semaines, mois, trimestre), première date, rappel X jours avant, périmètre",
+               "Chaque matin à 7h, les inventaires arrivés à échéance s'ouvrent tout seuls ; la gérante et la magasinière reçoivent un rappel avant la date, le jour même, puis tant que l'inventaire n'est pas soumis",
+               "« Inventaire surprise » (propriétaire) : lancé immédiatement, l'équipe est prévenue",
+               "Périmètre : tout le stock, ou une partie par catégorie, marque ou emplacement (champ Emplacement de la fiche produit)",
+               "Comptage à l'aveugle : pour chaque ligne, quantité comptée, commentaire et photo ; « Enregistrer » garde le travail en cours",
+               "« Soumettre au propriétaire » : toutes les lignes doivent être comptées",
+               "Le propriétaire voit les écarts par article et leur valeur, puis « Valider et appliquer » (le stock est corrigé) ou « Faire recompter » avec un motif obligatoire",
+               "L'historique garde tous les inventaires avec leurs résultats"])]},
+        {"id": "add-v4-permissions", "heading": "Rôles & permissions appliqués", "blocks": [
+            T("Équipe › Rôles & permissions : pour chaque page de la console et chaque rôle, choisissez un niveau. Il est appliqué par le serveur : taper l'adresse d'une page interdite ne donne aucun accès."),
+            S(["Aucun : la page disparaît du menu et ses données sont refusées",
+               "Lecture : consulter seulement ; un bandeau « Lecture seule » s'affiche et toute modification est refusée",
+               "Modif. : consulter, créer et modifier (pas de suppression)",
+               "Complet : tout, y compris supprimer",
+               "Enregistrez la matrice ; elle s'applique immédiatement côté serveur et au menu à la prochaine connexion de l'employé",
+               "Certaines actions restent réservées au propriétaire quoi qu'il arrive : validations, campagnes, exports, sécurité, rôles"])]},
     ]),
 ]
 

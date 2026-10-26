@@ -15,7 +15,7 @@ import ErrorBoundary from "@/components/ErrorBoundary";
 import HelpButton from "@/components/console/HelpButton";
 import GuidedTour from "@/components/console/GuidedTour";
 import AttendancePunchModal from "@/components/shared/AttendancePunchModal";
-import { canAccess, landingFor, LIMITED_ROLES } from "@/lib/rbac";
+import { canAccess, landingFor, LIMITED_ROLES, permLevel } from "@/lib/rbac";
 import { playChime, soundEnabled, setSoundEnabled } from "@/lib/notifySound";
 import { enablePush, pushErrorText, pushGranted } from "@/lib/push";
 import { toast } from "sonner";
@@ -421,7 +421,7 @@ export default function ConsoleLayout() {
             )}
           </div>
         </header>
-        <div className="p-3 sm:p-4 lg:p-6 flex-1 min-w-0"><ErrorBoundary><Outlet /></ErrorBoundary></div>
+        <div className="p-3 sm:p-4 lg:p-6 flex-1 min-w-0">{permLevel(pathname) === "read" && <div className="mb-3 text-xs px-3 py-2 rounded-lg bg-[#eceefe] text-[#3b47c4] font-medium" data-testid="readonly-banner">Lecture seule · votre rôle peut consulter cette page mais pas la modifier.</div>}<ErrorBoundary><Outlet /></ErrorBoundary></div>
       </main>
       <GuidedTour/>
 

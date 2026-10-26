@@ -1647,41 +1647,68 @@ async def stock_adj_decide(aid: str, body: Dict[str,Any], user: dict = Depends(r
 
 @api.get("/stock/inventories")
 async def inventories_list(user: dict = Depends(get_user)):
-    rows = await db.inventories.find({}).sort("created_at", -1).to_list(50)
-    # Hide ordered qty from non-admin on open inventories (blind count)
+    rows = await db.inventories.find({}).sort("created_at", -1).to_list(500)
+    # Blind count: expected qty / gaps hidden from non-owners until the owner validates
     if user.get("role") != "admin":
         for r in rows:
-            if r.get("status") == "open":
+            if r.get("status") in ("open", "submitted"):
                 for ln in r.get("lines", []):
-                    ln.pop("qty_expected", None)
+                    for k in ("qty_expected", "gap", "gap_value"):
+                        ln.pop(k, None)
+                r.pop("gaps", None)
     return clean(rows)
+
+async def _inventory_lines(scope: Dict[str, Any], pids: list) -> list:
+    f: Dict[str, Any] = {}
+    if pids:
+        f["id"] = {"$in": pids}
+    vals = [v for v in (scope.get("values") or []) if v]
+    if scope.get("type") in ("category", "brand", "location") and vals:
+        f[scope["type"]] = {"$in": vals}
+    lines = []
+    for p in await db.products.find(f).to_list(2000):
+        for size, qty in (p.get("stock_by_size") or {"": p.get("stock", 0)}).items():
+            lines.append({"product_id": p["id"], "product_name": p["name"], "sku": p.get("sku", ""), "size": size, "qty_expected": int(qty or 0),
+                          "qty_counted": None, "unit_cost": float(p.get("cost") or 0), "location": p.get("location"), "category": p.get("category"), "brand": p.get("brand")})
+    return lines
 
 @api.post("/stock/inventories")
 async def inventory_create(body: Dict[str,Any], user: dict = Depends(require_role("admin","manager"))):
-    pids = body.get("product_ids") or []
-    products = await db.products.find({"id":{"$in": pids}} if pids else {}).to_list(500)
-    lines = []
-    for p in products:
-        for size, qty in (p.get("stock_by_size") or {"":p.get("stock",0)}).items():
-            lines.append({"product_id": p["id"], "product_name": p["name"], "sku": p.get("sku",""), "size": size, "qty_expected": int(qty or 0), "qty_counted": None})
-    doc = {"id": new_id(), "created_at": now_iso(), "created_by": user.get("name"),
-           "status": "open", "name": body.get("name", f"Inventaire {datetime.now().strftime('%d/%m/%Y')}"),
-           "lines": lines}
+    kind = body.get("kind") or "manuel"
+    if kind == "surprise" and user.get("role") != "admin":
+        raise HTTPException(403, "Inventaire surprise réservé au propriétaire")
+    scope = body.get("scope") or {"type": "all"}
+    lines = await _inventory_lines(scope, body.get("product_ids") or [])
+    if not lines:
+        raise HTTPException(400, "Aucun article dans ce périmètre")
+    doc = {"id": new_id(), "created_at": now_iso(), "created_by": user.get("name"), "kind": kind, "scope": scope,
+           "status": "open", "name": body.get("name") or f"Inventaire {datetime.now().strftime('%d/%m/%Y')}",
+           "lines": lines, "plan_id": body.get("plan_id")}
     await db.inventories.insert_one(doc)
+    if kind == "surprise":
+        from routers.inventories import notify_counters
+        await notify_counters("Inventaire surprise à faire", f"{doc['name']} · {len(lines)} lignes à compter maintenant.")
     return clean(doc)
 
 @api.post("/stock/inventories/{iid}/count")
 async def inventory_count(iid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin","manager","stock_keeper"))):
     inv = await db.inventories.find_one({"id": iid})
     if not inv: raise HTTPException(404)
-    if inv.get("status") != "open": raise HTTPException(400, "Clôturé")
-    counts = body.get("counts") or []  # [{line_index, qty_counted}]
+    if inv.get("status") != "open": raise HTTPException(400, "Inventaire déjà soumis ou clôturé")
+    counts = body.get("counts") or []  # [{line_index, qty_counted, comment, photo}]
     lines = inv.get("lines", [])
     for c in counts:
         i = int(c.get("line_index", -1))
         if 0 <= i < len(lines):
-            lines[i]["qty_counted"] = int(c.get("qty_counted", 0))
-            lines[i]["counted_by"] = user.get("name")
+            if c.get("qty_counted") is not None and c.get("qty_counted") != "":
+                lines[i]["qty_counted"] = max(0, int(c.get("qty_counted")))
+                lines[i]["counted_by"] = user.get("name")
+                lines[i]["counted_at"] = now_iso()
+            if "comment" in c:
+                lines[i]["comment"] = (c.get("comment") or "")[:300]
+            if c.get("photo"):
+                if len(c["photo"]) > 1_500_000: raise HTTPException(400, "Photo trop lourde")
+                lines[i]["photo"] = c["photo"]
     await db.inventories.update_one({"id": iid}, {"$set": {"lines": lines, "updated_at": now_iso()}})
     return {"ok": True}
 
@@ -1689,23 +1716,27 @@ async def inventory_count(iid: str, body: Dict[str,Any], user: dict = Depends(re
 async def inventory_close(iid: str, body: Dict[str,Any], user: dict = Depends(require_role("admin"))):
     inv = await db.inventories.find_one({"id": iid})
     if not inv: raise HTTPException(404)
+    if inv.get("status") not in ("open", "submitted"): raise HTTPException(400, "Déjà clôturé")
     gaps = []
     for ln in inv.get("lines", []):
         if ln.get("qty_counted") is None: continue
         gap = int(ln["qty_counted"]) - int(ln.get("qty_expected", 0))
         if gap != 0:
-            gaps.append({**ln, "gap": gap})
-            # Apply as stock adjustment
+            gaps.append({k: v for k, v in ln.items() if k != "photo"} | {"gap": gap, "gap_value": gap * float(ln.get("unit_cost") or 0)})
             await db.stock_adjustments.insert_one({
                 "id": new_id(), "created_at": now_iso(), "created_by": user.get("name"),
                 "product_id": ln.get("product_id"), "size": ln.get("size"),
                 "qty_delta": gap, "reason": f"Inventaire {inv.get('name','')}",
                 "source": "inventory", "inventory_id": iid,
             })
-            if ln.get("product_id") and ln.get("size"):
-                await db.products.update_one({"id": ln["product_id"]},
-                    {"$inc": {f"stock_by_size.{ln['size']}": gap, "stock": gap}})
-    await db.inventories.update_one({"id": iid}, {"$set": {"status":"closed","closed_at": now_iso(), "closed_by": user.get("name"), "gaps": gaps, "note": body.get("note","")}})
+            if ln.get("product_id"):
+                inc = {f"stock_by_size.{ln['size']}": gap, "stock": gap} if ln.get("size") else {"stock": gap}
+                await db.products.update_one({"id": ln["product_id"]}, {"$inc": inc})
+    await db.inventories.update_one({"id": iid}, {"$set": {"status":"closed","closed_at": now_iso(), "closed_by": user.get("name"), "gaps": gaps,
+        "gap_value": sum(g["gap_value"] for g in gaps), "note": body.get("note",""), "owner_comment": body.get("note","")}})
+    if inv.get("submitted_by_id"):
+        from routers.notify import notify
+        await notify("staff", inv["submitted_by_id"], "Inventaire validé", f"{inv.get('name')} · {len(gaps)} écart(s) appliqué(s).", "/console/stock?tab=inventories", "stock", None, f"invok:{iid}")
     return {"ok": True, "gaps": gaps}
 
 # ---------- Promotions ----------
@@ -2912,15 +2943,23 @@ DEFAULT_PERMS = {
 
 @api.get("/roles-permissions")
 async def get_roles_permissions(user: dict = Depends(get_user)):
-    s = await db.roles_permissions.find_one({"id": "main"})
-    if not s:
-        s = {"id": "main", "matrix": DEFAULT_PERMS, "updated_at": now_iso()}
-        await db.roles_permissions.insert_one(s)
-    return clean(s)
+    from permissions import MODULES, role_levels
+    keys = {"admin", "manager", "sales", "stock_keeper", "community_manager"} | {r["key"] for r in await db.roles.find({}, {"key": 1}).to_list(100) if r.get("key")}
+    keys.discard("rider")
+    return {"id": "main", "matrix": {k: await role_levels(k) for k in sorted(keys)}, "modules": list(MODULES)}
+
+@api.get("/permissions/me")
+async def my_permissions(user: dict = Depends(get_user)):
+    from permissions import role_levels
+    return {"levels": await role_levels(user.get("role"))}
 
 @api.patch("/roles-permissions")
 async def update_roles_permissions(body: RolesPermissionsIn, user: dict = Depends(require_role("admin"))):
-    await db.roles_permissions.update_one({"id": "main"}, {"$set": {"id": "main", "matrix": body.matrix, "updated_at": now_iso()}}, upsert=True)
+    from permissions import MODULES, LV, invalidate
+    v2 = {role: {p: lv for p, lv in perms.items() if p in MODULES and lv in LV} for role, perms in body.matrix.items() if role not in ("admin", "rider")}
+    await db.roles_permissions.update_one({"id": "main"}, {"$set": {"id": "main", "v2": v2, "updated_at": now_iso(), "updated_by": user.get("name")}}, upsert=True)
+    invalidate()
+    await db.audit_log.insert_one({"id": new_id(), "action": "roles.permissions", "by": user.get("name"), "at": now_iso()})
     return {"ok": True}
 
 # ---------- Attendance (kiosk, legacy) ----------
@@ -5953,6 +5992,8 @@ from routers.privacy import router as privacy_router  # noqa: E402
 app.include_router(privacy_router)
 from routers.onboarding import router as onboarding_router  # noqa: E402
 app.include_router(onboarding_router)
+from routers.inventories import router as inventories_router  # noqa: E402
+app.include_router(inventories_router)
 app.add_middleware(LimitedRoleFieldFilter)
 _cors = [o.strip() for o in os.environ.get("CORS_ORIGINS", "*").split(",") if o.strip()]
 if "*" in _cors:

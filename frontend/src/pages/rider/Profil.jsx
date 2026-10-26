@@ -93,6 +93,7 @@ export default function Profil() {
       <SummaryCard score={score} today={today} onOpen={() => nav("/riders/performance")}/>
       <div className="dina-card-white !p-0 overflow-hidden" data-testid="profil-menu">
         <Row icon={History} label="Historique" sub="Mes journées et courses passées" onClick={() => nav("/riders/historique")} testid="profil-row-historique"/>
+        <Row icon={Star} label="Revoir la visite guidée" sub="Les écrans principaux pas à pas" onClick={() => window.dispatchEvent(new Event("dina-replay-tour"))} testid="profil-row-tour"/>
         <Row icon={Trophy} label="Performance" sub={score ? `Niveau ${score.level}` : "Score et critères"} onClick={() => nav("/riders/performance")} testid="profil-row-performance"/>
         <Row icon={Star} label="Avis clients" sub={score ? (score.stats?.reviews ? `${score.stats.reviews} avis · ${score.stats.rating_avg}★` : "Aucun avis pour le moment") : null} onClick={() => nav("/riders/avis")} testid="profil-row-avis"/>
         <Row icon={Wallet} label="Mon solde" sub={today ? `À remettre : ${fcfa(today.balance_to_hand_over || 0)}` : null} onClick={() => nav("/riders/solde")} testid="profil-row-solde"/>

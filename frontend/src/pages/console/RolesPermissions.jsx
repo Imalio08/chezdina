@@ -16,24 +16,21 @@ const LEVELS = [
   { k: "full",  label: "Complet",     color: "#1f8a4c", bg: "#e8f5ee" },
 ];
 
-const PATH_KEY = { "/console/pos": "pos", "/console/commandes": "orders", "/console/livraisons": "deliveries", "/console/produits": "products", "/console/stock": "stock",
-  "/console/achats": "purchases", "/console/clients": "customers", "/console/segments": "campaigns", "/console/sessions-caisse": "cash", "/console/statistiques": "stats",
-  "/console/finances": "stats_finances", "/console/equipe": "team", "/console/parametres": "settings" };
-const SENSITIVE = new Set(["stock", "cash", "stats", "stats_finances", "team", "settings", "audit", "expenses"]);
-// Every tab and sub-tab of the console menu becomes a row of the matrix
-const SECTIONS = (() => {
-  const seen = new Set();
+// Every console page becomes a row of the matrix; the server enforces the same keys (backend/permissions.py).
+const SENSITIVE = new Set(["/console/stock", "/console/sessions-caisse", "/console/statistiques", "/console/finances", "/console/equipe", "/console/parametres", "/console/audit", "/console/depenses"]);
+const EXTRA = [["/console/approbations", "À approuver"], ["/console/audit", "Journal d'audit"], ["/console/depenses", "Dépenses"], ["/console/encaissements", "Encaissements"]];
+const buildSections = (modules) => {
+  const ok = new Set(modules); const seen = new Set();
   const secs = NAV.map(s => ({ label: s.label || "Général", modules: s.items.map(it => {
-    const key = PATH_KEY[it.to] || `page:${it.to}`;
-    if (seen.has(key)) return null;
+    const key = it.to.split("?")[0];
+    if (!ok.has(key) || seen.has(key)) return null;
     seen.add(key);
     return { key, label: it.label, sensitive: SENSITIVE.has(key) };
   }).filter(Boolean) })).filter(s => s.modules.length);
-  const extra = [["expenses", "Dépenses"], ["audit", "Journal d'audit"], ["page:/console/approbations", "À approuver"], ["page:/console/equipe?onglet=presences", "Équipe › Présences"], ["page:/console/equipe?onglet=roles", "Équipe › Rôles & permissions"], ["page:/console/stock?tab=invendables", "Stock › Non vendables"], ["page:/console/stock?tab=inventories", "Stock › Inventaires"]]
-    .filter(([k]) => !seen.has(k)).map(([key, label]) => ({ key, label, sensitive: SENSITIVE.has(key) }));
-  return extra.length ? [...secs, { label: "Autres onglets", modules: extra }] : secs;
-})();
-const ALL_KEYS = SECTIONS.flatMap(s => s.modules.map(m => m.key));
+  const extra = EXTRA.filter(([k]) => ok.has(k) && !seen.has(k)).map(([key, label]) => { seen.add(key); return { key, label, sensitive: SENSITIVE.has(key) }; });
+  const rest = modules.filter(k => !seen.has(k)).map(key => ({ key, label: key.replace("/console/", "").replace("/console", "Tableau de bord"), sensitive: SENSITIVE.has(key) }));
+  return [...secs, ...(extra.length || rest.length ? [{ label: "Autres pages", modules: [...extra, ...rest] }] : [])];
+};
 
 const normalize = (v) => {
   if (v === true) return "full";
@@ -41,16 +38,12 @@ const normalize = (v) => {
   if (["none","read","write","full"].includes(v)) return v;
   return "none";
 };
-const asMap = (r) => {
-  if (!r) return {};
-  if (r.all === true || r.all === "full") {
-    return Object.fromEntries(ALL_KEYS.map(k => [k, "full"]));
-  }
-  return Object.fromEntries(ALL_KEYS.map(k => [k, normalize(r[k])]));
-};
+const asMap = (r, keys) => Object.fromEntries(keys.map(k => [k, normalize(r?.[k])]));
 
 export default function RolesPermissions() {
   const [matrix, setMatrix] = useState({});
+  const [mods, setMods] = useState([]);
+  const SECTIONS = useMemo(() => buildSections(mods), [mods]);
   const [allRoles, reloadRoles] = useRoles();
   const [roles, setRoles] = useState([]);
   useEffect(() => { if (allRoles.length) setRoles(rs => [...allRoles, ...rs.filter(r => !allRoles.find(a => a.key === r.key))]); }, [allRoles]);
@@ -64,8 +57,10 @@ export default function RolesPermissions() {
     try {
       const r = await api.get("/roles-permissions");
       const raw = r.data.matrix || {};
+      const keys = r.data.modules || [];
       const normalized = {};
-      Object.entries(raw).forEach(([role, perms]) => { normalized[role] = asMap(perms); });
+      Object.entries(raw).forEach(([role, perms]) => { normalized[role] = asMap(perms, keys); });
+      setMods(keys);
       setMatrix(normalized);
     } catch { toast.error("Erreur de chargement"); }
   };
@@ -87,7 +82,7 @@ export default function RolesPermissions() {
     setSaving(true);
     try {
       await api.patch("/roles-permissions", { matrix });
-      toast.success("Matrice enregistrée");
+      toast.success("Matrice enregistrée · appliquée à la prochaine page ouverte par chaque employé");
     } catch (e) { toast.error(e?.response?.status === 403 ? "Droits admin requis" : (typeof e?.response?.data?.detail === "string" ? e.response.data.detail : "Enregistrement impossible · réessayez")); }
     finally { setSaving(false); }
   };
@@ -97,7 +92,7 @@ export default function RolesPermissions() {
     const key = newRoleName.toLowerCase().replace(/\s+/g, "_").replace(/[^\w-]/g,"");
     if (roles.find(r => r.key === key)) { toast.error("Clé déjà utilisée"); return; }
     setRoles(rs => [...rs, { key, label: newRoleName, builtin: false }]);
-    setMatrix(m => ({ ...m, [key]: Object.fromEntries(ALL_KEYS.map(k => [k, "none"])) }));
+    setMatrix(m => ({ ...m, [key]: Object.fromEntries(mods.map(k => [k, "none"])) }));
     setNewRoleName(""); setShowNewRole(false);
     toast.success("Nouveau rôle · n'oubliez pas d'enregistrer");
   };
@@ -136,7 +131,7 @@ export default function RolesPermissions() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <div>
           <h1 className="font-serif text-3xl">Rôles & permissions</h1>
-          <p className="text-sm text-[#666]">4 niveaux par module · <span className="text-[#c62828] font-semibold">bordure rouge</span> = droit sensible · Admin a tout.</p>
+          <p className="text-sm text-[#666]">Aucun = page masquée et interdite · Lecture = consulter seulement · Modif. = créer et modifier · Complet = tout, y compris supprimer. Appliqué aussi par le serveur. Le propriétaire a tout.</p>
         </div>
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setShowNewRole(true)} className="dina-btn-secondary !min-h-[40px]" data-testid="roles-add"><Plus size={14}/>Nouveau rôle</button>

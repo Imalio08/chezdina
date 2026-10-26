@@ -112,6 +112,7 @@ import { PdfPreviewHost } from "@/components/shared/PdfPreview";
 import RiderLogin from "@/pages/rider/RiderLogin";
 import PunchGate from "@/components/shared/PunchGate";
 import OnboardingGate from "@/components/shared/OnboardingGate";
+import GuidedTour from "@/components/console/GuidedTour";
 import PopupGuard from "@/components/shared/PopupGuard";
 
 function Protected({ children }) {
@@ -131,7 +132,7 @@ function ProtectedRider({ children }) {
   if (!user) return <Navigate to="/riders/connexion" replace state={{ from: location.pathname + location.search }} />;
   if (user.role !== "rider") return <Navigate to="/console" replace />;
   if (user.onboarding_required) return <OnboardingGate />;
-  return children;
+  return <>{children}<GuidedTour /></>;
 }
 // Old URLs (/boutique/…, /rider/…) keep working: strip / swap the prefix, keep query + hash.
 function Legacy({ from, to }) {
