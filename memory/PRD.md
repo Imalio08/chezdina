@@ -1309,6 +1309,13 @@ Row 3 Par catégorie, charts statuts, Marge brute COGS, cancel_rate, "il y a X m
 - Manuel : sections add-v4-tour, add-v4-inventories, add-v4-permissions.
 - Tests : iteration_101 (inventaires, cron, visite, manuel OK ; trous de permissions), iteration_102 (15/16, 90 %) ; corrections ensuite (recherche cliente exige q non vide, page d'arrivée = 1re page autorisée, boutons Promotions, Créer masqué en lecture).
 
+## 2026-10-26 — Inventaires : propriétaire seul + « Compté par »
+- Création d'inventaire (ponctuel, surprise, planification) réservée au propriétaire (API + boutons). Mention « règle du stock » retirée de la caisse et du manuel (y compris sections déjà publiées).
+- Traçabilité : chaque ligne garde count_log [{qty, by, by_id, role, at}] + counted_by/counted_at ; colonne « Compté par », historique « N saisies », bandeau récapitulatif par compteur (lignes + plage horaire).
+- Enregistrement des comptages atomique par ligne ($set lines.i.* / $push) : plus de perte quand deux personnes enregistrent en même temps (0 perte sur 50 écritures parallèles).
+- Inventaire créé sur une sélection d'articles affiché « Sélection d'articles ».
+- Tests : iteration_103 (backend 4/4, frontend 100 %) + test de concurrence repassé après correctif.
+
 ## Roadmap
 - P0 : appliquer la matrice des droits aux accès réels.
 - P1 : inventaires réguliers (planification, surprise, partiel, photos, validation propriétaire).

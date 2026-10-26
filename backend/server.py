@@ -1678,7 +1678,7 @@ async def inventory_create(body: Dict[str,Any], user: dict = Depends(require_rol
     kind = body.get("kind") or "manuel"
     if kind == "surprise" and user.get("role") != "admin":
         raise HTTPException(403, "Inventaire surprise réservé au propriétaire")
-    scope = body.get("scope") or {"type": "all"}
+    scope = body.get("scope") or ({"type": "selection"} if body.get("product_ids") else {"type": "all"})
     lines = await _inventory_lines(scope, body.get("product_ids") or [])
     if not lines:
         raise HTTPException(400, "Aucun article dans ce périmètre")
@@ -1698,22 +1698,29 @@ async def inventory_count(iid: str, body: Dict[str,Any], user: dict = Depends(re
     if inv.get("status") != "open": raise HTTPException(400, "Inventaire déjà soumis ou clôturé")
     counts = body.get("counts") or []  # [{line_index, qty_counted, comment, photo}]
     lines = inv.get("lines", [])
+    sets: Dict[str, Any] = {"updated_at": now_iso()}
+    pushes: Dict[str, Any] = {}
     for c in counts:
         i = int(c.get("line_index", -1))
         if 0 <= i < len(lines):
             if c.get("qty_counted") is not None and c.get("qty_counted") != "":
                 q = max(0, int(c.get("qty_counted")))
                 if q != lines[i].get("qty_counted"):
-                    lines[i].setdefault("count_log", []).append({"qty": q, "by": user.get("name"), "by_id": user["id"], "role": user.get("role"), "at": now_iso()})
-                    lines[i]["counted_by"] = user.get("name")
-                    lines[i]["counted_at"] = now_iso()
-                lines[i]["qty_counted"] = q
+                    pushes[f"lines.{i}.count_log"] = {"qty": q, "by": user.get("name"), "by_id": user["id"], "role": user.get("role"), "at": now_iso()}
+                    sets[f"lines.{i}.counted_by"] = user.get("name")
+                    sets[f"lines.{i}.counted_at"] = now_iso()
+                sets[f"lines.{i}.qty_counted"] = q
             if "comment" in c:
-                lines[i]["comment"] = (c.get("comment") or "")[:300]
+                sets[f"lines.{i}.comment"] = (c.get("comment") or "")[:300]
             if c.get("photo"):
                 if len(c["photo"]) > 1_500_000: raise HTTPException(400, "Photo trop lourde")
-                lines[i]["photo"] = c["photo"]
-    await db.inventories.update_one({"id": iid}, {"$set": {"lines": lines, "updated_at": now_iso()}})
+                sets[f"lines.{i}.photo"] = c["photo"]
+    # Per-line atomic update: two counters saving at the same time never overwrite each other.
+    ops: Dict[str, Any] = {"$set": sets}
+    if pushes:
+        ops["$push"] = pushes
+    r = await db.inventories.update_one({"id": iid, "status": "open"}, ops)
+    if not r.matched_count: raise HTTPException(400, "Inventaire déjà soumis ou clôturé")
     return {"ok": True}
 
 @api.post("/stock/inventories/{iid}/close")

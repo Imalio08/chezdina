@@ -9,7 +9,7 @@ const ST = { open: ["À compter", "#e4991e"], submitted: ["À valider", "#5867fd
 const KIND = { manuel: "Ponctuel", planifie: "Planifié", surprise: "Surprise" };
 const FREQ = [["weekly", "Chaque semaine"], ["biweekly", "Toutes les 2 semaines"], ["monthly", "Chaque mois"], ["quarterly", "Chaque trimestre"]];
 const SCOPES = [["all", "Tout le stock"], ["category", "Par catégorie"], ["brand", "Par marque"], ["location", "Par emplacement"]];
-const scopeText = (s) => !s || s.type === "all" ? "Tout le stock" : `${SCOPES.find(x => x[0] === s.type)?.[1]} : ${(s.values || []).join(", ")}`;
+const scopeText = (s) => !s || s.type === "all" ? "Tout le stock" : s.type === "selection" ? "Sélection d'articles" : `${SCOPES.find(x => x[0] === s.type)?.[1]} : ${(s.values || []).join(", ")}`;
 
 // Stock › Inventaires: planned / surprise / partial counts, blind count with comment + photo, owner validation, history.
 export default function InventoriesTab({ products, isOwner, onChanged }) {

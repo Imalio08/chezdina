@@ -1,0 +1,31 @@
+{
+  "summary": "Tested the inventory 'Compté par' traceability feature in the backend and the UI. Backend: 4 of 4 pytest tests pass. They cover how count_log is appended and deduplicated, a joint count by admin, a TEST_ stock_keeper and the manager, the submit/reject/close flow, and the 403 returned to non-owners on create and surprise. UI (admin and manager) works end to end: the inv-counters banner, the inv-counted-by-i column (name and date/time), the 'non enregistré' label while dirty, the column updating right after Enregistrer, the expandable 'N saisies' history, and owner-only buttons. One real issue: concurrent /count calls lose updates (1 lost write in 50 parallel requests).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {"endpoint": "POST /api/stock/inventories/{id}/count", "issue": "Race condition. The endpoint reads the whole lines array, changes it in memory and writes it back with $set. When two counters save at the same moment, even on different lines, one save overwrites the other. Reproduced with tests/race_iter103_counts.py: 9/10 lines kept in 1 of 5 trials, all requests returned 200. This hits exactly the joint-count scenario the feature is for. Fix: per-line atomic update ($set lines.{i}.qty_counted/counted_by/counted_at + $push lines.{i}.count_log), or a version check with retry."}
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": [
+      {"screen": "Inventory sheet header", "issues": ["An inventory created with product_ids (no scope) shows 'Tout le stock' in the subtitle. Misleading, cosmetic only."]}
+    ]
+  },
+  "test_report_links": ["/app/backend/tests/test_iter103_counted_by.py", "/app/backend/tests/race_iter103_counts.py", "/app/backend/tests/ui_seed_iter103.py", "/app/test_reports/pytest/pytest_iter103.xml"],
+  "action_items": [
+    "Make inventory_count atomic per line (positional $set/$push, or optimistic concurrency) so simultaneous saves by the owner and the manager are not lost"
+  ],
+  "critical_code_review_comments": [
+    "inventory_count: the read-modify-write of the whole lines array causes lost updates when saves are concurrent (see above).",
+    "A count cannot be cleared back to null: the qty_counted null/'' value is silently ignored, so an accidental count can only be changed, not removed. Acceptable, but worth knowing.",
+    "Counters banner groups by display name (e.by), not by_id. Two staff members with the same name would be merged."
+  ],
+  "updated_files": ["/app/backend/tests/test_iter103_counted_by.py", "/app/backend/tests/race_iter103_counts.py", "/app/backend/tests/ui_seed_iter103.py"],
+  "success_rate": {"backend": "100% (4/4 functional tests); concurrency probe failed (1 lost update in 50 writes)", "frontend": "100%"},
+  "seed_data_creation": "Only TEST_ product, inventories and a stock_keeper user, all deleted afterwards. The manager and the TEST_ user were punched in through /attendance/check-in.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Staff login is at /console/connexion (not /console/login), using page.locator('input:visible').nth(0/1). Run pytest with -n 0. ui_seed_iter103.py creates the TEST_ inventory (line 0 counted by admin then manager); pass the argument 'cleanup' to remove it. Check-in pin must be digits only, so omit it."
+}
