@@ -1702,9 +1702,12 @@ async def inventory_count(iid: str, body: Dict[str,Any], user: dict = Depends(re
         i = int(c.get("line_index", -1))
         if 0 <= i < len(lines):
             if c.get("qty_counted") is not None and c.get("qty_counted") != "":
-                lines[i]["qty_counted"] = max(0, int(c.get("qty_counted")))
-                lines[i]["counted_by"] = user.get("name")
-                lines[i]["counted_at"] = now_iso()
+                q = max(0, int(c.get("qty_counted")))
+                if q != lines[i].get("qty_counted"):
+                    lines[i].setdefault("count_log", []).append({"qty": q, "by": user.get("name"), "by_id": user["id"], "role": user.get("role"), "at": now_iso()})
+                    lines[i]["counted_by"] = user.get("name")
+                    lines[i]["counted_at"] = now_iso()
+                lines[i]["qty_counted"] = q
             if "comment" in c:
                 lines[i]["comment"] = (c.get("comment") or "")[:300]
             if c.get("photo"):

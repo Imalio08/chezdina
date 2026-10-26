@@ -85,6 +85,39 @@ function CreateModal({ mode, products, onClose, onDone }) {
   );
 }
 
+const tm = (iso) => iso ? new Date(iso).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
+
+function CountedBy({ l }) {
+  const [open, setOpen] = useState(false);
+  if (l._dirty) return <span className="text-[#e4991e]">non enregistré</span>;
+  if (!l.counted_by) return <span className="text-[#999]">—</span>;
+  const log = l.count_log || [];
+  return (
+    <div>
+      <div className="font-medium">{l.counted_by}</div>
+      <div className="text-[#666]">{tm(l.counted_at)}</div>
+      {log.length > 1 && <button onClick={() => setOpen(!open)} className="text-[#5867fd] underline" data-testid="inv-count-history">{log.length} saisies</button>}
+      {open && log.map((e, k) => <div key={k} className="text-[#666]">{tm(e.at)} · {e.by} → {e.qty}</div>)}
+    </div>
+  );
+}
+
+function Counters({ lines }) {
+  const by = {};
+  lines.forEach(l => (l.count_log || (l.counted_by ? [{ by: l.counted_by, at: l.counted_at }] : [])).forEach(e => {
+    const x = by[e.by] || (by[e.by] = { n: new Set(), first: e.at, last: e.at });
+    x.n.add(l.product_id + (l.size || "")); if (e.at < x.first) x.first = e.at; if (e.at > x.last) x.last = e.at;
+  }));
+  const rows = Object.entries(by);
+  if (!rows.length) return null;
+  return (
+    <div className="text-xs p-2 rounded bg-[#f6f7ff] mb-2 flex flex-wrap gap-x-4 gap-y-1" data-testid="inv-counters">
+      <span className="font-semibold">Compté par :</span>
+      {rows.map(([name, x]) => <span key={name}>{name} · {x.n.size} ligne{x.n.size > 1 ? "s" : ""} · {tm(x.first)}{x.last !== x.first ? ` → ${tm(x.last)}` : ""}</span>)}
+    </div>
+  );
+}
+
 function InventorySheet({ inv, isOwner, onClose, onDone }) {
   const [lines, setLines] = useState(inv.lines || []);
   const [busy, setBusy] = useState(false);
@@ -96,7 +129,8 @@ function InventorySheet({ inv, isOwner, onClose, onDone }) {
   const save = async (quiet) => {
     const counts = lines.map((l, i) => l._dirty ? { line_index: i, qty_counted: l.qty_counted, comment: l.comment || "", photo: l.photo?.startsWith("data:") ? l.photo : undefined } : null).filter(Boolean);
     if (counts.length) await api.post(`/stock/inventories/${inv.id}/count`, { counts });
-    setLines(ls => ls.map(l => ({ ...l, _dirty: false })));
+    const fresh = (await api.get("/stock/inventories")).data.find(x => x.id === inv.id);
+    setLines(fresh?.lines || lines.map(l => ({ ...l, _dirty: false })));
     if (!quiet) toast.success("Comptages enregistrés");
   };
   const act = async (fn, msg) => { setBusy(true); try { await fn(); toast.success(msg); onDone(); } catch (e) { toast.error(e?.response?.data?.detail || "Erreur"); } finally { setBusy(false); } };
@@ -110,8 +144,9 @@ function InventorySheet({ inv, isOwner, onClose, onDone }) {
         <div className="flex justify-between items-start mb-2"><div><div className="font-serif text-xl">{inv.name}</div>
           <div className="text-xs text-[#666]">{KIND[inv.kind] || "Ponctuel"} · {scopeText(inv.scope)} · {ST[inv.status]?.[0]}{counting ? " · comptage à l'aveugle" : ""}{inv.submitted_by ? ` · soumis par ${inv.submitted_by}` : ""}{inv.closed_by ? ` · validé par ${inv.closed_by}` : ""}</div></div><button onClick={onClose}><X size={18} /></button></div>
         {inv.owner_comment && <div className="text-xs p-2 rounded bg-[#fff8e9] mb-2" data-testid="inv-owner-comment">Commentaire du propriétaire : {inv.owner_comment}</div>}
+        <Counters lines={lines} />
         {showGaps && isOwner && <div className="text-sm font-semibold mb-2" data-testid="inv-gap-total">Écart total : <span className={total < 0 ? "text-[#c62828]" : "text-[#1f8a4c]"}>{fcfa(total)}</span></div>}
-        <div className="overflow-x-auto"><table className="dina-table"><thead><tr><th>Article</th><th>Taille</th><th className="text-right">Compté</th>{showGaps && <><th className="text-right">Attendu</th><th className="text-right">Écart</th><th className="text-right">Valeur</th></>}<th>Commentaire</th><th>Photo</th></tr></thead>
+        <div className="overflow-x-auto"><table className="dina-table"><thead><tr><th>Article</th><th>Taille</th><th className="text-right">Compté</th>{showGaps && <><th className="text-right">Attendu</th><th className="text-right">Écart</th><th className="text-right">Valeur</th></>}<th>Commentaire</th><th>Photo</th><th>Compté par</th></tr></thead>
           <tbody>{lines.map((l, i) => { const gap = l.gap ?? (l.qty_counted != null && l.qty_expected != null ? l.qty_counted - l.qty_expected : null); return (
             <tr key={i} data-testid={`inv-line-${i}`}>
               <td className="font-medium">{l.product_name}<div className="text-[10px] text-[#999]">{[l.sku, l.location].filter(Boolean).join(" · ")}</div></td><td>{l.size || "—"}</td>
@@ -119,6 +154,7 @@ function InventorySheet({ inv, isOwner, onClose, onDone }) {
               {showGaps && <><td className="text-right tabular">{l.qty_expected ?? "—"}</td><td className={`text-right tabular font-semibold ${gap < 0 ? "text-[#c62828]" : gap > 0 ? "text-[#1f8a4c]" : ""}`}>{gap == null ? "—" : `${gap > 0 ? "+" : ""}${gap}`}</td><td className="text-right tabular text-xs">{gap ? fcfa(gap * (l.unit_cost || 0)) : "—"}</td></>}
               <td><input disabled={!counting} className="dina-input !py-1 text-xs min-w-[140px]" placeholder="—" value={l.comment || ""} onChange={e => upd(i, { comment: e.target.value })} data-testid={`inv-comment-${i}`} /></td>
               <td>{l.photo ? <a href={l.photo} target="_blank" rel="noreferrer"><img src={l.photo} alt="" className="w-9 h-9 object-cover rounded" data-testid={`inv-photo-${i}`} /></a> : counting ? <label className="cursor-pointer text-[#666]" data-testid={`inv-photo-add-${i}`}><Camera size={15} /><input type="file" accept="image/*" capture="environment" className="hidden" onChange={e => photo(i, e.target.files?.[0])} /></label> : "—"}</td>
+              <td className="text-[11px] whitespace-nowrap" data-testid={`inv-counted-by-${i}`}><CountedBy l={l} /></td>
             </tr>); })}</tbody></table></div>
         {inv.status !== "closed" && <textarea className="dina-input mt-3" rows={2} placeholder={isOwner ? "Commentaire du propriétaire (facultatif)" : "Note pour le propriétaire (facultatif)"} value={note} onChange={e => setNote(e.target.value)} data-testid="inv-note" />}
         <div className="flex gap-2 mt-3 flex-wrap">
